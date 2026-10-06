@@ -1,0 +1,14 @@
+{
+  "observedOn": "2026-10-07",
+  "cli": "@coinbase/cdp-cli@2.0.102",
+  "environment": "sandbox",
+  "operation": "accounts list",
+  "httpMethod": "GET",
+  "endpoint": "/platform/v2/accounts",
+  "result": "success",
+  "accountCount": 0,
+  "publicAccountIds": [],
+  "apiVersionHeader": "not exposed by CLI response",
+  "jqAvailable": false,
+  "notes": "CLI response was captured privately; only sanitized count/IDs are recorded. No account creation, balance mutation, or transfer was submitted."
+}
