@@ -7,7 +7,7 @@
  */
 import * as copy from '../copy/en.js';
 import { projectProgress } from '../contracts/backend.js';
-import type { Category, Channel, FundingRail, HumanProgress, Money, ProviderRoute, PurchaseState, PurchaseView } from '../contracts/backend.js';
+import type { Category, Channel, FundingRail, HumanProgress, Money, ProviderRoute, PurchaseState, PurchaseView, SourceOffer } from '../contracts/backend.js';
 import type { EvidenceListItem } from '../contracts/evidence.js';
 import type { ConsoleMode, PurchaseBundle, PurchaseListResult } from '../contracts/source.js';
 import { displayId, formatCrypto, formatMoney, formatTime, formatWhen, isTestNetwork, type FormatContext } from './format.js';
@@ -135,6 +135,8 @@ interface Facts {
   method: string;
   network: string | null;
   networkIsTest: boolean;
+  /** Set when the product was found at another store and bought as an equivalent order in Capsule's test store. */
+  source: SourceOffer | null;
 }
 
 function facts(b: PurchaseBundle, ctx: PresentContext): Facts {
@@ -148,17 +150,25 @@ function facts(b: PurchaseBundle, ctx: PresentContext): Facts {
   const fromChannel = channelOf(b.evidence?.purchase.channel);
   const agent = { name: b.context.requestedBy?.name ?? fromChannel.name, kind: fromChannel.kind };
   const env = b.quote?.providerEnvironment ?? p.receipt?.providerEnvironment ?? b.proof?.merchant.environment;
+  const sandboxed = !!(b.quote?.sandboxRepresentation ?? b.proof?.sandboxExecution ?? p.receipt?.sandboxExecution);
+  const source = sandboxed ? (b.quote?.sourceOffer ?? b.proof?.sourceOffer ?? p.receipt?.sourceOffer ?? null) : null;
   return {
     b, p, ctx, cat, key, progress,
     title: b.quote?.title ?? b.context.title ?? copy.category[cat].title,
     ref: displayId(p.purchaseId),
     agent,
-    merchant: merchantOf(p.route),
-    merchantIsTest: isTestEnvironment(env),
+    // The order goes to Capsule's test store, never to the store where the product was found.
+    merchant: sandboxed ? { name: copy.sourceStore.testStoreName, kind: copy.sourceStore.testStoreKind } : merchantOf(p.route),
+    merchantIsTest: sandboxed || isTestEnvironment(env),
     method: rail ? methodOf(rail) : '',
     network: networkRaw,
     networkIsTest: networkRaw ? isTestNetwork(networkRaw) : false,
+    source,
   };
+}
+
+function boundaryNote(f: Facts): string | null {
+  return f.source ? copy.sourceStore.boundary(f.source.merchantName) : null;
 }
 
 function eventTime(f: Facts, types: string[]): string | null {
@@ -249,7 +259,8 @@ function buildRoute(f: Facts): RouteVM {
     from: { label: copy.detail.requestedBy, name: f.agent.name, detail: f.agent.kind, payment: { method: f.method, network: f.networkIsTest ? copy.testNetwork : null } },
     capsule: { label: copy.detail.capsule, action: copy.routeAction[f.key](f.cat), stopped },
     to: {
-      label: copy.detail.merchantLabel, name: f.merchant.name, detail: copy.merchantDetail(f.merchant.kind, f.merchantIsTest),
+      label: copy.detail.merchantLabel, name: f.merchant.name,
+      detail: f.source ? copy.sourceStore.foundAt(f.source.merchantName) : copy.merchantDetail(f.merchant.kind, f.merchantIsTest),
       icon: categoryIcon(f.cat), result, resultIcon, done,
     },
     flowIn: f.progress.paymentConfirmed ? 'done' : f.key === 'awaiting_payment' || f.key === 'confirming_payment' ? 'active' : 'idle',
@@ -298,7 +309,7 @@ function buildSummary(f: Facts): SummaryVM {
     item: { title: f.title, detail: q?.fulfillmentSummary ?? copy.category[f.cat].title, icon: categoryIcon(f.cat) },
     costs,
     total: { label: copy.detail.total, value: `${formatMoney(f.p.payablePrincipal, f.ctx)} ${f.p.payablePrincipal.currency}` },
-    notes: payAtPropertyNotes(f),
+    notes: [...payAtPropertyNotes(f), boundaryNote(f)].filter((n): n is string => !!n),
     payment: {
       method: f.method,
       network: f.networkIsTest ? copy.testNetwork : null,
@@ -346,12 +357,16 @@ function buildProof(f: Facts): ProofVM {
     heading: copy.proof.orderHeading(f.cat), icon: 'receipt', badge: orderBadge,
     fields: [
       { label: copy.proof.rowMerchant, value: f.merchant.name },
+      ...(f.source ? [{ label: copy.sourceStore.rowFoundAt, value: f.source.merchantName }] : []),
       { label: copy.proof.rowMode, value: f.merchantIsTest ? copy.proof.testMode : copy.proof.liveMode },
       { label: copy.proof.rowOutcome, value: copy.commerceOutcome(p.commerceStatus, f.cat) },
       { label: copy.proof.rowMerchantPayment, value: copy.merchantPayment[p.merchantPaymentStatus] },
     ],
     reference: p.providerReference ? { label: copy.proof.merchantReference, value: p.providerReference, copyLabel: copy.proof.copyMerchantReference } : null,
-    note: done ? null : f.key === 'price_changed' || f.key === 'expired' ? copy.steps.confirmed.nothingBought : copy.proof.notConfirmedNote(f.merchant.name),
+    note: [
+      done ? null : f.key === 'price_changed' || f.key === 'expired' ? copy.steps.confirmed.nothingBought : copy.proof.notConfirmedNote(f.merchant.name),
+      boundaryNote(f),
+    ].filter(Boolean).join(' ') || null,
   };
 
   const sections = [payment, order];
@@ -398,6 +413,7 @@ function buildReceipt(f: Facts): ReceiptVM | null {
     { label: copy.receipt.rowRequestedBy, value: f.agent.name },
     { label: copy.receipt.rowPaidWith, value: f.networkIsTest ? `${f.method}, ${copy.testNetwork.toLowerCase()}` : f.method },
     { label: copy.receipt.rowMerchant, value: copy.merchantDetail(f.merchant.name, f.merchantIsTest) },
+    ...(f.source ? [{ label: copy.sourceStore.rowFoundAt, value: f.source.merchantName }] : []),
     { label: copy.receipt.rowOutcome, value: copy.commerceOutcome(r.commerceStatus, f.cat) },
   ];
   if (r.providerReference) fields.push({ label: copy.receipt.rowMerchantReference, value: r.providerReference, mono: true });
@@ -409,7 +425,7 @@ function buildReceipt(f: Facts): ReceiptVM | null {
     currency: f.p.payablePrincipal.currency,
     itemTitle: f.title,
     fields,
-    notes: r.limitations,
+    notes: [boundaryNote(f), ...r.limitations].filter((n): n is string => !!n),
     downloadName: `capsule-receipt-${f.ref.slice(1).toLowerCase()}.json`,
     download: r,
   };
@@ -432,6 +448,14 @@ function buildQuote(f: Facts): QuoteVM | null {
     validUntil: { label: copy.quoteDialog.rowValidUntil, value: formatWhen(q.expiresAt, f.ctx) },
     quoteNumber: { label: copy.quoteDialog.rowQuoteNumber, value: displayId(q.quoteId), mono: true },
     terms: q.terms,
+    source: f.source
+      ? {
+          foundAt: { label: copy.sourceStore.rowFoundAt, value: f.source.merchantName },
+          listedPrice: { label: copy.sourceStore.rowListedPrice, value: copy.sourceStore.listed(formatMoney(f.source.observedPrice, f.ctx), formatWhen(f.source.observedAt, f.ctx)) },
+          note: copy.sourceStore.boundary(f.source.merchantName),
+          link: { href: f.source.productUrl, label: copy.sourceStore.viewListing(f.source.merchantName) },
+        }
+      : null,
   };
 }
 

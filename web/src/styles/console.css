@@ -603,3 +603,7 @@ textarea:focus-visible{outline:2px solid var(--ox);outline-offset:3px}
 @media (max-width:560px){
   .conduit.active .packet-track{animation:none}
 }
+
+/* Products found at another store: the listing is context, the order goes to Capsule's test store. */
+.source-store .source-note{font-size:var(--fs-sm);color:var(--muted);line-height:1.5;margin:4px 0 0}
+.source-store .source-link{font-size:var(--fs-sm);justify-self:start}

@@ -8,6 +8,7 @@ const SCENARIOS: ReadonlyArray<{ key: string; label: string }> = [
   { key: 'checking', label: copy.dock.checking },
   { key: 'price-changed', label: copy.dock.priceChange },
   { key: 'awaiting-payment', label: copy.dock.awaitingPayment },
+  { key: 'found-elsewhere', label: copy.dock.foundElsewhere },
 ];
 
 /** Bottom bar of shortcuts into the sample scenarios. Rendered only when the console runs on sample data. */

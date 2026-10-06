@@ -6,7 +6,7 @@ import path from 'node:path';
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { CoreError } from '../../src/core/errors.js';
-import { CONSOLE_CSP, createConsoleRouter, defaultConsoleDir } from '../../src/console/router.js';
+import { CONSOLE_CSP, createConsoleRedirect, createConsoleRouter, defaultConsoleDir } from '../../src/console/router.js';
 
 const INDEX = '<!doctype html><html><head><script type="module" src="/console/assets/index-abc123.js"></script></head><body><div id="root"></div></body></html>';
 const SECRET = 'TOP-SECRET-OUTSIDE-THE-BUILD';
@@ -42,6 +42,8 @@ async function serve(dir: string): Promise<string> {
     next();
   });
   app.use('/console', createConsoleRouter({ dir }));
+  app.use('/proof', createConsoleRedirect());
+  app.use('/', createConsoleRedirect());
   app.use((req, _res, next) => next(new CoreError('not_found', `no route ${req.method} ${req.path}`)));
   app.use((err: unknown, _req: Request, res: Response, _next: NextFunction) => {
     const e = err as CoreError;
@@ -208,5 +210,24 @@ describe('console router', () => {
     expect(defaultConsoleDir(path.join(repo, 'src', 'console'))).toBe(path.join(repo, 'dist', 'console'));
     // node dist/src/main.js: <root>/dist/src/console
     expect(defaultConsoleDir(path.join(repo, 'dist', 'src', 'console'))).toBe(path.join(repo, 'dist', 'console'));
+  });
+});
+
+describe('console as the customer frontend', () => {
+  it('redirects the root and the retired /proof page to /console/', async () => {
+    const base = await serve(buildDir);
+    for (const p of ['/', '/proof', '/proof/']) {
+      const r = await fetch(base + p, { redirect: 'manual' });
+      expect(r.status, p).toBe(302);
+      expect(r.headers.get('location'), p).toBe('/console/');
+      expect(r.headers.get('cache-control'), p).toBe('no-store');
+    }
+  });
+
+  it('only redirects the exact mount path; other paths still 404', async () => {
+    const base = await serve(buildDir);
+    for (const p of ['/proof/app.js', '/anything', '/v1/unknown']) {
+      expect((await fetch(base + p, { redirect: 'manual' })).status, p).toBe(404);
+    }
   });
 });

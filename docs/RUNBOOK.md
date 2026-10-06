@@ -33,7 +33,7 @@ node --env-file=.env --import tsx src/main.ts
 node --env-file=.env dist/src/main.js
 ```
 
-`APP_ENV=production` is refused. `/health` proves process health. `/v1/capabilities` reports configuration/readiness without secrets. `/proof` is the customer/judge view; `/inspect` retains engineering evidence. Both are public static shells: enter a customer `evidence:read` token to load owner-scoped same-origin evidence. No private data or token is embedded or persisted in browser storage; clear the session when finished.
+`APP_ENV=production` is refused. `/health` proves process health. `/v1/capabilities` reports configuration/readiness without secrets. `/console/` is the customer and judge frontend (the Capsule console, `web/`); `/` and the earlier `/proof` page redirect there. `/inspect` retains engineering evidence. Both are public static shells: enter a customer token (`purchases:read` and `evidence:read`; `quotes:write` also shows price details) to load owner-scoped same-origin data. No private data or token is embedded or persisted in browser storage; clear the session when finished.
 
 ## Human demo flow
 

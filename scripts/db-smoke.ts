@@ -59,8 +59,13 @@ async function smoke(): Promise<void> {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         if (!ready) throw new Error('compiled gateway health timed out');
-        for (const path of ['/v1/capabilities', '/inspect', '/proof', '/proof/app.js']) {
+        for (const path of ['/v1/capabilities', '/inspect', '/console/']) {
           if ((await fetch(base + path)).status !== 200) throw new Error('public gateway smoke failed');
+        }
+        // The console is the customer frontend: the root and the retired /proof page send people to it.
+        for (const path of ['/', '/proof']) {
+          const r = await fetch(base + path, { redirect: 'manual' });
+          if (r.status !== 302 || r.headers.get('location') !== '/console/') throw new Error('console redirect smoke failed');
         }
         if ((await fetch(`${base}/v1/evidence/purchases`)).status !== 401) throw new Error('anonymous auth guard failed');
         if ((await fetch(`${base}/v1/evidence/purchases`, { headers: { authorization: `Bearer ${client.token}` } })).status !== 200) throw new Error('persisted client auth failed');

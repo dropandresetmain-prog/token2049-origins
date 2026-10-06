@@ -141,6 +141,14 @@ export interface QuoteVM {
   validUntil: Field;
   quoteNumber: Field;
   terms: string[];
+  /** Present when the product was found at another store; the order itself goes to Capsule's test store. */
+  source: {
+    foundAt: Field;
+    listedPrice: Field;
+    note: string;
+    /** Display-only HTTPS link to the original listing (validated by the gateway schema). */
+    link: { href: string; label: string };
+  } | null;
 }
 
 export interface PurchaseDetailVM {

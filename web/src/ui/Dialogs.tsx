@@ -85,6 +85,20 @@ export function QuoteDialog({ quote, onClose }: { quote: QuoteVM; onClose: () =>
           {n}
         </p>
       ))}
+      {quote.source ? (
+        <div className="quote-scope source-store">
+          {[quote.source.foundAt, quote.source.listedPrice].map((f) => (
+            <div key={f.label}>
+              <span>{f.label}</span>
+              <FieldValue field={f} />
+            </div>
+          ))}
+          <p className="source-note">{quote.source.note}</p>
+          <a className="source-link" href={quote.source.link.href} target="_blank" rel="noopener noreferrer">
+            {quote.source.link.label}
+          </a>
+        </div>
+      ) : null}
       <h3 className="terms-heading">{copy.quoteDialog.termsHeading}</h3>
       {quote.terms.length > 0 ? (
         <ul className="terms-list">

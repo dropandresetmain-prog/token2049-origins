@@ -47,17 +47,18 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
       const routers:NonNullable<GatewayParts['extraRouters']>=[
         {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:core.deps.clock,bankAdapters}),auth:true},
         {path:'/inspect',router:createInspectRouter(),auth:false},
-        {path:'/proof',router:createProofPageRouter(),auth:false},
+        // The console is the customer frontend; the earlier /proof page now sends people there.
         {path:'/console',router:createConsoleRouter(),auth:false},
+        {path:'/proof',router:createConsoleRedirect(),auth:false},
       ];
       const report=loadShopifyConfig(env), cfg=report.config;
       const webhook=cfg.storeDomain && cfg.clientSecret && report.invalid.length===0
         ? createShopifyWebhookRouter({storeDomain:cfg.storeDomain,secret:cfg.clientSecret,onReconcile:async hint=>(await enqueueShopifyReadback(core,hint))})
         : Router().post('/',(_req,_res,next)=>next(new CoreError('route_unavailable','Shopify webhook is not configured')));
       routers.push({path:'/v1/webhooks/shopify',router:webhook,auth:false,beforeJson:true});
+      routers.push({path:'/',router:createConsoleRedirect(),auth:false});
       return routers;
     },
   };
 }
-import { createProofPageRouter } from './evidence/proof-page.js';
-import { createConsoleRouter } from './console/router.js';
+import { createConsoleRedirect, createConsoleRouter } from './console/router.js';

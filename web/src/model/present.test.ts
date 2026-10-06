@@ -16,9 +16,9 @@ describe('presenters over sample purchases', () => {
   it('lists every sample with one status vocabulary and group counts', async () => {
     const vm = presentList(await source.listPurchases(), ctx);
     expect(vm.rows.map((r) => r.status.label)).toEqual([
-      'In progress', 'Completed', 'Checking with merchant', 'Completed', 'Price changed', 'Awaiting payment',
+      'In progress', 'Completed', 'Checking with merchant', 'Completed', 'Price changed', 'Awaiting payment', 'Completed',
     ]);
-    expect(vm.counts).toEqual({ all: 6, in_progress: 3, attention: 1, completed: 2 });
+    expect(vm.counts).toEqual({ all: 7, in_progress: 3, attention: 1, completed: 3 });
     expect(filterRows(vm.rows, 'all', 'bangkok').map((r) => r.title)).toEqual(['One night in Bangkok']);
   });
 
@@ -42,5 +42,18 @@ describe('presenters over sample purchases', () => {
     expect(vm.attention?.title).toBe('The price changed, so nothing was bought.');
     expect(vm.attention?.action.label).toBe('Copy request for a new quote');
     expect(vm.steps.find((s) => s.key === 'ordering')?.status).toBe('attention');
+  });
+
+  it('found at another store: the order goes to the test store, never the source store', async () => {
+    const vm = await detail('found-elsewhere');
+    expect(vm.route.to.name).toBe('Capsule test store');
+    expect(vm.route.to.detail).toBe('Found at Harbor and Pine');
+    const boundary = "This is a test order placed with Capsule's test store. Harbor and Pine receives no order and no payment.";
+    expect(vm.summary.notes).toContain(boundary);
+    expect(vm.receipt?.notes[0]).toBe(boundary);
+    expect(vm.proof.sections[1]!.fields.find((f) => f.label === 'Merchant')?.value).toBe('Capsule test store');
+    expect(vm.quote?.source?.link.href).toBe('https://harborandpine.example/products/merino-crew-socks');
+    // An ordinary Shopify purchase has no source store.
+    expect((await detail('completed')).quote?.source).toBeNull();
   });
 });

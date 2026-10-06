@@ -73,6 +73,14 @@ differ, and type-checks the read-model return types against the console's list a
 so plainly ("The price changed, so nothing was bought") and offers one action: copy a request for a new quote to give to
 the assistant. There is no side-by-side comparison, because no proposed quote exists to compare against.
 
+## Products found at another store
+
+When a quote carries `sourceOffer` and `sandboxRepresentation` (Shopify Global sandbox), the product was found at a
+real store but the order is placed as an equivalent test order in Capsule's own Shopify test store. The console shows
+the merchant as "Capsule test store", shows the original store only as "Found at <store>", and states on the summary,
+proof and receipt that the original store receives no order and no payment. The quote dialog shows the listed price
+and a display-only link to the original listing. The console never suggests the original store fulfilled the order.
+
 ## Gaps
 
 Proposed gateway changes. Console fields for G1 to G4 already exist as optional `PurchaseContext` fields
@@ -95,9 +103,12 @@ Nothing in this list blocks the console. Each one makes a screen more complete w
 ## Serving
 
 `npm run build` also builds the console in gateway mode to `dist/console`. The gateway serves it at `/console`
-(`src/console/router.ts`) with the same strict headers as `/inspect` and `/proof`: no inline scripts, same-origin
-scripts, styles, images and API calls only. The page contains no private data; everything comes from the authenticated
-API after the customer enters an access key. `/inspect` and `/proof` remain until they are retired.
+(`src/console/router.ts`) with the same strict headers as `/inspect`: no inline scripts, same-origin scripts, styles,
+images and API calls only. The page contains no private data; everything comes from the authenticated API after the
+customer enters an access key. The console is the customer frontend: `/` and the earlier `/proof` page redirect to
+`/console/`. `/inspect` remains as the engineering evidence view. `src/evidence/proof-page.ts` is no longer mounted by
+the gateway; the test harness and a manual Shopify acceptance script still mount it themselves until they move to the
+console.
 
 For design work without a gateway, `npm run console:dev` runs the console on sample data at
 `http://localhost:5174/console/`.

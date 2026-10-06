@@ -38,3 +38,4 @@ export {
 } from '../../../src/contracts/commerce.js';
 export { CapabilitiesResponse, OPERATIONS, PurchaseResponse } from '../../../src/contracts/api.js';
 export { HumanProgress, projectProgress } from '../../../src/contracts/presentation.js';
+export { SandboxExecution, SandboxRepresentation, SourceOffer } from '../../../src/contracts/provenance.js';

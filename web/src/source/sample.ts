@@ -36,6 +36,8 @@ interface Spec {
   /** Minutes before "now" the purchase was created. */
   ageMinutes: number;
   events: string[];
+  /** Found at another store; bought as an equivalent order in Capsule's test store. */
+  source?: { store: string; storeUrl: string; product: string; variant: string; productUrl: string; listedCents: number };
 }
 
 const LIMIT = 50;
@@ -106,6 +108,16 @@ const SPECS: Spec[] = [
     state: 'awaiting_funding', paymentState: 'not_received', commerceStatus: 'not_started', merchantPaymentStatus: 'none', providerReference: null,
     ageMinutes: 70, events: [...EVENTS.created],
   },
+  {
+    key: 'found-elsewhere', idSuffix: 'RTLSRC0422', category: 'retail', route: 'shopify', title: 'Merino crew socks',
+    fulfillmentSummary: '1 item, delivery included',
+    breakdown: [{ kind: 'item', label: 'Merino crew socks', cents: 2400 }, { kind: 'shipping', label: 'Delivery', cents: 500 }],
+    rail: 'solana', channel: 'mcp', requestedBy: 'Claude', requestText: 'Find merino socks online and buy a pair for under $35.', limitCents: 3500,
+    state: 'succeeded', paymentState: 'confirmed', commerceStatus: 'paid', merchantPaymentStatus: 'simulated_paid', providerReference: 'SAMPLE-ORDER-1043',
+    ageMinutes: 95, events: [...EVENTS.created, ...EVENTS.paid, ...EVENTS.started, ...EVENTS.done],
+    source: { store: 'Harbor and Pine', storeUrl: 'https://harborandpine.example', product: 'Merino crew socks', variant: 'Charcoal, medium',
+      productUrl: 'https://harborandpine.example/products/merino-crew-socks', listedCents: 2400 },
+  },
 ];
 
 function build(spec: Spec, now: number) {
@@ -136,8 +148,32 @@ function build(spec: Spec, now: number) {
   const eventRows = spec.events.map((type, i) => ({ sequence: i + 1, type, at: at(i) }));
   const eventAt = (type: string) => eventRows.find((e) => e.type === type)?.at ?? null;
   const transferReference = `SAMPLE-TX-${spec.idSuffix}`;
+  const digits = (n: number) => String(7_000_000_000 + n);
+  const sourceOffer = spec.source
+    ? {
+        source: 'shopify_global_catalog' as const, productId: `gid://shopify/p/${spec.idSuffix}`, variantId: `gid://shopify/ProductVariant/${digits(1)}`,
+        merchantId: `gid://shopify/Shop/${digits(2)}`, merchantName: spec.source.store, merchantUrl: spec.source.storeUrl,
+        productTitle: spec.source.product, variantTitle: spec.source.variant, productUrl: spec.source.productUrl,
+        observedPrice: usd(spec.source.listedCents), availability: 'available' as const, observedAt: created.toISOString(),
+        schemaVersion: '2026-08-25' as const, evidenceMode: 'local_fixture' as const,
+      }
+    : null;
+  const sandboxRepresentation = spec.source
+    ? {
+        provider: 'shopify' as const, environment: 'test' as const,
+        boundary: 'Source merchant receives no order or payment; equivalent transaction executes in Capsule Shopify Sandbox.' as const,
+        shadowProductId: `gid://shopify/Product/${digits(3)}`, shadowVariantId: `gid://shopify/ProductVariant/${digits(4)}`,
+        publicationId: `gid://shopify/Publication/${digits(5)}`, sourceDigest: hex64(spec.idSuffix + 'S'),
+      }
+    : null;
+  const provenance = { ...(sourceOffer ? { sourceOffer } : {}) };
+  const sandboxExecution = sandboxRepresentation
+    ? { ...sandboxRepresentation, quotedTotal: usd(merchantTotalCents), orderReference: spec.providerReference, paymentStatus: spec.merchantPaymentStatus,
+        evidenceMode: done ? ('local_fixture' as const) : null }
+    : null;
 
   const quote = QuoteView.parse({
+    ...provenance, ...(sandboxRepresentation ? { sandboxRepresentation } : {}),
     quoteId, version: 1, supersedesQuoteId: null, customerId: 'cus_SAMPLECUSTOMER0001', offerId: `off_${pad(spec.idSuffix + 'O')}`,
     category: spec.category, route: spec.route, providerEnvironment: env, title: spec.title,
     breakdown: spec.breakdown.map((l) => ({ kind: l.kind, label: l.label, amount: usd(l.cents) })),
@@ -154,6 +190,7 @@ function build(spec: Spec, now: number) {
 
   const receipt = done
     ? ReceiptView.parse({
+        ...provenance, ...(sandboxExecution ? { sandboxExecution } : {}),
         receiptId: `rcp_${pad(spec.idSuffix + 'R')}`, purchaseId, quoteId, quoteDigest: quote.digest, category: spec.category, route: spec.route,
         providerEnvironment: env, evidenceMode: 'local_fixture', principal: usd(merchantTotalCents), serviceFee: usd(0), funding,
         fundingRequirement: requirement, providerReference: spec.providerReference, commerceStatus: spec.commerceStatus,
@@ -184,6 +221,7 @@ function build(spec: Spec, now: number) {
     timestamp: isDone || current ? ts : null, text: label, evidenceRef: null,
   });
   const proof = PurchaseProof.parse({
+    ...provenance, ...(sandboxExecution ? { sandboxExecution } : {}),
     purchaseId, quoteId, summary: `${spec.category} purchase`, commercialAmount: usd(merchantTotalCents), progress,
     timeline: [
       step('requested', 'Requested', true, created.toISOString()),

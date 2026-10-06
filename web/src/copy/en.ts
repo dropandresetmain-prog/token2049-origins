@@ -167,6 +167,21 @@ export const allowance: Record<'active' | 'consumed' | 'released' | 'held_unreso
   held_unresolved: 'Held until the outcome is known',
 };
 
+/**
+ * Products found at another store are bought as an equivalent test order in Capsule's own test store.
+ * The source store never receives an order or a payment, and the copy must never suggest it did.
+ */
+export const sourceStore = {
+  testStoreName: 'Capsule test store',
+  testStoreKind: 'Shopify test store',
+  foundAt: (store: string) => `Found at ${store}`,
+  rowFoundAt: 'Found at',
+  rowListedPrice: 'Listed price there',
+  listed: (price: string, when: string) => `${price}, seen ${when}`,
+  boundary: (store: string) => `This is a test order placed with Capsule's test store. ${store} receives no order and no payment.`,
+  viewListing: (store: string) => `View the listing at ${store}`,
+};
+
 /* ---------------- Purchase page ---------------- */
 
 export const detail = {
@@ -475,5 +490,6 @@ export const dock = {
   checking: 'Checking with merchant',
   priceChange: 'Price change',
   awaitingPayment: 'Awaiting payment',
+  foundElsewhere: 'Found at another store',
   purchases: 'Purchases',
 };

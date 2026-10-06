@@ -111,3 +111,16 @@ export function createConsoleRouter(opts: ConsoleRouterOptions = {}): Router {
 
   return router;
 }
+
+/**
+ * The console is the gateway's customer frontend. Mounted at `/` and at the retired customer page `/proof`,
+ * this sends people to `/console/`. Only the exact mount path redirects; everything else falls through.
+ */
+export function createConsoleRedirect(target = '/console/'): Router {
+  const router = Router();
+  router.get('/', (_req: Request, res: Response) => {
+    res.setHeader('Cache-Control', 'no-store');
+    res.redirect(302, target);
+  });
+  return router;
+}

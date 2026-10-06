@@ -33,6 +33,7 @@ internal terms, so engineers, designers and anyone writing gateway text that cus
 | Channel `mcp` / `http` / `sokosumi` | AI assistant / Connected app / Agent marketplace |
 | Provider, route (`shopify`, `nuitee`, `atlas`) | Merchant by name ("Shopify, online store", "Nuitée, hotel booking partner", "Atlas, flight booking partner") |
 | Provider environment `sandbox`, `test`, `fixture` | Test mode |
+| `sourceOffer` + `sandboxRepresentation` (Shopify Global sandbox) | Merchant "Capsule test store"; "Found at <store>"; "<store> receives no order and no payment" |
 | Offer, quote | Quote, price (a quote is the approved price) |
 | Quote digest, quote version | Not shown. "Quote number" shows a short ID |
 | Approval, `approval.recorded` | Approved ("ChatGPT approved this exact price and payment method") |

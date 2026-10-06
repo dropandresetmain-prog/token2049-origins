@@ -89,7 +89,7 @@ All IDs, totals, times, orders, asset valuations and outcomes here are local sam
 
 Integration must read authenticated channel identity, executable quote context and independent payment/provider evidence from the existing core. Do not infer paid status from overall purchase state. Keep operator treasury permissions separate from customer evidence. Preserve simulated purchasing capacity labels; receiving test crypto is not bank cash or a crypto-to-fiat conversion.
 
-If external product discovery is paired with execution in our own Shopify test store, identify the discovery source and sandbox execution merchant separately. Do not imply the original merchant fulfilled the test purchase.
+If external product discovery is paired with execution in our own Shopify test store, identify the discovery source and sandbox execution merchant separately. Do not imply the original merchant fulfilled the test purchase. The console names the merchant "Capsule test store", shows the source only as "Found at <store>", and says the source store receives no order and no payment.
 
 ## Next work and exclusions
 

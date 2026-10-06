@@ -11,7 +11,7 @@
  * The mirror of PurchaseProof IS strict, because it must match the backend exactly.
  */
 import { z } from 'zod';
-import { FundingOption, HumanProgress, Money } from './backend.js';
+import { FundingOption, HumanProgress, Money, SandboxExecution, SourceOffer } from './backend.js';
 
 /* ---------- GET /v1/evidence/purchases/:id/proof (scope evidence:read) ---------- */
 
@@ -21,6 +21,7 @@ export const ProofStepStatus = z.enum(['complete', 'current', 'pending', 'attent
 export type ProofStepStatus = z.infer<typeof ProofStepStatus>;
 
 export const PurchaseProof = z.object({
+  sourceOffer: SourceOffer.optional(), sandboxExecution: SandboxExecution.optional(),
   purchaseId: z.string(), quoteId: z.string(), summary: z.string(), commercialAmount: Money,
   progress: HumanProgress,
   timeline: z.array(z.object({ step: ProofTimelineStep,
