@@ -247,3 +247,63 @@ facilitator/Blockfrost/asset/treasury and separate payer readiness, and still-un
 readback/journal/proof acceptance. Next action requires human authorization to fast-forward main and
 deploy the exact committed candidate SHA. No merge/deploy/payment is authorized merely by Phase 2
 CONTINUE. Final independent reconciliation review is reserved for full PASS or a terminal blocker.
+
+## Authorized Shopify paid sandbox acceptance with simulated funding
+
+The user explicitly requested the remaining Shopify steps be tested first, allowing simulated funds. This authorizes one real Bogus checkout submission through the production Storefront path and independent Admin readback, without Cardano, payer, main merge or Render deployment. The local manual harness uses buildGateway with the real ShopifyExecutor, a test-only FixtureFundingAdapter and one retained isolated loopback PostgreSQL schema. It runs the normal quote/approval/funding gate/worker/durable checkpoint/receipt/proof paths; deployed wiring has no fixture switch. Funding is local_fixture with a clearly synthetic reference, never a fake chain hash. Merchant evidence remains fresh_external. Preflight: strict typecheck PASS, Shopify/browser/webhook 74/74 PASS, zero payer processes. Exactly one worker tick is authorized; any unknown post-Pay outcome prohibits another execution or click. This separate Shopify acceptance cannot upgrade the overall Cardano E2E to PASS.
+
+### Issue 31 — submitted Shopify checkout without confirmed outcome
+
+| ID | Stage | Symptom / exact outcome | Root cause | Classification | Fix / verification | Status / demo risk |
+|---|---|---|---|---|---|---|
+| 31 | Production Shopify execution with simulated funding | One normal Bogus Pay click completed at 2026-10-06 13:35:21 UTC. Browser remained outside its confirmation URL condition for 90 seconds; driver returned CheckoutAbort order_not_confirmed. Capsule persisted unresolved / commerce unknown / merchant payment none. | Unknown. No provider error/confirmation body was captured. Could involve checkout validation or confirmation/navigation; neither is established. | Investigate Now | No speculative fix or retry. Worker stopped, original pay_click checkpoint/attempt retained, capacity held_unresolved. Independent Admin at 13:37:16 UTC found zero new/bound orders. Local funding explicitly local_fixture, no Cardano transaction. | OPEN, terminal ambiguity for this attempt. Zero visible orders is not proof the submission had no effect; another Pay/order attempt risks a duplicate. Blocks Shopify paid acceptance and demo reliability. |
+
+The user-authorized run created one real Storefront cart (public token, no delegate), one exact quote,
+one isolated Capsule purchase and one fixture funding event. No throttle and no frozen cart field
+changes were observed. The real executor, normal worker and durable PostgreSQL checkpoint path were
+used. Quote and execution each opened a fresh real browser; both passed the synthetic US buyer,
+shipping/total/Bogus checks. Only one normal Pay submission occurred, with no force or retry.
+
+- Run artifacts: artifacts/e2e/20261006T133500Z-shopify-paid/.
+- Exact quote: quo_01M48PSSSGY8KG6HYAJEAX9B2B; Agent Commerce Test Tee x1;
+  USD 9.95 item + 8.00 Standard shipping + 0.00 checkout tax = USD 17.95.
+- Purchase: pur_01M48PSSTDQDR4VGPAQPC2VRYZ; attempt att_01M48PSSXDE96996RCDHP89NTR.
+- Funding: one simulated 17,950-base-unit event under 1:1000 (0.017950 nominal fixture tUSDM),
+  reference shopify-simulated-cefde6fa-7269-4190-80a4-509999373a78, evidenceMode local_fixture.
+  This is a test fixture reference, NOT a Cardano tx hash. No payer, chain/facilitator call or bridge.
+- Durable pay_click checkpoint at 13:35:21.075 UTC; shopify_started retained. One execute_purchase
+  job completed, one unknown attempt, pending read-only reconcile_purchase job not run.
+- At 13:36:51.845 UTC / 21:36:51.845 Singapore: execution.unknown. Current purchase unresolved;
+  fixture payment_state confirmed/applied; commerce unknown; merchant payment none;
+  provider reference absent; no receipt. Funding confirmed here describes the local fixture only.
+- Independent Admin readback at 13:37:16.969 UTC found zero orders since run start and zero matching
+  quote nonce. This does not establish an authoritative not-sent result or authorize retry.
+- Read-only DB reconciliation at 13:38:07 UTC: one purchase, one applied local-fixture funding event,
+  one attempt, held_unresolved USD 17.95 reservation; trial balance zero for every present asset.
+  No merchant purchase/prepayment-applied journal or final receipt was invented.
+- Authenticated proof projection correctly reports Verifying result, merchant unknown/no reference,
+  no receipt and funding evidence local_fixture. Complete proof UI test was not reached because the
+  harness stopped at unresolved. It must not be reported as PASS.
+- Process/server/browser closed, automatic worker never started. Do not restart this harness or use
+  another artifact directory to bypass its one-run manifest. Reconcile the ORIGINAL attempt read-only.
+
+Verification: manual harness typecheck PASS; Shopify/browser/webhook 74/74 PASS before external run.
+The earlier 514/514 candidate suite at 72f95de is unchanged application-code evidence, not a paid
+Shopify acceptance result. No production/core/payment/recovery path was changed in this continuation.
+The new harness resides under tests/manual, outside deployed image/build composition; there is no
+runtime fixture funding switch. All attempted operations and exact failed statuses are preserved.
+
+Ledger now contains 31 unique records: 19 resolved, 3 open Investigate Now (4,18,31), 2 deferred SG
+issues, 6 accepted operational/scope/diagnostic risks, and historical partial record 25. No newly proven
+seed mismatch: Shopify live variant/price/US address still matched; local isolated customer/client/
+capacity seeds worked; no order seed existed or was fabricated. Hosted Postgres and Cardano/payer
+seed validity remain unverified. Existing seed problems are retained in their dedicated sections.
+
+Overall verdict is now UNRESOLVED because the actual submitted Shopify checkout outcome is unknown.
+This supersedes the earlier PARTIAL checkpoint status for the current external attempt. Main remains
+95a896c730cf893c3afd00919ebe16ad823a608b; nothing deployed. Candidate base is 72f95de467d4be7773e9c845e0a0fd932d242b81;
+meaningful manual harness/evidence docs will be committed as a safety checkpoint. No paid PASS,
+receipt, refund, void, cancellation or no-order certainty is claimed. Recommend one final independent
+Opus review of the complete captured diff/evidence at this terminal ambiguity; no review was launched.
+Exact next action: await the user's direction for read-only reconciliation of the original checkout.
+No payment/order retry or fresh canonical attempt until the original outcome is authoritatively resolved.

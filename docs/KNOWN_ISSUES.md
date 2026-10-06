@@ -124,3 +124,13 @@ cartCreate throttle risk remain Ignore / Accept Risk for the bounded demo; minim
 Deferring deployed readiness checks could produce an unusable rail or checkout, so funding remains
 blocked until those checks pass. The candidate passed 514/514 tests; paid external acceptance is not
 claimed. Full issue classifications, evidence and seed dispositions remain in the E2E ledger.
+
+### Shopify paid execution outcome unresolved — issue 31
+
+Investigate Now: the user-authorized single Bogus Pay submission with local fixture funding reached
+its durable checkpoint and normal click, but timed out waiting 90 seconds for confirmation. Capsule
+correctly preserved unresolved, held capacity and no receipt. Independent Admin currently shows zero
+new/bound orders; this does not prove not-sent. Root cause unknown. Do not retry Pay or execute another
+order. Reconcile the original quote/purchase read-only, preserving every checkpoint. Deferring this
+blocks Shopify paid acceptance; accepting zero-order readback as certainty risks a duplicate. See the
+E2E ledger and artifacts/e2e/20261006T133500Z-shopify-paid/. No Cardano transaction occurred.

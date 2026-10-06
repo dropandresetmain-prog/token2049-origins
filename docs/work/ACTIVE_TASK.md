@@ -110,3 +110,29 @@ Main remains 95a896c730cf893c3afd00919ebe16ad823a608b; gateway is not deployed. 
 purchase, testnet transaction or merchant order is authorized before later checkpoints. Same chat
 remains appropriate for the canonical E2E. Final independent review belongs after full PASS or a
 terminal/ambiguous blocker; do not start other project lanes.
+
+## Terminal Shopify-only acceptance stop — supersedes Checkpoint B next action
+
+The user explicitly requested completion of Shopify first with simulated funds. One isolated local
+Capsule gateway used the REAL production Shopify executor and TEST-ONLY funding fixture, one fresh
+cart/quote/purchase, one worker tick and one normal Bogus Pay submission. No main merge, Render,
+Cardano or payer. Exact quote USD 17.95; quote quo_01M48PSSSGY8KG6HYAJEAX9B2B;
+purchase pur_01M48PSSTDQDR4VGPAQPC2VRYZ; retained local schema
+shopify_accept_cefde6fa7269419080a4509999373a78.
+
+The browser timed out awaiting confirmation after its durable pay_click checkpoint. State unresolved,
+one unknown attempt, held_unresolved reservation, one local_fixture funding event, balanced journal,
+no provider reference/receipt. Independent Admin currently shows 0 new/bound orders, which is not
+not-sent proof. All active writes stopped; worker timer never started and process exited. The pending
+reconcile job was not run. Do not rerun the manual harness, Pay, or create a replacement purchase.
+
+Issue 31 Investigate Now/open; ledger has all 31 issues and seed dispositions. Artifacts:
+artifacts/e2e/20261006T133500Z-shopify-paid/. Harness tests/manual/shopify-paid-acceptance.ts is outside
+production wiring/image and requires an explicit one-order flag. Typecheck and Shopify/browser/webhook
+74/74 passed; complete paid receipt/UI checks were NOT reached. Overall verdict UNRESOLVED.
+
+Pause for user direction on READ-ONLY reconciliation of the original checkout. Main remains
+95a896c730cf893c3afd00919ebe16ad823a608b; no deployment. Recommend one final independent Opus
+review of captured evidence/diff in a fresh review chat; do not launch it or any new project lane.
+Keep the same integration chat for reconciliation. Do not fund real Cardano until this original
+Shopify outcome and the later deployment/source approval checkpoints are resolved.

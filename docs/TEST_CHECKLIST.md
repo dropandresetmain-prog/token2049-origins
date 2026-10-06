@@ -111,3 +111,17 @@ All issues and seed mismatches remain in docs/evidence/e2e-acceptance-log.md; cu
 artifacts are under ignored artifacts/e2e/20261006T130100Z-selected-address/. Do not repeat the successful
 unfunded rehearsal merely to fill a checklist. One final independent reconciliation review follows a
 full PASS or a genuine terminal/ambiguous blocker; no per-fix review loop.
+
+### Shopify-only paid attempt with fixture funding — terminal outcome
+
+- [x] One real production cart/quote, one isolated local purchase, one clearly local_fixture funding
+  event, normal worker, durable pay_click checkpoint and one normal Bogus submission.
+- [x] No frozen cart changes/throttle; exact USD 17.95 maintained before Pay.
+- [x] Timeout classified unresolved; capacity held, no fabricated receipt/provider reference.
+- [x] Independent Admin currently returned 0 new/bound orders; this is not definitive no-effect proof.
+- [x] Local DB trial balance remains zero; proof projection says Verifying result and local_fixture.
+- [ ] Shopify paid order, successful Bogus transaction and independent matching provider result.
+- [ ] Final receipt and completed proof UI. These were NOT reached and must not be marked PASS.
+
+Issue 31 is a mandatory ambiguity stop. No automatic retry, new order or replacement funding.
+Current overall verdict UNRESOLVED. Preserve original state and wait for read-only reconciliation.
