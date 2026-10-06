@@ -20,7 +20,9 @@ import {
   PurchaseProof as MirrorPurchaseProof,
   PurchaseProofResponse,
 } from '../../web/src/contracts/evidence.js';
+import { TreasuryResponse } from '../../web/src/contracts/operator.js';
 import { createSampleSource } from '../../web/src/source/sample.js';
+import { sampleConnections, sampleTreasury } from '../../web/src/source/sample.operator.js';
 
 const source = createSampleSource({ now: Date.parse('2026-10-06T10:20:00Z') });
 
@@ -87,5 +89,17 @@ describe('console contract drift: read-model return types (compile time)', () =>
 
   it('purchaseDetail() carries the parts of EvidenceDetail the console reads', () => {
     expectTypeOf<Pick<Detail, 'purchase' | 'reservation' | 'events'>>().toExtend<z.input<typeof EvidenceDetail>>();
+  });
+
+  // treasuryView() and latestBankObservations() widen ledgerMode and kind to `string`, so a compile-time
+  // assignment to the console's enums cannot hold. Their drift guard is runtime: the integration test
+  // tests/integration/operator-console.test.ts parses the real responses with the console's schemas.
+});
+
+describe('console contract drift: operator samples', () => {
+  it('sample treasury and connections parse with the same schemas as the live reads', () => {
+    expect(TreasuryResponse.safeParse(sampleTreasury()).success).toBe(true);
+    const c = sampleConnections(Date.parse('2026-10-06T10:20:00Z'));
+    expect(c.bank.observations.length).toBeGreaterThan(0);
   });
 });

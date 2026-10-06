@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import * as copy from '../copy/en.js';
+import * as operatorCopy from '../copy/operator.js';
 import type { ConsoleMode, ConsoleSource, PurchaseListResult } from '../contracts/source.js';
 import { defaultFormatContext } from '../model/format.js';
 import { presentList } from '../model/present.js';
@@ -10,10 +11,15 @@ import { AboutDialog } from './Dialogs.js';
 import { errorInfo, isAuthLost, type ErrorInfo } from './errors.js';
 import { PurchaseDetail } from './PurchaseDetail.js';
 import { PurchaseList } from './PurchaseList.js';
-import { detailHref, listHref, navigate, routeKey, useRoute } from './route.js';
+import { TREASURY_HREF, detailHref, listHref, navigate, routeKey, useRoute } from './route.js';
 import { EnvStrip, MobileNav, Sidebar, Topbar, type NavKey } from './Shell.js';
 import { SignIn, type Connected } from './SignIn.js';
 import { ErrorPanel, ListSkeleton } from './States.js';
+import { Connections } from './Connections.js';
+import { Treasury } from './Treasury.js';
+
+/** Whether this access key may open the operator screens. Unknown until an operator read answers. */
+type OperatorAccess = 'unknown' | 'allowed' | 'denied';
 
 interface Session {
   source: ConsoleSource;
@@ -36,6 +42,7 @@ function Console() {
   const [focusMode, setFocusMode] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
   const [title, setTitle] = useState<string | null>(null);
+  const [operatorAccess, setOperatorAccess] = useState<OperatorAccess>('unknown');
   const route = useRoute();
   const mainRef = useRef<HTMLElement>(null);
   const sessionRef = useRef<Session | null>(null);
@@ -61,6 +68,7 @@ function Console() {
 
   const signOut = useCallback((message: string) => {
     setSession(null);
+    setOperatorAccess('unknown');
     setNotice(message);
   }, []);
 
@@ -68,6 +76,29 @@ function Console() {
     setNotice(null);
     setSession({ source: c.source, mode: c.mode, raw: c.list, at: Date.now() });
   }, []);
+
+  /*
+   * Find out once per connection whether the key may use the operator screens. Allowed shows their links;
+   * anything else (denied, or an answer that could not be read) leaves them out. The screens do their own
+   * reads either way, so a hidden link never makes data visible and a typed address still gets the gate.
+   */
+  const probeSource = session?.source ?? null;
+  useEffect(() => {
+    setOperatorAccess('unknown');
+    if (!probeSource) return;
+    let alive = true;
+    probeSource.hasOperatorAccess().then(
+      (ok) => {
+        if (alive) setOperatorAccess(ok ? 'allowed' : 'denied');
+      },
+      () => undefined,
+    );
+    return () => {
+      alive = false;
+    };
+  }, [probeSource]);
+  const onOperatorAccess = useCallback((allowed: boolean) => setOperatorAccess(allowed ? 'allowed' : 'denied'), []);
+  const operator = operatorAccess === 'allowed';
 
   const list = useMemo(
     () => (session ? presentList(session.raw, { ...defaultFormatContext(), mode: session.mode }) : null),
@@ -116,7 +147,17 @@ function Console() {
   }, [sample]);
 
   const signedOut = config.kind === 'gateway' && !session;
-  const page = signedOut ? null : route.kind === 'detail' ? (title ?? copy.loading.purchase) : route.kind === 'list' ? copy.list.heading : null;
+  const page = signedOut
+    ? null
+    : route.kind === 'detail'
+      ? (title ?? copy.loading.purchase)
+      : route.kind === 'list'
+        ? copy.list.heading
+        : route.kind === 'treasury'
+          ? operatorCopy.nav.treasuryTitle
+          : route.kind === 'connections'
+            ? operatorCopy.nav.connectionsTitle
+            : null;
   useEffect(() => {
     document.title = page ? copy.nav.pageTitle(page) : copy.brand.name;
   }, [page]);
@@ -133,20 +174,39 @@ function Console() {
   }
 
   const navActive: NavKey | null =
-    route.kind === 'list'
-      ? route.filter === 'attention' ? 'attention' : 'purchases'
-      : route.kind === 'detail'
-        ? route.id === currentId ? 'live' : 'purchases'
-        : 'live';
+    route.kind === 'treasury'
+      ? 'treasury'
+      : route.kind === 'connections'
+        ? 'connections'
+        : route.kind === 'list'
+          ? route.filter === 'attention' ? 'attention' : 'purchases'
+          : route.kind === 'detail'
+            ? route.id === currentId ? 'live' : 'purchases'
+            : 'live';
   const attentionCount = list?.counts.attention ?? 0;
   const onSignOut = config.kind === 'gateway' ? () => signOut(copy.signIn.signedOut) : null;
 
+  const isOperatorRoute = route.kind === 'treasury' || route.kind === 'connections';
   const crumb =
-    route.kind === 'detail' ? (title ?? copy.loading.purchase) : route.kind === 'list' && route.filter !== 'all' ? copy.list.tabs[route.filter] : copy.list.allCrumb;
+    route.kind === 'treasury'
+      ? operatorCopy.nav.treasuryTitle
+      : route.kind === 'connections'
+        ? operatorCopy.nav.connectionsTitle
+        : route.kind === 'detail'
+          ? (title ?? copy.loading.purchase)
+          : route.kind === 'list' && route.filter !== 'all'
+            ? copy.list.tabs[route.filter]
+            : copy.list.allCrumb;
+  const crumbRoot = isOperatorRoute ? operatorCopy.nav.crumb : copy.nav.purchases;
+  const onCrumbRoot = () => navigate(isOperatorRoute ? TREASURY_HREF : listHref('all'));
 
   let content;
   if (!session || !list) {
     content = bootError ? <ErrorPanel error={bootError} onRetry={() => setAttempt((n) => n + 1)} /> : <ListSkeleton />;
+  } else if (route.kind === 'treasury') {
+    content = <Treasury source={session.source} mode={session.mode} onAuthLost={onAuthLost} onAccess={onOperatorAccess} />;
+  } else if (route.kind === 'connections') {
+    content = <Connections source={session.source} mode={session.mode} onAuthLost={onAuthLost} onAccess={onOperatorAccess} />;
   } else if (route.kind === 'list') {
     content = <PurchaseList list={list} filter={route.filter} onVisible={refreshList} />;
   } else if (route.kind === 'detail') {
@@ -161,11 +221,11 @@ function Console() {
         {copy.nav.skipToContent}
       </button>
       <div className="shell">
-        <Sidebar active={navActive} attentionCount={attentionCount} currentHref={currentHref} onSignOut={onSignOut} />
+        <Sidebar active={navActive} attentionCount={attentionCount} currentHref={currentHref} operator={operator} onSignOut={onSignOut} />
         <section className="surface" aria-label={copy.nav.appLabel}>
           <EnvStrip mode={session?.mode ?? null} />
-          <Topbar current={crumb} focusMode={focusMode} onFocus={toggleFocus} onAbout={() => setAboutOpen(true)} />
-          <MobileNav active={navActive} attentionCount={attentionCount} currentHref={currentHref} onSignOut={onSignOut} />
+          <Topbar root={crumbRoot} onRoot={onCrumbRoot} current={crumb} focusMode={focusMode} onFocus={toggleFocus} onAbout={() => setAboutOpen(true)} />
+          <MobileNav active={navActive} attentionCount={attentionCount} currentHref={currentHref} operator={operator} onSignOut={onSignOut} />
           <main className="content" id="main" tabIndex={-1} ref={mainRef}>
             {content}
           </main>

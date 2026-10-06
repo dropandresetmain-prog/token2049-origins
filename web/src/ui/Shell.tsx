@@ -1,11 +1,12 @@
 import * as copy from '../copy/en.js';
+import * as operatorCopy from '../copy/operator.js';
 import type { ConsoleMode } from '../contracts/source.js';
 import { Icon, type IconKey } from './Icon.js';
-import { listHref, navigate } from './route.js';
+import { CONNECTIONS_HREF, TREASURY_HREF, listHref, navigate } from './route.js';
 
 const asset = (file: string) => `${import.meta.env.BASE_URL}${file}`;
 
-export type NavKey = 'live' | 'purchases' | 'attention';
+export type NavKey = 'live' | 'purchases' | 'attention' | 'treasury' | 'connections';
 
 export function EnvStrip({ mode }: { mode: ConsoleMode | null }) {
   if (mode !== 'sample' && mode !== 'test') return null;
@@ -24,11 +25,13 @@ interface NavProps {
   active: NavKey | null;
   attentionCount: number;
   currentHref: string;
+  /** The access key may open the operator screens. Their links stay out of the way until it does. */
+  operator: boolean;
 }
 
 const goLive = (href: string) => navigate(href);
 
-export function Sidebar({ active, attentionCount, currentHref, onSignOut }: NavProps & { onSignOut: (() => void) | null }) {
+export function Sidebar({ active, attentionCount, currentHref, operator, onSignOut }: NavProps & { onSignOut: (() => void) | null }) {
   const item = (key: NavKey, icon: IconKey, label: string, onClick: () => void, count?: number) => (
     <button
       type="button"
@@ -66,6 +69,15 @@ export function Sidebar({ active, attentionCount, currentHref, onSignOut }: NavP
         {item('purchases', 'purchases', copy.nav.purchases, () => navigate(listHref('all')))}
         {item('attention', 'approval', copy.nav.attention, () => navigate(listHref('attention')), attentionCount)}
       </nav>
+      {operator ? (
+        <>
+          <p className="nav-label nav-label-secondary">{operatorCopy.nav.group}</p>
+          <nav className="nav" aria-label={operatorCopy.nav.group}>
+            {item('treasury', 'wallet', operatorCopy.nav.treasury, () => navigate(TREASURY_HREF))}
+            {item('connections', 'layers', operatorCopy.nav.connections, () => navigate(CONNECTIONS_HREF))}
+          </nav>
+        </>
+      ) : null}
       <div className="sidebar-bottom">
         {onSignOut ? (
           <div className="nav">
@@ -82,7 +94,7 @@ export function Sidebar({ active, attentionCount, currentHref, onSignOut }: NavP
   );
 }
 
-export function MobileNav({ active, attentionCount, currentHref, onSignOut }: NavProps & { onSignOut: (() => void) | null }) {
+export function MobileNav({ active, attentionCount, currentHref, operator, onSignOut }: NavProps & { onSignOut: (() => void) | null }) {
   const item = (key: NavKey, icon: IconKey, label: string, onClick: () => void, count?: number) => (
     <button type="button" aria-current={active === key ? 'page' : undefined} className={active === key ? 'selected' : undefined} onClick={onClick}>
       <Icon name={icon} />
@@ -95,6 +107,8 @@ export function MobileNav({ active, attentionCount, currentHref, onSignOut }: Na
       {item('live', 'activity', copy.nav.liveShort, () => goLive(currentHref))}
       {item('purchases', 'purchases', copy.nav.purchases, () => navigate(listHref('all')))}
       {item('attention', 'approval', copy.nav.attention, () => navigate(listHref('attention')), attentionCount)}
+      {operator ? item('treasury', 'wallet', operatorCopy.nav.treasury, () => navigate(TREASURY_HREF)) : null}
+      {operator ? item('connections', 'layers', operatorCopy.nav.connections, () => navigate(CONNECTIONS_HREF)) : null}
       {onSignOut ? (
         <button type="button" onClick={onSignOut}>
           {copy.signIn.signOut}
@@ -105,11 +119,16 @@ export function MobileNav({ active, attentionCount, currentHref, onSignOut }: Na
 }
 
 export function Topbar({
+  root,
+  onRoot,
   current,
   focusMode,
   onFocus,
   onAbout,
 }: {
+  /** First breadcrumb: "Purchases" on purchase screens, "Operator" on the operator screens. */
+  root: string;
+  onRoot: () => void;
   current: string;
   focusMode: boolean;
   onFocus: () => void;
@@ -118,8 +137,8 @@ export function Topbar({
   return (
     <header className="topbar">
       <nav className="breadcrumbs" aria-label={copy.nav.breadcrumbLabel}>
-        <button type="button" onClick={() => navigate(listHref('all'))}>
-          {copy.nav.purchases}
+        <button type="button" onClick={onRoot}>
+          {root}
         </button>
         <span className="crumb-slash" aria-hidden="true">
           {copy.nav.crumbSeparator}

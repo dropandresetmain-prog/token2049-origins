@@ -6,16 +6,20 @@
  * never written to storage, never placed in a URL and never included in an error message.
  *
  * Endpoints (all GET): /v1/capabilities, /v1/evidence/purchases, /v1/purchases/:id,
- * /v1/evidence/purchases/:id, /v1/evidence/purchases/:id/proof, /v1/quotes/:id.
+ * /v1/evidence/purchases/:id, /v1/evidence/purchases/:id/proof, /v1/quotes/:id, and the operator reads
+ * /v1/evidence/treasury and /v1/evidence/bank (operator:read). POST /v1/evidence/bank/refresh is deliberately
+ * not used: the console observes stored facts and never asks a bank anything.
  * See docs/contracts/CONSOLE_CONTRACT.md.
  */
 import { z } from 'zod';
 import { CapabilitiesResponse, ErrorBody, PurchaseResponse, QuoteView } from '../contracts/backend.js';
 import { EvidenceDetail, EvidenceListResponse, PurchaseProofResponse } from '../contracts/evidence.js';
+import { BankResponse, TreasuryResponse } from '../contracts/operator.js';
 import { EMPTY_CONTEXT } from '../contracts/proposed.js';
 import {
   ConsoleError,
   type ConsoleEnvironment,
+  type ConnectionsData,
   type ConsoleSource,
   type PurchaseBundle,
   type PurchaseListResult,
@@ -102,6 +106,27 @@ export function createGatewaySource(opts: GatewaySourceOptions): ConsoleSource {
     async listPurchases(): Promise<PurchaseListResult> {
       const { data } = await request('/v1/evidence/purchases', EvidenceListResponse);
       return { entries: data.purchases.map((item) => ({ item, context: EMPTY_CONTEXT })), limit: data.limit };
+    },
+
+    async getTreasury() {
+      return (await request('/v1/evidence/treasury', TreasuryResponse)).data;
+    },
+
+    async getConnections(): Promise<ConnectionsData> {
+      // The bank read is the gated one; ask for it first so a customer key fails before anything else is sent.
+      const bank = (await request('/v1/evidence/bank', BankResponse)).data;
+      const capabilities = (await request('/v1/capabilities', CapabilitiesResponse, { auth: false })).data;
+      return { capabilities, bank };
+    },
+
+    async hasOperatorAccess(): Promise<boolean> {
+      try {
+        await request('/v1/evidence/treasury', TreasuryResponse);
+        return true;
+      } catch (e) {
+        if (e instanceof ConsoleError && e.code === 'forbidden') return false;
+        throw e;
+      }
     },
 
     async getPurchase(purchaseId: string): Promise<PurchaseBundle> {

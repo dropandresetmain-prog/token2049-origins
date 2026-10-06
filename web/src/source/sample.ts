@@ -9,6 +9,7 @@ import { PurchaseView, QuoteView, ReceiptView, projectProgress } from '../contra
 import type { Money, PurchaseState, PaymentState, CommerceStatus, MerchantPaymentStatus } from '../contracts/backend.js';
 import { PurchaseContext } from '../contracts/proposed.js';
 import { ConsoleError, type ConsoleSource, type PurchaseBundle, type PurchaseListResult } from '../contracts/source.js';
+import { sampleConnections, sampleTreasury } from './sample.operator.js';
 
 type Cat = 'hotel' | 'retail' | 'flight';
 type Route = 'nuitee' | 'shopify' | 'atlas';
@@ -285,6 +286,17 @@ export function createSampleSource(opts: { now?: number; latencyMs?: number } = 
       const found = built.find((b) => b.bundle.purchase.purchaseId === purchaseId);
       if (!found) throw new ConsoleError('not_found', 'purchase not found', undefined, 404);
       return found.bundle;
+    },
+    async getTreasury() {
+      await wait();
+      return sampleTreasury();
+    },
+    async getConnections() {
+      await wait();
+      return sampleConnections(now);
+    },
+    async hasOperatorAccess() {
+      return true;
     },
     idFor(key: string) {
       return built.find((b) => b.key === key)?.bundle.purchase.purchaseId;
