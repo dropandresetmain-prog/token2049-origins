@@ -7,8 +7,10 @@
  *     200 { ok:true, purchase, payment:{ transferReference } }
  *     4xx { ok:false, error:{ code, message } }
  *
- * Listens on 127.0.0.1 only by default. The hosted deployment opts into `access.mode = 'private'`: bound to the platform's
- * private network, accepting only private-range peers and an exact Host allowlist (never a public name, never a browser).
+ * Listens on 127.0.0.1 only by default. The hosted (free web service) deployment opts into `access.mode = 'hosted'`: it is
+ * publicly reachable, so every request must arrive over HTTPS (platform proxy), for the exact configured Host, with no Origin
+ * (no browsers), under a global rate limit and a failed-authentication lockout; /pay and /status additionally need the long
+ * random bearer token. The only routes are GET /health, GET /status and POST /pay {purchaseId}.
  * One payment at a time (mutex). Responses never include signed payloads.
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
@@ -27,6 +29,7 @@ const STATUS: Record<PayerErrorCode, number> = {
   conflict: 409,
   payment_rejected: 422,
   gateway_unreachable: 502,
+  rate_limited: 429,
   internal: 500,
 };
 
@@ -35,8 +38,10 @@ export interface BridgePayer {
   pay(purchaseId: string): Promise<{ purchase?: unknown; transferReference: string | null; resumed: boolean }>;
 }
 
-/** Where a bridge may be reached from. Loopback is the default; `private` is for a private-network-only hosted service. */
-export type BridgeAccess = { mode: 'loopback' } | { mode: 'private'; allowedHosts: string[] };
+/** Where a bridge may be reached from. Loopback is the default; `hosted` is for the public HTTPS free web service. */
+export type BridgeAccess =
+  | { mode: 'loopback' }
+  | { mode: 'hosted'; allowedHosts: string[]; maxRequestsPerMinute?: number; maxFailuresPerMinute?: number; now?: () => number };
 
 export interface BridgeDeps {
   payer: BridgePayer;
@@ -45,19 +50,6 @@ export interface BridgeDeps {
   /** Bearer token callers must present. */
   token: string;
   log?: (e: Record<string, unknown>) => void;
-}
-
-/** Loopback or RFC 1918 / ULA peers only; used in private mode as defence in depth behind the platform's network isolation. */
-export function isPrivatePeer(address: string | undefined): boolean {
-  if (!address) return false;
-  const a = address.replace(/^::ffff:/i, '').toLowerCase();
-  if (a === '127.0.0.1' || a === '::1') return true;
-  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(a);
-  if (v4) {
-    const [x, y] = [Number(v4[1]), Number(v4[2])];
-    return x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168);
-  }
-  return /^f[cd][0-9a-f]{2}:/.test(a);
 }
 
 function sameToken(presented: string, expected: string): boolean {
@@ -99,15 +91,29 @@ export function createBridge(deps: BridgeDeps): Server {
     return run;
   };
 
+  // Public-mode abuse limits: sliding one-minute windows, process-wide (the platform proxy hides client addresses).
+  const hits: number[] = [];
+  const failures: number[] = [];
+  const window = (list: number[], now: number) => { while (list.length && list[0]! <= now - 60_000) list.shift(); return list.length; };
+
   const server = createServer((req, res) => {
     void (async () => {
       try {
         const remote = req.socket.remoteAddress;
         const access = deps.access ?? { mode: 'loopback' };
-        if (access.mode === 'private') {
-          if (!isPrivatePeer(remote)) return fail(res, 'unauthenticated', 'bridge is private-network only');
-          if (!access.allowedHosts.includes((req.headers.host ?? '').toLowerCase()) || req.headers.origin) {
-            return fail(res, 'unauthenticated', 'bridge requires a private non-browser caller');
+        if (access.mode === 'hosted') {
+          const now = (access.now ?? Date.now)();
+          if (window(failures, now) >= (access.maxFailuresPerMinute ?? 10) || window(hits, now) >= (access.maxRequestsPerMinute ?? 120)) {
+            res.setHeader('retry-after', '60');
+            return fail(res, 'rate_limited', 'too many requests');
+          }
+          hits.push(now);
+          // The platform's own health probe is internal HTTP and carries no proxy headers; /health reveals nothing.
+          if (req.method === 'GET' && req.url === '/health') return send(res, 200, { ok: true });
+          const badCaller = req.headers['x-forwarded-proto'] !== 'https' || !access.allowedHosts.includes((req.headers.host ?? '').toLowerCase()) || req.headers.origin !== undefined;
+          if (badCaller) {
+            failures.push(now);
+            return fail(res, 'unauthenticated', 'bridge requires an https non-browser caller for the configured host');
           }
         } else {
           if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') return fail(res, 'unauthenticated', 'bridge is local only');
@@ -120,7 +126,10 @@ export function createBridge(deps: BridgeDeps): Server {
         if (path !== '/pay' && path !== '/status') return fail(res, 'not_found', 'no such route');
 
         const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? '');
-        if (!m || !sameToken(m[1]!.trim(), deps.token)) return fail(res, 'unauthenticated', 'missing or invalid bridge token');
+        if (!m || !sameToken(m[1]!.trim(), deps.token)) {
+          if (access.mode === 'hosted') failures.push((access.now ?? Date.now)());
+          return fail(res, 'unauthenticated', 'missing or invalid bridge token');
+        }
         if (path === '/status') {
           if (req.method !== 'GET') return fail(res, 'invalid_request', 'use GET');
           if (!deps.source) return send(res, 200, { ok: true, source: null });
@@ -161,8 +170,8 @@ export function createBridge(deps: BridgeDeps): Server {
   return server;
 }
 
-/** Bind a private-network bridge on all interfaces; reachability is restricted by the platform plus isPrivatePeer/Host checks. */
-export async function listenPrivate(server: Server, port: number): Promise<void> {
+/** Bind the hosted bridge on all interfaces (the platform proxy terminates TLS); access is enforced per request in hosted mode. */
+export async function listenHosted(server: Server, port: number): Promise<void> {
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     server.listen(port, '0.0.0.0', resolve);

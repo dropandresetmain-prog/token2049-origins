@@ -2,20 +2,21 @@ import { afterEach, describe, expect, it } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { HostedConfigError, loadHostedMcpConfig, parsePrivateBridgeUrl, parsePublicOrigin } from '../../src/channels/hosted-mcp/config.js';
+import { HostedConfigError, loadHostedMcpConfig, parsePayerBridgeUrl, parsePublicOrigin } from '../../src/channels/hosted-mcp/config.js';
 import { hostAllowed, originAllowed } from '../../src/channels/hosted-mcp/router.js';
 import { INSTRUCTIONS } from '../../src/channels/mcp/server.js';
 
 const roots: string[] = [];
 afterEach(() => { for (const r of roots.splice(0)) rmSync(r, { recursive: true, force: true }); });
 const PUBLIC = 'https://token2049-origins.onrender.com';
+const PAYER = 'https://t2o-cardano-payer.onrender.com';
 
 function env(over: Record<string, string | undefined> = {}): NodeJS.ProcessEnv {
   const root = mkdtempSync(join(tmpdir(), 'hosted-cfg-')); roots.push(root);
   const pass = join(root, 'pass'); const bridge = join(root, 'bridge');
   writeFileSync(pass, 'owner-passcode-0123456789\n'); writeFileSync(bridge, 'bridge-token-0123456789-abcdef\n');
   return { MCP_HOSTED_ENABLED: 'true', MCP_PUBLIC_URL: PUBLIC, PUBLIC_BASE_URL: PUBLIC, PORT: '8787', MCP_OAUTH_OWNER_PASSCODE_FILE: pass,
-    CARDANO_PAYER_BRIDGE_URL: 'http://t2o-cardano-payer:8788', CARDANO_PAYER_BRIDGE_TOKEN_FILE: bridge, ...over } as NodeJS.ProcessEnv;
+    CARDANO_PAYER_BRIDGE_URL: PAYER, CARDANO_PAYER_BRIDGE_TOKEN_FILE: bridge, ...over } as NodeJS.ProcessEnv;
 }
 
 describe('hosted MCP configuration', () => {
@@ -24,10 +25,10 @@ describe('hosted MCP configuration', () => {
     expect(loadHostedMcpConfig(env({ MCP_HOSTED_ENABLED: 'yes' }))).toBeNull();
   });
 
-  it('loads the production shape: one public origin, private Cardano bridge, loopback gateway', () => {
+  it('loads the production shape: one public origin, one https free-service payer, loopback gateway', () => {
     const c = loadHostedMcpConfig(env())!;
     expect(c.publicUrl.origin).toBe(PUBLIC);
-    expect(c.cardanoBridge).toMatchObject({ url: 'http://t2o-cardano-payer:8788' });
+    expect(c.cardanoBridge).toMatchObject({ url: PAYER });
     expect(c.gatewayUrl).toBe('http://127.0.0.1:8787');
     expect(Object.keys(c)).not.toContain('gatewayToken'); // no shared gateway key exists in hosted mode
   });
@@ -40,9 +41,11 @@ describe('hosted MCP configuration', () => {
     ['credentials in the origin', { MCP_PUBLIC_URL: 'https://user:pw@token2049-origins.onrender.com' }],
     ['a Solana bridge', { SOLANA_PAYER_BRIDGE_URL: 'http://127.0.0.1:9', SOLANA_PAYER_BRIDGE_TOKEN_FILE: 'x' }],
     ['a half-configured Cardano bridge', { CARDANO_PAYER_BRIDGE_TOKEN_FILE: undefined }],
-    ['a public bridge host', { CARDANO_PAYER_BRIDGE_URL: 'https://payer.example.com' }],
-    ['a bridge with credentials', { CARDANO_PAYER_BRIDGE_URL: 'http://user:pw@t2o-cardano-payer:8788' }],
-    ['a bridge with a path', { CARDANO_PAYER_BRIDGE_URL: 'http://t2o-cardano-payer:8788/pay' }],
+    ['a plain-http payer origin', { CARDANO_PAYER_BRIDGE_URL: 'http://t2o-cardano-payer.onrender.com' }],
+    ['the gateway as its own payer', { CARDANO_PAYER_BRIDGE_URL: PUBLIC }],
+    ['a payer with credentials', { CARDANO_PAYER_BRIDGE_URL: 'https://user:pw@t2o-cardano-payer.onrender.com' }],
+    ['a payer with a path', { CARDANO_PAYER_BRIDGE_URL: `${PAYER}/pay` }],
+    ['a payer with a query', { CARDANO_PAYER_BRIDGE_URL: `${PAYER}?x=1` }],
     ['a missing passcode file', { MCP_OAUTH_OWNER_PASSCODE_FILE: '/nonexistent/passcode' }],
     ['a malformed payer token hash', { MCP_PAYER_GATEWAY_TOKEN_SHA256: 'not-a-hash' }],
     ['a non-https extra redirect', { MCP_OAUTH_EXTRA_REDIRECT_URIS: 'http://evil.example/cb' }],
@@ -64,10 +67,11 @@ describe('hosted MCP configuration', () => {
     catch (e) { expect((e as Error).message).not.toContain('tooshort'); expect(e).toBeInstanceOf(HostedConfigError); }
   });
 
-  it('accepts bridge hosts only as single-label private names or loopback', () => {
-    expect(parsePrivateBridgeUrl('http://t2o-cardano-payer:8788', 'x')).toBe('http://t2o-cardano-payer:8788');
-    expect(parsePrivateBridgeUrl('http://127.0.0.1:8788', 'x')).toBe('http://127.0.0.1:8788');
-    for (const bad of ['http://10.0.0.5:8788', 'http://payer.internal:8788', 'http://169.254.169.254', 'ftp://t2o-cardano-payer']) expect(() => parsePrivateBridgeUrl(bad, 'x'), bad).toThrow(HostedConfigError);
+  it('accepts exactly one https payer origin (loopback http only for local development)', () => {
+    expect(parsePayerBridgeUrl(`${PAYER}/`, 'x')).toBe(PAYER);
+    expect(parsePayerBridgeUrl('http://127.0.0.1:8788', 'x')).toBe('http://127.0.0.1:8788');
+    for (const bad of ['http://payer.example.com', 'ftp://payer.example.com', 'https://payer.example.com/pay', 'https://payer.example.com#frag', 'not a url']) expect(() => parsePayerBridgeUrl(bad, 'x'), bad).toThrow(HostedConfigError);
+    expect(() => parsePayerBridgeUrl(PUBLIC, 'x', PUBLIC)).toThrow(HostedConfigError);
     expect(parsePublicOrigin(PUBLIC + '/', 'x').origin).toBe(PUBLIC);
   });
 });

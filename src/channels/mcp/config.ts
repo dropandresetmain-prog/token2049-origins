@@ -22,6 +22,8 @@ export interface McpConfig {
   /** Per-request timeouts in ms. */
   gatewayTimeoutMs?: number;
   bridgeTimeoutMs?: number;
+  /** `/status` timeout; hosted payers on free instances may need a cold start (tens of seconds) before they answer. */
+  bridgeStatusTimeoutMs?: number;
 }
 
 export class ConfigError extends Error {}

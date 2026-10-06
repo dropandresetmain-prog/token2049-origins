@@ -1,73 +1,85 @@
 /**
- * Hosted Cardano Preprod payer: the existing bounded payer + bridge, run as a private-network-only service.
+ * Hosted Cardano Preprod payer on a FREE Render web service (no disk, no private network):
  *
- *   MCP (Render web service) -> private network -> this process -> POST {public gateway}/v1/purchases/{id}/fund
+ *   MCP (gateway web service) --HTTPS + bearer--> this service --> POST {public gateway}/v1/purchases/{id}/fund --> Cardano Preprod
  *
- * Nothing about payment logic changes here: this entrypoint only wires `Payer` (policy, caps, durable ledger, identical-header
- * resend) behind `createBridge` in private-access mode. The mnemonic comes from a Render secret file; the ledger lives on a
- * persistent disk, so cumulative/daily history survives restarts and redeploys. A missing or unreadable ledger stops the
- * service from signing (it is never silently recreated); a crash lock is reported and left for the operator, never cleared.
+ * Nothing about payment logic changes here: this entrypoint wires the existing bounded `Payer` (policy, caps, identical-header
+ * resend) to a PostgreSQL ledger (migration 0005) behind `createBridge` in public-hosted access mode. The mnemonic comes from a
+ * Render secret file; spend history lives in the shared Render Postgres, so it survives sleeping, restarts and redeploys.
  *
- * One-time provisioning (operator, from the payer service shell, never automatic):  npm run payer:hosted:init-ledger
+ * Startup is idempotent and fail-closed: the ledger is bound to the expected wallet address; a mnemonic that derives a different
+ * address, or a database that already belongs to a different wallet, refuses to start. History is never reset or reassigned.
  */
-import { existsSync } from 'node:fs';
+import { readFileSync } from 'node:fs';
 import { pathToFileURL } from 'node:url';
-import { createBridge, listenPrivate } from './bridge.js';
-import { loadBridgeConfig, loadPayerConfig, readSecretFile } from './config.js';
+import { Db } from '../../src/infrastructure/db.js';
+import { createBridge, listenHosted } from './bridge.js';
+import { loadPayerConfig, readSecretFile, type PayerConfig } from './config.js';
+import { createBoundSigner } from './signer.js';
+import { PgPayerLedger } from './pg-ledger.js';
 import { Payer } from './payer.js';
-import { PayerLedger } from './ledger.js';
 
 const log = (e: Record<string, unknown>) => process.stdout.write(`${JSON.stringify({ t: new Date().toISOString(), ...e })}\n`);
 
-/** Exact `host[:port]` values the MCP service uses to reach this bridge (Render private hostname). */
+/** Exact public hostnames (no scheme/port/path) the gateway uses to reach this service. */
 export function allowedHostsFrom(env: NodeJS.ProcessEnv): string[] {
   const hosts = String(env.PAYER_BRIDGE_ALLOWED_HOSTS ?? '').split(',').map((h) => h.trim().toLowerCase()).filter(Boolean);
   if (!hosts.length) throw new Error('invalid bridge configuration: PAYER_BRIDGE_ALLOWED_HOSTS');
-  for (const h of hosts) if (!/^[a-z0-9][a-z0-9-]{0,62}(?::[0-9]{1,5})?$/.test(h)) throw new Error('invalid bridge configuration: PAYER_BRIDGE_ALLOWED_HOSTS');
+  for (const h of hosts) if (!/^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$/.test(h)) throw new Error('invalid bridge configuration: PAYER_BRIDGE_ALLOWED_HOSTS');
   return hosts;
 }
 
-export async function startHostedPayer(env: NodeJS.ProcessEnv) {
-  const config = loadPayerConfig(env);
-  const bridge = loadBridgeConfig(env);
-  const token = readSecretFile(bridge.tokenFile, 'PAYER_BRIDGE_TOKEN_FILE');
-  if (token.length < 24) throw new Error('PAYER_BRIDGE_TOKEN_FILE must hold a token of at least 24 characters');
-  const allowedHosts = allowedHostsFrom(env);
-  // The payer's own gateway client resolves the 402 challenge against this URL, so it must be the public https gateway.
-  if (!config.gatewayUrl.startsWith('https://')) throw new Error('invalid payer configuration: PAYER_GATEWAY_URL (https required when hosted)');
-  if (!existsSync(config.ledgerFile)) throw new Error('payer ledger is missing; run payer:hosted:init-ledger once. Refusing to start with empty history.');
-  if (existsSync(`${config.ledgerFile}.lock`)) log({ type: 'payer.crash_lock_present', note: 'a previous payment did not finish; operator reconciliation required before paying' });
-
-  const payer = new Payer({ config, log });
-  const server = createBridge({ payer, token, access: { mode: 'private', allowedHosts }, source: () => payer.source(), log });
-  await listenPrivate(server, bridge.port);
-  return server;
+/** Public address of the wallet in the mnemonic secret file. Derived offline; no provider request, nothing printed. */
+export function deriveWalletAddress(config: PayerConfig): string {
+  const mnemonic = readFileSync(config.mnemonicFile, 'utf8');
+  return String(createBoundSigner(config, mnemonic, 'public-identity-only').getAddress());
 }
 
-/** One-time creation of the empty ledger on the persistent disk. Refuses to touch an existing ledger. */
-export function initHostedLedger(env: NodeJS.ProcessEnv): string {
-  const config = loadPayerConfig(env);
-  PayerLedger.initialize(config.ledgerFile);
-  return config.ledgerFile;
+export interface HostedPayerHandle {
+  server: import('node:http').Server;
+  db: Db;
+  address: string;
+  close(): Promise<void>;
+}
+
+export async function startHostedPayer(env: NodeJS.ProcessEnv, opts: { db?: Db; port?: number } = {}): Promise<HostedPayerHandle> {
+  const config = loadPayerConfig(env, { ledger: 'external' });
+  if (!config.walletAddress) throw new Error('invalid payer configuration: PAYER_WALLET_ADDRESS');
+  if (!config.gatewayUrl.startsWith('https://')) throw new Error('invalid payer configuration: PAYER_GATEWAY_URL (https required when hosted)');
+  const token = readSecretFile(String(env.PAYER_BRIDGE_TOKEN_FILE ?? ''), 'PAYER_BRIDGE_TOKEN_FILE');
+  if (token.length < 24) throw new Error('PAYER_BRIDGE_TOKEN_FILE must hold a token of at least 24 characters');
+  const allowedHosts = allowedHostsFrom(env);
+  const port = opts.port ?? Number(env.PORT ?? '10000');
+  if (!Number.isInteger(port) || port < 0 || port > 65535) throw new Error('invalid bridge configuration: PORT');
+
+  // The signing wallet must be exactly the configured one before anything touches the ledger.
+  const address = deriveWalletAddress(config);
+  if (address !== config.walletAddress) throw new Error('payer wallet does not match PAYER_WALLET_ADDRESS; refusing to start');
+
+  const db = opts.db ?? new Db(String(env.DATABASE_URL ?? ''));
+  if (!opts.db) await db.initialize(); // append-only migrations; idempotent and safe alongside the gateway's own start-up
+  const ledger = await PgPayerLedger.open(db, { network: config.network, address });
+
+  const payer = new Payer({ config, ledger, log });
+  const server = createBridge({ payer, token, access: { mode: 'hosted', allowedHosts }, source: () => payer.source(), log });
+  await listenHosted(server, port);
+  log({ type: 'payer.hosted.ready', network: config.network });
+  return {
+    server, db, address,
+    close: async () => { await new Promise<void>((r) => server.close(() => r())); if (!opts.db) await db.close(); },
+  };
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) {
-  if (process.argv.includes('--init-ledger')) {
-    try {
-      process.stdout.write(`created empty payer ledger at ${initHostedLedger(process.env)}\n`);
-    } catch (e) {
-      process.stderr.write(`${e instanceof Error && /EEXIST/.test(e.message) ? 'ledger already exists; refusing to reset history' : e instanceof Error ? e.message : 'init failed'}\n`);
+  startHostedPayer(process.env)
+    .then((h) => {
+      const stop = () => void h.close().then(() => process.exit(0));
+      process.on('SIGTERM', stop);
+      process.on('SIGINT', stop);
+    })
+    .catch((e) => {
+      // Messages here name variables and states only; they never carry secret values.
+      process.stderr.write(`${e instanceof Error ? e.message : 'hosted payer failed to start'}\n`);
       process.exitCode = 1;
-    }
-  } else {
-    startHostedPayer(process.env)
-      .then((s) => {
-        const a = s.address();
-        log({ type: 'payer.hosted.listening', port: typeof a === 'object' && a ? a.port : null });
-      })
-      .catch((e) => {
-        process.stderr.write(`${e instanceof Error ? e.message : 'hosted payer failed to start'}\n`);
-        process.exitCode = 1;
-      });
-  }
+    });
 }

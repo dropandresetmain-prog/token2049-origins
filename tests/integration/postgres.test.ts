@@ -33,7 +33,7 @@ describe('PostgreSQL persistence and competing connections', () => {
     await first.run("INSERT INTO customers VALUES ('persisted', 'Migration probe', '2026-10-06T00:00:00.000Z')");
     const [second, third] = await Promise.all([createTestDb(schema), createTestDb(schema)]);
     await Promise.all([first.initialize(), second.initialize(), third.initialize()]);
-    expect((await second.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM schema_migrations'))?.n).toBe(4);
+    expect((await second.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM schema_migrations'))?.n).toBe(5);
     expect((await third.get<{ display_name: string }>("SELECT display_name FROM customers WHERE id = 'persisted'"))?.display_name).toBe('Migration probe');
     await first.run("UPDATE schema_migrations SET checksum = 'tampered'");
     await expect(second.initialize()).rejects.toThrow(/checksum mismatch/);

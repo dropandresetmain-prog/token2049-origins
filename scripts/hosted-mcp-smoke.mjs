@@ -7,14 +7,16 @@
  * It exercises exactly what ChatGPT does: 401 discovery, protected-resource + authorization-server metadata, dynamic client
  * registration, authorization code + PKCE (consent with the owner passcode), then MCP initialize, tools/list, find_offers
  * and (with --quote) create_quote, plus negative checks for a bad Origin and a replayed authorization code.
+ * With --payer-url and --payer-token-file it first wakes the hosted payer (free instances sleep) and checks its /health and /status; it never calls /pay.
  * Tokens and the passcode are never printed. Exit code 1 if any check fails.
  */
 import { createHash, randomBytes } from 'node:crypto';
 import { parseArgs } from 'node:util';
+import { readFileSync } from 'node:fs';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 
-const { values } = parseArgs({ options: { base: { type: 'string' }, quote: { type: 'boolean', default: false }, query: { type: 'string', default: 'international travel adapter' }, country: { type: 'string', default: 'US' } } });
+const { values } = parseArgs({ options: { base: { type: 'string' }, quote: { type: 'boolean', default: false }, query: { type: 'string', default: 'international travel adapter' }, country: { type: 'string', default: 'US' }, 'payer-url': { type: 'string' }, 'payer-token-file': { type: 'string' } } });
 const base = (values.base ?? '').replace(/\/+$/, '');
 const passcode = process.env.HOSTED_MCP_PASSCODE ?? '';
 if (!/^https?:\/\//.test(base) || passcode.length < 16) {
@@ -26,6 +28,21 @@ const redirect = 'https://chatgpt.com/connector_platform_oauth_redirect';
 let failed = 0;
 const check = (name, ok, extra = '') => { process.stdout.write(`${ok ? 'PASS' : 'FAIL'}  ${name}${extra ? '  ' + extra : ''}\n`); if (!ok) failed++; return ok; };
 const b64 = (b) => b.toString('base64url');
+
+if (values['payer-url']) {
+  const payer = values['payer-url'].replace(/\/+$/, '');
+  const token = values['payer-token-file'] ? readFileSync(values['payer-token-file'], 'utf8').trim() : '';
+  // The first request may wait out a cold start; later checks then run against an awake payer. Nothing keeps it awake afterwards.
+  const health = await fetch(`${payer}/health`, { signal: AbortSignal.timeout(120_000) }).catch(() => null);
+  check('payer /health', health?.status === 200, `status=${health?.status}`);
+  const st = await fetch(`${payer}/status`, { headers: { authorization: `Bearer ${token}` }, signal: AbortSignal.timeout(60_000) }).catch(() => null);
+  const body = st?.status === 200 ? await st.json().catch(() => ({})) : {};
+  check('payer /status reports the configured Cardano Preprod wallet', body.ok === true && body.source?.rail === 'cardano' && body.source?.network === 'cardano:preprod' && body.source?.readiness === 'configured', `status=${st?.status}${body.source ? ' address=' + body.source.displayAddress : ''}`);
+  const bad = await fetch(`${payer}/status`, { headers: { authorization: 'Bearer definitely-not-the-token-0123456789' }, signal: AbortSignal.timeout(30_000) }).catch(() => null);
+  check('payer refuses a wrong bearer token', bad?.status === 401, `status=${bad?.status}`);
+  const noTls = await fetch(`${payer}/pay`, { method: 'POST', headers: { 'content-type': 'application/json' }, body: JSON.stringify({ purchaseId: 'pur_0000000000' }), signal: AbortSignal.timeout(30_000) }).catch(() => null);
+  check('payer /pay without the token is refused (nothing is paid)', noTls?.status === 401, `status=${noTls?.status}`);
+}
 
 const unauth = await fetch(mcpUrl, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream' }, body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'tools/list' }) });
 const challenge = unauth.headers.get('www-authenticate') ?? '';

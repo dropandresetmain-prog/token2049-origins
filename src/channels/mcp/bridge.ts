@@ -21,7 +21,7 @@ const DEFAULT_TIMEOUT_MS = 60_000;
 export class BridgeClient {
   private readonly f: typeof fetch;
 
-  constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; fetch?: typeof fetch; timeoutMs?: number }) {
+  constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; fetch?: typeof fetch; timeoutMs?: number; statusTimeoutMs?: number }) {
     this.f = cfg.fetch ?? fetch;
   }
 
@@ -34,6 +34,7 @@ export class BridgeClient {
         ...endpoint,
         ...(config.fetch ? { fetch: config.fetch } : {}),
         ...(config.bridgeTimeoutMs ? { timeoutMs: config.bridgeTimeoutMs } : {}),
+        ...(config.bridgeStatusTimeoutMs ? { statusTimeoutMs: config.bridgeStatusTimeoutMs } : {}),
       })];
     });
   }
@@ -43,7 +44,7 @@ export class BridgeClient {
     try {
       const response = await this.f(`${this.cfg.url}/status`, {
         headers: { accept: 'application/json', authorization: `Bearer ${this.cfg.token}` },
-        redirect: 'error', signal: AbortSignal.timeout(Math.min(this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5000)),
+        redirect: 'error', signal: AbortSignal.timeout(this.cfg.statusTimeoutMs ?? Math.min(this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5000)),
       });
       if (!response.ok) return null;
       const body = z.object({ ok: z.literal(true), source: FundingSource.nullable() }).strict().safeParse(await response.json());

@@ -49,6 +49,7 @@ const PayerEnv = z.object({
   PAYER_ALLOWED_ASSET_UNIT: z.string().transform((s) => s.trim().toLowerCase()).refine((s) => CANON_ASSET.test(s), 'lovelace or policyId.assetNameHex'),
   PAYER_EXPECTED_PAY_TO: z.string().regex(/^addr_test1[0-9a-z]+$/),
   PAYER_LEDGER_FILE: z.string().min(1).refine(s => { try { payerLedgerPath(s); return true; } catch { return false; } }, 'absolute file path required'),
+  PAYER_WALLET_ADDRESS: z.string().regex(/^addr_test1[0-9a-z]+$/).optional(),
 });
 
 export interface PayerConfig {
@@ -65,7 +66,10 @@ export interface PayerConfig {
   maxAdaOutputLovelace: bigint;
   allowedAsset: string;
   expectedPayTo: string;
+  /** Empty when the ledger is supplied externally (hosted PostgreSQL ledger). */
   ledgerFile: string;
+  /** Expected public address of the signing wallet; when set, every signer must derive exactly this address. */
+  walletAddress?: string;
 }
 
 export interface BridgeConfig {
@@ -73,11 +77,13 @@ export interface BridgeConfig {
   tokenFile: string;
 }
 
-export function loadPayerConfig(env: NodeJS.ProcessEnv = process.env): PayerConfig {
+export function loadPayerConfig(env: NodeJS.ProcessEnv = process.env, opts: { ledger?: 'file' | 'external' } = {}): PayerConfig {
   // Treat empty strings (from a copied .env.payer.example) as unset so defaults and optionals apply.
   const cleaned: Record<string, string> = {};
   for (const [k, v] of Object.entries(env)) if (k.startsWith('PAYER_') || k.startsWith('BLOCKFROST_')) if (v !== undefined && v.trim() !== '') cleaned[k] = v.trim();
-  const parsed = PayerEnv.safeParse(cleaned);
+  // Hosted mode keeps its ledger in PostgreSQL: the file path is neither required nor accepted.
+  const schema = opts.ledger === 'external' ? PayerEnv.extend({ PAYER_LEDGER_FILE: z.undefined().optional() }) : PayerEnv;
+  const parsed = schema.safeParse(cleaned);
   if (!parsed.success) {
     const names = [...new Set(parsed.error.issues.map((i) => String(i.path[0])))].join(', ');
     throw new Error(`invalid payer configuration: ${names}`);
@@ -100,7 +106,8 @@ export function loadPayerConfig(env: NodeJS.ProcessEnv = process.env): PayerConf
     maxAdaOutputLovelace: BigInt(e.PAYER_MAX_ADA_OUTPUT_LOVELACE),
     allowedAsset: e.PAYER_ALLOWED_ASSET_UNIT,
     expectedPayTo: e.PAYER_EXPECTED_PAY_TO,
-    ledgerFile: e.PAYER_LEDGER_FILE,
+    ledgerFile: e.PAYER_LEDGER_FILE ?? '',
+    ...(e.PAYER_WALLET_ADDRESS ? { walletAddress: e.PAYER_WALLET_ADDRESS } : {}),
   };
 }
 

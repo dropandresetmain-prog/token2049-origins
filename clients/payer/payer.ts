@@ -25,7 +25,7 @@ import { readSecretFile, type PayerConfig } from './config.js';
 import { SettlementBreakdown, validateSettlement } from '../../src/contracts/settlement.js';
 import { fundingCommitment } from '../../src/funding/cardano/binding.js';
 import { createBoundSigner } from './signer.js';
-import { PayerLedger } from './ledger.js';
+import { PayerLedger, type LedgerPort } from './ledger.js';
 
 export type PayerErrorCode =
   | 'invalid_request'
@@ -35,6 +35,7 @@ export type PayerErrorCode =
   | 'conflict'
   | 'payment_rejected'
   | 'gateway_unreachable'
+  | 'rate_limited'
   | 'internal';
 
 /** Safe-to-return failure: messages are written here, never copied from gateway bodies or wallet code. */
@@ -62,7 +63,7 @@ export interface PayerDeps {
   fetchImpl?: typeof fetch;
   /** Build the signer lazily, only after policy passes. Tests inject a mock; production reads the mnemonic file. */
   createSigner?: () => ClientCardanoSigner;
-  ledger?: PayerLedger;
+  ledger?: LedgerPort;
   /** Gateway bearer token source. Default reads PAYER_GATEWAY_TOKEN_FILE on each payment. */
   readGatewayToken?: () => string;
   sleep?: (ms: number) => Promise<void>;
@@ -118,13 +119,14 @@ const sleepReal = (ms: number) => new Promise<void>((r) => setTimeout(r, ms));
 
 export class Payer {
   private readonly f: typeof fetch;
-  private readonly ledger: PayerLedger;
+  private readonly ledger: LedgerPort;
   private readonly sleep: (ms: number) => Promise<void>;
   private readonly now: () => Date;
   private readonly log: (e: Record<string, unknown>) => void;
 
   constructor(private readonly d: PayerDeps) {
     this.f = d.fetchImpl ?? fetch;
+    if (!d.ledger && !d.config.ledgerFile) throw new Error('payer ledger is not configured');
     this.ledger = d.ledger ?? new PayerLedger(d.config.ledgerFile);
     if (!d.ledger) this.ledger.assertReady();
     this.sleep = d.sleep ?? sleepReal;
@@ -135,7 +137,7 @@ export class Payer {
   /** Offline public identity only. Wallet derivation stays in the signer process; no provider requests. */
   async source(): Promise<FundingSource> {
     try {
-      this.ledger.assertReady();
+      await this.ledger.assertReady();
       const signer = this.d.createSigner ? this.d.createSigner() : this.defaultSigner('public-identity-only');
       const publicAddress = await signer.getAddress();
       return FundingSource.parse({
@@ -250,13 +252,18 @@ export class Payer {
 
     // 1. Current purchase. If we already paid it in an earlier run, report instead of paying again.
     const { raw: purchaseRaw, lite: purchase } = await this.getPurchase(purchaseId);
-    const prior = this.ledger.find(purchaseId);
+    const prior = await this.ledger.find(purchaseId);
     if (purchase.state !== 'awaiting_funding' || purchase.paymentState === 'submitted') {
       if (prior && (prior.status === 'signed' || prior.status === 'accepted') && purchase.funding.length > 0) {
-        this.ledger.upsert({ ...prior, status: 'accepted', transferReference: prior.transferReference ?? purchase.funding[0]!.transferReference, updatedAt: this.now().toISOString() });
+        await this.ledger.upsert({ ...prior, status: 'accepted', transferReference: prior.transferReference ?? purchase.funding[0]!.transferReference, updatedAt: this.now().toISOString() });
         return { purchase: purchaseRaw, transferReference: purchase.funding[0]!.transferReference, resumed: true };
       }
       throw new PayerError('conflict', 'purchase does not accept funding', purchaseRaw);
+    }
+
+    // An unfinished signing attempt is ambiguous: ledgers that opt in refuse instead of signing again.
+    if (prior?.status === 'signing' && this.ledger.failClosedOnStaleSigning) {
+      throw new PayerError('conflict', 'a previous signing attempt for this purchase did not finish; operator reconciliation required before paying');
     }
 
     // 2. Obtain the challenge (no payment header => 402).
@@ -286,23 +293,29 @@ export class Payer {
     } else {
       // Cumulative cap, counting this payment, enforced before signing. An earlier 'signing' reservation
       // for this same purchase is replaced, not double counted (the ledger holds one row per purchase).
-      const already = this.ledger.committed(c.network, c.allowedAsset) - (prior ? BigInt(prior.amountBaseUnits) : 0n);
+      const already = (await this.ledger.committed(c.network, c.allowedAsset)) - (prior ? BigInt(prior.amountBaseUnits) : 0n);
       if (already + amount > c.maxCumulative) throw new PayerError('policy_violation', 'payment refused by payer policy: cumulative_cap');
 
       const now = this.now();
       const dailyPrior = prior && (prior.status !== 'accepted' || prior.updatedAt.slice(0, 10) === now.toISOString().slice(0, 10)) ? BigInt(prior.amountBaseUnits) : 0n;
-      if (this.ledger.daily(c.network, c.allowedAsset, now) - dailyPrior + amount > c.maxDaily) {
+      if ((await this.ledger.daily(c.network, c.allowedAsset, now)) - dailyPrior + amount > c.maxDaily) {
         throw new PayerError('policy_violation', 'payment refused by payer policy: daily_cap');
       }
       const ts = now.toISOString();
       // Reserve first: if we crash after signing, the cap already reflects it.
-      this.ledger.upsert({ purchaseId, network: c.network, asset: c.allowedAsset, amountBaseUnits: entry.amount, payTo: entry.payTo, status: 'signing', header: null, transferReference: null, createdAt: ts, updatedAt: ts });
-      header = await this.sign(challenge, entry);
-      this.ledger.upsert({ purchaseId, network: c.network, asset: c.allowedAsset, amountBaseUnits: entry.amount, payTo: entry.payTo, status: 'signed', header, transferReference: null, createdAt: ts, updatedAt: this.now().toISOString() });
+      await this.ledger.upsert({ purchaseId, network: c.network, asset: c.allowedAsset, amountBaseUnits: entry.amount, payTo: entry.payTo, status: 'signing', header: null, transferReference: null, createdAt: ts, updatedAt: ts });
+      try {
+        header = await this.sign(challenge, entry);
+      } catch (e) {
+        // Signing failed in this process, so nothing was signed or sent: free the unsent reservation (ledgers without release keep it).
+        await this.ledger.release?.(purchaseId);
+        throw e;
+      }
+      await this.ledger.upsert({ purchaseId, network: c.network, asset: c.allowedAsset, amountBaseUnits: entry.amount, payTo: entry.payTo, status: 'signed', header, transferReference: null, createdAt: ts, updatedAt: this.now().toISOString() });
       this.log({ type: 'payer.signed', purchaseId, amountBaseUnits: amount.toString() });
     }
 
-    if (this.ledger.daily(c.network, c.allowedAsset, this.now()) > c.maxDaily) {
+    if ((await this.ledger.daily(c.network, c.allowedAsset, this.now())) > c.maxDaily) {
       throw new PayerError('policy_violation', 'payment refused by payer policy: daily_cap');
     }
 
@@ -368,7 +381,10 @@ export class Payer {
   private defaultSigner(commitment: string): ClientCardanoSigner {
     const c = this.d.config;
     const mnemonic = readFileSync(c.mnemonicFile, 'utf8');
-    return createBoundSigner(c, mnemonic, commitment);
+    const signer = createBoundSigner(c, mnemonic, commitment);
+    // A swapped or wrong mnemonic must never sign: the configured wallet identity is checked on every payment.
+    if (c.walletAddress && signer.getAddress() !== c.walletAddress) throw new Error('wallet identity mismatch');
+    return signer;
   }
 
   private async sendFunding(purchaseId: string, header: string): Promise<PayResult> {
@@ -400,7 +416,7 @@ export class Payer {
           throw new PayerError('gateway_unreachable', 'payment response did not confirm this purchase; retry the identical payment');
         }
         tx ??= lite.data.funding[0]!.transferReference;
-        this.markAccepted(purchaseId, tx);
+        await this.markAccepted(purchaseId, tx);
         return { purchase: body?.purchase ?? null, transferReference: tx, resumed: false };
       }
 
@@ -426,7 +442,7 @@ export class Payer {
         const got = await this.getPurchase(purchaseId).catch(() => null);
         if (got && got.lite.state !== 'awaiting_funding' && got.lite.funding.length > 0 && code !== 'payment_replayed') {
           const tx = got.lite.funding[0]!.transferReference;
-          this.markAccepted(purchaseId, tx);
+          await this.markAccepted(purchaseId, tx);
           return { purchase: got.raw, transferReference: tx, resumed: true };
         }
         throw new PayerError('conflict', code === 'payment_replayed' ? 'gateway reports this payment was already used' : 'purchase does not accept this payment', got?.raw);
@@ -439,9 +455,9 @@ export class Payer {
     throw new PayerError('gateway_unreachable', `payment sent but no confirmed answer (${lastNote}); re-run to resend the identical payment`);
   }
 
-  private markAccepted(purchaseId: string, tx: string | null): void {
-    const e = this.ledger.find(purchaseId);
-    if (e) this.ledger.upsert({ ...e, status: 'accepted', transferReference: tx ?? e.transferReference, updatedAt: this.now().toISOString() });
+  private async markAccepted(purchaseId: string, tx: string | null): Promise<void> {
+    const e = await this.ledger.find(purchaseId);
+    if (e) await this.ledger.upsert({ ...e, status: 'accepted', transferReference: tx ?? e.transferReference, updatedAt: this.now().toISOString() });
   }
 }
 

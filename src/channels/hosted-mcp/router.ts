@@ -103,7 +103,9 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
     const toolConfig: McpConfig = {
       gatewayUrl: config.gatewayUrl,
       gatewayToken: token,
-      bridgeTimeoutMs: 100_000,
+      // A free payer may be asleep: allow a cold start for /status and the payment call; durable payer history guards against repeats.
+      bridgeTimeoutMs: config.bridgeTimeoutMs ?? 100_000,
+      bridgeStatusTimeoutMs: config.bridgeStatusTimeoutMs ?? 60_000,
       ...(config.cardanoBridge ? { bridges: { cardano: config.cardanoBridge } } : {}),
       ...(opts.fetch ? { fetch: opts.fetch } : {}),
     };

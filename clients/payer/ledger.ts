@@ -104,3 +104,22 @@ export class PayerLedger {
     this.write(all);
   }
 }
+
+type Maybe<T> = T | Promise<T>;
+
+/**
+ * What the payer needs from a ledger. The file ledger implements it synchronously; the hosted payer's PostgreSQL ledger
+ * implements it asynchronously. The payer awaits every call, so both satisfy the same contract.
+ */
+export interface LedgerPort {
+  assertReady(): Maybe<void>;
+  exclusive<T>(fn: () => Promise<T>): Promise<T>;
+  find(purchaseId: string): Maybe<LedgerEntry | undefined>;
+  committed(network: string, asset: string): Maybe<bigint>;
+  daily(network: string, asset: string, now: Date): Maybe<bigint>;
+  upsert(entry: LedgerEntry): Maybe<void>;
+  /** True when a prior `signing` row must be refused rather than re-signed (ambiguous outcome). */
+  readonly failClosedOnStaleSigning?: boolean;
+  /** Remove an unsent reservation after an in-process signing failure. */
+  release?(purchaseId: string): Maybe<void>;
+}

@@ -17,10 +17,13 @@ export interface HostedMcpConfig {
   /** api_clients id of the hosted payer's gateway client (only used when payerTokenSha256 is set). */
   payerClientId: string;
   extraRedirectUris: string[];
-  /** The single hosted Cardano payer bridge on the private network, if configured. */
+  /** The single hosted Cardano payer (exact https origin of its free web service), if configured. */
   cardanoBridge?: { url: string; token: string };
   /** SHA-256 (hex) of the hosted payer's gateway token. Only the hash is configured; it registers the payer's gateway client. */
   payerTokenSha256?: string;
+  /** Test seams for slow payers (production values are set in the router). */
+  bridgeTimeoutMs?: number;
+  bridgeStatusTimeoutMs?: number;
   /** Loopback URL of this same process, used by the MCP tools to call the gateway contract. */
   gatewayUrl: string;
 }
@@ -58,21 +61,23 @@ export function parsePublicOrigin(value: string | undefined, label: string): URL
   return u;
 }
 
-/** Private-network payer bridge: a single-label host (Render service name) or loopback. Never a public name. */
-export function parsePrivateBridgeUrl(value: string, label: string): string {
+/**
+ * The one hosted payer origin the gateway may call: https (loopback http only for local development), a bare origin, no
+ * credentials, and never the gateway's own origin. It is configured, never discovered, and there is no fallback.
+ */
+export function parsePayerBridgeUrl(value: string, label: string, gatewayOrigin?: string): string {
   let u: URL;
   try {
     u = new URL(value.trim());
   } catch {
     throw new HostedConfigError(`${label} is not a valid URL`);
   }
-  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new HostedConfigError(`${label} must be http(s)`);
   if (u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '') || /[\s\\]/.test(value.trim())) {
     throw new HostedConfigError(`${label} must be a bare origin without credentials`);
   }
   const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
-  const privateName = /^[a-z0-9][a-z0-9-]{0,62}$/.test(u.hostname); // single label: resolvable only inside the private network
-  if (!loopback && !privateName) throw new HostedConfigError(`${label} must name a private-network service (single-label host) or loopback`);
+  if (u.protocol !== 'https:' && !(u.protocol === 'http:' && loopback)) throw new HostedConfigError(`${label} must be an https origin`);
+  if (gatewayOrigin && u.origin === gatewayOrigin) throw new HostedConfigError(`${label} must be a different service than the gateway`);
   return u.origin;
 }
 
@@ -94,7 +99,7 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
   let cardanoBridge: HostedMcpConfig['cardanoBridge'];
   if (env.CARDANO_PAYER_BRIDGE_URL || env.CARDANO_PAYER_BRIDGE_TOKEN_FILE) {
     if (!env.CARDANO_PAYER_BRIDGE_URL || !env.CARDANO_PAYER_BRIDGE_TOKEN_FILE) throw new HostedConfigError('CARDANO_PAYER_BRIDGE_URL and CARDANO_PAYER_BRIDGE_TOKEN_FILE must be set together');
-    cardanoBridge = { url: parsePrivateBridgeUrl(env.CARDANO_PAYER_BRIDGE_URL, 'CARDANO_PAYER_BRIDGE_URL'), token: readSecret(env.CARDANO_PAYER_BRIDGE_TOKEN_FILE, 'CARDANO_PAYER_BRIDGE_TOKEN_FILE', 24) };
+    cardanoBridge = { url: parsePayerBridgeUrl(env.CARDANO_PAYER_BRIDGE_URL, 'CARDANO_PAYER_BRIDGE_URL', publicUrl.origin), token: readSecret(env.CARDANO_PAYER_BRIDGE_TOKEN_FILE, 'CARDANO_PAYER_BRIDGE_TOKEN_FILE', 24) };
   }
 
   const payerTokenSha256 = env.MCP_PAYER_GATEWAY_TOKEN_SHA256?.trim().toLowerCase();
