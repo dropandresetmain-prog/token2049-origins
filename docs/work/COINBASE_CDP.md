@@ -42,9 +42,9 @@ npm run cdp:treasury -- --test-transfer
 
 ## Status and evidence
 
-Current status: **PARTIAL / blocked on private CDP Wallet credentials and track confirmation**. Process/user/machine environment name inventories, recent Downloads and `C:\Dev` config-file key-name inventories, PowerShell profile names, and canonical `.env.local` key names contained no CDP Wallet credentials. A recent portal sandbox API-key page may refer to a separate product surface; it has not been assumed to authenticate API Key Wallet. No credential values were read. No CDP API call, wallet creation, faucet request, or transfer was attempted in this lane.
+Current status: **PARTIAL / blocked on API Key Wallet credentials and track confirmation**. The existing Drop & Reset SANDBOX portal account is confirmed to provide sandbox credentials for Coinbase payment integrations and simulated accounts; it is not evidence of API Key Wallet credentials. Process/user/machine environment name inventories, recent Downloads and `C:\Dev` config-file key-name inventories, PowerShell profile names, and canonical `.env.local` key names contained no Wallet credential names. No credential values were read. No authenticated Wallet API call, wallet creation, faucet request, or transfer was attempted in this lane.
 
-Local contract tests and TypeScript checks are recorded in `docs/evidence/coinbase-cdp/local-checks.json`. A real authenticated wallet proof requires private environment injection of `CDP_API_KEY_ID`, `CDP_API_KEY_SECRET`, and `CDP_WALLET_SECRET`, then explicit provisioning, independent balance readback, and (if still desired) one invocation of `--test-transfer`.
+Local contract tests and TypeScript checks are recorded in `docs/evidence/coinbase-cdp/local-checks.json`. A real authenticated wallet proof requires API Key Wallet credentials (`CDP_API_KEY_ID`, `CDP_API_KEY_SECRET`, and `CDP_WALLET_SECRET`), then explicit provisioning and independent balance readback. The separate sandbox payment credentials must not be substituted. Only after those checks succeed should an operator consider the one-time `--test-transfer` action.
 
 ## Review findings
 

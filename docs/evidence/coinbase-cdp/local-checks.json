@@ -21,5 +21,5 @@
       "result": "PASS"
     }
   ],
-  "externalEvidence": "None. No CDP Wallet credential names were found in process/user/machine environment inventories, recent Downloads and C:\\Dev configuration key-name inventory, PowerShell profiles, or local env key names; no authenticated call or transaction was attempted. A portal sandbox API key was not assumed to be a Wallet API credential."
+  "externalEvidence": "The existing Drop & Reset SANDBOX portal account is confirmed to provide payment-integration sandbox credentials and simulated accounts, not API Key Wallet credentials. No CDP Wallet credential names were found in process/user/machine environment inventories, recent Downloads and C:\\Dev configuration key-name inventory, PowerShell profiles, or local env key names. No authenticated Wallet API call, wallet creation, faucet request, or transaction was attempted."
 }
