@@ -9,6 +9,7 @@
  * merged. Raw `details_json`, checkpoints, fulfillment details and provider payloads are not exposed.
  */
 import type { Db } from '../infrastructure/db.js';
+import { EvidenceMode as EvidenceModeSchema } from '../contracts/common.js';
 import type { EvidenceMode } from '../contracts/common.js';
 import type { Money } from '../contracts/money.js';
 import type { QuoteView, ReceiptView } from '../contracts/commerce.js';
@@ -28,7 +29,9 @@ export interface Provenance {
   evidenceMode: EvidenceMode;
 }
 
-/** A fixture environment is local; any other provider environment is a (sandbox/test) external response. */
+export type ExecutionEvidenceStatus = 'not_started' | 'pending' | 'result_recorded' | 'receipt_issued' | 'unavailable';
+
+/** Classifies quote-source provenance only; an execution status accompanies environment-only fallback. */
 export const modeForProviderEnvironment = (environment: string): EvidenceMode => (environment === 'fixture' ? 'local_fixture' : 'fresh_external');
 
 /** Chain environment label for a funding network; fixtures never claim a chain. */
@@ -70,12 +73,69 @@ const parse = <T>(s: string | null): T | null => {
   }
 };
 
+function isEvidenceMode(value: unknown): value is EvidenceMode {
+  return EvidenceModeSchema.safeParse(value).success;
+}
+
+function persistedReceiptMode(receiptJson: string | null): EvidenceMode | null {
+  const receipt = parse<{ evidenceMode?: unknown }>(receiptJson);
+  return receipt && isEvidenceMode(receipt.evidenceMode) ? receipt.evidenceMode : null;
+}
+
+function persistedResultMode(resultJson: string | null): EvidenceMode | null {
+  const result = parse<{ evidence?: unknown }>(resultJson);
+  if (!result || !Array.isArray(result.evidence)) return null;
+  const first = result.evidence[0];
+  if (!first || typeof first !== 'object' || !('evidenceMode' in first)) return null;
+  const mode = (first as { evidenceMode?: unknown }).evidenceMode;
+  return isEvidenceMode(mode) ? mode : null;
+}
+
+/**
+ * Receipt/result provenance overrides environment inference. When neither exists, this is only the quote
+ * provider's environment provenance; executionEvidenceStatus makes clear that it is not a completed proof.
+ */
+function purchaseEvidenceProjection(
+  environment: string,
+  receiptJson: string | null,
+  resultJson: string | null,
+  attemptStatus: string | null,
+): { provenance: Provenance; executionEvidenceStatus: ExecutionEvidenceStatus } {
+  const receipt = parse<ReceiptView>(receiptJson);
+  const result = parse<{ kind?: unknown }>(resultJson);
+  const evidenceMode =
+    persistedReceiptMode(receiptJson) ??
+    persistedResultMode(resultJson) ??
+    modeForProviderEnvironment(environment);
+
+  let executionEvidenceStatus: ExecutionEvidenceStatus;
+  if (receipt) executionEvidenceStatus = 'receipt_issued';
+  else if (result?.kind === 'unknown' || attemptStatus === 'started' || attemptStatus === 'unknown') {
+    executionEvidenceStatus = 'pending';
+  } else if (result) executionEvidenceStatus = 'result_recorded';
+  else if (resultJson !== null || attemptStatus !== null) executionEvidenceStatus = 'unavailable';
+  else executionEvidenceStatus = 'not_started';
+
+  return { provenance: { environment, evidenceMode }, executionEvidenceStatus };
+}
+
 /* ---------------- purchases ---------------- */
 
 export function listPurchases(db: Db, customerId: string, limit = 50) {
-  const rows = db.all<PurchaseRow & { q_category: string; q_route: string; q_env: string; q_public: string }>(
-    `SELECT p.*, q.category AS q_category, q.route AS q_route, q.provider_environment AS q_env, q.public_json AS q_public
+  const rows = db.all<PurchaseRow & {
+    q_category: string;
+    q_route: string;
+    q_env: string;
+    q_public: string;
+    execution_status: AttemptRow['status'] | null;
+    execution_result: string | null;
+  }>(
+    `SELECT p.*, q.category AS q_category, q.route AS q_route, q.provider_environment AS q_env, q.public_json AS q_public,
+            latest.status AS execution_status, latest.result_json AS execution_result
        FROM purchases p JOIN quotes q ON q.id = p.quote_id
+       LEFT JOIN execution_attempts latest
+         ON latest.purchase_id = p.id
+        AND latest.attempt_no = (SELECT MAX(a.attempt_no) FROM execution_attempts a WHERE a.purchase_id = p.id)
       WHERE p.customer_id = ?
       ORDER BY p.created_at DESC, p.id DESC
       LIMIT ?`,
@@ -84,6 +144,7 @@ export function listPurchases(db: Db, customerId: string, limit = 50) {
   );
   return rows.map((p) => {
     const qv = parse<QuoteView>(p.q_public);
+    const evidence = purchaseEvidenceProjection(p.q_env, p.receipt_json, p.execution_result, p.execution_status);
     return {
       id: p.id,
       state: p.state,
@@ -94,7 +155,8 @@ export function listPurchases(db: Db, customerId: string, limit = 50) {
       merchantPaymentStatus: p.merchant_payment_status,
       payable: qv?.payablePrincipal ?? null,
       createdAt: p.created_at,
-      provenance: { environment: p.q_env, evidenceMode: modeForProviderEnvironment(p.q_env) } satisfies Provenance,
+      provenance: evidence.provenance,
+      executionEvidenceStatus: evidence.executionEvidenceStatus,
     };
   });
 }
@@ -109,9 +171,18 @@ export function purchaseDetail(db: Db, p: PurchaseRow) {
   const qv = parse<QuoteView>(q.public_json);
   const receipt = parse<ReceiptView>(p.receipt_json);
   const quoteMode = modeForProviderEnvironment(q.provider_environment);
-  // The receipt states the evidence mode the executor actually reported; it wins over the environment default.
-  const purchaseMode: EvidenceMode = receipt?.evidenceMode ?? quoteMode;
-  const provenance: Provenance = { environment: q.provider_environment, evidenceMode: purchaseMode };
+  const latestExecution = db.get<{ status: AttemptRow['status']; result_json: string | null }>(
+    'SELECT status, result_json FROM execution_attempts WHERE purchase_id = ? ORDER BY attempt_no DESC LIMIT 1',
+    p.id,
+  );
+  const evidence = purchaseEvidenceProjection(
+    q.provider_environment,
+    p.receipt_json,
+    latestExecution?.result_json ?? null,
+    latestExecution?.status ?? null,
+  );
+  const purchaseMode = evidence.provenance.evidenceMode;
+  const provenance = evidence.provenance;
 
   const funding = db
     .all<FundingEvidenceRow>('SELECT * FROM funding_evidence WHERE purchase_id = ? ORDER BY verified_at, id', p.id)
@@ -158,8 +229,8 @@ export function purchaseDetail(db: Db, p: PurchaseRow) {
   });
 
   const attempts = db
-    .all<Pick<AttemptRow, 'attempt_no' | 'status' | 'started_at' | 'finished_at'>>(
-      'SELECT attempt_no, status, started_at, finished_at FROM execution_attempts WHERE purchase_id = ? ORDER BY attempt_no',
+    .all<Pick<AttemptRow, 'attempt_no' | 'status' | 'started_at' | 'finished_at' | 'result_json'>>(
+      'SELECT attempt_no, status, started_at, finished_at, result_json FROM execution_attempts WHERE purchase_id = ? ORDER BY attempt_no',
       p.id,
     )
     .map((a) => ({
@@ -167,7 +238,10 @@ export function purchaseDetail(db: Db, p: PurchaseRow) {
       status: a.status,
       startedAt: a.started_at,
       finishedAt: a.finished_at,
-      provenance,
+      provenance: {
+        environment: q.provider_environment,
+        evidenceMode: persistedResultMode(a.result_json) ?? purchaseMode,
+      },
     }));
 
   const events = db
@@ -195,6 +269,7 @@ export function purchaseDetail(db: Db, p: PurchaseRow) {
       createdAt: p.created_at,
       updatedAt: p.updated_at,
       provenance,
+      executionEvidenceStatus: evidence.executionEvidenceStatus,
     },
     // Curated commercial facts only. Omit provider prose, terms, customer ID, and fulfillment data.
     quote: qv

@@ -127,6 +127,79 @@ describe('evidence API and inspect shell', () => {
     expect(own.body.execution.attempts[0] ?? {}).not.toHaveProperty('providerReference');
   });
 
+  it('uses persisted fixture result provenance in list and detail without claiming a pending result is complete', async () => {
+    const h = await setup();
+    const actor = authenticate(h.db, `Bearer ${h.alice.token}`, 'provenance-request');
+    const offers = await h.gw.core.searchOffers(actor, {
+      category: 'retail', query: 'test tee', quantity: 1, shipToCountry: 'SG',
+      spendCeiling: { currency: 'USD', amountMinor: '10000', scale: 2 },
+    });
+    const quote = await h.gw.core.createQuote(actor, offers[0]!.offerId, {
+      category: 'retail', email: 'buyer@example.com',
+      shippingAddress: { firstName: 'Private', lastName: 'Buyer', address1: '99 Private Street', city: 'Singapore', zip: '018989', countryCode: 'SG' },
+    });
+    const created = await h.gw.core.createPurchase(actor, {
+      quoteId: quote.quoteId,
+      approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest },
+      fundingRail: 'cardano',
+    }, 'evidence-provenance-test');
+    const purchaseId = created.purchase.purchaseId;
+    const quoteRow = h.db.get<{ public_json: string }>('SELECT public_json FROM quotes WHERE id = ?', quote.quoteId)!;
+    const publicQuote = JSON.parse(quoteRow.public_json) as Record<string, unknown>;
+    publicQuote.providerEnvironment = 'test';
+    h.db.run('UPDATE quotes SET provider_environment = ?, public_json = ? WHERE id = ?', 'test', JSON.stringify(publicQuote), quote.quoteId);
+
+    const before = await h.call('GET', '/v1/evidence/purchases', h.alice.token);
+    const beforeRow = before.body.purchases.find((row: { id: string }) => row.id === purchaseId);
+    expect(beforeRow).toMatchObject({
+      provenance: { environment: 'test', evidenceMode: 'fresh_external' },
+      executionEvidenceStatus: 'not_started',
+    });
+    const beforeDetail = await h.call('GET', `/v1/evidence/purchases/${purchaseId}`, h.alice.token);
+    expect(beforeDetail.body.purchase.provenance).toEqual(beforeRow.provenance);
+    expect(beforeDetail.body.purchase.executionEvidenceStatus).toBe('not_started');
+
+    const now = h.clock.now().toISOString();
+    const result = {
+      kind: 'unknown',
+      reason: 'provider outcome is pending',
+      providerReference: null,
+      evidence: [{
+        source: 'fixture:shopify',
+        environment: 'fixture',
+        evidenceMode: 'local_fixture',
+        reference: 'fixture-result',
+        observedAt: now,
+        details: {},
+      }],
+    };
+    h.db.run(
+      `INSERT INTO execution_attempts(id, purchase_id, attempt_no, idempotency_key, status, provider_reference, checkpoints_json, result_json, started_at, finished_at)
+       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+      'att_evidenceprovenance01',
+      purchaseId,
+      1,
+      'evidence-provenance-attempt-1',
+      'unknown',
+      null,
+      '{}',
+      JSON.stringify(result),
+      now,
+      null,
+    );
+
+    const listed = await h.call('GET', '/v1/evidence/purchases', h.alice.token);
+    const row = listed.body.purchases.find((item: { id: string }) => item.id === purchaseId);
+    const detail = await h.call('GET', `/v1/evidence/purchases/${purchaseId}`, h.alice.token);
+    expect(row).toMatchObject({
+      provenance: { environment: 'test', evidenceMode: 'local_fixture' },
+      executionEvidenceStatus: 'pending',
+    });
+    expect(detail.body.purchase.provenance).toEqual(row.provenance);
+    expect(detail.body.purchase.executionEvidenceStatus).toBe('pending');
+    expect(detail.body.execution.attempts[0].provenance.evidenceMode).toBe('local_fixture');
+  });
+
   it('requires operator scope for treasury, bank and refresh while storing masked sandbox observations', async () => {
     const h = await setup();
     expect((await h.call('GET', '/v1/evidence/treasury', h.alice.token)).status).toBe(403);
