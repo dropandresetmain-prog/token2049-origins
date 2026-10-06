@@ -1,5 +1,10 @@
 # Runbook — Capsule integrated baseline
 
+Current hosted rehearsal: [deployment evidence](evidence/render-rehearsal.md), 7 October 2026.
+Capsule is live at `https://token2049-origins.onrender.com`; that exact origin is PUBLIC_BASE_URL.
+The earlier no-deployment statements below record previous lanes. The rehearsal deploys an isolated
+branch with auto-deploy off, and leaves Solana disabled pending an approved pinned HTTPS tunnel.
+
 Current authority: the integrated main baseline, including native Masumi. See [ACTIVE_TASK](work/ACTIVE_TASK.md), [current integration verification](work/MASUMI_INTEGRATION.md), [historical pre-Masumi verification](evidence/pre-masumi-integration.md) and [issue triage](KNOWN_ISSUES.md). Retained Cardano/Solana, Nuitée, Atlas and OCBC evidence passed within their stated limits. Shopify paid/Global exact quote and ChatGPT host remain unresolved or unverified. No provider/chain/payment/deployment action is authorized by local checks.
 
 The native Masumi task service runs separately on loopback; startup/configuration is in [ENVIRONMENT](ENVIRONMENT.md#masumisokosumi). Its fee is separate from direct purchase principal. Public Sokosumi marketplace hosting/authentication/delivery remains unverified.

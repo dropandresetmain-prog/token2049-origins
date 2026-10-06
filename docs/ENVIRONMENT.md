@@ -171,7 +171,10 @@ With variables already in the process environment, `npm run channel:masumi` laun
 
 ## Render deployment
 
-render.yaml points at main with auto-deploy off. Deployment has not occurred on this baseline.
+render.yaml points at main with auto-deploy off. The 7 October rehearsal is live from the isolated
+`codex/render-rehearsal-solana-https` branch at `https://token2049-origins.onrender.com`; that same
+HTTPS origin is frozen as PUBLIC_BASE_URL. Solana is deliberately disabled pending a trusted tunnel.
+See [deployment evidence](evidence/render-rehearsal.md) for exact SHA, readiness and limitations.
 
 Before deployment:
 - verify secrets in Render rather than copying local env wholesale;
