@@ -1,7 +1,7 @@
 # Channel contract v1 — for channel lanes (MCP, ChatGPT, Sokosumi/Masumi, console)
 
 Canonical schemas: [`src/contracts/`](../../src/contracts/) (zod, executable). This document summarizes them; on
-conflict the code wins. The core lead owns changes; other lanes propose changes (PR against `build/commerce-core`).
+conflict the code wins. After pre-Masumi promotion, `main` is the implementation baseline; future lanes propose changes against it. Implemented channels are HTTP and MCP; ChatGPT host connectivity is unverified and Masumi is pending.
 
 ## Rules every channel follows
 
@@ -131,7 +131,7 @@ does no external work and adds no tables or alternate truth store.
 `order_created_unpaid` commerce status is never a completed purchase. `unresolved` means the provider outcome is not
 yet known; the core reconciles by readback and never re-executes.
 
-## Funding (direct Cardano, x402 v2)
+## Funding (selected Cardano or Solana, x402 v2)
 
 `POST …/fund` without a payment header ⇒ `402` with `PAYMENT-REQUIRED` (base64 JSON) and the same JSON body:
 `{x402Version:2, resource, accepts:[{scheme:"exact", network:"cardano:preprod", amount, asset:"<policyId>.<assetNameHex>", payTo, maxTimeoutSeconds, extra}]}`.
@@ -140,7 +140,9 @@ facilitator **before** recording funding; the purchase executes later in the wor
 evidence. Success ⇒ `202` + `PAYMENT-RESPONSE`. Replay ⇒ `409 payment_replayed`. Already funded ⇒ `409 conflict`
 (no settlement attempted).
 
-## Masumi/Sokosumi seam
+The selected fundingOptionId controls the adapter; no rail is inferred. Solana Devnet uses the same canonical purchase/approval/funding/evidence model and disclosed 1:1000 policy. Its supplied payer requires authenticated /prepare co-signing and durable candidate recovery. Gateway contains no payer keys. See [Solana report](../work/SOLANA_FIX.md). Stock-client interoperability is not claimed.
+
+## Masumi/Sokosumi seam (pending, not integrated)
 
 - Map `externalTaskId → purchaseId` in the Masumi lane's own storage; call core with idempotency key `sokosumi:<id>`.
 - Masumi funding evidence, if proven, becomes a **separate funding adapter** (`rail: "masumi"`), not a channel shortcut.

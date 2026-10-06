@@ -1,156 +1,61 @@
-# Known issues and review triage
+# Current Capsule issues
 
-Implementation checkpoint: `beac0228eec8418380b575e1d90665da3e939989`, reviewed and tested locally on 2026-10-06. No external purchase has passed. Findings below distinguish fixed safety issues from operational blockers and accepted first-lane limits.
+Pre-Masumi integration. This is the current operational triage; older lane dispositions are
+historical evidence in Git and the append-only E2E/Global reports. Local passing tests do not
+resolve external gaps. See [verification](evidence/pre-masumi-integration.md) and
+[retained provider results](work/COMPLETED_LANES.md).
 
-## PostgreSQL migration findings
-
-| Classification | Finding / affected files / evidence | Recommendation | Risk of deferring |
-|---|---|---|---|
-| Act Now — resolved | Startup reclaimed other workers' live leases; stale workers could complete/reschedule a newer claim. src/core/worker.ts. Independent-connection lease/expiry regression passes. | Recover only expired leases; fence status writes; lock purchase work across provider I/O. | Concurrent retrieval or repeated job ownership changes. |
-| Act Now — resolved | Async confirmation could turn an already applied proof into an unapplied obligation after another confirmer committed. src/core/worker.ts. Recheck pending_confirmation in the transaction. | Keep transactional proof/state rechecks and unique journal/proof constraints. | Misclassified customer obligation or duplicate financial processing. |
-| Investigate Now | Free Render database expires 5 November 2026, 14:55 Singapore time; 1 GB and no managed backups. Official CLI metadata and Render free-plan docs. | Export before expiry; obtain explicit authorization before any paid upgrade. | Loss of access and eventual deletion; no durable hosted retention claim beyond the trial. |
-| Ignore / Accept Risk | Core writes serialize through one short PostgreSQL advisory lock. src/infrastructure/db.ts; capacity/idempotency tests across pools pass. | Keep one worker for this hackathon; external calls remain outside transactions. | Limited write throughput; lock timeouts fail safely rather than oversubscribe capacity. |
-
-Provider/payer policy findings from the separate review lane are excluded; this migration changes no
-Atlas gate, Cardano funding contract, Shopify/Nuitée payment behavior, MCP authority or payer policy.
-
-## Act Now — resolved locally
-
-| Finding / why it matters | Action implemented | Risk if omitted; remaining evidence |
-|---|---|---|
-| Settlement could precede durable funding evidence and lose a real receipt on crash. Same-hash retries could collide with completed jobs. | Persist candidate and recovery job before settlement; candidate-specific dedupe; startup job repair; one immutable replay reference. | Lost customer funds or stranded recovery. Real database restart and same-header fixture regressions pass; live crash recovery still unverified. |
-| Pre-settlement rejection could lock a purchase forever. | Explicit `settlementAttempted:false` clears only proven pre-settlement candidates; ambiguous outcomes keep recovery and refuse another transfer. | Invalid signatures could hold capacity or a retry could double spend. Local rejection/ambiguity tests pass. |
-| Expiry could cross async readiness/verification/confirmation or provider preparation. Late submitted evidence could lose confirmation work. | Signed transaction TTL must end by quote expiry; recheck after awaited gates and at provider commit markers; continue confirmation after closure; record late funds as unapplied liability. | Unapproved expired spend or unrecorded customer receipts. Local late/expired boundary tests pass. |
-| Recovery could change commitment/payee after deployment origin or config changes. | Freeze funding resource URL; confirmation/recovery use stored payee/asset/commitment; missing credentials remain pending. | Actual old transfers could be falsely invalidated. Rotation/origin/restart tests pass; legacy records require their old origin. |
-| Refresh could regress a paid receipt or stop silently on transport errors/retry exhaustion. | Forward-only consistent paid ticketing-to-ticketed refresh; read-only hourly continuation and manual-required events for funding/ticket jobs. | False receipt facts or abandoned confirmation. Local unknown/thrown-error/threshold tests pass. |
-| Unauthorized charge currency/scale/amount could release capacity and recognize principal. | Keep unresolved exposure, retain greater same-unit reservation, preserve anomaly event and prohibit automatic later success/cancellation from erasing it. | Unfunded liabilities or capacity reuse. Local monetary mismatch tests pass; manual financial reconciliation has no mutation API. |
-| Nuitée HTTP 408/5xx could be treated as definite rejection; readback could omit purchase identities. | Ambiguous status takes precedence; exact booking/client/hotel identities required before completion/cancellation. | Released exposure or unsupported success. Fake-provider regression tests pass. |
-| Atlas order totals could omit extra fees or readback amount/reference. | Require explicit zero fees before payment, plus independent order identity and observed charged amount/currency. | Unauthorized fee or false paid claim. No fee-bearing route is enabled; live response semantics need verification. |
-| Test-balance usage could be booked as card payable. | Separate provider-test-balance account/capacity usage and truthful receipt limitation. | Misleading liabilities and claimed card settlement. Balanced local journal tests pass. |
-| Numeric provider handles could be redacted in restart checkpoints. | Preserve opaque private checkpoint reference; redact public event/PII/token outputs. | Lost reconciliation handles. Numeric-reference and token-redaction regressions pass. |
-| MCP could send bearer authority to remote cleartext gateway/bridge. | HTTPS except loopback gateway; loopback-only bridge; ambiguous URLs and redirects refused; default MCP scope excludes funding. | Credential/payer authority disclosure. URL and real local redirect tests pass. |
-| Environment-only evidence list could label a fixture as fresh external proof. | Persisted receipt/result provenance wins; execution-evidence status distinguishes source fallback from execution proof. | Fabricated external acceptance. Fixture-under-test-environment regression passes. |
-
-The Docker access/build concern was resolved through permitted local access: image build, non-root Chromium, auth and persistent-volume restart checks PASS on Linux ARM64. Deployment remains NOT_RUN; repeat checks for its actual architecture/environment.
-
-## Investigate Now — open
+## Act Now
 
 | Issue / why it matters | Recommended action | Risk of deferring |
 |---|---|---|
-| All provider/funding credentials absent. | Provision privately and follow TEST_CHECKLIST fresh funded acceptance sequence. | Local success cannot substantiate a working external purchasing demo. Every external row remains BLOCKED_EXTERNAL. |
-| Atlas payment-path approval and all-in fee semantics are unresolved. | Founder explicitly approves bounded sandbox test balance, or supplies an evidenced permitted card/VCC mechanism. Verify actual latest fee field; retain zero-fee fail-closed rule. | No paid Atlas demo; enabling the flag or guessing fee semantics risks unauthorized spending claims. Flag remains false. |
-| Shopify dev-store provisioning and live checkout/GraphQL behavior are unverified. | Provision own dev store, Bogus gateway, tokens/read_orders access and installed browser; verify exact tax/shipping and selectors using synthetic identities. | Missing permissions, unstable checkout or incomplete tax quote could block the run. No Admin mark-paid workaround is permitted. |
-| Nuitée sandbox key/identity/paid response fields unverified against this account. | Confirm sandbox entitlement and exact independent booking/client/hotel identity fields before acceptance. | Strict adapter may remain unknown; do not drop identity checks to manufacture success. |
-| OCBC subscriptions/session and card API contracts remain unverified. | Verify current entitled account/card/history endpoints from official documentation and fresh masked read-only calls; record 403/900908 and historical dates honestly. | Inaccessible or obsolete APIs; bank evidence cannot be claimed. Account Swagger/hackathon references alone are insufficient. |
+| Future signer use must preserve canonical configuration and protected Cardano/Solana histories. Existing Cardano budget is exhausted; a legacy independent signer bypasses it. | Before any future authorized spending, use the bounded payer and existing absolute shared ledger; privately provision canonical names. Never reset histories or run the legacy signer concurrently. No provisioning/spending performed here. | Duplicate/out-of-policy spending or lost recovery authority. This does not block offline integration. |
+
+Resolved in this candidate: missing Solana ws runtime peer and incomplete gateway example config.
+Inherited safety fixes remain implemented: durable funding recovery, lease fencing, fee scaling,
+explicit funding selection, conservative unknown outcomes, strict provider readback, bounded payer
+history, current Shopify PCI/actionability/diagnostics and retained-shadow discovery exclusion.
+These are not open issues; their original evidence is preserved.
+
+## Investigate Now
+
+| Issue / why it matters | Recommended action | Risk of deferring |
+|---|---|---|
+| Deterministic Shopify paid acceptance is UNRESOLVED: pur_01M48PSSTDQDR4VGPAQPC2VRYZ had one Pay, held reservation, no confirmed order/receipt. Zero orders does not prove not-sent. | Reconcile only the original attempt read-only; do not retry/mutate or create replacement payment. Preserve evidence. | Unknown merchant outcome and blocked paid acceptance; retry could duplicate. |
+| Original abandoned-checkout lookup lacks protected AbandonedCheckout approval despite read_orders. | Obtain original Admin Timeline evidence through an authorized human lookup. No scope expansion here. | Original error/root cause remains unavailable; fresh browser strings cannot reconstruct it. |
+| Global shadow exact sandbox quote remains unresolved; shipping/tax/total never froze. | Investigate original row/rate/tax mismatch in a future authorized read-only check; preserve strict quote checks. | Global lane remains PARTIAL; parser fixtures cannot prove external quote/order acceptance. |
+| Official Catalog transaction-offer retention interpretation is unconfirmed. | Clarify reduced durable transaction snapshots against official no-caching guidance before wider/deployed operation. | Possible usage-policy conflict; do not broaden retention claims. |
+| Atlas ambiguous-create lookup/recovery NOT_VERIFIED. Ticketing evidence passed separately. | Verify safe read-only recovery in a separately authorized acceptance task; do not repeat uncertain create. | An unknown created order can remain unresolved; blind repeat risks duplication. |
+| ChatGPT host MCP connection NOT_VERIFIED. Protocol tests use fixtures/local core. | Test actual host connection in a later authorized task, preserving canonical tools/authority. | Host authentication/delivery may fail despite protocol PASS. |
+| Deployment environment, token validity, public origin, browser architecture, US market and rail readiness remain unverified. Template alone is not runtime proof. | Verify actual configuration at an authorized deployment checkpoint; use public Storefront auth, DATABASE_URL and BLOCKFROST_PROJECT_ID; preserve histories. | Unusable checkout/rail or changed funding commitments. No deployment in this integration. |
+| Recorded free Render DB expires 5 November 2026 at 14:55 Singapore, no managed backups. | Recheck service metadata before use and export before expiry; paid upgrade needs authorization. | Hosted data/access loss; recorded date is historical metadata, not a fresh check. |
+| Solana requires authenticated /prepare and the provided payer. | Use supplied payer; design durable stock-client preparation separately before claiming interoperability. | Stock clients are rejected; no universal x402-client compatibility claim. |
 
 ## Park for Later
 
 | Issue / why it matters | Recommended action | Risk of deferring |
 |---|---|---|
-| Write-only purchase clients cannot retrieve idempotent retry results. | Return the owner-scoped view within write retry or define a combined scope requirement. Defaults already include read. | Custom minimal clients get authorization failures on retries. |
-| Masked bank last-four identities can collide when projecting latest balances. | Persist a private stable pseudonymous source identity separately from display masking. | Distinct observations can collapse. Journal/capacity is unaffected. |
-| No operator mutation/refund automation is supplied. | Design audited, independently verified manual reconciliation/refund workflows as a separate milestone. | Liabilities/held exposure need manual investigation; refunds are not automatically sent. Never repair through raw mark-paid/journal edits. |
+| Shopify SG market unsupported. | Add evidenced sellability/currency/shipping support separately; current sandbox live lane is USD/US only. | SG purchases unavailable; do not silently substitute market. |
+| Masumi NOT INTEGRATED / PENDING SEPARATE LANE. | Integrate only its completed verified checkpoint later. | Current baseline does not include that lane. |
+| UI V3 runtime implementation, polished console/submissions. | Consume approved DESIGN.md/assets in a separate UI milestone. | Current runtime retains existing proof/inspect views; design approval is not runtime completion. |
+| FX, shadow cleanup scheduling and delegated budgets. | Keep USD/item/quantity caps and retained audit shadows until separately designed. | Limited scope and growing retained test inventory. |
+| Operator mutation/refund tooling and stale signer-lock/reservation recovery. | Design audited proof-based reconciliation; never repair by history deletion or raw mark-paid/journal edits. | Held exposure/limits require manual attention; automatic refunds unavailable. |
+| Write-only custom purchase clients cannot retrieve idempotent retry views. | Keep default read+write scopes or define combined retry scope separately. | Custom clients may fail retry authorization. |
+| Masked bank last-four identifiers can collide. | Add private stable pseudonymous identity when needed. | Distinct observation projections can collapse; journal/capacity unaffected. |
+| Strong human/wallet-session attestation; distributed/HA workers and lease renewal. | Treat as separate milestones; keep bounded one-gateway/worker topology. | Current approval proves channel submission, and HA behavior is not validated. |
+| Additional live funding crash windows; mainnet, Token-2022, ALTs, remote sponsor hosting. | Retain local recovery coverage and supported Preprod/Devnet scope; test separately if requested. | Unsupported paths remain unproved or fail policy checks. |
 
-## Ignore / Accept Risk — bounded launch constraints
+## Ignore / Accept Risk
 
-| Constraint / why acceptable here | Action / guard | Risk accepted |
+| Constraint / why it matters | Guard / recommended action | Risk accepted |
 |---|---|---|
-| One gateway and in-process worker remain the launch topology. | PostgreSQL row/session locks protect accidental competing processes; preserve persisted jobs and attempt markers. | HA/replica operations are not validated or supported as a deployment architecture. |
-| Payer incidental ADA caps are per transaction; principal caps are daily/cumulative. | Use one protected absolute shared ledger and a disposable wallet with bounded ADA; reconcile stale locks manually. | Total fee ADA is bounded by the wallet rather than a daily fee ledger. No production wallet is authorized. |
-| Windows mode 0600 is best effort. | Apply Windows ACLs to private wallet/token/ledger directories. | OS file permissions remain an operator responsibility. |
-| Unmodified x402 Cardano signer is incompatible with application binding. | Use the supplied committed signer; reject missing metadata. | Third-party payer integration needs the documented signer seam. |
-| Shopify discovery searches recent orders with a finite window. | Persist direct order handles and use verified webhook hints; ambiguous/missing readback stays unresolved. | An undiscovered order may require manual lookup; no second checkout is sent. |
-| Cross-currency charge anomalies have no automatic valuation. | Preserve original currency reservation, record actual anomaly and require operator review; no automatic release. | Exposure cannot be quantified automatically in another currency. Production use is excluded. |
-| Solana, live Masumi/Sokosumi, polished console and submissions remain separate lanes. | Preserve channel/funding contracts and explicit completion matrix. | This first-lane local completion does not mean hackathon completion. |
-
-## External acceptance hardening review disposition
-
-| Finding | Class | Status / action | Why it matters / risk of deferring |
-|---|---|---|---|
-| AN-1 Atlas funding with closed gate | Act Now | Resolved locally: quote/funding guard and execution guard before any write; gate remains false. | Customer funding or supplier hold could precede rejection. Offline regressions pass. |
-| IN-4 relative/missing payer ledger | Act Now | Resolved locally: required absolute path, exclusive setup initialization, pay/bridge require existing valid history. | Lost history could reset signer caps. Operator reconciliation required after loss. |
-| PG-2 swallowed worker database errors | Act Now | Resolved locally: sanitized tick/job machine-code logs, no lifecycle redesign. | Acceptance failures would otherwise disappear; retry/recovery remains durable. |
-| PG-5 unscaled service fee | Act Now | Resolved locally: frozen scaled principal/fee/total allocation; non-zero fee regression. | Unscaled fee could exceed scaled funding and corrupt completion accounting. |
-| Shopify IN-1 hosted fields/forced click | Investigate Now | Unchanged; later UNFUNDED live rehearsal. | Unverified hosted fields or forced click can invalidate payment-safety/acceptance assumptions. |
-| Atlas IN-2 ambiguous pay.do results | Investigate Now | Unchanged payment blocker; preserve gate false. | Ambiguous outcomes may be misclassified; no Atlas payment acceptance yet. |
-| Atlas IN-3 final fee readback / runbook overstatement | Investigate Now | Unchanged payment blocker; verify independently before enabling payment. | Final fees may not match prior zero-fee assumptions; documentation is not external proof. |
-| Legacy unstructured/full-notional obligations | Ignore / Accept Risk | Stored amounts and original commitments preserved; new payer rejects them. Requote for new demo payments, retain old recovery records. | No silent history rewrite, but old challenges cannot be signed by the hardened demo payer. |
-| Windows protected ledger permissions | Ignore / Accept Risk | Apply OS ACLs; mode 0600 is best effort as before. | Absolute paths and initialization do not replace filesystem access control. |
-| Full Chromium runtime packaging/live selectors | Investigate Now | Build-stage packaging only; no browser rehearsal or runtime image verification here. | Host tests cannot establish actual store selector behavior; acceptance remains NOT_RUN. |
-
-P-1 through P-12, PG-1 and other PG findings remain outside this lane. No unrelated remediation or
-provider-routing redesign was performed. The owner-supplied accepted Opus verdict/findings and PostgreSQL review reconciliation pasted in
-Hackathon Build Recommendation were used. Original full core report was absent in inspected worktrees;
-its accepted findings are carried through that reconciliation. Independent review
-must check the combined financial-policy and human-orchestration branch before acceptance.
-
-## Human orchestration findings and limits
-
-| Finding | Class | Evidence / affected files | Action and deferral risk | Blocks first external acceptance? |
-|---|---|---|---|---|
-| Missing user fields could not reach MCP handlers; HTTP exposed generic validation errors | Act Now | `contracts/input.ts`, HTTP/core/MCP and input/HTTP tests | Resolved locally with strict drafts and controlled 422 `needs_input`. Deferring would encourage fabricated customer fields. | Resolved locally; review required |
-| Default Cardano choice and approval did not name a stored funding option | Act Now | `contracts/api.ts`, `commerce.ts`, core/service/worker, MCP and funding-selection tests | Resolved locally: opaque quote-scoped IDs, no independent rail/default, persisted approval and execution guard. Deferring could spend using an unselected source. | Resolved locally; review required |
-| Repeated buy could ask payer again while funding was submitted/uncertain or after a refusal | Act Now | MCP tools/client, quote-purchase lookup and MCP regressions | Resolved locally: owner-scoped follow-existing approval plus payment-state/attempt guard. Durable payer ledger remains the process/restart safeguard. Deferring could create duplicate funding interactions. | Resolved locally; review required |
-| Missing payer identity and opaque state/JSON-first proof obscured what actually happened | Act Now | Payer status allowlist, shared progress, proof projection/page and tests/browser fixture checks | Resolved locally without exposing signing material or raw provider/fulfillment data. Deferring would undermine truthful approval/demo evidence. | Resolved locally; review required |
-| Proof read shares the existing core advisory transaction lock | Ignore / Accept Risk | Evidence router/proof and PostgreSQL DB transaction helper | Keep bounded read-only queries for a coherent projection. At greater volume, move to a reviewed repeatable-read snapshot. Current bounded demo can tolerate brief read/write contention. | No |
-| Bridge status is configuration/public identity, not balance or spend-cap acceptance | Ignore / Accept Risk | `Payer.source`, strict FundingSource, MCP preflight and UI text | Clearly label configured/unverified balance; payer still enforces caps before signing. Quote may be valid but payment can refuse for funds/caps. Never switch source automatically. | No, operator must provision the bounded demo source |
-| Stronger human/wallet-session attestation | Park for Later | Approval event records channel-submitted exact terms; source metadata is channel/payer display only | Separate milestone if physical-human or unchanged-wallet attestation is needed. Current approval must not claim that proof. | No for bounded hackathon scope |
-| Legacy quotes lack selectable option IDs | Ignore / Accept Risk | Optional persisted FundingOption ID and strict new purchase approval | Requote for new buys; retain old frozen amounts/receipts/recovery. Avoid inventing IDs or changing old digests. Old legacy quote cannot start a new purchase through this API. | No |
-
-No new unresolved acceptance blocker was found in this lane. Shopify IN-1 (hosted-field allowlist /
-forced click), Atlas IN-2 (ambiguous payment result), and Atlas IN-3 (fee readback/runbook claim) stay
-**Investigate Now** blockers. Their affected provider files were not changed. Resolve through the
-already-defined acceptance work only after independent review; this lane ran no external calls.
-
-
-## Current E2E acceptance blocker — 2026-10-06
-
-**Investigate Now: production Shopify cart cannot substantiate an exact quote.** The US Storefront cartCreate/delivery-selection response and two subsequent reads returned USD 17.95 with all estimate flags true and explicit tax null. Capsule correctly refused shopify_total_unavailable before browser/payment. Do not infer zero tax or ignore estimates. Recommended action requires a human provider-strategy decision: read-only checkout totals before quote approval/funding, with unchanged execution/pay checkpoints. Deferral blocks first external acceptance; accepting estimates risks falsely labelled exact terms. See issue 26 and complete append-only reconciliation in [E2E ledger](evidence/e2e-acceptance-log.md). Production-path rehearsal is BLOCKED; prior permalink evidence remains partial. No payment, order or Cardano transaction occurred.
-
-
-### Shopify Phase 1 resolution — 2026-10-06 21:01 Singapore
-
-The user approved read-only checkout quote discovery. Issue 26 is resolved for the unfunded production rehearsal: settled hosted checkout supplies the exact full breakdown; API estimate/null-tax fields are not treated as payable proof. New execution verifies the frozen breakdown and cart binding before the unchanged pay checkpoint; legacy guards retained. Issue 28 (delivery-group omitted country/province) is resolved by explicit selected CartDeliveryAddress plus strict conflict/request checks and modern hash binding. Real production flow stopped before Pay with USD 17.95, US/NY, normal actionability and 0 new Admin orders. Paid E2E remains NOT_RUN. Deployment token/env/Render market verification remains open; SG sellability deferred. See the append-only ledger's Checkpoint A section.
-
-### Phase 2 candidate disposition
-
-Public Storefront authentication is the intended Render profile and independently passed catalog
-readback; the local private delegate must stay unset because it has no runtime refresh. This resolves
-issue 12's deployment-token choice, while actual Render token validity/cart/browser/market remain
-Investigate Now verification at deployment. Issue 30's stale Blueprint branch is corrected to main
-with automatic deploys off. Old private env aliases are documented against live config names; actual
-secret environment verification is still open (issue 4). Broad provisioning scopes and recurring
-cartCreate throttle risk remain Ignore / Accept Risk for the bounded demo; minimize scopes later.
-Deferring deployed readiness checks could produce an unusable rail or checkout, so funding remains
-blocked until those checks pass. The candidate passed 514/514 tests; paid external acceptance is not
-claimed. Full issue classifications, evidence and seed dispositions remain in the E2E ledger.
-
-### Shopify paid execution outcome unresolved — issue 31
-
-Investigate Now: the user-authorized single Bogus Pay submission with local fixture funding reached
-its durable checkpoint and normal click, but timed out waiting 90 seconds for confirmation. Capsule
-correctly preserved unresolved, held capacity and no receipt. Independent Admin currently shows zero
-new/bound orders; this does not prove not-sent. Root cause unknown. Do not retry Pay or execute another
-order. Reconcile the original quote/purchase read-only, preserving every checkpoint. Deferring this
-blocks Shopify paid acceptance; accepting zero-order readback as certainty risks a duplicate. See the
-E2E ledger and artifacts/e2e/20261006T133500Z-shopify-paid/. No Cardano transaction occurred.
-
-### Read-only Shopify investigation — issues 32 and 33
-
-Issue 31 remains Investigate Now/open: no definitive post-Pay outcome. Admin still shows zero orders;
-original cart remains available. Fresh browser state/static error strings are not original error proof.
-
-Issue 32 Investigate Now/open: abandonedCheckouts HTTP 200 / ACCESS_DENIED because the app lacks
-approval for the protected AbandonedCheckout object; read_orders is already granted. No scope or
-approval change. Recommended action: human Admin Orders -> Abandoned checkouts -> Timeline lookup
-around 21:35 Singapore, 6 October. Deferral blocks error reconciliation and paid acceptance; zero
-orders cannot authorize another Pay.
-
-Issue 33 Act Now/resolved: passive failure diagnostics before browser cleanup on confirmation
-timeout/challenge and actual Pay failure. Manual harness saves sanitized booleans/route classes/
-hostnames/status counts. Four regressions preserve one Pay, original errors and cleanup ordering.
-Full 518/518, focused 78/78, typecheck/build pass. This cannot recover the original lost session;
-payment/state/retry semantics unchanged. Full evidence/classifications in append-only E2E ledger.
-## Shopify Global Catalog sandbox lane — 2026-10-06
-
-Scope: isolated `build/shopify-global-sandbox`. [Evidence](evidence/shopify-global-sandbox-e2e.md) records each classified issue, action and deferral risk. Investigate Now: preceding unresolved post-Pay outcome blocks new paid tests; new shadow exact checkout summary remains unproved; confirm reduced transaction-offer retention against official Catalog no-caching guidance before deployment. Act Now fixes completed locally: native unique-ID metafield input, publication UserError selection, strict free-shipping row, retained-shadow discovery/provenance bypass. Park for Later: FX, cleanup scheduling, delegated budgets. Accept Risk: untracked development inventory and undocumented numeric keyless quota, bounded by test-store/item/quantity guards. Overall PARTIAL; no real new quote/order/receipt acceptance claim.
+| Shopify throttling, broad existing provisioning scopes, unspecified keyless Catalog quota and public Devnet RPC limits. | Bounded retries/backoff, quiet windows, no repeated cart probing or blind Pay/transfer retry. Minimize scopes later; never invent buyer IP. | Availability delays; finite hackathon provisioning exposure. |
+| Core/proof reads use bounded advisory locks; one worker topology. | Keep external I/O outside transactions and current concurrency/idempotency tests. | Limited throughput; lock contention fails safely. |
+| Windows mode 0600 is best effort; privileged operators can bypass shared signer history. | Apply private OS ACLs and sole signer access; one canonical absolute history path. | OS/operator trust remains required; Cardano incidental ADA bounded by wallet/per-transaction caps. |
+| Legacy frozen quotes/obligations lack current option IDs or scaled policy. | Requote new buys, preserve old digests/amounts/origins/recovery. | Hardened payer rejects old new-payment challenges; no silent rewrite. |
+| Cardano commitment and Solana co-sign flow require supplied payers. | Reject unsupported signatures and preserve exact immutable candidate. | Third-party clients need the documented integration seam. |
+| Shopify finite order-discovery window and untracked sandbox inventory. | Persist direct handles, use verified webhook hints; source shadow provenance required. | Missing order may need manual lookup; test inventory does not prove real fulfillment. |
+| Cross-currency anomalies have no automated valuation; source item observation is not merchant all-in price. | Hold exposure and label sandbox shipping/tax/total; reject unsupported FX. | Manual financial reconciliation; no source merchant order/payment claim. |
+| Testnet assets, synthetic fiat/card capacity and sandbox provider payment. | Retain 1:1000 and fixture/sandbox disclosures, including funding fixture labels. Nuitée USD 96.24 fee evidence applies only to tested method. | No production, FX/redemption, bank/Visa settlement or economic equivalence claim. |
+| Payer source identity/status is configured identity, not wallet balance/cap approval. | Payer enforces caps before signing; never switch rail silently. | A valid quote can still be refused by payer. |
+| Solana transitive optional TypeScript peers still declare ^5 with pinned TypeScript 6. | Preserve tested lockfile; current strict typecheck/build and all runtime suites pass. | npm peer warnings; revalidate compatibility when upgrading dependencies. |

@@ -1,6 +1,6 @@
-# Runbook — Commerce Core
+# Runbook — Capsule pre-Masumi baseline
 
-This branch implements the local first lane. Real Cardano funding and provider acceptance remain blocked; see [ACTIVE_TASK](work/ACTIVE_TASK.md) and [local verification](evidence/local-verification.md). Configuration or a passing fixture never proves an external purchase.
+Current authority: the pre-Masumi integrated main baseline after exact-head promotion. See [ACTIVE_TASK](work/ACTIVE_TASK.md), [verification](evidence/pre-masumi-integration.md) and [issue triage](KNOWN_ISSUES.md). Retained Cardano/Solana, Nuitée, Atlas and OCBC evidence passed within their stated limits. Shopify paid/Global exact quote and ChatGPT host remain unresolved or unverified. No provider/chain/payment/deployment action is authorized by local checks.
 
 ## Local runtime
 
@@ -10,7 +10,7 @@ Hosted runtime uses Render PostgreSQL. SQLite is not supported. PostgreSQL 18 ma
 current default. Planning sources under `docs/planning/` are historical snapshots for persistence choices.
 
 ```powershell
-Set-Location C:\Dev\token2049-origins\external-acceptance-hardening
+Set-Location C:\Dev\token2049-origins
 npm ci
 docker compose up -d --wait
 $env:DATABASE_URL = 'postgresql://origins:origins_local_only@127.0.0.1:55432/origins'
@@ -54,8 +54,7 @@ node --env-file=.env dist/src/main.js
    Verify that pending steps remain pending, the merchant environment is labelled and receipt
    limitations are visible. Expand technical evidence only when needed.
 
-This branch remains review-gated. No Shopify rehearsal, provider/payment call, testnet transaction or
-deployment is authorized by local verification. Atlas stays disabled; IN-1/IN-2/IN-3 remain blockers.
+This integration runs local regressions only. Preserve original unresolved Shopify purchase pur_01M48PSSTDQDR4VGPAQPC2VRYZ: no new Pay, mutation or replacement purchase. The next final review is a later Astra review+fix after all final lanes are integrated.
 
 ## Clients and funding authority
 
@@ -225,65 +224,73 @@ Worker tick/job failures emit sanitized worker.error events with stage, optional
 SQLSTATE/system errorCode. Messages/SQL detail/provider bodies are omitted. Durable retries/recovery
 are unchanged. PG-1 lease renewal stays parked.
 
-Shopify IN-1 hosted-field allow-list/forced pay click must be investigated in the later UNFUNDED live
-rehearsal. Atlas IN-2 ambiguous pay.do and IN-3 final-fee readback remain payment-acceptance blockers;
-the provider table is not external acceptance proof. Do not enable Atlas to bypass these blockers.
+## Current Shopify architecture
 
-## Current Capsule E2E candidate — 2026-10-06
+Both paths use the same current ShopifyExecutor, hosted exact quote, browser execution and
+independent Admin readback. Controlled-catalog discovery selects a Capsule product directly.
+Opt-in discovery: live uses official Global Catalog/UCP, normalizes a reduced sourceOffer,
+then creates/reuses one durable Capsule shadow per selected offer. Publication and Storefront
+readback precede the exact quote; source and sandbox evidence remain distinct. The source
+merchant receives no order or payment. Ordinary discovery excludes retained audit shadows.
 
-This section supersedes the earlier Shopify IN-1 rehearsal instruction for this E2E. The production
-Storefront cartCreate path now creates an exact quote by observing the settled hosted checkout before
-approval or funding. Quote observation fills the approved synthetic buyer/address and selects shipping,
-but enters no card data and has no payment checkpoint. It freezes item/shipping/tax/total and the
-post-observation cart binding. The later execution browser rechecks the full breakdown and cart before
-its one durable pay_click boundary. API estimated totals or missing tax alone never authorize payment.
+Configure SHOPIFY_SANDBOX_PUBLICATION_ID only for the live-shadow path, alongside owned-store
+credentials/dev-store/Bogus gates. Live mode is USD, quantity one, source item at most USD 100.
+The mapping survives ambiguous create/publication via native identity readback and migration
+0003_shopify_shadows.sql. Quote retries reuse frozen fulfillment/terms; changed/expired terms
+require new discovery. There is no parallel Global purchase contract or Shopify-only MCP API.
 
-The US/NY Agent Commerce Test Tee rehearsal reached REHEARSAL_STOPPED_BEFORE_PAY_CLICK with USD 17.95
-(9.95 item + 8.00 Standard shipping + 0.00 checkout-balanced tax), hosted frames on
-checkout.pci.shopifyinc.com and normal Pay now actionability. Independent Admin readback found zero new
-orders. This is unfunded evidence, not a paid E2E result. Use a fresh deployed quote; never hardcode or
-reuse the local total. SG sellability remains deferred. See the append-only E2E ledger.
+Read-only hosted quote freezes settled item/shipping/tax/total before approval or funding,
+with no card entry or Pay checkpoint. Execution rechecks cart/address/full breakdown,
+shipping settlement, PCI allow-list and Bogus gateway before a normal actionable Pay click.
+No force click. The durable pay_click precedes the one submission; passive diagnostics run
+before cleanup on unknown outcome. Unknown payment remains unresolved with held exposure.
 
-Deployment preparation is authorized; merge and deploy require approval of the exact tested SHA.
-render.yaml now targets main in Singapore, APP_ENV=sandbox, with automatic deploys off. Fast-forward
-only to the approved candidate and verify Render deployed that commit. The existing separately
-provisioned Singapore database must use DATABASE_URL with its internal connection URL; DATABASE_PATH
-is obsolete. Set PUBLIC_BASE_URL to the actual final HTTPS service host before creating approvable
-quotes: funding commitments bind that URL.
+Recorded deterministic US/NY quote rehearsal passed at USD 17.95, but the subsequent one-Pay
+purchase remains unresolved, no confirmed order or receipt and no Cardano transaction in that
+run. Global discovery/shadow/publication passed; exact sandbox quote is unresolved and no
+paid sandbox order/receipt was produced. Do not relabel either lane PASS through integration.
+See append-only [E2E ledger](evidence/e2e-acceptance-log.md) and
+[Global evidence](evidence/shopify-global-sandbox-e2e.md). Do not rerun their paid harnesses.
 
-The intended Storefront deployment profile uses SHOPIFY_STOREFRONT_TOKEN (public authentication).
-Leave SHOPIFY_STOREFRONT_PRIVATE_TOKEN unset; the local delegate inherits a short parent lifetime and
-the runtime has no delegate mint/refresh lifecycle. A read-only public-auth search independently found
-the canonical live variant at USD 9.95. This proves current catalog access, not deployed cart/browser
-readiness or permanent validity. Verify deployed authentication and one-cart behavior before funding;
-never probe cartCreate repeatedly. Shopify may throttle public-auth traffic; use existing bounded
-backoff, then a quiet window and one clean retry. Do not invent a forwarded buyer IP.
+## Configuration and later deployment
 
-SHOPIFY_CLIENT_ID/SHOPIFY_CLIENT_SECRET independently mint and refresh the Admin readback token in
-memory. That refresh does not extend a Storefront delegate. Storefront requests require product-listing
-and checkout read/write access; independent Admin order readback requires read_orders. The provisioning
-app already has broader scopes; do not expand them during the E2E. Confirm actual granted scopes and
-minimize them after acceptance. SHOPIFY_STORE_PASSWORD is a gateway secret. Confirm the owned dev
-store and Bogus gateway before setting their confirmation flags true. Chromium comes from the image's
-SHOPIFY_BROWSER_EXECUTABLE default; never copy a local Windows executable path into Render.
+Use DATABASE_URL and BLOCKFROST_PROJECT_ID. Do not load obsolete variable aliases.
+The intended Render Storefront profile uses SHOPIFY_STOREFRONT_TOKEN. Leave the optional
+private delegate unset; there is no delegate mint/refresh lifecycle. Admin credentials
+refresh their own readback token separately. SHOPIFY_STOREFRONT_BUYER_IP, if supplied,
+must be the actual egress address. Throttling calls for bounded backoff, not repeated carts.
 
-Receive-only verifier names are CARDANO_NETWORK=cardano:preprod, CARDANO_FACILITATOR_URL,
-CARDANO_TREASURY_ADDRESS, CARDANO_ASSET_UNIT, CARDANO_ASSET_DECIMALS=6 and BLOCKFROST_PROJECT_ID
-(not the old CARDANO_PROVIDER_PROJECT_ID alias). Verify the exact tUSDM asset, treasury, facilitator
-support and independent Preprod readback after deployment. Only ready funding rails may appear.
-The payer wallet, keys, mnemonic, bridge credentials and spend ledger stay local in their separate
-process; none belongs in the gateway image or Render environment. Keep Atlas payment disabled.
+The prepared render.yaml targets main with automatic deploys off. Actual deployed token,
+public origin, database, browser architecture, US market and rail readiness are unverified.
+No deployment occurs here. Any later deployment must use its authorized exact main head,
+private DATABASE_URL and correct PUBLIC_BASE_URL before creating funding commitments.
+The recorded Render DB expiry above is historical metadata; recheck before using that service.
 
-Stop after deployed health/migrations, Shopify/Admin, Chromium, Cardano verifier and MCP readiness,
-then wait at Human Checkpoint C. New quote/source approval and one funding attempt require the later
-explicit checkpoints. Any ambiguous irreversible chain/order result stops writes and prohibits retry.
+## Solana and retained provider evidence
 
-Provider references: [Storefront authentication](https://shopify.dev/docs/api/storefront/latest),
-[delegate lifetime](https://shopify.dev/docs/apps/build/authentication-authorization/delegate-api-access),
-[Admin access tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens).
+.env.example contains receive-only Solana Devnet configuration. .env.solana.example also
+contains separate payer/sponsor key paths and caps; do not load signer keys into the gateway.
+Run payer/sponsor independently only in a later authorized spending task. Authenticated
+/prepare and the supplied payer are required; stock-client compatibility is unverified.
+Preserve existing signer histories; never reset locks/caps to gain spending headroom.
+Cardano supplied signer requires canonical quote metadata. Its recorded budget is exhausted.
 
-## Shopify Global Catalog sandbox addition
+[Completed lanes](work/COMPLETED_LANES.md) retains Cardano/Solana independent testnet proofs,
+Nuitée USD 96.24 including processing fee, Atlas sandbox ticketing and OCBC corrected history
+observations. Atlas ambiguous-create recovery remains NOT_VERIFIED. The Atlas payment gate
+still defaults false; prior test evidence does not authorize a new booking. OCBC is read-only;
+bank observations do not modify journal/capacity. No provider readiness or receipt means
+production readiness or real bank/card settlement.
 
-Configure nonsecret `SHOPIFY_SANDBOX_PUBLICATION_ID` alongside existing owned development-store/Bogus configuration. Live discovery is opt-in typed `discovery: live`; no Catalog API key is required for the verified keyless UCP profile. Runtime caps USD100 item, quantity1; exact sandbox total remains subject to Capsule intent/approval. Product creation happens after selection only; products are retained for audit/demo.
+## MCP, UI and verification
 
-[Lane decision](decisions/shopify-real-discovery-sandbox-execution.md) documents runtime scopes, migration0003 and boundary. [Protocol](evidence/shopify-protocol.md) contains the test-only unfunded harness command. [Evidence](evidence/shopify-global-sandbox-e2e.md) is PARTIAL: do not run a fresh paid test until original E2E outcome reconciliation completes. No production fixture toggle or real Cardano call exists in this lane.
+Generic find_offers/create_quote/buy/get_purchase remain thin over canonical HTTP/core.
+needs_input, selected funding option, public payer identity, duplicate suppression and F-1
+follow-existing-purchase guidance are retained. Compiled stdio/protocol tests do not establish
+ChatGPT host compatibility. UI V3, DESIGN.md and approved logos are design references only;
+existing runtime proof/inspect behavior remains in place.
+
+Use the local fixture suites and compiled db-smoke against local PostgreSQL only. Full suite
+is run once for the final gate after focused fixes. Informational readiness with no provider
+credentials reports MISSING_CONFIG, not external success. See TEST_CHECKLIST and the recorded
+integration verification for commands/results. No .env/private history is copied or committed.

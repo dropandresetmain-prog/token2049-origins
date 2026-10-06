@@ -1,14 +1,14 @@
-# TOKEN2049 Origins — Commerce Gateway
+# Capsule — TOKEN2049 Origins Commerce Gateway
 
 > Any agent. Agent-native money in. Ordinary commerce out.
 
 A buyer-side commerce gateway. A customer's existing agent submits a purchasing job; the gateway
-issues an executable quote, verifies real testnet funding (direct Cardano Preprod x402 first,
-Solana Devnet next), reserves treasury capacity in a balanced journal, executes ordinary commerce
+issues an executable quote, verifies real testnet funding (Cardano Preprod or Solana Devnet),
+reserves treasury capacity in a balanced journal, executes ordinary commerce
 through provider sandboxes (Shopify retail, Atlas flights, Nuitée hotels), independently retrieves
 the outcome and returns a safe receipt.
 
-Channels (canonical HTTP, thin MCP, ChatGPT, Sokosumi Coworker) all call the same authenticated
+Implemented channels (canonical HTTP and thin MCP) call the same authenticated
 core. No channel owns commerce logic, funding truth or journal writes. Payer keys never live in the
 gateway process.
 
@@ -23,10 +23,10 @@ payment and receipt; `/inspect` retains detailed engineering evidence.
 - Planning release `launch-2026-10-06-v1` imported from
   `dropandresetmain-prog/wip-personal@af648eece01321fec50bcddeee9ba92fd3e10d3a`
   (`token2049-hackathon/`).
-- Commerce Core local implementation is complete on `build/commerce-core`. `build/human-orchestration` builds on the isolated external-acceptance-hardening branch; the combined diff requires independent review against the reviewed PostgreSQL baseline before external acceptance.
+- Pre-Masumi integrated candidate: latest E2E plus crypto/providers, Shopify Global sandbox, and approved UI V3 references. `main` becomes the implementation baseline after the recorded local verification and exact-head promotion. Masumi is excluded and pending.
 - Runtime and acceptance instructions: [RUNBOOK](docs/RUNBOOK.md), [TEST_CHECKLIST](docs/TEST_CHECKLIST.md), [KNOWN_ISSUES](docs/KNOWN_ISSUES.md), [HANDOFF](docs/HANDOFF.md).
-- No external acceptance has passed yet. Sandbox/testnet evidence is tracked separately from local
-  tests in [`docs/work/ACTIVE_TASK.md`](docs/work/ACTIVE_TASK.md).
+- Recorded Cardano/Solana testnet funding, Nuitée sandbox booking, Atlas ticketing and OCBC read-only observations passed. These are retained evidence, not new runs. Deterministic Shopify paid acceptance remains unresolved; Global Catalog discovery/shadow passed but exact quote remains unresolved and paid order was not run. MCP protocol passed; ChatGPT host is unverified. See [`ACTIVE_TASK`](docs/work/ACTIVE_TASK.md) and [integration verification](docs/evidence/pre-masumi-integration.md).
+- [DESIGN.md](DESIGN.md), approved Capsule logos and [UI V3](docs/design/ui-v3/index.html) are design references. The static prototype is not wired into the runtime.
 
 ## Database contract
 
@@ -90,4 +90,4 @@ See [current settlement decision](docs/decisions/scaled-testnet-settlement.md).
 
 ## Shopify live discovery sandbox lane
 
-Retail intent may opt into `discovery: live` for official Shopify Global Catalog discovery. Selection creates one retained shadow in Capsule's owned development store and reuses the existing exact quote/checkout machinery. The source merchant receives no order or payment. Omitted discovery preserves ordinary controlled-store behavior. USD only, quantity one, source item maximumUSD100; no source image copying or FX. Configure `SHOPIFY_SANDBOX_PUBLICATION_ID`. See [decision](docs/decisions/shopify-real-discovery-sandbox-execution.md) and [external evidence](docs/evidence/shopify-global-sandbox-e2e.md): discovery/shadow PASS, execution NOT_RUN, lane PARTIAL.
+Retail intent may opt into `discovery: live` for official Shopify Global Catalog/UCP discovery. Selection creates one durable shadow per selected offer in Capsule's owned development store, verifies publication/Storefront readback, and reuses the current exact hosted-quote/browser executor. The source merchant receives no order or payment. Omitted discovery preserves the deterministic controlled-store path. Source identity/item price and sandbox shipping/tax/total/order evidence remain separate. USD only, quantity one, source item maximum USD 100; no source image copying or FX. Configure `SHOPIFY_SANDBOX_PUBLICATION_ID`. See [decision](docs/decisions/shopify-real-discovery-sandbox-execution.md) and [external evidence](docs/evidence/shopify-global-sandbox-e2e.md): discovery/shadow PASS, exact sandbox quote UNRESOLVED, paid order NOT_RUN, lane PARTIAL.
