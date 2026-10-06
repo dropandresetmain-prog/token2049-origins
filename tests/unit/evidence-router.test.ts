@@ -103,6 +103,8 @@ describe('evidence API and inspect shell', () => {
       approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest, selectedFundingOptionId: quote.fundingOptions[0]!.fundingOptionId! },
     }, 'evidence-owner-test');
     const purchaseId = created.purchase.purchaseId;
+    const orderGid = 'gid://shopify/Order/18933264089145';
+    await h.db.run('UPDATE purchases SET provider_reference = $1 WHERE id = $2', orderGid, purchaseId);
     await appendEvent(h.db, purchaseId, 'provider.debug', { email: 'private-event@example.com', note: 'untrusted provider payload' }, h.clock.now().toISOString());
 
     expect((await h.call('GET', '/v1/evidence/purchases')).status).toBe(401);
@@ -125,6 +127,14 @@ describe('evidence API and inspect shell', () => {
     expect(own.body.quote).not.toHaveProperty('fundingOptions');
     expect(own.body.events[0]).not.toHaveProperty('data');
     expect(own.body.execution.attempts[0] ?? {}).not.toHaveProperty('providerReference');
+
+    const proof = await h.call('GET', `/v1/evidence/purchases/${purchaseId}/proof`, h.alice.token);
+    expect(proof.status).toBe(200);
+    expect(proof.body.proof.merchant.providerReference).toBe(orderGid);
+    await h.db.run('UPDATE purchases SET provider_reference = $1 WHERE id = $2',
+      'order 4111 1111 1111 1111 buyer@example.com Bearer fixture-token shpat_12345678', purchaseId);
+    const redactedProof = await h.call('GET', `/v1/evidence/purchases/${purchaseId}/proof`, h.alice.token);
+    expect(redactedProof.body.proof.merchant.providerReference).toBe('order [REDACTED_NUMBER][REDACTED_EMAIL] Bearer [REDACTED] [REDACTED_TOKEN]');
   });
 
   it('uses persisted fixture result provenance in list and detail without claiming a pending result is complete', async () => {

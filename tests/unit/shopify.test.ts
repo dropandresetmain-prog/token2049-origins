@@ -6,7 +6,7 @@ import { AdminClient, type AdminOrder } from '../../src/execution/shopify/admin.
 import { CheckoutAbort, createStepLogger, type CheckoutDriver } from '../../src/execution/shopify/checkout.js';
 import { isTrustedCheckoutUrl, displayedTotalMatches, challengeFromText, hasTestGateway } from '../../src/execution/shopify/browserCheckout.js';
 import { loadShopifyConfig } from '../../src/execution/shopify/config.js';
-import { postGraphQL } from '../../src/execution/shopify/http.js';
+import { postGraphQL, ShopifyHttpError } from '../../src/execution/shopify/http.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
 import type { ExecutionContext } from '../../src/contracts/ports.js';
 import type { RetailFulfillment, RetailIntent } from '../../src/contracts/intent.js';
@@ -206,6 +206,33 @@ describe('Shopify payment checkpoint and independent readback', () => {
     expect(await s.executor.execute(s.ctx)).toMatchObject({ kind: 'unknown' });
     const unpaid = order(); unpaid.customAttributes[0]!.value = s.ctx.quote.executionRef.nonce as string; unpaid.displayFinancialStatus = 'PENDING'; s.setOrders([unpaid]);
     expect(await s.executor.retrieve(s.ctx)).toMatchObject({ kind: 'unknown', providerReference: unpaid.id });
+  });
+  it('distinguishes Admin access denial from an empty order search without weakening paid readback', async () => {
+    const denied = await setup();
+    denied.admin.searchOrders.mockImplementationOnce(async () => {
+      throw new ShopifyHttpError('graphql', 'GraphQL errors: ACCESS_DENIED', undefined, true);
+    });
+    const accessDenied = await denied.executor.retrieve(denied.ctx);
+    if (accessDenied.kind !== 'unknown') throw new Error('expected unresolved readback');
+    expect(accessDenied).toMatchObject({
+      kind: 'unknown',
+      providerReference: null,
+      reason: expect.stringContaining('Admin readback access denied'),
+      evidence: [],
+    });
+    expect(accessDenied.reason).not.toContain('No independently bound order');
+    expect(denied.admin.searchOrders).toHaveBeenCalledOnce();
+    expect(denied.ctx.checkpoint).not.toHaveBeenCalled();
+
+    const noMatch = await setup();
+    const missing = await noMatch.executor.retrieve(noMatch.ctx);
+    expect(missing).toMatchObject({
+      kind: 'unknown',
+      reason: 'No independently bound order visible; reconciliation required',
+      evidence: [],
+    });
+    expect(noMatch.admin.searchOrders).toHaveBeenCalledOnce();
+    expect(noMatch.ctx.checkpoint).not.toHaveBeenCalled();
   });
   it.each(['production','authorized','pending','manual','wrong_amount','wrong_currency','wrong_gateway'])('rejects %s paid evidence', key => {
     const o = order();

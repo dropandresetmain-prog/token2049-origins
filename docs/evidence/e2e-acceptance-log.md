@@ -362,3 +362,46 @@ Exactly one next action: obtain original synthetic abandoned-checkout Timeline p
 error from Admin without buyer details/recovery URL. Same integration chat; one final independent
 Opus review of complete evidence/diff recommended in a fresh review chat at this terminal ambiguity.
 No review or new project lane started.
+
+## 2026-10-07 Singapore — Shopify checkout repair and same-order recovery
+
+The user subsequently authorized a fresh diagnostic sandbox execution and fixing the discovered
+failures. No real payment or chain funding was used. Original unresolved attempts were preserved;
+none was submitted again. Work was isolated on `codex/shopify-checkout-fix` while main's unrelated
+console integration continued.
+
+| Finding | Classification | Repair and evidence | Risk if deferred |
+| --- | --- | --- | --- |
+| Hosted card frames each contain several inputs; `.locator('input').first()` filled the number input instead of the intended name/expiry/CVV fields. | Act Now — fixed | Strict field-name selectors within their matching frames, plus exact test-value and Shopify validation checks before Pay. Regression fixtures include misleading first inputs. | Inline card validation prevents submission and appears as a 90-second timeout. |
+| Shopify rendered a separate empty billing form without a same-as-shipping toggle. | Act Now — fixed | Fill billing controls from the controlled synthetic buyer address. Accessible controls exclude hidden autofill clones. | Pay cannot submit despite valid card fields. |
+| The commerce app had `read_orders` but lacked protected Order-object access. Empty order searches had concealed this. | Act Now — fixed | User explicitly approved saving the minimum protected-data declaration. No optional name/email/phone/address fields selected. Admin now reads the exact paid order. Access failures remain unknown and have a specific diagnostic. | A successful payment remains unresolved because independent verification is denied. |
+| Global checkout prints shipping as `FREE`; summary parser accepted only `Free`. | Act Now — fixed | Accept case variants of this token only. Amount, currency, duplicate-row and final-total checks remain strict. Live exact quote passed for USD 89.95, free Standard shipping, zero tax; repeated quote reused ID/digest. | Global discovery cannot reach approval. |
+| The proof redactor masked the numeric portion of a valid Shopify Order GID. | Act Now — fixed | Preserve an exact structured Order GID, while continuing to mask bare card-like numbers, sensitive keys, email and tokens. | Receipt proof cannot display its independently verified merchant reference. |
+
+Confirmed checkout on `pur_01M492GH945KMA12YMDJ9BJZFE`, quote
+`quo_01M492GH7MPSD5RQPQBNNHVKZ7`: one Pay checkpoint at 2026-10-06 17:00:03.725 UTC,
+Shopify SubmitSuccess at 17:00:05.453 and confirmation at 17:00:06.982. Thus **90 seconds is our
+polling deadline**, not a demonstrated Shopify processing deadline or outage.
+
+Independent Admin: order `gid://shopify/Order/18933264089145`, `#1001`, confirmation
+`RDYVW0M6M`, test=true, PAID, USD 17.95; SALE/SUCCESS/test=true/gateway=bogus for USD 17.95.
+The quote nonce binds this order to the purchase. Fixing access allowed the normal reconciliation
+worker to complete the existing attempt, issue `rcp_01M493JQG5MQ4P1M4T4F3J0193` and consume its
+reservation. No checkout or funding was repeated during recovery.
+
+Retained local evidence in the repair worktree:
+- `artifacts/e2e/20261007-shopify-diagnostic-01/`: original-selector failure; one Pay, no confirmed order.
+- `artifacts/e2e/20261007-shopify-fixed-02/`: native HTML `pattern=""` issue rejected before Pay.
+- `artifacts/e2e/20261007-shopify-fixed-03/`: missing billing fields; one Pay, no confirmed order.
+- `artifacts/e2e/20261007-shopify-fixed-04/`: successful checkout and reconciliation verification.
+- `artifacts/e2e/20261007-shopify-global-quote-fixed/`: uppercase FREE diagnosis, plus expired-offer stop.
+- `artifacts/e2e/20261007-shopify-global-quote-pass/`: live Global exact-quote and idempotency PASS,
+  stopped before funding/purchase/Pay. No order or payment to the source merchant.
+
+This establishes the repaired Shopify sandbox path with **local_fixture funding**. It does not
+establish Cardano/Solana/Masumi, hosted deployment or a paid Global Catalog acceptance. Historical
+unknown purchases, including `pur_01M48PSSTDQDR4VGPAQPC2VRYZ`, remain unknown and must never be
+re-Paid. The Global paid harness retains its guard against outstanding ambiguous attempts.
+
+Provider references: [Shopify test payment instructions](https://help.shopify.com/en/manual/checkout-settings/test-orders/payments-test-mode)
+and [protected customer data in development](https://shopify.dev/docs/apps/launch/protected-customer-data).

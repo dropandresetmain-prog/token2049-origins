@@ -61,6 +61,8 @@ export type CheckoutAbortCode =
   | 'total_mismatch'
   | 'untrusted_checkout_url'
   | 'browser_unavailable'
+  | 'payment_fields_invalid'
+  | 'payment_validation_failed'
   | 'step_failed'
   | 'order_not_confirmed';
 

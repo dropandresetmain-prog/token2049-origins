@@ -26,6 +26,7 @@ import { SearchOffersResponse, CreateQuoteResponse, PurchaseResponse } from '../
 import { PurchaseProof } from '../../src/evidence/proof.js';
 import type { QuoteView } from '../../src/contracts/commerce.js';
 import type { StorefrontCart } from '../../src/execution/shopify/storefront.js';
+import { attachPaymentDiagnostics, paymentFieldDiagnostics } from './shopify-diagnostics.js';
 
 const arg=process.argv[2];
 if(!arg || !process.argv.includes('--allow-one-bogus-order'))throw new Error('explicit_one_order_authorization_required');
@@ -72,7 +73,11 @@ let checkoutPage:Page|undefined;
 const blockedRequests:Record<string,number>={},browserResponses:Record<string,number>={};
 const captureFailure=async(step:string)=>{
  if(!checkoutPage)return;
+ emit('payment_field_diagnostics',{step,...await paymentFieldDiagnostics(checkoutPage)});
  const body=await checkoutPage.locator('body').innerText({timeout:1500}).catch(()=>'');
+ const invalidInputs=await checkoutPage.locator('[aria-invalid="true"]').evaluateAll(inputs=>inputs.map(input=>({tag:input.tagName,name:input.getAttribute('name'),autocomplete:input.getAttribute('autocomplete'),describedBy:input.getAttribute('aria-describedby')}))).catch(()=>[]);
+ const validationMessages=body.split('\n').map(line=>line.trim()).filter(line=>/^(?:Enter |Provide |Select |Your (?:card|payment) |This field |There was |Please )/.test(line)).map(line=>line.replace(/https?:\/\/\S+|[\w.+-]+@[\w.-]+/g,'[redacted]').slice(0,180)).slice(0,20);
+ emit('checkout_validation',{step,invalidInputs,validationMessages});
  const url=new URL(checkoutPage.url());
  const indicators={invalidCard:/enter a valid card number/i.test(body),invalidExpiry:/enter a valid (?:expiration|expiry) date/i.test(body),invalidSecurityCode:/enter a valid security code/i.test(body),paymentFailure:/your payment (?:could not|couldn't)|card (?:was |is )?declined|unable to process (?:your |the )?payment/i.test(body),challenge:/verify (?:that )?you are (?:a )?human|one-time (?:code|passcode)/i.test(body)};
  emit('checkout_failure_snapshot',{phase,step,host:url.hostname,routeClass:/thank[-_]?you/.test(url.pathname)?'thank_you':/\/orders\//.test(url.pathname)?'order':/^\/checkouts\//.test(url.pathname)?'checkout':'other',confirmationUrlPattern:/thank[-_]?you|\/orders\/[a-f0-9]{8,}/i.test(checkoutPage.url()),indicators,invalidFields:await checkoutPage.locator('[aria-invalid="true"]').count().catch(()=>-1),visibleAlertElements:await checkoutPage.getByRole('alert').count().catch(()=>-1),frameHosts:[...new Set(checkoutPage.frames().map(f=>{try{return new URL(f.url()).hostname||'about';}catch{return 'invalid';}}))],blockedRequests,browserResponses});
@@ -85,7 +90,7 @@ try{
  const shopify=new ShopifyExecutor(env,{fetchImpl:observedFetch,sink:line=>{
   const step=/step=([a-z0-9_.-]+)/.exec(line)?.[1];
   if(step){if(step==='pay_click')payCheckpointSeen=true;emit('browser_step',{phase,step});}
- },checkoutObserver:{attach:page=>{checkoutPage=page;page.on('response',r=>{const key=new URL(r.url()).hostname+'|'+r.status();browserResponses[key]=(browserResponses[key]??0)+1;});},blocked:e=>{const key=e.hostname+'|'+e.resourceType+'|'+e.frame;blockedRequests[key]=(blockedRequests[key]??0)+1;},stepFailed:async step=>{emit('browser_step_failed',{phase,step});await captureFailure(step);},beforePay:async()=>{emit('irreversible_boundary',{action:'one_bogus_pay_submission',funding:'local_fixture'});}}});
+ },checkoutObserver:{attach:page=>{checkoutPage=page;attachPaymentDiagnostics(page,emit);page.on('response',r=>{const key=new URL(r.url()).hostname+'|'+r.status();browserResponses[key]=(browserResponses[key]??0)+1;});},blocked:e=>{const key=e.hostname+'|'+e.resourceType+'|'+e.frame;blockedRequests[key]=(blockedRequests[key]??0)+1;},stepFailed:async step=>{emit('browser_step_failed',{phase,step});await captureFailure(step);},beforePay:async()=>{emit('payment_field_diagnostics',{step:'before_pay',...await paymentFieldDiagnostics(checkoutPage!)});emit('irreversible_boundary',{action:'one_bogus_pay_submission',funding:'local_fixture'});}}});
  gw=await buildGateway({executors:[shopify],fundingAdapters:[funding],bankAdapters:[],buildRouters:core=>[
   {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:systemClock,bankAdapters:[]}),auth:true},
   {path:'/proof',router:createProofPageRouter(),auth:false},

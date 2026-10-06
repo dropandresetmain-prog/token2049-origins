@@ -16,8 +16,8 @@ Historical issue ledgers remain in docs/evidence/. This file contains only curre
 
 | Issue | Action | Risk if deferred |
 | --- | --- | --- |
-| Deterministic Shopify paid acceptance remains UNRESOLVED for pur_01M48PSSTDQDR4VGPAQPC2VRYZ. | Preserve it read-only. Never retry that purchase. A fresh final-candidate test, if justified, must be a new authorized purchase with current diagnostics. | Paid Shopify acceptance remains unproved; retrying old attempt risks duplication. |
-| Shopify Global exact sandbox quote remains PARTIAL/UNRESOLVED. | Diagnose strict shipping/tax/total mismatch only if this path is chosen for final demo. | Global judge flow cannot reach approval/payment reliably. |
+| Historical Shopify submissions remain unresolved, including pur_01M48PSSTDQDR4VGPAQPC2VRYZ. A fresh corrected purchase now has independently verified paid test order #1001 and a receipt. | Preserve old attempts; never retry their Pay. Use same-order Admin reconciliation only. See the 2026-10-07 repair evidence. | Retrying old attempts risks duplication; fresh acceptance does not establish their outcome. |
+| Shopify Global paid acceptance remains unexecuted. Exact sandbox quote now passes after the uppercase FREE parser repair. | Retain the ambiguity guard and verify the final approved funding/provider composition separately. | Global quote PASS and canonical paid Shopify PASS are not a paid Global end-to-end result. |
 | Shopify Global Catalog reduced transaction-retention interpretation remains unclear. | Clarify against official guidance before broader/deployed operation. | Possible provider-usage-policy mismatch. |
 | Atlas ambiguous-create recovery is NOT VERIFIED. | Verify read-only lookup/recovery only if Atlas becomes canonical/final-demo critical. | Unknown create could remain unresolved; blind repeat is unsafe. |
 | ChatGPT host MCP connection is NOT VERIFIED. | Test actual host only if it materially improves judging/submission. | Protocol pass may not translate to host connectivity. |

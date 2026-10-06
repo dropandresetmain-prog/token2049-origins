@@ -15,6 +15,10 @@ const VALUE_PATTERNS: Array<[RegExp, string]> = [
 ];
 
 export function redactString(s: string): string {
+  // A Shopify Order GID is an opaque reference needed to reconcile a verified merchant result.
+  // Preserve only the complete canonical form; the numeric component remains masked in any
+  // surrounding or otherwise untrusted string, and object keys are still handled by redact().
+  if (/^gid:\/\/shopify\/Order\/[1-9]\d{0,19}(?![\s\S])/.test(s)) return s;
   let out = s;
   for (const [re, rep] of VALUE_PATTERNS) out = out.replace(re, rep);
   return out;

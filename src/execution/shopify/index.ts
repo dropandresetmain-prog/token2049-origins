@@ -11,7 +11,7 @@ import { AdminClient, type AdminOrder } from './admin.js';
 import { createPlaywrightDriver, isTrustedCheckoutUrl, type CheckoutObserver } from './browserCheckout.js';
 import { CheckoutAbort, createStepLogger, type CheckoutDriver } from './checkout.js';
 import { toMoney } from './money.js';
-import { toProviderError } from './http.js';
+import { ShopifyHttpError, toProviderError } from './http.js';
 
 const hash = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const same = (a: Money, b: Money): boolean => a.currency === b.currency && a.scale === b.scale && a.amountMinor === b.amountMinor;
@@ -248,7 +248,11 @@ export class ShopifyExecutor implements CommerceExecutor {
       await ctx.checkpoint('order', { providerReference: order.id, kind: 'gid' });
       if (!hasPaidTestEvidence(order, ctx.quote.merchantTotal)) return unknown('Order lacks exact successful test SALE/CAPTURE payment evidence', order.id, evidence);
       return { kind: 'succeeded', providerReference: order.id, commerceStatus: 'paid', merchantPaymentStatus: 'simulated_paid', chargedAmount: ctx.quote.merchantTotal, evidence };
-    } catch { return unknown('Independent Shopify readback unavailable; reconciliation required'); }
+    } catch (e) {
+      if (e instanceof ShopifyHttpError && e.blocked)
+        return unknown('Shopify Admin readback access denied; verify app access and reconcile the order');
+      return unknown('Independent Shopify readback unavailable; reconciliation required');
+    }
   }
 }
 

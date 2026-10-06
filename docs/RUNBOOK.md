@@ -247,10 +247,21 @@ shipping settlement, PCI allow-list and Bogus gateway before a normal actionable
 No force click. The durable pay_click precedes the one submission; passive diagnostics run
 before cleanup on unknown outcome. Unknown payment remains unresolved with held exposure.
 
-Recorded deterministic US/NY quote rehearsal passed at USD 17.95, but the subsequent one-Pay
-purchase remains unresolved, no confirmed order or receipt and no Cardano transaction in that
-run. Global discovery/shadow/publication passed; exact sandbox quote is unresolved and no
-paid sandbox order/receipt was produced. Do not relabel either lane PASS through integration.
+Admin `read_orders` scope alone is insufficient: configure **Protected customer data** for the
+commerce app in Shopify Partners > API access requests. Our verification query does not require
+the optional customer name, email, phone or address fields. Shopify permits development-store
+access after saving the data-use declaration, without an App Store review. Verify against an
+existing test order: an empty orders response can conceal missing Order-object access.
+See [Shopify protected-data requirements](https://shopify.dev/docs/apps/launch/protected-customer-data).
+An access-denied readback after Pay requires fixing access and reconciling that same purchase,
+never another checkout submission. The dedicated local `shopify-reconcile-acceptance.ts` harness
+allows only Admin order queries and recovery of the retained acceptance purchase.
+
+The corrected deterministic US/NY checkout produced paid test order #1001 at USD 17.95;
+independent Admin reconciliation issued its receipt with local fixture funding. Global
+discovery/shadow/publication and exact USD 89.95 free-shipping quote now pass, but no paid
+Global acceptance was run. Historical unknown submissions remain unknown; do not retry them.
+These results do not establish chain funding, other providers or hosted deployment.
 See append-only [E2E ledger](evidence/e2e-acceptance-log.md) and
 [Global evidence](evidence/shopify-global-sandbox-e2e.md). Do not rerun their paid harnesses.
 

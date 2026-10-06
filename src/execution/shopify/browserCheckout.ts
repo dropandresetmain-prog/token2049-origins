@@ -14,14 +14,14 @@ import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver, type 
  * - never solve or bypass a CAPTCHA/challenge/OTP: stop (before pay = not sent, after = unknown);
  * - `pay_click` is checkpointed durably BEFORE the single pay click, and the click is never retried.
  *
- * The production cart-to-checkout selectors passed the unfunded US development-store rehearsal.
- * Paid completion and independent order readback still require the funded external acceptance run.
+ * The controlled US development-store flow has paid test acceptance with independent Admin
+ * readback. Funding in that acceptance was a local fixture, not a confirmed chain payment.
  */
 
 /* ---------------- pure helpers (unit-tested) ---------------- */
 
 /** Published Shopify test-gateway values. These are not real card data. */
-export const BOGUS_CARD = { number: '1', name: 'Bogus Gateway', cvv: '123' } as const;
+export const BOGUS_CARD = { number: '1', name: 'Test payment gateway', cvv: '123' } as const;
 
 // Live Bogus checkout does not print its name; it shows its own test instructions ("1 to simulate an approved transaction").
 const TEST_GATEWAY_TEXT = /bogus gateway|test payment gateway|1 to simulate an approved transaction/i;
@@ -118,13 +118,13 @@ export function sameCheckoutTotals(a: CheckoutTotals, b: CheckoutTotals): boolea
 export function readCheckoutTotals(text: string, subtotal: Money, shipping: Money, shippingTitle: string): CheckoutTotals | null {
   if (subtotal.currency !== shipping.currency || subtotal.scale !== shipping.scale || /calculating|calculated at (?:the )?next step|estimated taxes/i.test(text)) return null;
   const row = (label: string, allowFree = false): bigint | null => {
-    const pattern = String.raw`(?:^|\n)\s*LABEL\s*\n?\s*(?:[A-Z]{3}\s*)?\$?\s*AMOUNT(?=\s|$)`.replace('LABEL', label).replace('AMOUNT', allowFree ? `(?:${AMOUNT}|(Free))` : AMOUNT);
+    const pattern = String.raw`(?:^|\n)\s*LABEL\s*\n?\s*(?:[A-Z]{3}\s*)?\$?\s*AMOUNT(?=\s|$)`.replace('LABEL', label).replace('AMOUNT', allowFree ? `(?:${AMOUNT}|([Ff][Rr][Ee][Ee]))` : AMOUNT);
     const matches = [...text.matchAll(new RegExp(pattern, 'g'))];
     if (!matches.length) return null;
     try {
       const values = matches.map(m => {
         if ((m[0].match(/\b[A-Z]{3}\b/g) ?? []).some(currency => currency !== subtotal.currency)) throw new Error('row_currency_mismatch');
-        return allowFree && m[2] === 'Free' ? 0n : parseDecimalToMinor(m[1]!.replace(/,/g, ''), subtotal.scale);
+        return allowFree && m[2]?.toLowerCase() === 'free' ? 0n : parseDecimalToMinor(m[1]!.replace(/,/g, ''), subtotal.scale);
       });
       return values.every(v => v === values[0]) ? values[0]! : null;
     } catch { return null; }
@@ -312,7 +312,29 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     }
     await this.assertNoChallenge(page);
 
+    await this.fillBillingAddress(page, input.fulfillment, log);
     await this.step(log, 'choose_shipping', () => this.chooseQuotedShipping(page, input.shippingTitle));
+  }
+
+  private async fillBillingAddress(page: Page, fulfillment: CheckoutQuoteInput['fulfillment'], log: (s: string) => void): Promise<void> {
+    const country = page.locator('select[autocomplete="billing country-name"]:visible');
+    if (await country.count() === 0) return;
+    await this.step(log, 'fill_test_billing_address', async () => {
+      // The controlled test buyer uses one synthetic address for shipping and billing. Shopify
+      // can expose a separate blank billing form without offering a same-as-shipping checkbox.
+      // Scope by billing autocomplete tokens so shipping/autofill clones are never overwritten.
+      const a = fulfillment.shippingAddress;
+      await country.selectOption(a.countryCode);
+      const values = { 'given-name': a.firstName, 'family-name': a.lastName, 'address-line1': a.address1,
+        'address-line2': a.address2 ?? '', 'address-level2': a.city, 'postal-code': a.zip };
+      for (const [field, value] of Object.entries(values)) {
+        // Autofill clones can have nonzero bounds despite being aria-hidden. Use accessible
+        // controls as well as the billing scope; address autocomplete exposes a combobox.
+        await page.getByRole('textbox').or(page.getByRole('combobox'))
+          .and(page.locator(`input[autocomplete="billing ${field}"]`)).fill(value);
+      }
+      if (a.province) await page.locator('select[autocomplete="billing address-level1"]:visible').selectOption(a.province);
+    });
   }
 
   private async run(page: Page, input: CheckoutDriverInput, log: (s: string) => void): Promise<CheckoutDriverResult> {
@@ -323,11 +345,11 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     // Test gateway must be visible BEFORE any card value is entered.
     await this.verifyGateway(page, log, true);
     await this.step(log, 'fill_test_card', async () => {
-      const inFrame = (prefix: string) => page.frameLocator(`iframe[name^="${prefix}"]`).locator('input').first();
-      await inFrame('card-fields-number').fill(BOGUS_CARD.number);
-      await inFrame('card-fields-name').fill(BOGUS_CARD.name);
-      await inFrame('card-fields-expiry').fill(futureExpiry(this.clock.now()));
-      await inFrame('card-fields-verification_value').fill(BOGUS_CARD.cvv);
+      // Each hosted frame contains inputs for ALL card fields. Selecting its first input
+      // writes into `number`, even in the name/expiry/CVV frames, and leaves payment invalid.
+      for (const [field, value] of Object.entries(this.testCardValues())) {
+        await this.cardField(page, field).fill(value);
+      }
     });
 
     await this.assertNoChallenge(page);
@@ -340,6 +362,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     try { await payButton.click({ trial: true }); } catch (e) { await observe(() => this.opts.observer?.stepFailed?.('pay_trial_click')); throw e; }
     await this.chooseQuotedShipping(page, input.shippingTitle);
     await this.waitForTotal(page, expectedTotal, input.expectedCheckoutTotals);
+    await this.step(log, 'verify_test_card', () => this.verifyTestCard(page));
     if (!hasTestGateway(await this.bodyText(page))) throw new CheckoutAbort('test_gateway_not_active');
     if (new URL(page.url()).hostname !== this.opts.storeDomain) throw new CheckoutAbort('untrusted_checkout_url');
     const payElement = await payButton.elementHandle();
@@ -363,6 +386,11 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       for (;;) {
         if (/thank[-_]?you|\/orders\/[a-f0-9]{8,}/i.test(page.url())) break;
         await this.assertNoChallenge(page);
+        // An inline rejection does not navigate. Preserve the unknown submission outcome, but
+        // report the validation failure immediately instead of mislabelling it a 90-second timeout.
+        if (/enter a valid (?:card number|expiration date|expiry date|security code)|your card (?:was |has been )?declined/i.test(await this.bodyText(page))) {
+          throw new CheckoutAbort('payment_validation_failed');
+        }
         if (this.clock.now().getTime() > deadline) throw new CheckoutAbort('order_not_confirmed');
         await page.waitForTimeout(1000);
       }
@@ -375,6 +403,28 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       await input.checkpoint('order', { providerReference, kind: ids.orderName ? 'name' : 'confirmation' });
     }
     return ids;
+  }
+
+  private testCardValues(): Record<string, string> {
+    return { number: BOGUS_CARD.number, name: BOGUS_CARD.name, expiry: futureExpiry(this.clock.now()), verification_value: BOGUS_CARD.cvv };
+  }
+
+  private cardField(page: Page, field: string) {
+    // Strict locator resolution also rejects duplicated frames or fields.
+    return page.frameLocator(`iframe[name^="card-fields-${field}"]`).locator(`input[name="${field}"]`);
+  }
+
+  private async verifyTestCard(page: Page): Promise<void> {
+    for (const [field, expected] of Object.entries(this.testCardValues())) {
+      const input = this.cardField(page, field);
+      const actual = await input.inputValue();
+      const normalize = (value: string) => field === 'name' ? value.trim() : value.replace(/\D/g, '');
+      // Shopify's hosted name input has pattern="", so native checkValidity() rejects every
+      // nonempty name. Verify our exact test values and Shopify's own aria-invalid state instead.
+      if (normalize(actual) !== normalize(expected) || await input.getAttribute('aria-invalid') === 'true') {
+        throw new CheckoutAbort('payment_fields_invalid');
+      }
+    }
   }
 
   private async verifyGateway(page: Page, log: (s: string) => void, select = false): Promise<void> {

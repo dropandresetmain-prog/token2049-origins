@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { ProviderError } from '../../core/errors.js';
+import { CheckoutAbort } from './checkout.js';
 
 /**
  * Transport failure from Shopify. Messages never include response bodies, headers or request
@@ -78,6 +79,7 @@ export async function postGraphQL<S extends z.ZodType>(
  */
 export function toProviderError(e: unknown, code: string): ProviderError {
   if (e instanceof ProviderError) return e;
+  if (e instanceof CheckoutAbort) return new ProviderError('not_sent', code, `Checkout stopped: ${e.code}`);
   if (e instanceof ShopifyHttpError) {
     const retryable = e.kind === 'network' || e.status === 429 || (e.status !== undefined && e.status >= 500);
     return new ProviderError(e.kind === 'http' && e.status !== undefined && e.status < 500 && e.status !== 429 ? 'rejected' : 'not_sent', code, e.message, retryable);

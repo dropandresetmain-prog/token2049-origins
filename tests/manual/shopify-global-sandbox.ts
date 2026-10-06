@@ -21,6 +21,7 @@ import { getPurchaseRow } from '../../src/core/store.js';
 import { purchaseProof } from '../../src/evidence/proof.js';
 import { trialBalance } from '../../src/core/journal.js';
 import { ProviderError, CoreError } from '../../src/core/errors.js';
+import type { Page } from 'playwright-core';
 
 const output = process.argv[2];
 const stopBeforePay = process.argv.includes('--stop-before-pay');
@@ -68,7 +69,16 @@ const observedFetch: typeof fetch = async (url, init) => {
   return fetch(url, init);
 };
 try {
-  const executor = createGlobalSandboxExecutor(process.env, () => db, { fetchImpl: observedFetch, sink: step => emit('checkout_step', { phase, step }) });
+  let checkoutPage: Page | undefined;
+  const executor = createGlobalSandboxExecutor(process.env, () => db, { fetchImpl: observedFetch, sink: step => emit('checkout_step', { phase, step }),
+    checkoutObserver: { attach: page => { checkoutPage = page; }, stepFailed: async step => {
+      if (!checkoutPage) return;
+      const text = await checkoutPage.locator('body').innerText();
+      // Only standalone summary labels and money tokens; never persist customer text or URLs.
+      const tokens = text.split('\n').map(line => line.trim()).filter(line => /^(?:Subtotal|Shipping|Total|Tax|Taxes|Total tax|USD|Free|Standard|\$[\d,.]+)$/i.test(line));
+      emit('checkout_summary_diagnostic', { step, tokens, pending: /calculating|calculated at (?:the )?next step|estimated taxes/i.test(text) });
+    } },
+  });
   const funding = new FixtureFundingAdapter(systemClock);
   const gw = await buildGateway({ executors: [executor], fundingAdapters: [funding], bankAdapters: [] }, { db,
     env: { APP_ENV: 'test', DATABASE_URL: databaseUrl, PUBLIC_BASE_URL: 'http://127.0.0.1:8787', SERVICE_FEE_BPS: '0' } });
