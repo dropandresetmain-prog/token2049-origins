@@ -18,7 +18,9 @@
     "finalAffectedTests": 70,
     "finalAffectedPassed": 70,
     "compiledGatewayPreflight": "Expected sanitized failure, no configuration; no spend",
-    "finalBuild": "PASS"
+    "finalBuild": "PASS",
+    "privateContainerBuild": "PASS; source-only Dockerfile-specific context",
+    "unconfiguredPrivateContainer": "Expected sanitized failure, exit 1; no ports, credentials or volumes; no spend"
   },
   "external": {
     "renderApi": "authenticated read-only HTTP 200",

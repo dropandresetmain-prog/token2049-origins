@@ -18,7 +18,7 @@ BuilderBase Solana track wording, read in the signed-in event dashboard: a funct
 
 ## Deployment resources and exact blocker
 
-Blueprint: deploy/render-solana.yaml; Dockerfile.solana. One Singapore Starter private service + 1 GB disk is $7.25/month at checked prices ($7 compute + $0.25 disk). The existing free public gateway can send private-network traffic in the same workspace/region. Use the actual Render Internal hostname, not an assumed display name. Service autodeploy is off. Canonical Render deployment and render.yaml were not changed.
+Blueprint: deploy/render-solana.yaml; Dockerfile.solana with a dedicated source-only Dockerfile.solana.dockerignore. One Singapore Starter private service + 1 GB disk is $7.25/month at checked prices ($7 compute + $0.25 disk). The existing free public gateway can send private-network traffic in the same workspace/region. Use the actual Render Internal hostname, not an assumed display name. Service autodeploy is off. Canonical Render deployment and render.yaml were not changed.
 
 Read-only Render API: live gateway deploy dep-db2luemgekts73ff3g4g uses common base SHA, service srv-db2jgqnavr4c73e9blrg. No Solana private service exists. Render Billing UI explicitly says No card on file. Paid private service/disk requires the human to add billing and provision. No platform mutation was attempted.
 
@@ -34,8 +34,9 @@ Read-only Render API: live gateway deploy dep-db2luemgekts73ff3g4g uses common b
 
 ## Verification and review
 
-Local tests and external proof are separate. Initial affected set: 102/102 tests across seven files. Added OAuth integration checks: 2/2 after fixing an overlong fixture display address. Full repo: 51 files, 978/978 tests passed once. Typecheck and build passed. These exercise real OAuth/HTTP transport with test payer/facilitator seams; no hosted service or external payment is implied. Final CLI additions passed typecheck, production build and no-configuration fail-closed smoke. After the final bridge credential and packaging fixes, the directly affected hosted configuration/OAuth set passed 70/70 tests across three files. The full suite was not repeated.
+Local tests and external proof are separate. Initial affected set: 102/102 tests across seven files. Added OAuth integration checks: 2/2 after fixing an overlong fixture display address. Full repo: 51 files, 978/978 tests passed once. Typecheck and build passed. These exercise real OAuth/HTTP transport with test payer/facilitator seams; no hosted service or external payment is implied. Final CLI additions passed typecheck, production build and no-configuration fail-closed smoke. After the final bridge credential and packaging fixes, the directly affected hosted configuration/OAuth set passed 70/70 tests across three files. The full suite was not repeated. The private Docker image built successfully with its source-only context; a container without configuration, ports, keys or volumes exited 1 with a sanitized readiness failure before any signing.
 
+- Act Now — Gateway Docker ignore rules omit payer source. Added a Dockerfile-specific allowlist containing only known package manifests and TypeScript/SQL source, so private key files and runtime histories cannot enter the image. Deferring prevents the private image from building.
 - Act Now — Read-only preflight must be present in the production gateway image. Added its compiled entry to tsconfig.build.json and invoke it with Node; no dev-only tsx dependency in the gateway. Deferring would make the deployment check unusable.
 - Act Now — Rail bridge credentials must be distinct to keep their authority separate. Configuration now rejects identical Cardano/Solana bridge tokens.
 - Act Now — Durable atomic rename needed directory fsync on Linux, otherwise an abrupt host failure could lose a spend reservation. Fixed directory fsync after both initialization and update; existing ledger suite passes. Deferring could weaken spend caps.
