@@ -15,7 +15,7 @@ Official references checked for this lane:
 - [TypeScript SDK release history](https://github.com/smartcontractkit/cre-sdk-typescript/releases)
 - [Koios API guide](https://www.koios.rest/guide/introduction.html)
 
-Pinned versions: CRE CLI v1.37.0, `@chainlink/cre-sdk` 1.23.0, Bun 1.4.0, TypeScript 5.9.3, Javy 8.1.0. SDK and project dependencies are lockfile-pinned. The official CRE CLI v1.37.0 Linux ARM64 release archive (`cre_v1.37.0_linux_arm64.tar.gz`, SHA-256 `8454d872386a1633e9f1792d593b13b3f1dd7f8101bc09cbb6f67069edcb5dfa`) and Javy v8.1.0 ARM64 release asset (`javy-arm-linux-v8.1.0.gz`, SHA-256 `dcb2cd296fcba827a61e9750badb6d12a111346483e6f3fe4cbf287e62fb2a5a`) were verified from their official release manifests and kept under ignored `chainlink/.tools/`. On Windows ARM64, CRE/Javy compilation ran inside the official Bun Linux ARM64 container; a fresh Debian-based container needs `ca-certificates`, `curl`, and `gpg` for the official installer flow. The official Javy Windows installer does not support Windows ARM64. The temporary Docker container and copied CRE profile were removed after simulation.
+Pinned versions: CRE CLI v1.37.0, `@chainlink/cre-sdk` 1.23.0, `@chainlink/cre-sdk-javy-plugin` 1.7.0, Bun 1.4.0, TypeScript 5.9.3, and Javy v8.1.0. SDK and project dependencies are lockfile-pinned. The official CRE CLI Linux ARM64 release archive (`cre_v1.37.0_linux_arm64.tar.gz`) was verified against SHA-256 `8454d872386a1633e9f1792d593b13b3f1dd7f8101bc09cbb6f67069edcb5dfa`; its extracted binary is kept under ignored `chainlink/.tools/`. The pinned Javy plugin exposes `cre-setup`; `bun x cre-setup` installs Javy v8.1.0 for the container platform using the official [Javy release asset](https://github.com/bytecodealliance/javy/releases/download/v8.1.0/javy-arm-linux-v8.1.0.gz), SHA-256 `dcb2cd296fcba827a61e9750badb6d12a111346483e6f3fe4cbf287e62fb2a5a`. No standalone Javy binary is tracked. On Windows ARM64, CRE/Javy compilation ran inside the official Bun Linux ARM64 container; a fresh Debian-based container needs `ca-certificates`, `curl`, and `gpg` for the official setup. The official Javy Windows installer does not support Windows ARM64. The temporary Docker container and copied CRE profile were removed after simulation.
 
 The organizer clarified in a private chat that DON deployment is not necessary and does not affect evaluation; simulation is sufficient. The private chat image is intentionally not copied here. The local account is authenticated, but deploy access is disabled; no request was submitted and no workflow was deployed.
 
@@ -42,10 +42,11 @@ docker run -d --name capsule-cre-sim `
   -v "${root}\chainlink\.tools:/tools:ro" `
   -w /work/chainlink/capsule-chainlink `
   --entrypoint sh oven/bun:1.4.0 -c 'sleep 600'
+docker exec capsule-cre-sim sh -lc 'apt-get update && apt-get install -y --no-install-recommends ca-certificates curl gpg'
 docker exec capsule-cre-sim mkdir -p /root/.cre
 docker cp "$env:USERPROFILE\.cre\context.yaml" capsule-cre-sim:/root/.cre/context.yaml
 docker cp "$env:USERPROFILE\.cre\cre.yaml" capsule-cre-sim:/root/.cre/cre.yaml
-docker exec capsule-cre-sim sh -lc 'cd /work/chainlink/capsule-chainlink/commerce-verification && bun install --frozen-lockfile'
+docker exec capsule-cre-sim sh -lc 'cd /work/chainlink/capsule-chainlink/commerce-verification && bun install --frozen-lockfile && bun x cre-setup'
 docker exec -d capsule-cre-sim sh -lc 'cd /work/chainlink/capsule-chainlink/commerce-verification && bun run snapshot-fixture'
 Start-Sleep -Seconds 2
 docker exec capsule-cre-sim sh -lc '/tools/cre-linux-arm64 workflow simulate commerce-verification --target snapshot-settings --non-interactive --trigger-index 0 --http-payload "{\"purchaseId\":\"pur_01M49B9QJCBD8SS77FMAXNTJK8\"}"'
