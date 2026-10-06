@@ -64,6 +64,12 @@ const SCRIPT = `(() => {
     top.append(node('span',p.merchant.environment.toUpperCase(),'badge'),node('span',p.progress.label,'badge'),node('h2',p.summary),node('div',amount(p.commercialAmount),'amount'),node('p','Commercial total · exact approved quote'),node('p',p.progress.message));
     if(p.progress.nextAction) top.append(node('p',p.progress.nextAction));
     const refresh=node('button','Refresh progress');refresh.type='button';refresh.addEventListener('click',()=>load(p.purchaseId));top.append(refresh);root.append(top);
+    if(p.sourceOffer && p.sandboxExecution){
+      const source=node('div',undefined,'card'), dl=node('dl'), s=p.sourceOffer;
+      source.append(node('h2','Source offer'));row(dl,'Product',s.productTitle);row(dl,'Merchant',s.merchantName);row(dl,'Observed item price',amount(s.observedPrice));row(dl,'Availability',s.availability);row(dl,'Observed',time(s.observedAt));row(dl,'Evidence',s.evidenceMode);source.append(dl);
+      const link=node('a','Source product ↗');link.href=s.productUrl;link.target='_blank';link.rel='noopener noreferrer';source.append(link);
+      source.append(node('h2','Sandbox boundary'),node('p',p.sandboxExecution.boundary));row(dl,'Capsule sandbox exact total',amount(p.sandboxExecution.quotedTotal));root.append(source);
+    }
     const grid=node('div',undefined,'grid'), journey=node('div',undefined,'card'), timeline=node('ol');journey.append(node('h2','From request to result'));
     p.timeline.forEach(s=>{const li=node('li');li.dataset.status=s.status;li.append(node('span',s.label,'step-label'),node('span',s.status,'step-state'),node('p',s.text));if(s.timestamp)li.append(node('div',time(s.timestamp),'time'));timeline.append(li);});journey.append(timeline);grid.append(journey);
     const side=node('div'), funding=node('div',undefined,'card'), dl=node('dl'), f=p.funding.requirement, a=f.amount;

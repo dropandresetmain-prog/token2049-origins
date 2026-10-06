@@ -226,6 +226,53 @@ describe('Shopify payment checkpoint and independent readback', () => {
   });
 });
 
+describe('Storefront retained sandbox shadow isolation', () => {
+  const canonicalTitle = 'Controlled test shirt';
+  const shadowTitle = '[CAPSULE SANDBOX] Canvas tote';
+  function variantNode() {
+    return { id:'gid://shopify/ProductVariant/123', title:'Default Title', availableForSale:true, price:amount('12.50') };
+  }
+  function productNode(title: string) {
+    return { id:'gid://shopify/Product/456', title, description:'Synthetic fixture', availableForSale:true, variants:{ nodes:[variantNode()] } };
+  }
+  function client(data: unknown) {
+    const fetchImpl = vi.fn<typeof fetch>().mockImplementation(async () => new Response(JSON.stringify({ data })));
+    return { sf:new StorefrontClient(loadShopifyConfig(env).config, fetchImpl), fetchImpl };
+  }
+  function node(kind: 'Product' | 'ProductVariant', title: string) {
+    return kind === 'Product' ? productNode(title) : { ...variantNode(), product:{ id:'gid://shopify/Product/456', title, description:'Synthetic fixture' } };
+  }
+
+  it('excludes reserved shadow titles from ordinary search while retaining the canonical catalog product', async () => {
+    const { sf,fetchImpl } = client({ products:{ nodes:[productNode(shadowTitle), productNode(canonicalTitle)] } });
+    expect(await sf.findVariants({ query:'shirt', country:'US' })).toEqual([
+      { variantId:'gid://shopify/ProductVariant/123', title:canonicalTitle, description:'Synthetic fixture', unitPrice:money('USD',1250) },
+    ]);
+    expect(JSON.parse(fetchImpl.mock.calls[0]![1]!.body as string).variables.q).toBe('shirt available_for_sale:true tag_not:capsule-sandbox');
+  });
+
+  it.each(['Product','ProductVariant'] as const)('excludes a retained shadow addressed directly by %s ref', async kind => {
+    const { sf } = client({ node:node(kind,shadowTitle) });
+    expect(await sf.findVariants({ productRef:`gid://shopify/${kind}/${kind === 'Product' ? 456 : 123}`, country:'US' })).toEqual([]);
+  });
+
+  it.each(['Product','ProductVariant'] as const)('preserves canonical catalog discovery by direct %s ref', async kind => {
+    const { sf } = client({ node:node(kind,canonicalTitle) });
+    expect(await sf.findVariants({ productRef:`gid://shopify/${kind}/${kind === 'Product' ? 456 : 123}`, country:'US' })).toEqual([
+      { variantId:'gid://shopify/ProductVariant/123', title:canonicalTitle, description:'Synthetic fixture', unitPrice:money('USD',1250) },
+    ]);
+  });
+
+  it.each(['query','Product','ProductVariant'] as const)('allows an explicit internal shadow readback by %s', async kind => {
+    const { sf,fetchImpl } = client(kind === 'query' ? { products:{ nodes:[productNode(shadowTitle)] } } : { node:node(kind,shadowTitle) });
+    const ref = kind === 'query' ? { query:'tote' } : { productRef:`gid://shopify/${kind}/${kind === 'Product' ? 456 : 123}` };
+    expect(await sf.findVariants({ ...ref, country:'US', includeSandboxShadows:true })).toEqual([
+      { variantId:'gid://shopify/ProductVariant/123', title:shadowTitle, description:'Synthetic fixture', unitPrice:money('USD',1250) },
+    ]);
+    if (kind === 'query') expect(JSON.parse(fetchImpl.mock.calls[0]![1]!.body as string).variables.q).toBe('tote available_for_sale:true');
+  });
+});
+
 describe('Shopify outbound transport and browser safeguards', () => {
   it.each(['https://evil.example/checkouts/x','http://test-shop.myshopify.com/checkouts/x','https://x:test@test-shop.myshopify.com/checkouts/x','https://test-shop.myshopify.com:444/checkouts/x','https://test-shop.myshopify.com/admin'])('rejects unsafe checkout URL %s', url => expect(isTrustedCheckoutUrl(url,env.SHOPIFY_STORE_DOMAIN)).toBe(false));
   it('requires quoted currency and total, and detects OTP/CAPTCHA', () => {

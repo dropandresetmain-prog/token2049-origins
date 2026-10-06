@@ -130,6 +130,7 @@ export class CommerceCore {
         const expiresAt = new Date(Math.min(ttl.getTime(), Date.parse(o.expiresAt))).toISOString();
         const view: OfferView = {
           offerId,
+          ...(o.sourceOffer ? { sourceOffer: o.sourceOffer } : {}),
           category: intent.category,
           route,
           providerEnvironment: ex.environment,
@@ -165,6 +166,32 @@ export class CommerceCore {
 
   async createQuote(actor: ActorContext, offerId: string, rawFulfillment: unknown, supersedes?: QuoteRow): Promise<QuoteView> {
     this.requireScope(actor, 'quotes:write');
+    const offer = await this.d.db.get<{ customer_id: string; intent_json: string }>('SELECT customer_id,intent_json FROM offers WHERE id=$1', offerId);
+    if (!offer || offer.customer_id !== actor.customerId) throw new CoreError('not_found', 'offer not found');
+    const intent = JSON.parse(offer.intent_json) as PurchaseIntent;
+    if (intent.category !== 'retail' || intent.discovery !== 'live') return this.createQuoteOnce(actor, offerId, rawFulfillment, supersedes);
+    const assessment = assessFulfillment(rawFulfillment);
+    if (assessment.status === 'needs_input') throw new CoreError('needs_input', 'fulfillment information required', assessment);
+    const fulfillment = FulfillmentSchema.parse(assessment.value);
+    // One selected live offer has one immutable quote. New terms require a new discovery/selection.
+    // The session lock spans provider I/O without holding a database transaction.
+    const result = await this.d.db.withExclusiveLock('live-retail-quote:' + offerId, async () => {
+      const existing = await this.d.db.get<QuoteRow>('SELECT * FROM quotes WHERE offer_id=$1 ORDER BY created_at LIMIT 1', offerId);
+      if (existing) {
+        if (digestOf(JSON.parse(existing.fulfillment_json)) !== digestOf(fulfillment))
+          throw new CoreError('quote_changed', 'Selected offer already has frozen fulfillment; search again for new terms');
+        if (Date.parse(existing.expires_at) <= this.d.clock.now().getTime())
+          throw new CoreError('quote_expired', 'Selected offer quote expired; search and select again');
+        return JSON.parse(existing.public_json) as QuoteView;
+      }
+      return this.createQuoteOnce(actor, offerId, fulfillment, supersedes);
+    });
+    if (!result.acquired) throw new CoreError('conflict', 'Selected offer quote is being prepared; retry the same offer');
+    return result.value;
+  }
+
+  private async createQuoteOnce(actor: ActorContext, offerId: string, rawFulfillment: unknown, supersedes?: QuoteRow): Promise<QuoteView> {
+    this.requireScope(actor, 'quotes:write');
     const assessment = assessFulfillment(rawFulfillment);
     if (assessment.status === 'needs_input') throw new CoreError('needs_input', 'fulfillment information required', assessment);
     const fulfillment = FulfillmentSchema.parse(assessment.value);
@@ -185,7 +212,7 @@ export class CommerceCore {
     await this.assertRouteReady(ex);
 
     await this.assessProvider(ex, intent, fulfillment);
-    const pq = await ex.quote({ executionRef: JSON.parse(offer.execution_ref_json), intent }, fulfillment);
+    const pq = await ex.quote({ offerId, executionRef: JSON.parse(offer.execution_ref_json), intent }, fulfillment);
 
     // Spend ceiling from intent applies to the exact payable principal.
     const fee = this.serviceFee(pq.merchantTotal);
@@ -228,6 +255,8 @@ export class CommerceCore {
       route: offer.route,
       providerEnvironment: ex.environment,
       title: pq.title,
+      ...(pq.sourceOffer ? { sourceOffer: pq.sourceOffer } : {}),
+      ...(pq.sandboxRepresentation ? { sandboxRepresentation: pq.sandboxRepresentation } : {}),
       breakdown: pq.breakdown,
       merchantTotal: pq.merchantTotal,
       serviceFee: fee,

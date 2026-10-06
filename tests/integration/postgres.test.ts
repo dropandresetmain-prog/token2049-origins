@@ -33,7 +33,7 @@ describe('PostgreSQL persistence and competing connections', () => {
     await first.run("INSERT INTO customers VALUES ('persisted', 'Migration probe', '2026-10-06T00:00:00.000Z')");
     const [second, third] = await Promise.all([createTestDb(schema), createTestDb(schema)]);
     await Promise.all([first.initialize(), second.initialize(), third.initialize()]);
-    expect((await second.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM schema_migrations'))?.n).toBe(2);
+    expect((await second.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM schema_migrations'))?.n).toBe(3);
     expect((await third.get<{ display_name: string }>("SELECT display_name FROM customers WHERE id = 'persisted'"))?.display_name).toBe('Migration probe');
     await first.run("UPDATE schema_migrations SET checksum = 'tampered'");
     await expect(second.initialize()).rejects.toThrow(/checksum mismatch/);
@@ -89,6 +89,36 @@ describe('PostgreSQL persistence and competing connections', () => {
     })));
     expect(results.every(result => result.acquired)).toBe(true);
     expect((await db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM customers'))?.n).toBe(8);
+  });
+
+  it('completes five simultaneous nested session locks without starving the connection pool', async () => {
+    const db = await createTestDb();
+    const allOuterLocksHeld = deferred();
+    let entered = 0;
+    const results = await Promise.all(Array.from({ length:5 }, (_, index) => db.withExclusiveLock(`${db.connectionName}:outer:${index}`, async () => {
+      const before = await db.get<{ pid:number }>('SELECT pg_backend_pid() AS pid');
+      // Hold all five pool sessions before any callback attempts a second lock.
+      if (++entered === 5) allOuterLocksHeld.resolve();
+      await allOuterLocksHeld.promise;
+      const nested = await db.withExclusiveLock(`${db.connectionName}:inner:${index}`, async () => {
+        expect((await db.get<{ pid:number }>('SELECT pg_backend_pid() AS pid'))?.pid).toBe(before!.pid);
+        await db.tx(async () => {
+          await db.run('INSERT INTO customers VALUES ($1, $2, $3)', `nested-${index}`, 'Nested lock probe', 'now');
+          await db.tx(() => db.run('UPDATE customers SET display_name=$1 WHERE id=$2', `saved-${index}`, `nested-${index}`));
+        });
+        return index;
+      });
+      expect((await db.get<{ pid:number }>('SELECT pg_backend_pid() AS pid'))?.pid).toBe(before!.pid);
+      return nested;
+    })));
+    expect(results.map(result => result.acquired)).toEqual([true,true,true,true,true]);
+    for (const [index,result] of results.entries()) {
+      if (!result.acquired) throw new Error('Outer lock unexpectedly unavailable');
+      expect(result.value).toEqual({ acquired:true, value:index });
+    }
+    expect(await db.all<{ id:string; display_name:string }>('SELECT id, display_name FROM customers ORDER BY id')).toEqual(
+      Array.from({ length:5 }, (_, index) => ({ id:`nested-${index}`, display_name:`saved-${index}` })),
+    );
   });
 
   it('returns one purchase for concurrent identical buy attempts through two gateways', async () => {

@@ -49,7 +49,10 @@ export class Db {
 
   /** Session lock spans funding verification without holding a transaction across network I/O. */
   async withExclusiveLock<T>(key: string, fn: () => Promise<T>): Promise<{ acquired: false } | { acquired: true; value: T }> {
-    const client = await this.pool.connect();
+    const parent = this.context.getStore();
+    // Nested provider preparation locks share the already-owned session, avoiding pool starvation.
+    const reuse = parent !== undefined && parent.depth < 0;
+    const client = reuse ? parent.client : await this.pool.connect();
     // A server disconnect during external I/O must fail subsequent queries, not crash the process.
     const disconnected = () => undefined;
     client.on('error', disconnected);
@@ -71,7 +74,7 @@ export class Db {
           destroy = true;
         }
       }
-      client.release(destroy);
+      if (!reuse) client.release(destroy);
       client.off('error', disconnected);
     }
   }

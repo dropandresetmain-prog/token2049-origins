@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SourceOffer, SandboxExecution } from '../contracts/provenance.js';
 import type { Db } from '../infrastructure/db.js';
 import { Money } from '../contracts/money.js';
 import { HumanProgress, projectProgress } from '../contracts/presentation.js';
@@ -8,6 +9,7 @@ import { getQuoteRow, type PurchaseRow, type FundingEvidenceRow } from '../core/
 import { redactString } from '../infrastructure/redact.js';
 
 export const PurchaseProof = z.object({
+  sourceOffer: SourceOffer.optional(), sandboxExecution: SandboxExecution.optional(),
   purchaseId: z.string(), quoteId: z.string(), summary: z.string(), commercialAmount: Money,
   progress: HumanProgress,
   timeline: z.array(z.object({ step: z.enum(['requested', 'quote_confirmed', 'approved', 'funded', 'merchant_execution', 'result_verified']),
@@ -44,12 +46,14 @@ export async function purchaseProof(db: Db, p: PurchaseRow): Promise<PurchasePro
     timestamp: done || current ? timestamp : null, text, evidenceRef: done || current ? ref : null,
   });
   return PurchaseProof.parse({
+    ...(qv.sourceOffer ? { sourceOffer: qv.sourceOffer } : {}),
+    ...(qv.sandboxRepresentation ? { sandboxExecution: { ...qv.sandboxRepresentation, quotedTotal: qv.merchantTotal, orderReference: p.provider_reference, paymentStatus: p.merchant_payment_status, evidenceMode: purchase.receipt?.evidenceMode ?? null } } : {}),
     purchaseId: p.id, quoteId: q.id, summary: `${q.category} purchase via ${q.route}`, commercialAmount: qv.payablePrincipal, progress,
     timeline: [
       step('requested', 'Requested', !!requested, requested?.created_at ?? null, 'Purchase request received.', null),
       step('quote_confirmed', 'Quote confirmed', true, q.created_at, 'Exact commercial terms frozen in the quote.', q.id),
       step('approved', 'Approved', !!approval, approval?.created_at ?? null, approval ? 'Channel submitted approval of the exact quote and selected funding option.' : 'No explicit approval event is available for this legacy purchase.', approval?.id ?? null),
-      step('funded', 'Funded', applied && !!funded, funded?.created_at ?? null, applied ? 'Payment confirmed and applied to this purchase.' : 'Awaiting confirmation of payment for this purchase.', funded?.id ?? null, !applied),
+      step('funded', 'Funded', applied && !!funded, funded?.created_at ?? null, applied ? funding.some(f => f.evidence_mode === 'local_fixture') ? 'SIMULATED / LOCAL FIXTURE funding applied; no externally confirmed chain transaction is proved.' : 'Payment confirmed and applied to this purchase.' : 'Awaiting confirmation of payment for this purchase.', funded?.id ?? null, !applied),
       step('merchant_execution', 'Merchant execution', !!execution && verified, execution?.created_at ?? null, execution ? 'Merchant execution started; completion depends on the verified result.' : 'Merchant execution has not started.', execution?.id ?? null, applied && !verified),
       step('result_verified', 'Result verified', verified && progress.stage === 'complete', result?.created_at ?? null, verified ? progress.message : 'A final merchant result is not yet verified.', result?.id ?? null, verified && progress.stage !== 'complete'),
     ],

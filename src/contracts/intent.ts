@@ -17,6 +17,8 @@ const common = {
 export const RetailIntent = z
   .object({
     category: z.literal('retail'),
+    /** Optional live retail discovery; omitted preserves the controlled catalog path. */
+    discovery: z.enum(['live', 'controlled_catalog']).optional(),
     ...common,
     /** Free text search against the supported store catalog, or an opaque product ref from a prior search. */
     query: z.string().min(1).max(200).optional(),

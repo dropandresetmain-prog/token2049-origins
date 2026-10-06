@@ -5,6 +5,7 @@
  * - FundingAdapter: generates protocol requirements and independently verifies payments. Never books commerce.
  * - BankObservationAdapter: provenance-bearing OCBC observations only.
  */
+import type { SourceOffer, SandboxRepresentation } from './provenance.js';
 import type { SettlementBreakdown } from './settlement.js';
 import type { Money, CryptoAmount } from './money.js';
 import type {
@@ -21,6 +22,7 @@ import type { CommerceStatus, MerchantPaymentStatus, PaymentState } from './comm
 /* ---------------- Commerce executor ---------------- */
 
 export interface ProviderOffer {
+  sourceOffer?: SourceOffer;
   title: string;
   description: string;
   indicativePrice: Money;
@@ -32,6 +34,8 @@ export interface ProviderOffer {
 }
 
 export interface ProviderQuote {
+  sourceOffer?: SourceOffer;
+  sandboxRepresentation?: SandboxRepresentation;
   title: string;
   breakdown: Array<{ kind: 'item' | 'shipping' | 'tax' | 'fee_included' | 'fee_payable_at_property' | 'discount'; label: string; amount: Money }>;
   /** Exact amount the merchant/provider will charge for this purchase (incl. shipping/tax). */
@@ -109,7 +113,7 @@ export interface CommerceExecutor {
   /** Read-only discovery; paths must refer to reviewed canonical customer fields. Never request arbitrary JSON. */
   inputRequirements?(input: { intent: PurchaseIntent; fulfillment?: Fulfillment }): Promise<{ phase: 'search' | 'fulfillment'; paths: string[] } | null>;
   search(intent: PurchaseIntent): Promise<ProviderOffer[]>;
-  quote(offer: { executionRef: Record<string, unknown>; intent: PurchaseIntent }, fulfillment: Fulfillment): Promise<ProviderQuote>;
+  quote(offer: { offerId?: string; executionRef: Record<string, unknown>; intent: PurchaseIntent }, fulfillment: Fulfillment): Promise<ProviderQuote>;
   /** Must never be called twice for one attempt by the core; must still be safe to resume from checkpoints. */
   execute(ctx: ExecutionContext): Promise<ExecutionResult>;
   /** Independent readback; used after execute and for reconciliation of unknown outcomes. */

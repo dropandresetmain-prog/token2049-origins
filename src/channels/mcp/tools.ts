@@ -84,7 +84,7 @@ export function describePurchase(p: PurchaseView): string {
 
 function describeOffers(offers: OfferView[]): string {
   if (offers.length === 0) return 'No offers found. Try a different query or a higher spend ceiling.';
-  const lines = offers.map((o) => `- ${o.offerId} | ${o.title} | ${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)} | expires ${o.expiresAt}`);
+  const lines = offers.map((o) => `- ${o.offerId} | ${o.title} | ${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)} | expires ${o.expiresAt}${o.sourceOffer ? ' | source ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl + ' | execution: Capsule Shopify Sandbox' : ''}`);
   return `${offers.length} offer(s). Offers are indicative and NOT executable; call create_quote for exact terms.\n${lines.join('\n')}`;
 }
 

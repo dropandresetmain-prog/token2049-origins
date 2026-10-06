@@ -551,8 +551,13 @@ export class Worker {
     if (qv.route === 'nuitee') limitations.push('Nuitée sandbox booking payment is simulated by the provider (no charge).');
     if (qv.route === 'shopify') limitations.push('Shopify test-gateway payment proves merchant-side test behaviour only; no physical fulfillment is implied.');
     if (evidenceMode === 'local_fixture') limitations.unshift('LOCAL FIXTURE: not external evidence.');
+    const funding = await fundingSummaries(this.db, p.id);
+    if (funding.some(f => f.evidenceMode === 'local_fixture')) limitations.unshift('Funding is SIMULATED / LOCAL FIXTURE; no externally confirmed chain transaction is proved.');
+    if (qv.sourceOffer && qv.sandboxRepresentation) limitations.push(qv.sandboxRepresentation.boundary, 'Source price is an observed item price. Shipping, tax and total are Capsule sandbox charges, not source merchant checkout charges.');
     return {
       receiptId: newId('rcp'),
+      ...(qv.sourceOffer ? { sourceOffer: qv.sourceOffer } : {}),
+      ...(qv.sandboxRepresentation ? { sandboxExecution: { ...qv.sandboxRepresentation, quotedTotal: qv.merchantTotal, orderReference: r.providerReference, paymentStatus: r.merchantPaymentStatus, evidenceMode } } : {}),
       purchaseId: p.id,
       quoteId: q.id,
       quoteDigest: q.digest,
@@ -563,7 +568,7 @@ export class Worker {
       principal: qv.merchantTotal,
       fundingRequirement: fundingRequirementView(JSON.parse(p.funding_requirement_json) as FundingRequirementRecord),
       serviceFee: qv.serviceFee,
-      funding: (await fundingSummaries(this.db, p.id)),
+      funding,
       providerReference: r.providerReference,
       commerceStatus: r.commerceStatus,
       merchantPaymentStatus: r.merchantPaymentStatus,
