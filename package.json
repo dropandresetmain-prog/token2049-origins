@@ -22,7 +22,11 @@
     "payer": "tsx clients/payer/pay.ts",
     "payer:bridge": "tsx clients/payer/bridge.ts",
     "wallet": "tsx clients/payer/wallet-generate.ts",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "console:dev": "vite --config web/vite.config.ts",
+    "console:build": "vite build --config web/vite.config.ts",
+    "console:test": "vitest run --config web/vitest.config.ts",
+    "console:typecheck": "tsc -p web/tsconfig.json"
   },
   "dependencies": {
     "@evolution-sdk/evolution": "0.5.14",
@@ -39,8 +43,14 @@
     "@types/express": "5.0.6",
     "@types/node": "24.19.1",
     "@types/pg": "8.23.1",
+    "@types/react": "19.3.0",
+    "@types/react-dom": "19.3.0",
+    "@vitejs/plugin-react": "6.1.2",
+    "react": "19.3.0",
+    "react-dom": "19.3.0",
     "tsx": "4.23.15",
     "typescript": "6.0.3",
+    "vite": "8.3.3",
     "vitest": "4.1.11"
   }
 }
