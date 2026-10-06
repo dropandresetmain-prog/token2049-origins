@@ -5,7 +5,7 @@ import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { tmpdir } from 'node:os';
-import { join } from 'node:path';
+import { dirname, join } from 'node:path';
 import { loadPayerConfig } from '../../clients/payer/config.js';
 import { deriveWalletAddress } from '../../clients/payer/hosted.js';
 import { PayerLedger, readLedgerSnapshot, retireFileLedger, retiredMarkerPath, type LedgerEntry } from '../../clients/payer/ledger.js';
@@ -681,6 +681,18 @@ describe('provision-hosted-mcp-render (existing canonical payer)', () => {
     expect(res.code).toBe(0);
     expect(res.out).toMatch(/other policy candidate .*\.env\.old \(older\) differs on/);
     expect(res.out).toMatch(/\[from .*\.env\.payer\]/);
+  }, T);
+
+  it('prefers an owner-authorised policy file kept in the protected payer directory (newest wins) and uses its caps', async () => {
+    const tree = makeTree();
+    const fake = await startFake(tree);
+    const raised = String(Number(CAP) * 50);
+    const authorised = join(dirname(tree.ledgerPath), '.env.hosted-policy');
+    writeFileSync(authorised, readFileSync(join(tree.envRoot, '.env.payer'), 'utf8').replace(new RegExp(`PAYER_MAX_(PER_PAYMENT|CUMULATIVE|DAILY)_BASE_UNITS=${CAP}(?!\\d)`, 'g'), (_m, k) => `PAYER_MAX_${k}_BASE_UNITS=${raised}`));
+    const res = await run(fake, tree, ['--dry-run']);
+    expect(res.code).toBe(0);
+    expect(res.out).toContain(`per payment ${raised}, cumulative ${raised}, daily ${raised}`);
+    expect(res.out).toMatch(/\[from .*\.env\.hosted-policy\]/);
   }, T);
 
   it.each([

@@ -46,15 +46,15 @@ services:
         sync: false
       - key: PAYER_EXPECTED_PAY_TO
         sync: false
-      # Current caps of the protected payer (base units of the allowed asset, 6 decimals), copied from its private config; never raise
-      # them here. Cumulative never resets (it is read from Postgres, including the imported history).
+      # Current caps of the protected payer (base units of the allowed asset, 6 decimals), copied from its private config. OWNER-AUTHORISED
+      # on 2026-10-07 at 50x the previous values (102000 / 50000000 / 200000000); never change them here without the owner's authorisation. Cumulative never resets (it is read from Postgres, including the imported history).
       - key: PAYER_MAX_PER_PAYMENT_BASE_UNITS
-        value: '102000'
+        value: '5100000'
       - key: PAYER_MAX_CUMULATIVE_BASE_UNITS
-        value: '102000'
+        value: '5100000'
       - key: PAYER_MAX_DAILY_BASE_UNITS
-        value: '102000'
+        value: '5100000'
       - key: PAYER_MAX_FEE_LOVELACE
-        value: '50000000'
+        value: '2500000000'
       - key: PAYER_MAX_ADA_OUTPUT_LOVELACE
-        value: '200000000'
+        value: '10000000000'

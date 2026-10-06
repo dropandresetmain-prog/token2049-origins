@@ -318,6 +318,9 @@ function discoverPolicy(opts, payer) {
     return { file, values: policyFrom(file, parseEnvFile(file)) };
   }
   const roots = opts.envRoots ? opts.envRoots.split(',').map((r) => r.trim()).filter(Boolean) : defaultEnvRoots();
+  // The protected payer directory itself may hold the owner-authorised policy (e.g. `.env.hosted-policy`); the newest matching file always wins.
+  const protectedDir = path.dirname(payer.ledgerPath);
+  if (!roots.some((r) => path.resolve(r) === path.resolve(protectedDir))) roots.push(protectedDir);
   const wantLedger = normPath(payer.ledgerPath);
   const wantMnemonic = normPath(payer.mnemonicPath);
   const candidates = [];
