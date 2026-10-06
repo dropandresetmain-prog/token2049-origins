@@ -8,6 +8,12 @@ import type { SolanaRpc } from '../../src/funding/solana/rpc.js';
 const Entry = z.object({ id: z.string(), signature: z.string().nullable(), amount: z.string().regex(/^[0-9]+$/), fee: z.string().regex(/^[0-9]+$/), header: z.string().nullable(), createdAt: z.string() }).strict();
 const Ledger = z.object({ version: z.literal(1), owner: z.string(), network: z.literal(NETWORK), mint: z.literal(TEST_MINT), entries: z.array(Entry) }).strict();
 export type SolanaLedgerEntry = z.infer<typeof Entry>;
+/** Persist directory entries as well as file contents on the Linux hosted disk. */
+function syncDirectory(path: string): void {
+  if (process.platform === 'win32') return; // Windows cannot open directory handles through this API.
+  const fd = openSync(path, 'r');
+  try { fsyncSync(fd); } finally { closeSync(fd); }
+}
 /** Fail closed on stale locks, missing/corrupt history, or access by other local users. No automatic cap reset. */
 export class SolanaLedger {
   constructor(readonly path: string, readonly owner: string) { if (!isAbsolute(path)) throw new Error('absolute ledger path required'); }
@@ -33,11 +39,13 @@ export class SolanaLedger {
   }
   initialize(entries: SolanaLedgerEntry[]): void {
     const fd = openSync(this.path,'wx',0o600); try { writeFileSync(fd,JSON.stringify({version:1,owner:this.owner,network:NETWORK,mint:TEST_MINT,entries})); fsyncSync(fd); } finally { closeSync(fd); }
+    syncDirectory(dirname(this.path));
   }
   private write(entries: SolanaLedgerEntry[]): void {
     const tmp = this.path + '.tmp', fd = openSync(tmp,'wx',0o600);
     try { writeFileSync(fd,JSON.stringify({version:1,owner:this.owner,network:NETWORK,mint:TEST_MINT,entries})); fsyncSync(fd); } finally { closeSync(fd); }
     renameSync(tmp,this.path);
+    syncDirectory(dirname(this.path));
   }
   upsert(entry: SolanaLedgerEntry): void { this.write([...this.read().filter(e => e.id !== entry.id),entry]); }
   async exclusive<T>(fn: () => Promise<T>): Promise<T> {

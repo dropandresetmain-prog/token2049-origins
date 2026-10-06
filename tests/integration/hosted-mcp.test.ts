@@ -32,7 +32,7 @@ const freePort = () => new Promise<number>((resolve) => {
 const b64url = (b: Buffer) => b.toString('base64url');
 const pkce = () => { const verifier = b64url(randomBytes(32)); return { verifier, challenge: b64url(createHash('sha256').update(verifier).digest()) }; };
 
-interface Fixture { h: Harness; base: string; mcpUrl: string; cleanup: Array<() => Promise<void>>; bridge?: { calls: string[] }; bridgeUrl?: string }
+interface Fixture { h: Harness; base: string; mcpUrl: string; cleanup: Array<() => Promise<void>>; bridge?: { calls: string[] }; bridgeUrl?: string; solanaCalls?: string[] }
 
 let current: Fixture | undefined;
 afterEach(async () => {
@@ -63,7 +63,7 @@ function retailReportsPaid(h: Harness): void {
 }
 
 /** Gateway + hosted MCP on one listener, with an optional fake Cardano payer on the "private network". */
-async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; statusDelayMs?: number; headroomBaseUnits?: string; backgroundWaitMs?: number; payStartDelayMs?: number; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
+async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; withSolanaBridge?: boolean; statusDelayMs?: number; headroomBaseUnits?: string; backgroundWaitMs?: number; payStartDelayMs?: number; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const cleanup: Array<() => Promise<void>> = [];
@@ -97,16 +97,33 @@ async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; wi
     bridgeUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     cleanup.push(() => new Promise<void>((r) => server.close(() => r())));
   }
+  const solanaCalls: string[] = [];
+  let solanaBridgeUrl: string | undefined;
+  if (opts.withSolanaBridge) {
+    const server = createServer((req,res)=>{
+      let raw=''; req.on('data',c=>raw+=c);req.on('end',()=>{
+        const send=(status:number,body:unknown)=>res.writeHead(status,{'content-type':'application/json'}).end(JSON.stringify(body));
+        if(req.headers.authorization!== 'Bearer '+BRIDGE_TOKEN) return send(401,{ok:false});
+        if(req.url==='/status')return send(200,{ok:true,source:FundingSource.parse({sourceId:'src_'+'b'.repeat(32),rail:'solana',network:SOLANA_DEVNET_NETWORK,publicAddress:SOLANA_PAYEE,displayAddress:SOLANA_PAYEE.slice(0,12)+"…"+SOLANA_PAYEE.slice(-6),assetId:SOLANA_DEVNET_USDC_MINT,readiness:'configured'})});
+        solanaCalls.push((JSON.parse(raw) as {purchaseId:string}).purchaseId);
+        return send(422,{ok:false,error:{code:'payment_rejected',message:'fixture: no spending'}});
+      });
+    });
+    await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
+    solanaBridgeUrl='http://127.0.0.1:'+ (server.address() as AddressInfo).port;
+    cleanup.push(()=>new Promise<void>(r=>server.close(()=>r())));
+  }
   const config: HostedMcpConfig = {
     publicUrl: new URL(base), allowedOrigins: opts.allowedOrigins ?? ['https://chatgpt.com'], ownerPasscode: PASSCODE,
     customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO', payerClientId: 'cli_HOSTEDTESTPAYER', extraRedirectUris: [], gatewayUrl: base,
     ...(opts.bridgeTimeoutMs ? { bridgeTimeoutMs: opts.bridgeTimeoutMs } : {}), ...(opts.backgroundWaitMs ? { backgroundWaitMs: opts.backgroundWaitMs } : {}), ...(opts.bridgeStatusTimeoutMs ? { bridgeStatusTimeoutMs: opts.bridgeStatusTimeoutMs } : {}),
+    ...(solanaBridgeUrl ? { solanaBridge: { url: solanaBridgeUrl, token: BRIDGE_TOKEN } } : {}),
     ...(bridgeUrl ? { cardanoBridge: { url: bridgeUrl, token: BRIDGE_TOKEN } } : {}),
   };
   h = await startHarness({ port, extraRouters: (core) => createHostedMcp({ db: core.deps.db, config }).mounts });
   if (opts.withSolana) h.gw.core.deps.fundingAdapters.set('solana', solanaFixtureAdapter(h));
   payerToken = (await createClient(h.gw.db, { customerId: config.customerId, displayName: 'payer', channel: 'test', label: 'hosted-payer', scopes: ['purchases:read', 'purchases:fund'] }, new Date().toISOString())).token;
-  return (current = { h, base, mcpUrl: `${base}/mcp`, cleanup, bridge, ...(bridgeUrl ? { bridgeUrl } : {}) });
+  return (current = { h, base, mcpUrl: `${base}/mcp`, cleanup, bridge, solanaCalls, ...(bridgeUrl ? { bridgeUrl } : {}) });
 }
 
 /** Run the whole OAuth dance the way ChatGPT does and return the tokens. */
@@ -861,5 +878,31 @@ describe('hosted console access key (hash only, read only)', () => {
     expect((await f.h.call('POST', '/v1/offers/search', { token: key, body: { intent: retailIntent() } })).status).toBe(403);
     expect((await f.h.call('POST', '/v1/purchases/pur_0000000000000/fund', { token: key })).status).toBe(403);
     expect((await f.h.call('GET', '/v1/evidence/treasury', { token: key })).status).toBe(403);
+  });
+});
+
+describe('hosted Solana MCP isolation',()=>{
+  it('shows both connected sources over OAuth without buying or paying',async()=>{
+    const f=await start({withBridge:true,withSolana:true,withSolanaBridge:true}),g=await fullGrant(f),client=await mcp(f,g.tokens.access_token);
+    try {
+      const found=await client.callTool({name:'find_offers',arguments:{intent:retailIntent()}}) as any;
+      const q=await client.callTool({name:'create_quote',arguments:{offerId:found.structuredContent.offers[0].offerId,fulfillment:retailFulfillment}}) as any;
+      expect(q.structuredContent.fundingSources.map((s:any)=>s.rail)).toEqual(['cardano','solana']);
+      expect(q.content[0].text).toMatch(/- solana .*Connected wallet/);
+      expect(f.solanaCalls).toEqual([]);expect(f.bridge?.calls).toEqual([]);
+      expect(await f.h.gw.db.all('SELECT id FROM purchases')).toEqual([]);
+    }finally{await client.close();}
+  });
+  it('uses only the selected Solana payer and never falls back after rejection or repeated buy',async()=>{
+    const f=await start({withBridge:true,withSolana:true,withSolanaBridge:true}),g=await fullGrant(f),client=await mcp(f,g.tokens.access_token);
+    try {
+      const found=await client.callTool({name:'find_offers',arguments:{intent:retailIntent()}}) as any;
+      const quoted=await client.callTool({name:'create_quote',arguments:{offerId:found.structuredContent.offers[0].offerId,fulfillment:retailFulfillment}}) as any;
+      const q=quoted.structuredContent.quote;
+      const args={quoteId:q.quoteId,selectedFundingOptionId:q.fundingOptions.find((o:any)=>o.rail==='solana').fundingOptionId,maxTotal:q.payablePrincipal,quoteDigest:q.digest};
+      await client.callTool({name:'buy',arguments:args});await client.callTool({name:'buy',arguments:args});
+      expect(f.solanaCalls).toHaveLength(1);expect(f.bridge?.calls).toEqual([]);
+      expect(await f.h.gw.db.all('SELECT id FROM funding_evidence')).toEqual([]);
+    }finally{await client.close();}
   });
 });

@@ -37,12 +37,12 @@ const limiter = (max: number, windowMs: number) => ({ windowMs, max, validate: f
  * platform keeps exactly one public listener. Returns routers for the gateway's extraRouters list.
  */
 /**
- * Register the hosted payer's gateway client for the hosted customer: scopes purchases:read + purchases:fund, nothing else.
+ * Register each hosted payer's dedicated gateway client for the hosted customer: scopes purchases:read + purchases:fund, nothing else.
  * Only the token's SHA-256 is configured, so no plaintext token exists on this service. Idempotent; rotating the hash replaces it,
  * and an operator-revoked client stays revoked.
  */
 export async function provisionPayerClient(db: Db, config: HostedMcpConfig, nowIso = new Date().toISOString()): Promise<void> {
-  if (!config.payerTokenSha256 && !config.consoleKeySha256) return;
+  if (!config.payerTokenSha256 && !config.solanaPayerTokenSha256 && !config.consoleKeySha256) return;
   await db.tx(async () => {
     await db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', config.customerId, 'Hosted MCP demo customer', nowIso);
     const upsert = (id: string, channel: string, label: string, sha: string, scopes: string[]) => db.run(
@@ -50,6 +50,7 @@ export async function provisionPayerClient(db: Db, config: HostedMcpConfig, nowI
        ON CONFLICT(id) DO UPDATE SET token_hash = EXCLUDED.token_hash WHERE api_clients.revoked_at IS NULL AND api_clients.customer_id = EXCLUDED.customer_id`,
       id, config.customerId, channel, label, sha, JSON.stringify(scopes), nowIso);
     if (config.payerTokenSha256) await upsert(config.payerClientId, 'http', 'Hosted Cardano payer', config.payerTokenSha256, ['purchases:read', 'purchases:fund']);
+    if (config.solanaPayerTokenSha256) await upsert(config.solanaPayerClientId ?? 'cli_HOSTEDSOLANAPAYER', 'http', 'Hosted Solana payer', config.solanaPayerTokenSha256, ['purchases:read', 'purchases:fund']);
     // Read-only key for the console: sees this customer's purchases and evidence, can neither buy nor fund.
     if (config.consoleKeySha256) await upsert('cli_HOSTEDCONSOLE', 'console', 'Hosted console (read only)', config.consoleKeySha256, ['purchases:read', 'evidence:read']);
   });
@@ -113,7 +114,7 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
       bridgeStatusTimeoutMs: config.bridgeStatusTimeoutMs ?? 60_000,
       // Exact quotes drive a headless checkout on a small free instance and can take minutes; the quote itself continues server-side.
       gatewayTimeoutMs: config.gatewayTimeoutMs ?? 600_000,
-      ...(config.cardanoBridge ? { bridges: { cardano: config.cardanoBridge } } : {}),
+      bridges: { ...(config.cardanoBridge ? { cardano: config.cardanoBridge } : {}), ...(config.solanaBridge ? { solana: config.solanaBridge } : {}) },
       ...(opts.fetch ? { fetch: opts.fetch } : {}),
     };
     void serveMcpPost(toolConfig, req, res, { hosted: { resourceMetadataUrl: metadataUrl }, background }).catch(() => {
