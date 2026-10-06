@@ -1,0 +1,42 @@
+# Secrets and environment files (examples are allowed)
+.env
+.env.*
+!.env.example
+!.env.*.example
+*.pem
+*.key
+
+# Wallets, keys, seeds, signer material
+wallets/
+keys/
+secrets/
+*.skey
+*.vkey
+*.mnemonic
+*seed*.txt
+*wallet*.json
+!**/fixtures/**/*wallet*.json
+
+# Local data and runtime databases
+data/
+*.db
+*.db-journal
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3
+
+# Raw logs, traces, artifacts (publish only sanitized evidence)
+logs/
+*.log
+traces/
+artifacts/
+playwright-report/
+test-results/
+docs/evidence/raw/
+
+# Build output and dependencies
+node_modules/
+dist/
+coverage/
+.DS_Store
