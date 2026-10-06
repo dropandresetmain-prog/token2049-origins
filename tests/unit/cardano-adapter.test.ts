@@ -568,6 +568,50 @@ describe('cardano adapter: verify and settle', () => {
   });
 });
 
+describe('cardano adapter: durable funding recovery seam', () => {
+  it('prepares a canonical candidate without facilitator or chain side effects', () => {
+    const r = okRig();
+    expect(r.adapter.prepare(header(r), input())).toEqual({ ok: true, transferReference: TX });
+    expect(r.fac.calls).toEqual([]); expect(r.bf.requests).toEqual([]);
+  });
+  it('refuses malformed candidates before any side effect', () => {
+    const r = okRig();
+    expect(r.adapter.prepare(header(r, { resourceUrl: 'https://evil.example' }), input())).toMatchObject({ ok: false });
+    expect(r.adapter.prepare('invalid', input())).toMatchObject({ ok: false });
+    expect(r.fac.calls).toEqual([]); expect(r.bf.requests).toEqual([]);
+  });
+  it('retrieves a prepared reference independently without settling again', async () => {
+    const r = okRig();
+    const f = expectOk(await r.adapter.recover(TX, input()));
+    expect(f).toMatchObject({ transferReference: TX, paymentState: 'confirmed' });
+    expect(r.fac.calls).toEqual([]);
+  });
+  it('recovers after quote expiry as evidence for core refundable obligations', async () => {
+    const r = okRig(); const requirement = input(); const h = header(r, {}, requirement);
+    expect(r.adapter.prepare(h, requirement)).toMatchObject({ ok: true });
+    clock.advance(16 * 60_000);
+    const originalCommitment = fundingCommitment(RESOURCE, { ...(rig().adapter.paymentRequirements(input()) as unknown as PaymentRequired).accepts[0]!, extra: {
+      assetTransferMethod: 'default', confirmationPolicy: { l1Confirmations: 1 }, areFeesSponsored: false,
+      purchaseId: requirement.purchaseId, quoteId: requirement.quoteId, quoteDigest: requirement.quoteDigest, expiresAt: requirement.expiresAt,
+    } });
+    r.bf.metadataOverride = originalCommitment;
+    expect(expectOk(await r.adapter.recover(TX, requirement))).toMatchObject({ paymentState: 'confirmed' });
+    expect(r.fac.calls).toEqual([]);
+  });
+  it('fails closed or stays pending on missing, mismatched, unavailable and shallow recovery evidence', async () => {
+    const missing = okRig(); missing.bf.txs.clear();
+    expect(await missing.adapter.recover(TX, input())).toMatchObject({ ok: false });
+    const wrong = okRig(); wrong.bf.metadataOverride = 'f'.repeat(64);
+    expect(await wrong.adapter.recover(TX, input())).toMatchObject({ ok: false });
+    const down = okRig(); down.bf.status = 503;
+    expect(await down.adapter.recover(TX, input())).toMatchObject({ ok: false });
+    const shallow = okRig(); shallow.bf.tip = 1005;
+    expect(expectOk(await shallow.adapter.recover(TX, input())).paymentState).toBe('submitted');
+    expect(await shallow.adapter.recover('../unsafe', input())).toMatchObject({ ok: false });
+    for (const r of [missing, wrong, down, shallow]) expect(r.fac.calls).toEqual([]);
+  });
+});
+
 describe('cardano adapter: confirm()', () => {
   const funding = (over: Partial<VerifiedFunding> = {}): VerifiedFunding => ({
     rail: 'cardano',

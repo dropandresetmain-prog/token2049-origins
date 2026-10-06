@@ -50,6 +50,14 @@ export interface DecodedTxView {
   outputs: Array<{ address: string; coin: bigint; assets: Record<string, bigint> }>;
 }
 
+export type FundingPreparation = { ok: true; transferReference: string } | Extract<FundingVerification, { ok: false }>;
+/** Recovery is available only for a core attempt persisted before any settlement side effect. */
+export interface CardanoRecoveryAdapter extends FundingAdapter {
+  prepare(paymentHeaderValue: string, input: FundingRequirementInput): FundingPreparation;
+  recover(transferReference: string, input: FundingRequirementInput): Promise<FundingVerification>;
+}
+type PreparedPayment = { ok: true; payload: PaymentPayload; requirement: PaymentRequirements; nonce: string; localTx: string; localReceived: bigint };
+
 export interface CardanoAdapterOptions {
   /** Used for Blockfrost. (The SDK's HTTPFacilitatorClient uses global fetch; inject `facilitator` to replace it.) */
   fetchImpl?: typeof fetch;
@@ -92,7 +100,7 @@ const PaymentPayloadShape = z
   })
   .loose();
 
-const invalid = (reason: string): FundingVerification => ({ ok: false, code: 'payment_invalid', reason });
+const invalid = (reason: string): Extract<FundingVerification, { ok: false }> => ({ ok: false, code: 'payment_invalid', reason });
 
 /** Only machine-style SDK reason codes pass through; anything else collapses to a fixed word. */
 function safeCode(c: unknown, fallback: string): string {
@@ -123,11 +131,11 @@ type ChainCheck =
 
 type ReadinessProbe = { status: 'ok' | 'blocked' | 'unverified'; detail?: string };
 
-export function createCardanoFundingAdapter(env: NodeJS.ProcessEnv, opts: CardanoAdapterOptions = {}): FundingAdapter {
+export function createCardanoFundingAdapter(env: NodeJS.ProcessEnv, opts: CardanoAdapterOptions = {}): CardanoRecoveryAdapter {
   return new CardanoFundingAdapter(env, opts);
 }
 
-class CardanoFundingAdapter implements FundingAdapter {
+class CardanoFundingAdapter implements CardanoRecoveryAdapter {
   readonly rail = 'cardano' as const;
   readonly network = CARDANO_NETWORK;
   readonly paymentHeaderName = 'payment-signature';
@@ -189,7 +197,7 @@ class CardanoFundingAdapter implements FundingAdapter {
   }
 
   /** The requirement must be one this adapter would itself issue (same network, asset and treasury). */
-  private requirementMatchesConfig(input: FundingRequirementInput): boolean {
+  private requirementMatchesConfig(input: FundingRequirementInput, allowExpired = false): boolean {
     const c = this.cfg;
     return (
       !!c &&
@@ -197,7 +205,7 @@ class CardanoFundingAdapter implements FundingAdapter {
       input.amount.assetId === c.assetUnit &&
       input.amount.decimals === c.decimals &&
       Number.isFinite(Date.parse(input.expiresAt)) &&
-      Date.parse(input.expiresAt) > this.clock.now().getTime() &&
+      (allowExpired || Date.parse(input.expiresAt) > this.clock.now().getTime()) &&
       input.payTo === c.treasuryAddress &&
       CANONICAL_CARDANO_ASSET_REGEX.test(input.amount.assetId) &&
       POSITIVE_CANONICAL_AMOUNT_REGEX.test(input.amount.amountBaseUnits)
@@ -244,7 +252,7 @@ class CardanoFundingAdapter implements FundingAdapter {
 
   /* ---------------- verify + settle ---------------- */
 
-  async verify(paymentHeaderValue: string, input: FundingRequirementInput): Promise<FundingVerification> {
+  private inspectPayment(paymentHeaderValue: string, input: FundingRequirementInput): PreparedPayment | Extract<FundingVerification, { ok: false }> {
     const c = this.cfg;
     if (!c || !this.facilitator) return invalid('cardano funding rail is not configured');
     if (!this.requirementMatchesConfig(input)) return invalid('requirement does not match configured treasury or asset');
@@ -294,6 +302,29 @@ class CardanoFundingAdapter implements FundingAdapter {
     const requiredUnits = BigInt(input.amount.amountBaseUnits);
     const localReceived = localPaidTo(decoded, input.payTo, input.amount.assetId);
     if (localReceived < requiredUnits) return invalid('transaction does not pay the required amount to the treasury');
+
+    return { ok: true, payload, requirement, nonce, localTx, localReceived };
+  }
+
+  /** Validate the candidate locally, so core can persist its identity before facilitator broadcast. */
+  prepare(paymentHeaderValue: string, input: FundingRequirementInput): FundingPreparation {
+    const prepared = this.inspectPayment(paymentHeaderValue, input);
+    return prepared.ok ? { ok: true, transferReference: prepared.localTx } : prepared;
+  }
+
+  /** Never settles. The caller must prove this reference was durably prepared for this exact requirement. */
+  async recover(transferReference: string, input: FundingRequirementInput): Promise<FundingVerification> {
+    if (!this.requirementMatchesConfig(input, true) || !TX_HASH.test(transferReference)) return invalid('invalid persisted funding recovery requirement');
+    const recovered = await this.recoverFromChain(transferReference, input, null, null);
+    return recovered ?? invalid('recovery_pending: transfer is not independently observable');
+  }
+
+  async verify(paymentHeaderValue: string, input: FundingRequirementInput): Promise<FundingVerification> {
+    const c = this.cfg;
+    if (!c || !this.facilitator) return invalid('cardano funding rail is not configured');
+    const prepared = this.inspectPayment(paymentHeaderValue, input);
+    if (!prepared.ok) return prepared;
+    const { payload, requirement, nonce, localTx, localReceived } = prepared;
 
     // 4. Facilitator verify (read-only). Settle is never reached when this fails.
     let verifyRes: VerifyResponse;
@@ -398,7 +429,7 @@ class CardanoFundingAdapter implements FundingAdapter {
   private async recoverFromChain(
     txHash: string,
     input: FundingRequirementInput,
-    nonce: string,
+    nonce: string | null,
     payer: string | null,
   ): Promise<FundingVerification | null> {
     const chain = await this.checkChain(txHash, input);
@@ -441,7 +472,7 @@ class CardanoFundingAdapter implements FundingAdapter {
     confirmations: number | null;
     received: bigint;
     chain: OnChainTx | null;
-    nonce: string;
+    nonce: string | null;
     settlementStatus: string;
     header: string;
   }): VerifiedFunding {
