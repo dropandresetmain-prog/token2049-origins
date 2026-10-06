@@ -65,3 +65,35 @@ Full suite: **396 tests in 21 files PASS**; typecheck/build/compiled startup/cli
 All original lanes merged. Pushed lane heads: MCP `12b1e03`, Atlas `d47463e`, Nuitée `5f06326`, Shopify `fecbb29`, evidence `e0f947f`, Cardano `03cff5a`. Follow-up patches cherry-picked into core; core owns wiring, financial semantics, shared contracts, root runtime and final verification. Exact paths and constraints are in `docs/HANDOFF.md`.
 
 Recommend a fresh chat for credential-dependent external acceptance. Read RUNBOOK, TEST_CHECKLIST, KNOWN_ISSUES and HANDOFF. First resolve credentials/Shopify provisioning/Atlas founder decision, then prove Cardano-funded Shopify and update only the externally verified row; repeat approved Atlas/Nuitée and separate OCBC observation. Preserve BLOCKED_EXTERNAL where no proof exists. Do not merge main, enable production, deploy, publish, expand into unrelated lanes, erase cap history, release unknown exposure or repeat provider writes without the corresponding scope/authorization.
+
+## PostgreSQL migration lane — authoritative current task
+
+Base: build/commerce-core at 2b6260b41149d36fafcb98b387dec9cf43faa31f (fetched and unchanged).
+Worktree: C:/Dev/token2049-origins/postgres-persistence; branch build/postgres-persistence.
+No changes in the active commerce-core worktree. Provider/payer policy fixes are excluded.
+
+Before-edit inventory: 17 domain tables: customers, api_clients, offers, quotes, purchases,
+idempotency_keys, funding_evidence, capacity_pools, reservations, jobs, funding_attempts,
+execution_attempts, journal_entries, journal_lines, purchase_events, bank_observations
+plus schema_meta. Preserve all primary keys, foreign keys and indexes. Unique guards cover
+client token hashes, quote digests, one purchase/reservation per quote/purchase, customer-operation
+idempotency, rail/network/proof replay, job dedupe, funding candidates, execution keys/attempts,
+journal event keys and event sequence. Journal update/delete triggers enforce immutability.
+Amounts stay integer strings with BigInt arithmetic; timestamps and serialized domain JSON stay
+text to avoid changing API values. PostgreSQL identity replaces journal line autoincrement.
+
+Current transaction boundaries cover purchases/reservations/idempotency/events, funding candidate
+and recovery jobs, evidence/journal/queue, execution markers/results, reconciliation, expiry,
+client creation and bank observation batches. Existing BEGIN IMMEDIATE and synchronous calls
+implicitly serialize writers; async PostgreSQL must make that protection explicit. Use pg pools,
+connection-bound async transactions/savepoints and a transaction advisory lock for the small core's
+existing multi-table invariants. Job claims use FOR UPDATE SKIP LOCKED; startup must never steal
+unexpired leases. Provider calls stay outside database transactions. Persisted started attempts
+always recover by readback, never by repeating execution. Constraints remain the final guards.
+
+Schema bootstrap becomes ordered transactional SQL migrations with version/checksum tracking
+and a migration advisory lock. Tests use one random schema per harness/DB instance, explicit schema
+reuse for restart, and cleanup only their own schemas; no shared truncate. Render defaults to
+PostgreSQL 18 per official docs/CLI; local official Docker image will use major 18.
+
+Progress: inspection complete; implementation and real PostgreSQL verification pending.

@@ -1,0 +1,19 @@
+name: token2049-origins
+services:
+  postgres:
+    image: postgres:18
+    environment:
+      POSTGRES_USER: origins
+      POSTGRES_PASSWORD: origins_local_only
+      POSTGRES_DB: origins
+    ports:
+      - "127.0.0.1:55432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U origins -d origins"]
+      interval: 2s
+      timeout: 5s
+      retries: 30
+volumes:
+  postgres_data:
