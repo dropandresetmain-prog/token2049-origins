@@ -50,3 +50,7 @@ Local tests and external proof are separate. Initial affected set: 102/102 tests
 Hook: Choose Cardano or Solana; Capsule honors your selected funding source.
 
 Shared files: package.json scripts, tsconfig.build.json preflight entry, hosted MCP config/router, Solana facilitator config, ledger directory durability, affected hosted MCP tests. No shared UI/docs or root render.yaml edit. Integration must reconcile package scripts with other lanes and rerun affected payment/OAuth checks. This lane is not merged or deployed. Recommend a fresh integration chat only after external readiness/persistence evidence exists.
+
+## Newer main discovered after lane creation
+
+Origin/main advanced during this parallel build to 57fde8a64e3a3065c9db938e2b7c2e07b51309fa. All four lanes keep their exact common base; none was rebased or merged. New main introduces a public HTTPS free Cardano payer and PostgreSQL history. It changes hosted MCP config/router/tests and removes private BridgeAccess, isPrivatePeer and listenPrivate from clients/payer/bridge.ts. This Solana lane deliberately requires a private signer service and imports those older private helpers, so a direct merge into newer main will need code reconciliation, not just conflict resolution. Preserve new main Cardano behavior while restoring isolated Solana private access or moving the private bridge into a separate Solana module. Do not switch Solana to a public signer to avoid billing. Integration risk is HIGH until that adaptation and affected security tests pass.
