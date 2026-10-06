@@ -2,92 +2,92 @@
 
 > Any agent. Agent-native money in. Ordinary commerce out.
 
-A buyer-side commerce gateway. A customer's existing agent submits a purchasing job; the gateway
-issues an executable quote, verifies real testnet funding (Cardano Preprod or Solana Devnet),
-reserves treasury capacity in a balanced journal, executes ordinary commerce
-through provider sandboxes (Shopify retail, Atlas flights, Nuitée hotels), independently retrieves
-the outcome and returns a safe receipt.
+Capsule is a buyer-side commerce gateway for AI agents. The user's existing agent handles conversation and reasoning; Capsule handles typed commerce intent, exact quotes, explicit human authority, testnet funding verification, durable execution, reconciliation, accounting and proof.
 
-Implemented channels (canonical HTTP and thin MCP) call the same authenticated
-core. No channel owns commerce logic, funding truth or journal writes. Payer keys never live in the
-gateway process.
+## Current authoritative baseline
 
-The human flow is progressive: collect missing information, find offers, show an exact quote,
-explicitly select an available funding option, approve those terms and payment choice, then follow
-one durable purchase. No Cardano choice is inferred. [Channel contract](docs/contracts/CHANNEL_CONTRACT.md)
-documents `needs_input`, approval and duplicate behavior. `/proof` shows the customer timeline,
-payment and receipt; `/inspect` retains detailed engineering evidence.
+- Repository: dropandresetmain-prog/token2049-origins
+- Main baseline: 8a76225364bf3b56fe2bf192297ee17b86d8f540
+- Status: PRE-MASUMI integrated implementation baseline.
+- Local integration gate: 697/697 tests across 33 files, clean npm install, typecheck/build, PostgreSQL migrations/rerun, compiled gateway/MCP smoke, UI asset sanity and bounded secret scan PASS.
+- Deployment: NOT RUN.
+- Masumi/Sokosumi: NOT INTEGRATED; separate lane still pending.
+- Final external E2E: NOT RUN on this integrated main.
 
-## Current state
+Main includes the latest E2E fixes, Cardano + Solana funding lanes, OCBC history fix, Nuitée and Atlas provider lanes, Shopify deterministic + Global Catalog/shadow work, thin MCP, PostgreSQL, evidence/proof, and approved Capsule UI V3 design references.
 
-- Planning release `launch-2026-10-06-v1` imported from
-  `dropandresetmain-prog/wip-personal@af648eece01321fec50bcddeee9ba92fd3e10d3a`
-  (`token2049-hackathon/`).
-- Pre-Masumi integrated candidate: latest E2E plus crypto/providers, Shopify Global sandbox, and approved UI V3 references. `main` becomes the implementation baseline after the recorded local verification and exact-head promotion. Masumi is excluded and pending.
-- Runtime and acceptance instructions: [RUNBOOK](docs/RUNBOOK.md), [TEST_CHECKLIST](docs/TEST_CHECKLIST.md), [KNOWN_ISSUES](docs/KNOWN_ISSUES.md), [HANDOFF](docs/HANDOFF.md).
-- Recorded Cardano/Solana testnet funding, Nuitée sandbox booking, Atlas ticketing and OCBC read-only observations passed. These are retained evidence, not new runs. Deterministic Shopify paid acceptance remains unresolved; Global Catalog discovery/shadow passed but exact quote remains unresolved and paid order was not run. MCP protocol passed; ChatGPT host is unverified. See [`ACTIVE_TASK`](docs/work/ACTIVE_TASK.md) and [integration verification](docs/evidence/pre-masumi-integration.md).
-- [DESIGN.md](DESIGN.md), approved Capsule logos and [UI V3](docs/design/ui-v3/index.html) are design references. The static prototype is not wired into the runtime.
+## Recorded external evidence
 
-## Database contract
+| Lane | Recorded result | Important limit |
+| --- | --- | --- |
+| Cardano | Real Preprod funding/recovery PASS | Merchant execution was a fixture; protected payer budget/history must be preserved |
+| Solana | Finalized Devnet funding/recovery PASS | Merchant fixture; provided payer/preparation path required |
+| Nuitée | Sandbox booking/readback PASS | USD 96.24 includes processing fee; tested payment method only |
+| Atlas | Sandbox payment/ticketing PASS | Ambiguous-create recovery NOT VERIFIED |
+| OCBC | Read-only sandbox observation/history PASS | Historical sandbox data; no settlement/debit claim |
+| Shopify deterministic | Paid attempt UNRESOLVED | One Pay attempt; held unresolved reservation; no confirmed order/receipt |
+| Shopify Global | Discovery/shadow/publication/readback PASS | Exact sandbox quote PARTIAL/UNRESOLVED; paid order NOT RUN |
+| MCP | Protocol/local journeys PASS | ChatGPT host connection NOT VERIFIED |
+| UI | V3 design approved | Static reference only; not wired into runtime |
 
-Local development and automated integration tests use PostgreSQL.
-Hosted runtime uses Render PostgreSQL.
-SQLite is not supported.
+These rows are deliberately separate. A local green suite does not upgrade an external row.
 
-Use Node 24+, Docker Desktop and the official Postgres 18 Compose service:
+## Core contract
 
-```powershell
-npm ci
-docker compose up -d --wait
-$env:DATABASE_URL = 'postgresql://origins:origins_local_only@127.0.0.1:55432/origins'
-npm run db:migrate
-npm run typecheck
-npm run build
-npm test
-node dist/scripts/db-smoke.js
-```
+Canonical flow:
 
-Tests use a random isolated schema per fixture, with explicit reuse for restart tests and
-cleanup of owned schemas only. A test PostgreSQL outage fails the suite. There is no database fallback.
-See the [runbook](docs/RUNBOOK.md) for stop/reset, migration and Render operations.
-The Render gateway configuration is prepared in `render.yaml`; it has **not** been deployed.
+1. collect missing information through structured needs_input;
+2. find normalized offers;
+3. create an exact immutable quote;
+4. show available funding options;
+5. human explicitly selects a funding option and approves the quote;
+6. verify funding;
+7. execute exactly once with durable checkpoints;
+8. reconcile unknown outcomes by readback, never blind retry;
+9. return a concise proof/receipt backed by durable evidence.
 
-## Planning documents
+Funding rails currently implemented in core: Cardano Preprod and Solana Devnet. Masumi remains a separate pending lane.
 
-| Document | Owns |
-|---|---|
-| [IMPLEMENTATION_PLAN.md](docs/planning/IMPLEMENTATION_PLAN.md) | Scope, lanes, checkpoints, acceptance |
-| [CORE_CONTRACT.md](docs/planning/CORE_CONTRACT.md) | Channel/core/provider boundary, financial invariants |
-| [ARCHITECTURE_DECISIONS.md](docs/planning/ARCHITECTURE_DECISIONS.md) | Founder decisions and engineering corrections |
-| [SETUP_AND_EVIDENCE.md](docs/planning/SETUP_AND_EVIDENCE.md) | Configuration groups, readiness, references |
-| [NEXT_DISCUSSION_AGENDA.md](docs/planning/NEXT_DISCUSSION_AGENDA.md) | Open launch decisions |
-| [Planning README](docs/planning/README.md) | Authority and scope table |
+Commerce providers currently implemented: Shopify, Atlas and Nuitée. Shopify has two retail discovery modes:
+- deterministic Capsule-owned store flow;
+- live Shopify Global Catalog discovery -> durable shadow in Capsule's dev store -> same controlled sandbox execution path.
 
-`docs/planning/` is a pinned snapshot. Later planning changes come across through an explicit
-reviewed commit; this repository owns execution state.
+The source merchant receives no order/payment in the Global Catalog flow. Source offer evidence and Capsule sandbox execution evidence stay distinct.
 
-## Evidence labels
+## Database
 
-Public-testnet payments are real transactions with valueless test assets. Merchant sandboxes produce
-provider-generated test orders/bookings. Internal simulated fiat/card accounting connects them but is
-not a real crypto-to-fiat conversion, bank settlement or card-network transaction.
+Capsule uses PostgreSQL only.
 
-## Demo settlement policy
+- Local dev/tests: official PostgreSQL 18 via Docker Compose.
+- Hosted DB provisioned: Render PostgreSQL, Singapore.
+- SQLite is unsupported.
+- Applied migrations: 0001_initial.sql, 0002_journal_truncate_guard.sql, 0003_shopify_shadows.sql.
 
-The hackathon demo uses a disclosed **1:1000 notional scale** for public-testnet stablecoins:
-USD 183.40 commercial principal -> 0.183400 tUSDM on Cardano Preprod (183,400 base units at 6 decimals).
-These test assets have no real-world value. This is a testnet notional scale, not an FX rate.
-The chain transfer demonstrates payment authorization, amount binding, transaction settlement,
-purchase gating and reconciliation. It does not prove USD redemption, crypto-to-fiat conversion,
-Visa settlement, bank settlement or equivalent economic value. Provider sandbox commerce continues
-at its full commercial test amount. SERVICE_FEE_BPS remains 0 by default; a configured non-zero fee
-uses the same scale as principal.
+## Demo settlement
 
-Canonical secret-free scenario data: [demo/demo-data.json](demo/demo-data.json), validated by
-[src/demo/config.ts](src/demo/config.ts). Runtime endpoints, secrets, exact asset identities,
-protocol constants and independent signer/security caps remain runtime configuration or code.
-See [current settlement decision](docs/decisions/scaled-testnet-settlement.md).
+Public-testnet stablecoins use a disclosed 1:1000 notional scale. Example:
 
-## Shopify live discovery sandbox lane
+USD 183.40 commercial notional -> 0.183400 six-decimal test stablecoin.
 
-Retail intent may opt into `discovery: live` for official Shopify Global Catalog/UCP discovery. Selection creates one durable shadow per selected offer in Capsule's owned development store, verifies publication/Storefront readback, and reuses the current exact hosted-quote/browser executor. The source merchant receives no order or payment. Omitted discovery preserves the deterministic controlled-store path. Source identity/item price and sandbox shipping/tax/total/order evidence remain separate. USD only, quantity one, source item maximum USD 100; no source image copying or FX. Configure `SHOPIFY_SANDBOX_PUBLICATION_ID`. See [decision](docs/decisions/shopify-real-discovery-sandbox-execution.md) and [external evidence](docs/evidence/shopify-global-sandbox-e2e.md): discovery/shadow PASS, exact sandbox quote UNRESOLVED, paid order NOT_RUN, lane PARTIAL.
+This is not FX and does not establish crypto-to-fiat settlement. Provider sandboxes continue to use the full commercial test amount.
+
+## UI
+
+Capsule is the approved name. DESIGN.md and docs/design/ui-v3/ are the approved design reference. The production runtime has not yet been wired to V3.
+
+## Start here
+
+Current docs:
+- docs/DOCS_INDEX.md — what is authoritative vs historical
+- docs/HANDOFF.md — complete project handoff
+- docs/ROADMAP.md — remaining hackathon work
+- docs/KNOWN_ISSUES.md — current triage
+- docs/ENVIRONMENT.md — runtime/services/configuration
+- docs/architecture/CURRENT_ARCHITECTURE.md — current system architecture
+- docs/demo/CANONICAL_DEMO.md — target judge flow
+- docs/demo/SEED_DATA.md — seed/preflight discipline
+- docs/RUNBOOK.md — operations
+- docs/TEST_CHECKLIST.md — verification gates
+- docs/work/ACTIVE_TASK.md — current checkpoint and next action
+
+Historical planning snapshots under docs/planning/ and append-only lane evidence under docs/evidence/ remain intentionally unchanged.
