@@ -3,13 +3,28 @@ import { address } from '@solana/kit';
 import { NETWORK, TEST_MINT } from './wire.js';
 const Address = z.string().refine(v => { try { address(v); return true; } catch { return false; } });
 export const trustedRpc = (v: string) => v === 'https://api.devnet.solana.com';
-export const trustedFacilitator = (v: string) => { try { const u = new URL(v); return u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname) && !u.username && !u.password && !u.search && !u.hash && u.pathname === '/'; } catch { return false; } };
+function facilitatorOrigin(v: string): URL | null {
+  try { const u = new URL(v); return !u.username && !u.password && !u.search && !u.hash && u.pathname === '/' ? u : null; } catch { return null; }
+}
+// Remote access is opt-in to one operator-controlled HTTPS origin, including its port.
+export const trustedFacilitator = (v: string, trustedOrigin?: string) => {
+  const u = facilitatorOrigin(v); if (!u) return false;
+  if (u.protocol === 'http:' && ['127.0.0.1', 'localhost', '[::1]'].includes(u.hostname)) return true;
+  const trusted = trustedOrigin ? facilitatorOrigin(trustedOrigin) : null;
+  return u.protocol === 'https:' && trusted?.protocol === 'https:' && u.origin === trusted.origin;
+};
 const Config = z.object({
   SOLANA_NETWORK: z.enum(['devnet', NETWORK]), SOLANA_RPC_URL: z.string().refine(trustedRpc),
   SOLANA_USDC_MINT: z.literal(TEST_MINT), SOLANA_ASSET_DECIMALS: z.literal('6'),
   SOLANA_TREASURY_ADDRESS: Address, SOLANA_TREASURY_TOKEN_ACCOUNT: Address,
-  SOLANA_FACILITATOR_TOKEN_FILE: z.string().min(1), SOLANA_FEE_PAYER_ADDRESS: Address, SOLANA_FACILITATOR_URL: z.string().refine(trustedFacilitator),
+  SOLANA_FACILITATOR_TOKEN_FILE: z.string().min(1), SOLANA_FEE_PAYER_ADDRESS: Address, SOLANA_FACILITATOR_URL: z.string(),
+  SOLANA_FACILITATOR_TRUSTED_ORIGIN: z.string().optional(),
   SOLANA_MAX_PAYMENT_BASE_UNITS: z.string().regex(/^[1-9][0-9]*$/),
+}).superRefine((cfg, ctx) => {
+  if (cfg.SOLANA_FACILITATOR_TRUSTED_ORIGIN && facilitatorOrigin(cfg.SOLANA_FACILITATOR_TRUSTED_ORIGIN)?.protocol !== 'https:')
+    ctx.addIssue({ code: 'custom', path: ['SOLANA_FACILITATOR_TRUSTED_ORIGIN'], message: 'HTTPS origin required' });
+  if (!trustedFacilitator(cfg.SOLANA_FACILITATOR_URL, cfg.SOLANA_FACILITATOR_TRUSTED_ORIGIN))
+    ctx.addIssue({ code: 'custom', path: ['SOLANA_FACILITATOR_URL'], message: 'untrusted facilitator origin' });
 });
 export function parseSolanaConfig(env: NodeJS.ProcessEnv) {
   const p = Config.safeParse(env);

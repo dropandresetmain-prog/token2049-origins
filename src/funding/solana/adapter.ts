@@ -1,9 +1,9 @@
-import { readFileSync } from 'node:fs';
-import { HTTPFacilitatorClient, encodePaymentResponseHeader } from '@x402/core/http';
+import { type HTTPFacilitatorClient, encodePaymentResponseHeader } from '@x402/core/http';
 import type { PaymentRequirements } from '@x402/core/types';
 import type { FundingAdapter, FundingRequirementInput, FundingVerification, FundingPreparation } from '../../contracts/ports.js';
 import { systemClock, type Clock } from '../../infrastructure/clock.js';
 import { parseSolanaConfig } from './config.js';
+import { createSolanaFacilitatorClient } from './facilitator.js';
 import { NETWORK, commitment, readHeader, assertTransfer, decodeTransaction } from './wire.js';
 import { SolanaRpc, type ChainTransaction } from './rpc.js';
 export interface SolanaAdapterOptions { clock?: Clock; fetchImpl?: typeof fetch; facilitator?: Pick<HTTPFacilitatorClient,'verify'|'settle'|'getSupported'>; }
@@ -12,7 +12,7 @@ export function createSolanaFundingAdapter(env: NodeJS.ProcessEnv, opts: SolanaA
   const parsed = parseSolanaConfig(env), clock = opts.clock ?? systemClock;
   const cfg = parsed.ok ? parsed.config : null;
   const rpc = cfg ? new SolanaRpc(cfg.rpcUrl, opts.fetchImpl) : null;
-  const facilitator = cfg ? opts.facilitator ?? new HTTPFacilitatorClient({ url: cfg.facilitatorUrl, timeoutMs: 45000, createAuthHeaders: async () => { const token=readFileSync(cfg.facilitatorTokenFile,'utf8').trim(); if(!token) throw new Error('facilitator authentication unavailable'); const h={Authorization:'Bearer '+token}; return {verify:h,settle:h,supported:h}; } }) : null;
+  const facilitator = cfg ? opts.facilitator ?? createSolanaFacilitatorClient(cfg, opts.fetchImpl) : null;
   function requirement(input: FundingRequirementInput, allowExpired = false): PaymentRequirements {
     if (!cfg || input.amount.network !== NETWORK || input.amount.assetId !== cfg.mint || input.amount.decimals !== 6 || input.payTo !== cfg.payee ||
         !/^[1-9][0-9]*$/.test(input.amount.amountBaseUnits) || BigInt(input.amount.amountBaseUnits) > cfg.maxAmount ||

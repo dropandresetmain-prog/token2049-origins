@@ -1,5 +1,10 @@
 # Runbook — Capsule integrated baseline
 
+Current hosted rehearsal: [deployment evidence](evidence/render-rehearsal.md), 7 October 2026.
+Capsule is live at `https://token2049-origins.onrender.com`; that exact origin is PUBLIC_BASE_URL.
+The earlier no-deployment statements below record previous lanes. The rehearsal deploys an isolated
+branch with auto-deploy off, and leaves Solana disabled pending an approved pinned HTTPS tunnel.
+
 Current authority: the integrated main baseline, including native Masumi. See [ACTIVE_TASK](work/ACTIVE_TASK.md), [current integration verification](work/MASUMI_INTEGRATION.md), [historical pre-Masumi verification](evidence/pre-masumi-integration.md) and [issue triage](KNOWN_ISSUES.md). Retained Cardano/Solana, Nuitée, Atlas and OCBC evidence passed within their stated limits. Shopify paid/Global exact quote and ChatGPT host remain unresolved or unverified. No provider/chain/payment/deployment action is authorized by local checks.
 
 The native Masumi task service runs separately on loopback; startup/configuration is in [ENVIRONMENT](ENVIRONMENT.md#masumisokosumi). Its fee is separate from direct purchase principal. Public Sokosumi marketplace hosting/authentication/delivery remains unverified.
@@ -280,6 +285,14 @@ private DATABASE_URL and correct PUBLIC_BASE_URL before creating funding commitm
 The recorded Render DB expiry above is historical metadata; recheck before using that service.
 
 ## Solana and retained provider evidence
+
+Hosted rehearsal: configure one exact `SOLANA_FACILITATOR_TRUSTED_ORIGIN` matching the HTTPS
+`SOLANA_FACILITATOR_URL`. A secure tunnel routes that origin to the authenticated local
+127.0.0.1 listener; set `SOLANA_FACILITATOR_LISTEN_PORT` to its local port. Keep the existing
+payer/sponsor keys, histories, locks and caps local. Set the gateway's final HTTPS
+`PUBLIC_BASE_URL` before any funded hosted quote. Test connectivity only with authenticated
+`GET /supported`, and verify unauthenticated access returns 401; do not use prepare/settle
+for deployment smoke. If no approved tunnel is available, leave Solana unconfigured on Render.
 
 .env.example contains receive-only Solana Devnet configuration. .env.solana.example also
 contains separate payer/sponsor key paths and caps; do not load signer keys into the gateway.

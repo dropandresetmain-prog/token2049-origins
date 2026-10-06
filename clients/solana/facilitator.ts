@@ -79,7 +79,7 @@ export async function startSolanaFacilitator(cfg: SolanaPayerConfig, port = 0): 
   return await new Promise(resolve=>{ const server=app.listen(port,'127.0.0.1',()=>resolve(server)); });
 }
 if (process.argv[1]?.replaceAll('\\','/').endsWith('/clients/solana/facilitator.ts')) {
-  const cfg=loadSolanaPayerConfig(process.env), port=Number(new URL(cfg.facilitatorUrl).port);
+  const cfg=loadSolanaPayerConfig(process.env), port=Number(process.env.SOLANA_FACILITATOR_LISTEN_PORT ?? new URL(cfg.facilitatorUrl).port);
   if (!Number.isSafeInteger(port)||port<1||port>65535) throw new Error('configured facilitator port required');
   await startSolanaFacilitator(cfg,port); console.log('Solana Devnet facilitator listening on loopback');
 }

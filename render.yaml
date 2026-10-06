@@ -1,4 +1,4 @@
-# Candidate deployment configuration. Merge/deploy only after approval of the exact tested SHA.
+# Rehearsal deployment configuration. Deploy the exact tested SHA; auto-deploy stays off.
 # The existing database is provisioned separately; paste its private/internal URL into DATABASE_URL.
 services:
   - type: web
@@ -39,6 +39,56 @@ services:
         value: 'true'
       - key: SHOPIFY_HEADLESS
         value: 'true'
+      - key: SHOPIFY_SANDBOX_PUBLICATION_ID
+        sync: false
+      - key: SHOPIFY_WEBHOOK_SECRET
+        sync: false
+      - key: NUITEE_API_KEY
+        sync: false
+      - key: NUITEE_SEARCH_BASE_URL
+        value: https://api.liteapi.travel/v3.0
+      - key: NUITEE_BOOKING_BASE_URL
+        value: https://book.liteapi.travel/v3.0
+      - key: ATLAS_BASE_URL
+        sync: false
+      - key: ATLAS_CLIENT_ID
+        sync: false
+      - key: ATLAS_CLIENT_SECRET
+        sync: false
+      # Receive-only gateway configuration. Bearer token is a Render secret file;
+      # payer/sponsor keys and protected ledgers stay on the local facilitator host.
+      - key: SOLANA_NETWORK
+        value: devnet
+      - key: SOLANA_RPC_URL
+        value: https://api.devnet.solana.com
+      - key: SOLANA_USDC_MINT
+        value: 4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU
+      - key: SOLANA_ASSET_DECIMALS
+        value: '6'
+      - key: SOLANA_TREASURY_ADDRESS
+        sync: false
+      - key: SOLANA_TREASURY_TOKEN_ACCOUNT
+        sync: false
+      - key: SOLANA_FEE_PAYER_ADDRESS
+        sync: false
+      - key: SOLANA_FACILITATOR_URL
+        sync: false
+      - key: SOLANA_FACILITATOR_TRUSTED_ORIGIN
+        sync: false
+      - key: SOLANA_FACILITATOR_TOKEN_FILE
+        value: /etc/secrets/solana-facilitator-token
+      - key: SOLANA_MAX_PAYMENT_BASE_UNITS
+        value: '10000'
+      - key: OCBC_API_CLIENT_ID
+        sync: false
+      - key: OCBC_API_CLIENT_SECRET
+        sync: false
+      - key: OCBC_API_BASE_URL
+        sync: false
+      - key: OCBC_API_CALLS_PER_MINUTE
+        value: '5'
+      - key: OCBC_SANDBOX_SESSION_TOKEN
+        sync: false
       # Receive-only Preprod verifier. Payer keys/bridge/ledger never belong on Render.
       - key: CARDANO_NETWORK
         value: cardano:preprod
