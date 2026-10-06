@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SettlementBreakdown, validateSettlement } from './settlement.js';
 import { CryptoAmount, Money } from './money.js';
 import {
   Category,
@@ -62,9 +63,19 @@ export const FundingOption = z
     rail: FundingRail,
     amount: CryptoAmount,
     payTo: z.string(),
-    valuation: ValuationConvention,
+    /** Legacy persisted quotes only. New quotes carry an explicit notional settlement. */
+    valuation: ValuationConvention.optional(),
+    settlement: SettlementBreakdown.optional(),
   })
-  .strict();
+  .strict().superRefine((o, ctx) => {
+    if (!o.settlement && !o.valuation) ctx.addIssue({ code: 'custom', message: 'settlement policy required' });
+    if (o.settlement) {
+      try {
+        const s = validateSettlement(o.settlement, o.amount.decimals);
+        if (s.totalBaseUnits !== o.amount.amountBaseUnits) throw new Error('total mismatch');
+      } catch { ctx.addIssue({ code: 'custom', message: 'inconsistent funding settlement' }); }
+    }
+  });
 export type FundingOption = z.infer<typeof FundingOption>;
 
 export const QuoteView = z
@@ -192,6 +203,8 @@ export const ReceiptView = z
     principal: Money,
     serviceFee: Money,
     funding: z.array(FundingSummary),
+    /** Frozen selected requirement, retained after funding and completion. */
+    fundingRequirement: FundingOption.optional(),
     providerReference: z.string().nullable(),
     commerceStatus: CommerceStatus,
     merchantPaymentStatus: MerchantPaymentStatus,
@@ -233,6 +246,8 @@ export const PurchaseView = z
     payablePrincipal: Money,
     fundingInstructions: FundingInstructions.nullable(),
     funding: z.array(FundingSummary),
+    /** Frozen selected requirement, retained after funding and completion. */
+    fundingRequirement: FundingOption.optional(),
     reservation: z
       .object({ status: z.enum(['active', 'consumed', 'released', 'held_unresolved']), amount: Money })
       .strict()

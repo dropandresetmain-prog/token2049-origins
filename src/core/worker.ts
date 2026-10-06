@@ -13,13 +13,15 @@ import {
   type AttemptRow,
   type FundingEvidenceRow,
   type PurchaseRow,
+  type FundingRequirementRecord,
 } from './store.js';
 import type { ExecutionContext, ExecutionResult, VerifiedFunding } from '../contracts/ports.js';
 import type { Fulfillment } from '../contracts/intent.js';
 import type { QuoteView, ReceiptView, CommerceStatus, MerchantPaymentStatus } from '../contracts/commerce.js';
 import type { FundingRail, ProviderRoute } from '../contracts/common.js';
 import { Accounts, cryptoAsset, entriesForPurchase, fiatAsset, postEntry, type JournalLine } from './journal.js';
-import { fundingSummaries } from './views.js';
+import { validateSettlement } from '../contracts/settlement.js';
+import { fundingRequirementView, fundingSummaries } from './views.js';
 import { Money, minor, rescaleMinor } from '../contracts/money.js';
 
 interface JobRow {
@@ -49,7 +51,15 @@ export class Worker {
   private timer: NodeJS.Timeout | null = null;
   private running = false;
 
-  constructor(private readonly core: CommerceCore) {}
+  constructor(private readonly core: CommerceCore, private readonly log: (line: Record<string, unknown>) => void = () => undefined) {}
+
+  private logFailure(error: unknown, stage: string, jobId?: string): void {
+    // Error messages, SQL detail and provider bodies can contain secrets. Emit only a machine code.
+    const code = (error as { code?: unknown } | null)?.code;
+    this.log(redact({ component: 'worker', event: 'worker.error', stage, ...(jobId ? { jobId } : {}),
+      errorCode: typeof code === 'string' && /^(?:[0-9A-Z]{5}|E[A-Z_]{2,30})$/.test(code) ? code : 'UNCLASSIFIED',
+      message: 'worker operation failed; durable jobs retain retry and recovery state' }));
+  }
 
   private get db() {
     return this.core.deps.db;
@@ -61,7 +71,7 @@ export class Worker {
   async start(intervalMs = 1000): Promise<void> {
     await this.recoverLeases();
     await this.recoverOrphans();
-    this.timer = setInterval(() => void this.tick().catch(() => undefined), intervalMs);
+    this.timer = setInterval(() => void this.tick().catch(e => this.logFailure(e, 'tick')), intervalMs);
   }
 
   stop(): void {
@@ -112,6 +122,7 @@ export class Worker {
           try {
             await this.run(job);
           } catch (e) {
+            this.logFailure(e, 'job', job.id);
             await this.failJob(job, e);
           }
         });
@@ -467,12 +478,16 @@ export class Worker {
       },
       nowIso,
     );
-    // Observed: customer prepayment is earned (principal + fee) on completion.
-    const req = JSON.parse(p.funding_requirement_json) as { network: string; assetId: string; decimals: number; amountBaseUnits: string };
+    // Discharge the testnet prepayment obligation in its own asset; this is not USD revenue or conversion.
+    const req = JSON.parse(p.funding_requirement_json) as FundingRequirementRecord;
     const asset = cryptoAsset(req.network, req.assetId);
     const total = BigInt(req.amountBaseUnits);
-    const feeBase = minor(qv.serviceFee) === 0n ? 0n : rescaleMinorCeilSafe(minor(qv.serviceFee), qv.serviceFee.scale, req.decimals);
+    // New obligations use the frozen allocation; legacy obligations retain their stored full notional.
+    const settlement = req.settlement ? validateSettlement(req.settlement, req.decimals) : null;
+    if (settlement && settlement.totalBaseUnits !== req.amountBaseUnits) throw new Error('stored settlement total mismatch');
+    const feeBase = settlement ? BigInt(settlement.feeBaseUnits) : minor(qv.serviceFee) === 0n ? 0n : rescaleMinorCeilSafe(minor(qv.serviceFee), qv.serviceFee.scale, req.decimals);
     const principalBase = total - feeBase;
+    if (principalBase <= 0n || feeBase < 0n) throw new Error('invalid stored settlement allocation');
     const lines: JournalLine[] = [
       { account: Accounts.customerPrepayment, asset, side: 'debit' as const, amount: total },
       { account: Accounts.principalApplied, asset, side: 'credit' as const, amount: principalBase },
@@ -524,6 +539,7 @@ export class Worker {
     const evidenceMode = r.evidence[0]?.evidenceMode ?? (qv.providerEnvironment === 'fixture' ? 'local_fixture' : 'fresh_external');
     const limitations = [
       'Testnet funding uses valueless test assets; no crypto-to-fiat conversion occurred.',
+      ...(JSON.parse(p.funding_requirement_json).settlement?.policy.mode === 'scaled_testnet' ? ['Scaled testnet notional — 1:1000. Commercial capacity and chain settlement have no equivalent economic value.'] : []),
       'Merchant payment is provider sandbox/test evidence; it is not bank settlement or an OCBC transaction.',
       ...(r.merchantPaymentStatus === 'test_balance_paid'
         ? ['Provider test-balance usage consumes synthetic capacity; it is not card spend or supplier credit approval.']
@@ -543,6 +559,7 @@ export class Worker {
       providerEnvironment: qv.providerEnvironment,
       evidenceMode,
       principal: qv.merchantTotal,
+      fundingRequirement: fundingRequirementView(JSON.parse(p.funding_requirement_json) as FundingRequirementRecord),
       serviceFee: qv.serviceFee,
       funding: (await fundingSummaries(this.db, p.id)),
       providerReference: r.providerReference,

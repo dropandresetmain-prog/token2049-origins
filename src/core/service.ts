@@ -9,7 +9,7 @@ import type { PurchaseIntent, Fulfillment } from '../contracts/intent.js';
 import { Fulfillment as FulfillmentSchema, PurchaseIntent as PurchaseIntentSchema } from '../contracts/intent.js';
 import type { OfferView, QuoteView, PurchaseView, FundingOption, PurchaseEventView } from '../contracts/commerce.js';
 import type { CommerceExecutor, FundingAdapter, FundingRequirementInput, VerifiedFunding, BankObservationAdapter } from '../contracts/ports.js';
-import { compareMoney, money, minor, rescaleMinorCeil, type Money, addMoney } from '../contracts/money.js';
+import { compareMoney, money, minor, type Money, addMoney } from '../contracts/money.js';
 import {
   appendEvent,
   getPurchaseRow,
@@ -27,6 +27,9 @@ import { Accounts, cryptoAsset, postEntry, type JournalLine } from './journal.js
 import { buildPurchaseView } from './views.js';
 import type { CreatePurchaseRequest } from '../contracts/api.js';
 
+import { demoData } from '../demo/config.js';
+import { SettlementPolicy, settlementBaseUnits, validateSettlement } from '../contracts/settlement.js';
+
 export const DEFAULT_ROUTE: Record<Category, ProviderRoute> = { retail: 'shopify', hotel: 'nuitee', flight: 'atlas' };
 
 export interface CoreConfig {
@@ -38,6 +41,7 @@ export interface CoreConfig {
   perPurchaseLimitMinor: Record<string, bigint>;
   /** Service fee in basis points of merchant total (0 for launch unless configured). */
   serviceFeeBps: number;
+  settlementPolicy?: SettlementPolicy;
 }
 
 export interface CoreDeps {
@@ -175,7 +179,7 @@ export class CommerceCore {
     const now = this.d.clock.now();
     const ttl = new Date(now.getTime() + this.d.config.quoteTtlSeconds * 1000);
     const expiresAt = new Date(Math.min(ttl.getTime(), Date.parse(pq.expiresAt), Date.parse(offer.expires_at) + this.d.config.quoteTtlSeconds * 1000)).toISOString();
-    const fundingOptions = this.fundingOptionsFor(payable);
+    const fundingOptions = this.fundingOptionsFor(pq.merchantTotal, fee, payable);
     const quoteId = newId('quo');
     const version = supersedes ? supersedes.version + 1 : 1;
     const digest = digestOf({
@@ -239,32 +243,27 @@ export class CommerceCore {
     return money(merchantTotal.currency, fee, merchantTotal.scale);
   }
 
-  /** Funding options for configured rails. Only USD-parity test stablecoins for USD quotes are offered. */
-  private fundingOptionsFor(payable: Money): FundingOption[] {
+  /** USD commercial obligations and valueless testnet notional are distinct quantities. */
+  private fundingOptionsFor(principal: Money, fee: Money, payable: Money): FundingOption[] {
     const out: FundingOption[] = [];
+    const policy = SettlementPolicy.parse(this.d.config.settlementPolicy ?? demoData.settlementPolicy);
     for (const [rail, adapter] of this.d.fundingAdapters) {
       const asset = adapter.acceptedAsset();
-      if (!asset || !asset.usdParity || payable.currency !== 'USD') continue;
-      const base = rescaleMinorCeil(minor(payable), payable.scale, asset.decimals);
-      const num = asset.decimals >= payable.scale ? (10n ** BigInt(asset.decimals - payable.scale)).toString() : '1';
-      const den = asset.decimals >= payable.scale ? '1' : (10n ** BigInt(payable.scale - asset.decimals)).toString();
-      out.push({
-        rail,
-        amount: {
-          network: adapter.network,
-          assetId: asset.assetId,
-          ...(asset.symbol ? { symbol: asset.symbol } : {}),
-          decimals: asset.decimals,
-          amountBaseUnits: base.toString(),
-        },
-        payTo: asset.payTo,
-        valuation: {
-          convention: 'test_stablecoin_usd_parity',
-          numerator: num,
-          denominator: den,
-          statement:
-            'Demo convention: 1 unit of the configured testnet stablecoin is valued at 1 USD for reporting. Test assets have no market value and are not redeemable.',
-        },
+      if (!asset || !asset.supportsUsdNotional || payable.currency !== 'USD') continue;
+      let settlement;
+      try {
+        settlement = validateSettlement({
+          policy, commercialPrincipal: principal, commercialServiceFee: fee, commercialTotal: payable,
+          principalBaseUnits: settlementBaseUnits(principal, asset.decimals, policy).toString(),
+          feeBaseUnits: settlementBaseUnits(fee, asset.decimals, policy).toString(),
+          totalBaseUnits: settlementBaseUnits(payable, asset.decimals, policy).toString(),
+        }, asset.decimals);
+      } catch {
+        throw new CoreError('route_unavailable', 'commercial obligation cannot be settled exactly under the supported notional policy');
+      }
+      out.push({ rail, payTo: asset.payTo, settlement,
+        amount: { network: adapter.network, assetId: asset.assetId, decimals: asset.decimals,
+          ...(asset.symbol ? { symbol: asset.symbol } : {}), amountBaseUnits: settlement.totalBaseUnits },
       });
     }
     return out;
@@ -300,6 +299,7 @@ export class CommerceCore {
     if (!quote || quote.customer_id !== actor.customerId) throw new CoreError('not_found', 'quote not found');
     const qv = JSON.parse(quote.public_json) as QuoteView;
     const ex = this.executorFor(qv.route);
+    ex.assertPaymentAvailable?.();
     await this.assertRouteReady(ex);
     const adapter = this.d.fundingAdapters.get(req.fundingRail);
     if (!adapter) throw new CoreError('route_unavailable', `funding rail ${req.fundingRail} is not available`);
@@ -360,7 +360,8 @@ export class CommerceCore {
         payTo: option.payTo,
         expiresAt: quote.expires_at,
         quoteDigest: quote.digest,
-        valuation: option.valuation,
+        ...(option.valuation ? { valuation: option.valuation } : {}),
+        ...(option.settlement ? { settlement: validateSettlement(option.settlement, option.amount.decimals) } : {}),
       };
       await this.d.db.run(
         `INSERT INTO purchases(id, customer_id, quote_id, channel, state, payment_state, commerce_status, merchant_payment_status, funding_rail, funding_requirement_json, approval_json, created_at, updated_at)
@@ -443,6 +444,7 @@ export class CommerceCore {
       },
       payTo: r.payTo,
       resourceUrl: r.resourceUrl ?? `${this.d.config.publicBaseUrl}/v1/purchases/${p.id}/fund`,
+      ...(r.settlement ? { settlement: validateSettlement(r.settlement, r.decimals) } : {}),
       description: `Purchase funding for ${p.id} (quote ${p.quote_id})`,
       expiresAt: r.expiresAt,
     };
@@ -456,6 +458,8 @@ export class CommerceCore {
   async fundPurchase(actor: ActorContext, purchaseId: string, paymentHeader: string | undefined): Promise<FundResult> {
     this.requireScope(actor, 'purchases:fund');
     let p = await this.ownedPurchase(actor, purchaseId);
+    const quote = (await getQuoteRow(this.d.db, p.quote_id))!;
+    this.executorFor(quote.route as ProviderRoute).assertPaymentAvailable?.();
     const adapter = this.d.fundingAdapters.get(p.funding_rail as FundingRail);
     if (!adapter) throw new CoreError('route_unavailable', `funding rail ${p.funding_rail} unavailable`);
 

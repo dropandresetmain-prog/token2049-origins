@@ -95,7 +95,8 @@ export interface FundingRequirementRecord {
   payTo: string;
   expiresAt: string;
   quoteDigest: string;
-  valuation: Record<string, unknown>;
+  valuation?: Record<string, unknown>;
+  settlement?: import('../contracts/settlement.js').SettlementBreakdown;
 }
 
 export async function appendEvent(db: Db, purchaseId: string, type: string, data: Record<string, unknown>, nowIso: string): Promise<void> {

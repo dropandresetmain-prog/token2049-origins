@@ -5,6 +5,7 @@
  * - FundingAdapter: generates protocol requirements and independently verifies payments. Never books commerce.
  * - BankObservationAdapter: provenance-bearing OCBC observations only.
  */
+import type { SettlementBreakdown } from './settlement.js';
 import type { Money, CryptoAmount } from './money.js';
 import type {
   Category,
@@ -103,6 +104,8 @@ export interface CommerceExecutor {
   readonly category: Category;
   readonly environment: ProviderEnvironment;
   readiness(): Promise<Readiness>;
+  /** Local payment gate; must run before creating a funding obligation. */
+  assertPaymentAvailable?(): void;
   search(intent: PurchaseIntent): Promise<ProviderOffer[]>;
   quote(offer: { executionRef: Record<string, unknown>; intent: PurchaseIntent }, fulfillment: Fulfillment): Promise<ProviderQuote>;
   /** Must never be called twice for one attempt by the core; must still be safe to resume from checkpoints. */
@@ -114,6 +117,8 @@ export interface CommerceExecutor {
 /* ---------------- Funding adapter ---------------- */
 
 export interface FundingRequirementInput {
+  /** Absent only for legacy obligations, whose stored amounts remain authoritative. */
+  settlement?: SettlementBreakdown;
   purchaseId: string;
   quoteId: string;
   quoteDigest: string;
@@ -163,7 +168,7 @@ export interface FundingAdapter {
   readonly network: string;
   readiness(): Promise<Readiness>;
   /** Asset/payee this rail will accept, for building quotes. Null if not configured. */
-  acceptedAsset(): { assetId: string; decimals: number; symbol?: string; payTo: string; usdParity: boolean } | null;
+  acceptedAsset(): { assetId: string; decimals: number; symbol?: string; payTo: string; supportsUsdNotional: boolean } | null;
   /** Protocol-native challenge body (e.g. x402 `accepts[]` entry) for this requirement. */
   paymentRequirements(input: FundingRequirementInput): Record<string, unknown>;
   /** Header the client sends the payment payload in. */

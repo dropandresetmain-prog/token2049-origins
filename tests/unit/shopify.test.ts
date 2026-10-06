@@ -1,3 +1,4 @@
+import { demoData } from '../../src/demo/config.js';
 import { describe, it, expect, vi } from 'vitest';
 import { createShopifyExecutor, hasPaidTestEvidence, cartSignature } from '../../src/execution/shopify/index.js';
 import { readCartTotals, cheapestSelections, StorefrontClient, type StorefrontCart } from '../../src/execution/shopify/storefront.js';
@@ -15,7 +16,7 @@ import { readdirSync, readFileSync } from 'node:fs';
 
 const env = { SHOPIFY_STORE_DOMAIN: 'test-shop.myshopify.com', SHOPIFY_STOREFRONT_TOKEN: 'fixture-storefront', SHOPIFY_CLIENT_ID: 'fixture-client', SHOPIFY_CLIENT_SECRET: 'fixture-secret', SHOPIFY_DEV_STORE_CONFIRMED: 'true', SHOPIFY_BOGUS_GATEWAY_ENABLED: 'true', SHOPIFY_BROWSER_EXECUTABLE: 'fixture-path' };
 const nonce = '596fef08-64d7-4e3a-8dfd-2930d6c5b8e7';
-const f: RetailFulfillment = { category: 'retail', email: 'test@example.com', shippingAddress: { firstName: 'Test', lastName: 'Buyer', address1: '1 Test Street', city: 'Singapore', zip: '018956', countryCode: 'SG' } };
+const f: RetailFulfillment = { category: 'retail', ...demoData.buyer };
 const intent: RetailIntent = { category: 'retail', query: 'shirt', quantity: 2, shipToCountry: 'SG', spendCeiling: money('USD', 4000) };
 const amount = (value: string) => ({ amount: value, currencyCode: 'USD' });
 function cart(): StorefrontCart {

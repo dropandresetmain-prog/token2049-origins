@@ -9,6 +9,7 @@ export function fundingCommitment(resourceUrl: string, entry: PaymentRequirement
   return createHash('sha256').update(JSON.stringify([
     'commerce-funding-v1', resourceUrl, extra.purchaseId, extra.quoteId, extra.quoteDigest,
     extra.expiresAt, entry.network, entry.asset, entry.amount, entry.payTo,
+    ...(extra.settlement ? [extra.settlement, extra.chainDecimals] : []),
   ])).digest('hex');
 }
 

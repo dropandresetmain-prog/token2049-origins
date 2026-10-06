@@ -32,6 +32,7 @@ import { SettleError, VerifyError } from '@x402/core/types';
 import type { PaymentPayload, PaymentRequired, PaymentRequirements, SettleResponse, VerifyResponse } from '@x402/core/types';
 import { deepEqual } from '@x402/core/utils';
 import { z } from 'zod';
+import { validateSettlement } from '../../contracts/settlement.js';
 import { fundingCommitment, readFundingCommitment } from './binding.js';
 import type { FundingAdapter, FundingRequirementInput, FundingVerification, VerifiedFunding } from '../../contracts/ports.js';
 import type { PaymentState } from '../../contracts/commerce.js';
@@ -193,14 +194,18 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
       // A ticker is never an identity; only the exactly recognized tUSDM unit gets a symbol.
       ...(c.isTusdm ? { symbol: 'tUSDM' } : {}),
       payTo: c.treasuryAddress,
-      // Test-token USD parity is a stated demo convention that applies to tUSDM ONLY. tADA floats.
-      usdParity: c.isTusdm,
+      // Only recognized tUSDM supports the USD notional policy; this does not assert parity or redemption.
+      supportsUsdNotional: c.isTusdm,
     };
   }
 
   /** The requirement must be one this adapter would itself issue (same network, asset and treasury). */
   private requirementMatchesConfig(input: FundingRequirementInput, allowExpired = false): boolean {
     const c = this.cfg;
+    if (input.settlement) {
+      try { if (validateSettlement(input.settlement, input.amount.decimals).totalBaseUnits !== input.amount.amountBaseUnits) return false; }
+      catch { return false; }
+    }
     return (
       !!c &&
       input.amount.network === CARDANO_NETWORK &&
@@ -235,6 +240,7 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
         quoteId: input.quoteId,
         quoteDigest: input.quoteDigest,
         expiresAt: input.expiresAt,
+        ...(input.settlement ? { settlement: input.settlement, chainDecimals: input.amount.decimals } : {}),
       },
     };
   }

@@ -44,7 +44,7 @@ export async function buildGateway(parts: GatewayParts, opts: { env?: NodeJS.Pro
     fundingAdapters: new Map<FundingRail, FundingAdapter>(parts.fundingAdapters.map((a) => [a.rail, a])),
     bankAdapters: parts.bankAdapters,
   });
-  const worker = new Worker(core);
+  const worker = new Worker(core, opts.log);
   const extraRouters = [...(parts.extraRouters ?? []), ...(parts.buildRouters?.(core) ?? [])];
   const app = createHttpApp({ core, extraRouters, ...(opts.log ? { log: opts.log } : {}) });
   return { env, db, core, worker, app };

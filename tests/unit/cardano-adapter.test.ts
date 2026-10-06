@@ -17,6 +17,8 @@ import { SettleError, VerifyError } from '@x402/core/types';
 import type { PaymentPayload, PaymentRequired, PaymentRequirements, SettleResponse, SupportedResponse, VerifyResponse } from '@x402/core/types';
 import { createCardanoFundingAdapter, type CardanoFacilitatorPort, type DecodedTxView } from '../../src/funding/cardano/index.js';
 import type { FundingRequirementInput, FundingVerification, VerifiedFunding } from '../../src/contracts/ports.js';
+import { money } from '../../src/contracts/money.js';
+import { demoData } from '../../src/demo/config.js';
 import { fundingCommitment } from '../../src/funding/cardano/binding.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
 
@@ -208,25 +210,25 @@ describe('cardano adapter: asset and requirements', () => {
     expect(createCardanoFundingAdapter({}).acceptedAsset()).toBeNull();
 
     const tusdm = rig().adapter.acceptedAsset();
-    expect(tusdm).toEqual({ assetId: USDM_PREPROD_ASSET, decimals: 6, symbol: 'tUSDM', payTo: TREASURY, usdParity: true });
+    expect(tusdm).toEqual({ assetId: USDM_PREPROD_ASSET, decimals: 6, symbol: 'tUSDM', payTo: TREASURY, supportsUsdNotional: true });
 
     // tADA is never valued at USD parity and gets no ticker.
     const ada = createCardanoFundingAdapter(baseEnv({ CARDANO_ASSET_UNIT: 'lovelace' })).acceptedAsset();
-    expect(ada).toEqual({ assetId: 'lovelace', decimals: 6, payTo: TREASURY, usdParity: false });
+    expect(ada).toEqual({ assetId: 'lovelace', decimals: 6, payTo: TREASURY, supportsUsdNotional: false });
 
     // Same policy, different asset name; and a different policy with the real name: neither is tUSDM.
     const [policy, name] = USDM_PREPROD_ASSET.split('.');
     const wrongName = createCardanoFundingAdapter(baseEnv({ CARDANO_ASSET_UNIT: `${policy}.0014df105553444d` })).acceptedAsset();
     const wrongPolicy = createCardanoFundingAdapter(baseEnv({ CARDANO_ASSET_UNIT: `${'0'.repeat(56)}.${name}` })).acceptedAsset();
-    expect(wrongName?.usdParity).toBe(false);
+    expect(wrongName?.supportsUsdNotional).toBe(false);
     expect(wrongName).not.toHaveProperty('symbol');
-    expect(wrongPolicy?.usdParity).toBe(false);
+    expect(wrongPolicy?.supportsUsdNotional).toBe(false);
     expect(wrongPolicy).not.toHaveProperty('symbol');
 
     // Hex case is normalized, so an upper-case spelling of the same unit is still the same asset.
     const upper = createCardanoFundingAdapter(baseEnv({ CARDANO_ASSET_UNIT: USDM_PREPROD_ASSET.toUpperCase() })).acceptedAsset();
     expect(upper?.assetId).toBe(USDM_PREPROD_ASSET);
-    expect(upper?.usdParity).toBe(true);
+    expect(upper?.supportsUsdNotional).toBe(true);
   });
 
   it('exports the rail identity', () => {
@@ -760,5 +762,27 @@ describe('signed transaction expiry boundary',()=>{
       expect(await r.adapter.verify(signed,inp)).toMatchObject({ok:false,settlementAttempted:false});
       expect(r.fac.calls).toContain('verify');expect(r.fac.calls).not.toContain('settle');
     } finally {clock.set(original);}
+  });
+});
+
+
+describe('Cardano frozen scaled settlement', () => {
+  it.each(['scale', 'amount', 'asset', 'payee', 'network', 'decimals'])('refuses altered %s before facilitator submission', async kind => {
+    const r = rig();
+    const settlement = { policy: demoData.settlementPolicy, commercialPrincipal: money('USD', '18340'), commercialServiceFee: money('USD', '0'), commercialTotal: money('USD', '18340'), principalBaseUnits: '183400', feeBaseUnits: '0', totalBaseUnits: '183400' };
+    const inp = input({ amount: { network: 'cardano:preprod', assetId: USDM_PREPROD_ASSET, decimals: 6, amountBaseUnits: '183400' }, settlement });
+    const requirement = (r.adapter.paymentRequirements(inp) as unknown as PaymentRequired).accepts[0]!;
+    expect(requirement.extra.settlement).toEqual(settlement);
+    const altered = structuredClone(requirement);
+    if (kind === 'scale') (altered.extra.settlement as typeof settlement).policy.denominator = 999 as 1000;
+    if (kind === 'amount') altered.amount = '183401';
+    if (kind === 'asset') altered.asset = 'lovelace';
+    if (kind === 'payee') altered.payTo = OTHER;
+    if (kind === 'network') altered.network = 'cardano:mainnet';
+    if (kind === 'decimals') altered.extra.chainDecimals = 5;
+    const value = encodePaymentSignatureHeader({ x402Version: 2, resource: { url: RESOURCE }, accepted: altered, payload: { transaction: 'test-only', nonce: NONCE } });
+    const v = await r.adapter.verify(value, inp);
+    expect(v.ok).toBe(false); expect(r.fac.calls).toEqual([]);
+    expect(fundingCommitment(RESOURCE, altered)).not.toBe(fundingCommitment(RESOURCE, requirement));
   });
 });

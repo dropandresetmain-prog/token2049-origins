@@ -1,3 +1,4 @@
+import { demoData } from '../../src/demo/config.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Browser, Page, BrowserContext, Route } from 'playwright-core';
 import { PlaywrightCheckoutDriver } from '../../src/execution/shopify/browserCheckout.js';
@@ -31,7 +32,7 @@ function fixture() {
   const driver = new PlaywrightCheckoutDriver({storeDomain:'test-shop.myshopify.com',executablePath:'fixture-browser',clock});
   const input: CheckoutDriverInput = {
     checkoutUrl:url,expectedTotal:money('USD',3200),shippingTitle:'Standard',storePassword:null,
-    fulfillment:{category:'retail',email:'test@example.com',shippingAddress:{firstName:'Test',lastName:'Buyer',address1:'1 Test Street',city:'Singapore',zip:'018956',countryCode:'SG'}},
+    fulfillment:{category:'retail',...demoData.buyer},
     checkpoint:vi.fn(async step => { events.push(step); }), log:vi.fn(),
   };
   return {driver,input,pay,fill,events,browser,context,page,setText:(value:string) => {text=value;},routeHandler:()=>routeHandler!};

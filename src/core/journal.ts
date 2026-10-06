@@ -10,8 +10,8 @@ import { newId } from '../infrastructure/ids.js';
  *   assets:crypto_treasury            DR when testnet funding is independently verified
  *   liabilities:customer_prepayment   CR when funding is applied to a purchase (deliver or refund)
  *   liabilities:customer_unapplied    CR when funding arrives that cannot be applied (duplicate/overpay/late)
- *   income:purchase_principal_applied CR when a purchase completes and the prepayment is earned
- *   income:service_fee                CR fee portion on completion
+ *   income:purchase_principal_applied CR testnet principal applied when commerce completes, not USD value
+ *   income:service_fee                CR testnet fee portion under the frozen notional policy
  *
  * Simulated ledger (explicitly synthetic fiat/card capacity; never OCBC cash):
  *   simulated:merchant_purchases      DR when a provider reports the merchant payment

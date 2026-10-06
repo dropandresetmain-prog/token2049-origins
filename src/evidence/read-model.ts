@@ -12,6 +12,8 @@ import type { Db } from '../infrastructure/db.js';
 import { EvidenceMode as EvidenceModeSchema } from '../contracts/common.js';
 import type { EvidenceMode } from '../contracts/common.js';
 import type { Money } from '../contracts/money.js';
+import { fundingRequirementView } from '../core/views.js';
+import type { FundingRequirementRecord } from '../core/store.js';
 import type { QuoteView, ReceiptView } from '../contracts/commerce.js';
 import { entriesForPurchase, trialBalance, Accounts, SIMULATED_ACCOUNTS } from '../core/journal.js';
 import { capacitySnapshot } from '../core/capacity.js';
@@ -154,6 +156,7 @@ export async function listPurchases(db: Db, customerId: string, limit = 50) {
       commerceStatus: p.commerce_status,
       merchantPaymentStatus: p.merchant_payment_status,
       payable: qv?.payablePrincipal ?? null,
+      fundingRequirement: fundingRequirementView(JSON.parse(p.funding_requirement_json) as FundingRequirementRecord),
       createdAt: p.created_at,
       provenance: evidence.provenance,
       executionEvidenceStatus: evidence.executionEvidenceStatus,
@@ -266,6 +269,7 @@ export async function purchaseDetail(db: Db, p: PurchaseRow) {
       merchantPaymentStatus: p.merchant_payment_status,
       fundingRail: p.funding_rail,
       payable: qv?.payablePrincipal ?? null,
+      fundingRequirement: fundingRequirementView(JSON.parse(p.funding_requirement_json) as FundingRequirementRecord),
       createdAt: p.created_at,
       updatedAt: p.updated_at,
       provenance,

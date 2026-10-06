@@ -2,6 +2,15 @@ import type { Db } from '../infrastructure/db.js';
 import type { PurchaseView, QuoteView, FundingSummary, ReceiptView } from '../contracts/commerce.js';
 import { getQuoteRow, getReservation, type PurchaseRow, type FundingEvidenceRow, type FundingRequirementRecord } from './store.js';
 
+export function fundingRequirementView(req: FundingRequirementRecord): import('../contracts/commerce.js').FundingOption {
+  return { rail: req.rail as import('../contracts/common.js').FundingRail,
+    amount: { network: req.network, assetId: req.assetId, decimals: req.decimals, amountBaseUnits: req.amountBaseUnits,
+      ...(req.symbol ? { symbol: req.symbol } : {}) }, payTo: req.payTo,
+    ...(req.settlement ? { settlement: req.settlement } : {}),
+    ...(req.valuation ? { valuation: req.valuation as import('../contracts/commerce.js').FundingOption['valuation'] } : {}),
+  };
+}
+
 export async function fundingSummaries(db: Db, purchaseId: string): Promise<FundingSummary[]> {
   return (await db
     .all<FundingEvidenceRow>('SELECT * FROM funding_evidence WHERE purchase_id = $1 ORDER BY verified_at, id', purchaseId))
@@ -37,11 +46,12 @@ export async function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: s
     commerceStatus: p.commerce_status as PurchaseView['commerceStatus'],
     merchantPaymentStatus: p.merchant_payment_status as PurchaseView['merchantPaymentStatus'],
     payablePrincipal: qv.payablePrincipal,
+    fundingRequirement: fundingRequirementView(req),
     fundingInstructions: awaiting
       ? {
           fundUrl: `${publicBaseUrl}/v1/purchases/${p.id}/fund`,
           protocol: 'x402',
-          options: qv.fundingOptions.filter((o) => o.rail === req.rail),
+          options: [fundingRequirementView(req)],
           expiresAt: req.expiresAt,
           note: 'POST the fund URL without a payment header to receive the x402 challenge; pay with a bounded payer client. No merchant spend occurs until funding is independently verified and confirmed.',
         }

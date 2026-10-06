@@ -144,7 +144,7 @@ export class FixtureFundingAdapter implements FundingAdapter {
   }
 
   acceptedAsset() {
-    return { assetId: FIXTURE_ASSET, decimals: 6, symbol: 'tUSDM', payTo: FIXTURE_TREASURY, usdParity: true };
+    return { assetId: FIXTURE_ASSET, decimals: 6, symbol: 'tUSDM', payTo: FIXTURE_TREASURY, supportsUsdNotional: true };
   }
 
   paymentRequirements(input: FundingRequirementInput): Record<string, unknown> {

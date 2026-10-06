@@ -1,3 +1,5 @@
+import type { SettlementPolicy } from '../../src/contracts/settlement.js';
+import { demoData } from '../../src/demo/config.js';
 import { createTestDb, testDatabaseUrl } from './database.js';
 import { buildGateway, type Gateway } from '../../src/composition.js';
 import { Db } from '../../src/infrastructure/db.js';
@@ -31,7 +33,7 @@ export const TEST_ENV = {
   SIMULATED_CARD_CAPACITY_USD_MINOR: '20000',
 } as NodeJS.ProcessEnv;
 
-export async function startHarness(opts: { schema?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[] } = {}): Promise<Harness> {
+export async function startHarness(opts: { schema?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[]; settlementPolicy?: SettlementPolicy; serviceFeeBps?: number } = {}): Promise<Harness> {
   const clock = opts.clock ?? new ManualClock();
   const db = opts.db ?? await createTestDb(opts.schema);
   const retail = new FixtureExecutor('shopify', 'retail', clock);
@@ -42,6 +44,8 @@ export async function startHarness(opts: { schema?: string; db?: Db; clock?: Man
     { executors: [retail, hotel, flight], fundingAdapters: [funding], bankAdapters: opts.bankAdapters ?? [] },
     { env: TEST_ENV, clock, db },
   );
+  gw.core.deps.config.settlementPolicy = opts.settlementPolicy ?? { mode: 'full_notional', numerator: 1, denominator: 1 };
+  gw.core.deps.config.serviceFeeBps = opts.serviceFeeBps ?? 0;
   const now = clock.now().toISOString();
   const existing = (await db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM api_clients'))!;
   const alice = await createClient(db, { displayName: 'Alice', channel: 'test', label: `alice-${existing.n}` }, now);
@@ -76,16 +80,15 @@ export async function startHarness(opts: { schema?: string; db?: Db; clock?: Man
 
 export const retailIntent = (ceilingMinor = '10000') => ({
   category: 'retail',
-  query: 'test tee',
-  quantity: 1,
-  shipToCountry: 'SG',
+  query: demoData.retail.query,
+  quantity: demoData.retail.quantity,
+  shipToCountry: demoData.retail.shipToCountry,
   spendCeiling: { currency: 'USD', amountMinor: ceilingMinor, scale: 2 },
 });
 
 export const retailFulfillment = {
   category: 'retail',
-  email: 'buyer@example.com',
-  shippingAddress: { firstName: 'Test', lastName: 'Buyer', address1: '1 Test Street', city: 'Singapore', zip: '018989', countryCode: 'SG' },
+  ...demoData.buyer,
 };
 
 /** search -> quote -> purchase; returns ids and the funding requirement. */
