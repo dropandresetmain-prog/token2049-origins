@@ -45,6 +45,7 @@ Historical issue ledgers remain in docs/evidence/. This file contains only curre
 
 - **Unverified externally until provisioned:** the real ChatGPT OAuth/DCR handshake and the free payer's behaviour on Render (cold starts, Postgres connectivity from the payer service) are verified only by local/fixture tests; the provisioning script's final no-spend smoke is the first live check.
 - **Operational:** free services sleep (first request after idle can take ~50 s, longer for two services); 750 free instance-hours per month are shared by all free services in the workspace; the Render Postgres instance has an expiry date.
+- **Cap headroom:** the canonical payer's current caps (102,000 base units cumulative) leave limited headroom after earlier spends; the payer refuses (never raises) a purchase above it. The provisioner's pre-spend report shows the exact headroom.
 - **Accepted:** single-owner passcode consent with global (not per-IP) lockout; stateless `/mcp` with no SSE; a failed or unconfirmed first payment attempt is not resent by the same `buy` (check `get_purchase`, or request a fresh quote); a payer crash mid-signing leaves a `signing` ledger row that blocks only that purchase until an operator reconciles it.
 
 ## Ignore / Accept Risk for hackathon

@@ -2,7 +2,7 @@
 # The preferred path is `node scripts/provision-hosted-mcp-render.mjs` (one command; see docs/channels/hosted-mcp.md): it creates
 # this service, sets these variables one by one, uploads the secret files and deploys. Use this file only if you want the
 # dashboard flow (Blueprint path: deploy/render-payer-free.yaml); never apply the root render.yaml for the payer.
-# Secret files (dashboard -> Environment -> Secret Files): payer-cardano-mnemonic, cardano-payer-bridge-token, payer-gateway-token.
+# Secret files (dashboard -> Environment -> Secret Files): payer-cardano-mnemonic (the EXISTING wallet), legacy-ledger, cardano-payer-bridge-token, payer-gateway-token.
 services:
   - type: web
     name: t2o-cardano-payer
@@ -30,9 +30,14 @@ services:
         value: cardano:preprod
       - key: PAYER_CARDANO_MNEMONIC_FILE
         value: /etc/secrets/payer-cardano-mnemonic
-      # Public address of the dedicated demo wallet; start-up refuses a mnemonic that derives anything else.
+      # Public address of the EXISTING canonical payer wallet (fingerprint a2e66045653afe62); start-up refuses a mnemonic deriving anything else.
       - key: PAYER_WALLET_ADDRESS
-        value: addr_test1qzxfrsznxqm4y2f40jv4xfdydpagzmva82c4asgzdvhsk6eqrvlay7vdxxca7rzlk5z29pe756yq58rutu6v4d02hmtqjy2drl
+        value: addr_test1qrwghp45ywnyn6vvm6utfk3xmjxap97mve5gql2cj2fq6wnqdqnepvemxymt7h4f4hteytznvy5n9kte95vtvufetnqqtthyxm
+      # One-time import of the canonical file ledger (secret file `legacy-ledger`), pinned by hash. The provisioner computes the hash.
+      - key: PAYER_LEGACY_LEDGER_FILE
+        value: /etc/secrets/legacy-ledger
+      - key: PAYER_LEGACY_LEDGER_SHA256
+        sync: false
       - key: BLOCKFROST_PROJECT_ID
         sync: false
       - key: BLOCKFROST_BASE_URL
@@ -41,14 +46,15 @@ services:
         sync: false
       - key: PAYER_EXPECTED_PAY_TO
         sync: false
-      # Hard small caps (base units of the allowed asset, 6 decimals). Cumulative never resets (it is read from Postgres).
+      # Current caps of the protected payer (base units of the allowed asset, 6 decimals), copied from its private config; never raise
+      # them here. Cumulative never resets (it is read from Postgres, including the imported history).
       - key: PAYER_MAX_PER_PAYMENT_BASE_UNITS
-        value: '500000'
+        value: '102000'
       - key: PAYER_MAX_CUMULATIVE_BASE_UNITS
-        value: '1500000'
+        value: '102000'
       - key: PAYER_MAX_DAILY_BASE_UNITS
-        value: '1000000'
+        value: '102000'
       - key: PAYER_MAX_FEE_LOVELACE
-        value: '2000000'
+        value: '50000000'
       - key: PAYER_MAX_ADA_OUTPUT_LOVELACE
-        value: '3000000'
+        value: '200000000'
