@@ -32,7 +32,7 @@ function setup(amount = '1500000') {
   PayerLedger.initialize(config.ledgerFile);
   const entry = { scheme: 'exact', network: config.network, asset: config.allowedAsset, amount, payTo: TO, maxTimeoutSeconds: 600,
     extra: { settlement, chainDecimals: 6, assetTransferMethod: 'default', areFeesSponsored: false, confirmationPolicy: { l1Confirmations: 1 }, purchaseId: ID,
-      quoteId: 'quo_ABCDEFGHIJKLMNOP', quoteDigest: 'd'.repeat(64), expiresAt: EXPIRY } };
+      quoteId: 'quo_ABCDEFGHIJKLMNOP', quoteDigest: 'sha256:' + 'd'.repeat(64), expiresAt: EXPIRY } };
   const challenge: PaymentRequired = { x402Version: 2, resource: { url: `${config.gatewayUrl}/v1/purchases/${ID}/fund` }, accepts: [entry] };
   const purchase = { purchaseId: ID, quoteId: 'quo_ABCDEFGHIJKLMNOP', state: 'awaiting_funding', paymentState: 'not_received',
     fundingInstructions: { expiresAt: EXPIRY, options: [{ rail: 'cardano', amount: { network: config.network, assetId: config.allowedAsset, amountBaseUnits: amount, decimals: 6 }, payTo: TO, settlement }] }, funding: [] };
@@ -56,13 +56,14 @@ describe('bounded payer', () => {
     expect(s.signer).toHaveBeenCalledTimes(1); expect(s.sent).toHaveLength(2); expect(s.sent[0]).toBe(s.sent[1]);
     expect(readFileSync(s.config.ledgerFile, 'utf8')).not.toContain('test-token');
   });
-  it.each(['amount', 'daily', 'cumulative', 'payee', 'resource', 'expiry', 'identity', 'method', 'version', 'shape', 'scale', 'fee_scale', 'settlement_mode', 'network', 'asset'])('refuses %s violations before touching a key', async kind => {
+  it.each(['amount', 'daily', 'cumulative', 'payee', 'resource', 'expiry', 'identity', 'method', 'version', 'shape', 'scale', 'fee_scale', 'settlement_mode', 'network', 'asset', 'digest_format'])('refuses %s violations before touching a key', async kind => {
     const s = setup();
     if (kind === 'scale') s.entry.extra.settlement.policy.denominator = 999 as 1000;
     if (kind === 'fee_scale') s.entry.extra.settlement.feeBaseUnits = '1000000';
     if (kind === 'settlement_mode') (s.entry.extra.settlement.policy as { mode: string }).mode = 'full_notional';
     if (kind === 'network') s.entry.network = 'cardano:mainnet' as 'cardano:preprod';
     if (kind === 'asset') s.entry.asset = 'lovelace';
+    if (kind === 'digest_format') s.entry.extra.quoteDigest = 'd'.repeat(64);
     if (kind === 'amount') s.config.maxPerPayment = 1n;
     if (kind === 'daily') s.config.maxDaily = 1n;
     if (kind === 'cumulative') s.config.maxCumulative = 1n;

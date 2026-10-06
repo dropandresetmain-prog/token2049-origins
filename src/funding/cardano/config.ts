@@ -12,6 +12,12 @@ import {
 import { DEFAULT_BLOCKFROST_PREPROD_URL, isTrustedBlockfrostUrl } from './blockfrost.js';
 import { missingEnv } from '../../infrastructure/config.js';
 
+// Masumi dispenser tUSDM is distinct from the SDK default token. Recognize its exact Preprod
+// identity only; the shared ticker never permits substituting one asset for the other.
+// Source: https://www.masumi.network/dev/masumi/documentation/how-to-guides/list-agent-on-sokosumi
+export const MASUMI_USDM_PREPROD_ASSET = '16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d';
+const isRecognizedTusdm = (unit: string) => unit === USDM_PREPROD_ASSET || unit === MASUMI_USDM_PREPROD_ASSET;
+
 export const CARDANO_NETWORK = CARDANO_PREPROD_CAIP2; // 'cardano:preprod'
 /** L1 depth advertised in every requirement and required before the adapter reports `confirmed`. */
 export const REQUIRED_L1_CONFIRMATIONS = 1;
@@ -36,7 +42,7 @@ export interface CardanoConfig {
   decimals: number;
   blockfrostProjectId: string;
   blockfrostBaseUrl: string;
-  /** True only for the exact Preprod tUSDM policy + name (compared against the SDK's own constant). */
+  /** Exact SDK-default or Masumi-dispenser Preprod tUSDM identity, never a ticker match. */
   isTusdm: boolean;
 }
 
@@ -83,8 +89,8 @@ export function parseCardanoConfig(env: NodeJS.ProcessEnv): CardanoConfigResult 
   if (has('CARDANO_ASSET_DECIMALS')) {
     decimals = /^\d{1,2}$/.test(v('CARDANO_ASSET_DECIMALS')) ? Number(v('CARDANO_ASSET_DECIMALS')) : NaN;
     if (!Number.isInteger(decimals) || decimals > 18) invalid.push('CARDANO_ASSET_DECIMALS');
-    // Both assets we recognize are 6-decimal; a different value would silently mis-scale quotes.
-    else if ((unit === LOVELACE_ASSET || unit === USDM_PREPROD_ASSET) && decimals !== 6) invalid.push('CARDANO_ASSET_DECIMALS');
+    // Recognized tUSDM tokens and lovelace are 6-decimal; a different value mis-scales quotes.
+    else if ((unit === LOVELACE_ASSET || isRecognizedTusdm(unit)) && decimals !== 6) invalid.push('CARDANO_ASSET_DECIMALS');
   }
 
   const rawBase = v('BLOCKFROST_BASE_URL');
@@ -103,7 +109,7 @@ export function parseCardanoConfig(env: NodeJS.ProcessEnv): CardanoConfigResult 
       decimals,
       blockfrostProjectId: v('BLOCKFROST_PROJECT_ID'),
       blockfrostBaseUrl: base ? base.toString().replace(/\/+$/, '') : DEFAULT_BLOCKFROST_PREPROD_URL,
-      isTusdm: unit === USDM_PREPROD_ASSET,
+      isTusdm: isRecognizedTusdm(unit),
     },
   };
 }

@@ -191,7 +191,7 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
     return {
       assetId: c.assetUnit,
       decimals: c.decimals,
-      // A ticker is never an identity; only the exactly recognized tUSDM unit gets a symbol.
+      // A ticker is never an identity; only explicitly recognized exact tUSDM units get a symbol.
       ...(c.isTusdm ? { symbol: 'tUSDM' } : {}),
       payTo: c.treasuryAddress,
       // Only recognized tUSDM supports the USD notional policy; this does not assert parity or redemption.

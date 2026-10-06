@@ -1,0 +1,371 @@
+{
+  "timestamp": "2026-10-06T14:07:19.484Z",
+  "scope": "Real Cardano Preprod funding; hotel and card capacity are local fixtures",
+  "checks": [
+    {
+      "check": "fixture hotel quote with exact real Cardano requirement",
+      "purchaseId": "pur_01M48RKCSN1GEPBY0MNBEQDC6A",
+      "commercialTotalMinor": "102",
+      "requiredBaseUnits": "1020",
+      "fixture": true
+    },
+    {
+      "check": "commerce gated before funding",
+      "result": "PASS",
+      "counts": {
+        "funding_evidence": 0,
+        "funding_attempts": 0,
+        "reservations": 1,
+        "journal_entries": 0,
+        "jobs": 0
+      }
+    },
+    {
+      "check": "wrong network refused before broadcast",
+      "result": "PASS",
+      "http": 402
+    },
+    {
+      "check": "wrong asset refused before broadcast",
+      "result": "PASS",
+      "http": 402
+    },
+    {
+      "check": "wrong amount refused before broadcast",
+      "result": "PASS",
+      "http": 402
+    },
+    {
+      "check": "wrong payTo refused before broadcast",
+      "result": "PASS",
+      "http": 402
+    },
+    {
+      "check": "wrong extra refused before broadcast",
+      "result": "PASS",
+      "http": 402
+    },
+    {
+      "check": "real signed payment gateway response",
+      "http": 202
+    },
+    {
+      "check": "deliberate response loss or payment failure",
+      "code": "gateway_unreachable",
+      "message": "payment sent but no confirmed answer (network error or timeout); re-run to resend the identical payment"
+    },
+    {
+      "check": "gateway and payer restart recovery",
+      "result": "PASS",
+      "resumed": true,
+      "transferReference": "0086ff87f9cdd828968d1f3a895af11d935325efddad5890b79850ce7d97e683"
+    },
+    {
+      "check": "truthful receipt",
+      "result": "PASS",
+      "state": "succeeded",
+      "paymentState": "confirmed",
+      "receipt": {
+        "receiptId": "rcp_01M48RN1XGFE2K9CDH346SMANZ",
+        "purchaseId": "pur_01M48RKCSN1GEPBY0MNBEQDC6A",
+        "quoteId": "quo_01M48RKCRK2ZDJP5TJ3BB3PXCV",
+        "quoteDigest": "sha256:944ba3c172a1beb50aecab0ec02f088926176d3c0e80b52164bf1a1eaee16c87",
+        "category": "hotel",
+        "route": "nuitee",
+        "providerEnvironment": "fixture",
+        "evidenceMode": "local_fixture",
+        "principal": {
+          "currency": "USD",
+          "amountMinor": "100",
+          "scale": 2
+        },
+        "fundingRequirement": {
+          "rail": "cardano",
+          "fundingOptionId": "fop_01M48RKCRK2330K3KWA88QB3DP",
+          "amount": {
+            "network": "cardano:preprod",
+            "assetId": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "decimals": 6,
+            "amountBaseUnits": "1020",
+            "symbol": "tUSDM"
+          },
+          "payTo": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py",
+          "settlement": {
+            "policy": {
+              "mode": "scaled_testnet",
+              "numerator": 1,
+              "denominator": 1000
+            },
+            "commercialPrincipal": {
+              "currency": "USD",
+              "amountMinor": "100",
+              "scale": 2
+            },
+            "commercialServiceFee": {
+              "currency": "USD",
+              "amountMinor": "2",
+              "scale": 2
+            },
+            "commercialTotal": {
+              "currency": "USD",
+              "amountMinor": "102",
+              "scale": 2
+            },
+            "principalBaseUnits": "1000",
+            "feeBaseUnits": "20",
+            "totalBaseUnits": "1020"
+          }
+        },
+        "serviceFee": {
+          "currency": "USD",
+          "amountMinor": "2",
+          "scale": 2
+        },
+        "funding": [
+          {
+            "rail": "cardano",
+            "network": "cardano:preprod",
+            "asset": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "amountBaseUnits": "1020",
+            "decimals": 6,
+            "transferReference": "0086ff87f9cdd828968d1f3a895af11d935325efddad5890b79850ce7d97e683",
+            "paymentState": "confirmed",
+            "purpose": "purchase_principal",
+            "verifiedAt": "2026-10-06T14:07:32.010Z",
+            "evidenceMode": "fresh_external"
+          }
+        ],
+        "providerReference": "FIX-pur_01M48RKCSN1GEPBY0MNBEQDC6A:1",
+        "commerceStatus": "confirmed",
+        "merchantPaymentStatus": "simulated_paid",
+        "limitations": [
+          "LOCAL FIXTURE: not external evidence.",
+          "Testnet funding uses valueless test assets; no crypto-to-fiat conversion occurred.",
+          "Scaled testnet notional — 1:1000. Commercial capacity and chain settlement have no equivalent economic value.",
+          "Merchant payment is provider sandbox/test evidence; it is not bank settlement or an OCBC transaction.",
+          "Card spend is internally simulated capacity (card payable), not an immediate bank debit.",
+          "Nuitée sandbox booking payment is simulated by the provider (no charge)."
+        ],
+        "treasuryEffect": [
+          {
+            "ledgerMode": "observed",
+            "account": "assets:crypto_treasury",
+            "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "delta": "1020"
+          },
+          {
+            "ledgerMode": "observed",
+            "account": "liabilities:customer_prepayment",
+            "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "delta": "-1020"
+          },
+          {
+            "ledgerMode": "simulated",
+            "account": "simulated:merchant_purchases",
+            "asset": "fiat:USD/2",
+            "delta": "100"
+          },
+          {
+            "ledgerMode": "simulated",
+            "account": "simulated:card_payable",
+            "asset": "fiat:USD/2",
+            "delta": "-100"
+          },
+          {
+            "ledgerMode": "observed",
+            "account": "liabilities:customer_prepayment",
+            "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "delta": "1020"
+          },
+          {
+            "ledgerMode": "observed",
+            "account": "income:purchase_principal_applied",
+            "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "delta": "-1000"
+          },
+          {
+            "ledgerMode": "observed",
+            "account": "income:service_fee",
+            "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "delta": "-20"
+          }
+        ],
+        "evidenceRefs": [
+          "journal:jen_01M48RN06ARCX0B50RMN7659R7",
+          "journal:jen_01M48RN1WYQ1GXAS830VX2GCXN",
+          "journal:jen_01M48RN1X40J233HHSPTZ0DW0M",
+          "fixture:nuitee:FIX-pur_01M48RKCSN1GEPBY0MNBEQDC6A:1"
+        ],
+        "issuedAt": "2026-10-06T14:07:33.781Z"
+      }
+    },
+    {
+      "check": "single funding reservation execution and balanced journal",
+      "result": "PASS",
+      "id": 4,
+      "ok": true,
+      "counts": {
+        "funding_evidence": 1,
+        "funding_attempts": 1,
+        "reservations": 1,
+        "journal_entries": 3,
+        "jobs": 2
+      },
+      "executions": 1,
+      "balance": [
+        {
+          "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+          "sum": "0"
+        },
+        {
+          "asset": "fiat:USD/2",
+          "sum": "0"
+        }
+      ]
+    },
+    {
+      "check": "same purchase replay has no second transfer",
+      "result": "PASS",
+      "http": 409
+    },
+    {
+      "check": "accepted payer rerun retains exact transaction and cap",
+      "result": "PASS",
+      "transferReference": "0086ff87f9cdd828968d1f3a895af11d935325efddad5890b79850ce7d97e683",
+      "committedBaseUnits": "1020"
+    },
+    {
+      "check": "independent official Blockfrost exact chain readback",
+      "result": "PASS",
+      "observedAt": "2026-10-06T14:10:16.371Z",
+      "txHash": "0086ff87f9cdd828968d1f3a895af11d935325efddad5890b79850ce7d97e683",
+      "networkMagic": 1,
+      "blockHeight": 5260845,
+      "blockTime": 1791295647,
+      "newerBlocks": 8,
+      "treasury": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py",
+      "asset": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+      "receivedBaseUnits": "1020",
+      "treasuryAdaLovelace": "1168010",
+      "commitment": "c3609fd61ba88bf17fe1870404794aaf08b3c6cc708a7eb68577cb730a41a9da",
+      "outputs": [
+        {
+          "address": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py",
+          "amount": [
+            {
+              "unit": "lovelace",
+              "quantity": "1168010"
+            },
+            {
+              "unit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+              "quantity": "1020"
+            }
+          ],
+          "output_index": 0,
+          "collateral": false
+        },
+        {
+          "address": "addr_test1qrwghp45ywnyn6vvm6utfk3xmjxap97mve5gql2cj2fq6wnqdqnepvemxymt7h4f4hteytznvy5n9kte95vtvufetnqqtthyxm",
+          "amount": [
+            {
+              "unit": "lovelace",
+              "quantity": "98654653"
+            },
+            {
+              "unit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+              "quantity": "99998980"
+            }
+          ],
+          "output_index": 1,
+          "collateral": false
+        }
+      ]
+    },
+    {
+      "check": "persisted live purchase cumulative cap before key access",
+      "result": "PASS"
+    },
+    {
+      "check": "persisted live purchase daily cap before key access",
+      "result": "PASS"
+    },
+    {
+      "check": "persisted live purchase per_payment cap before key access",
+      "result": "PASS"
+    },
+    {
+      "check": "expired requirement and caps never touch key or reserve",
+      "result": "PASS",
+      "keysTouched": 0
+    },
+    {
+      "check": "signed old transaction cannot bind a new purchase even with exact echoed terms",
+      "result": "PASS",
+      "http": 402,
+      "reason": "signed transaction does not bind this purchase and quote"
+    },
+    {
+      "check": "unaltered cross purchase replay rejected",
+      "result": "PASS",
+      "http": 402
+    },
+    {
+      "check": "negative tests retain one chain funding and unchanged payer history",
+      "result": "PASS",
+      "counts": {
+        "funding_evidence": 1,
+        "funding_attempts": 1,
+        "reservations": 2,
+        "journal_entries": 3,
+        "jobs": 2
+      },
+      "committedBaseUnits": "1020"
+    }
+  ],
+  "outcome": "PASS",
+  "signedTransaction": {
+    "hash": "0086ff87f9cdd828968d1f3a895af11d935325efddad5890b79850ce7d97e683",
+    "feeLovelace": "177337",
+    "outputs": [
+      {
+        "address": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py",
+        "coin": "1168010",
+        "assets": {
+          "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d": "1020"
+        }
+      },
+      {
+        "address": "addr_test1qrwghp45ywnyn6vvm6utfk3xmjxap97mve5gql2cj2fq6wnqdqnepvemxymt7h4f4hteytznvy5n9kte95vtvufetnqqtthyxm",
+        "coin": "98654653",
+        "assets": {
+          "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d": "99998980"
+        }
+      }
+    ]
+  },
+  "signedHeaderFingerprint": "7b69d624e1ebf65b911db7de839fc14e47dc6ae13357da618f789e15276b29ad",
+  "completedAt": "2026-10-06T14:12:39.664Z",
+  "historyReconciliation": {
+    "checkedAt": "2026-10-06T13:59:25.095Z",
+    "addressFingerprint": "a2e66045653afe62",
+    "transactionCount": 3,
+    "outgoingCount": 0,
+    "incomingTransactionHashes": [
+      "e001f800a631b91707006119142d978df26a47d475ed5647a614b76bf5084b39",
+      "388d7d3670a973d1afc3951fe9b8c9e1a74caa94f73bd988fe2b5ee4a78bf485",
+      "a7d1f36d6a725da615ea5507a939ae57efb921b8e97ab2d4ae587a74cd74307a"
+    ],
+    "sharedLedger": "C:/Dev/token2049-setup/secrets/cardano-payer-a2e66045653afe62/ledger.json"
+  },
+  "sourceBaseSha": "0afd377681fe0e27e0ea86cf2cfaa34cdb970769",
+  "sourceWorkingTreeSha256": {
+    "clients/payer/payer.ts": "fb1eda21d41f4075dad80e0f7698822630451cfec455bf1cc0082d7d36912996",
+    "src/funding/cardano/config.ts": "d7e68b15818ea147417689e7f3edd25fa5381b971bc167590e1af93002f057bb",
+    "src/funding/cardano/adapter.ts": "385bf9c5b67715a9a9b479838c8f4f93585e3e643d0d63f7ae2db3d2385b41ef",
+    "integration-e2e/cardano/e2e.ts": "20f2304c9635c134d341bc74067fa5fcee66d7e9fbba38015e67d184b022ee61",
+    "integration-e2e/cardano/gateway.ts": "6c620e621058bf3cb9dac8b6954670617b7cd16839b19b57e1d8071d44061e66",
+    "integration-e2e/cardano/runtime.ts": "0530a315e69f25a6836ae2fa6b353436faf08e5b7c9feecfb3818c768ff3c2b8",
+    "integration-e2e/cardano/postchecks.ts": "1653aae3be4a59ba6d9ebbb141a0847e0d4ea8786c79b9ed03adc226af4bd833",
+    "integration-e2e/cardano/readback.ts": "032264d9a5487854906a2748620504cbfa056118c4713eb5feb96a211d7b3de7"
+  }
+}

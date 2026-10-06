@@ -5,6 +5,7 @@
  */
 import { describe, expect, it } from 'vitest';
 import { USDM_PREPROD_ASSET } from '@x402/cardano';
+import { MASUMI_USDM_PREPROD_ASSET, parseCardanoConfig } from '../../src/funding/cardano/config.js';
 import { ExactCardanoScheme as ExactCardanoClientScheme } from '@x402/cardano/exact/client';
 import { x402Client } from '@x402/core/client';
 import {
@@ -784,5 +785,21 @@ describe('Cardano frozen scaled settlement', () => {
     const v = await r.adapter.verify(value, inp);
     expect(v.ok).toBe(false); expect(r.fac.calls).toEqual([]);
     expect(fundingCommitment(RESOURCE, altered)).not.toBe(fundingCommitment(RESOURCE, requirement));
+  });
+});
+
+
+describe('exact dispenser asset identity', () => {
+  it('offers the documented Masumi Preprod asset without substituting the SDK default', () => {
+    const adapter = createCardanoFundingAdapter(baseEnv({ CARDANO_ASSET_UNIT: MASUMI_USDM_PREPROD_ASSET }), { clock });
+    expect(adapter.acceptedAsset()).toMatchObject({ assetId: MASUMI_USDM_PREPROD_ASSET, decimals: 6, supportsUsdNotional: true });
+    const challenge = adapter.paymentRequirements(input({}, MASUMI_USDM_PREPROD_ASSET)) as unknown as PaymentRequired;
+    expect(challenge.accepts[0]!.asset).toBe(MASUMI_USDM_PREPROD_ASSET);
+    expect(() => adapter.paymentRequirements(input({}, USDM_PREPROD_ASSET))).toThrow(/configuration/);
+  });
+  it('rejects incorrect dispenser decimals and does not recognize a similar policy', () => {
+    expect(parseCardanoConfig(baseEnv({ CARDANO_ASSET_UNIT: MASUMI_USDM_PREPROD_ASSET, CARDANO_ASSET_DECIMALS: '5' }))).toMatchObject({ ok: false, invalid: ['CARDANO_ASSET_DECIMALS'] });
+    const similar = MASUMI_USDM_PREPROD_ASSET.replace(/^1/, '2');
+    expect(createCardanoFundingAdapter(baseEnv({ CARDANO_ASSET_UNIT: similar })).acceptedAsset()!.supportsUsdNotional).toBe(false);
   });
 });

@@ -215,7 +215,7 @@ export class Payer {
     if (resourceUrl !== this.url(`/v1/purchases/${id}/fund`)) p.push('resource');
     if (!purchase.fundingInstructions || Date.parse(purchase.fundingInstructions.expiresAt) <= this.now().getTime()) p.push('expiry');
     if (entry.extra?.purchaseId !== id || entry.extra?.quoteId !== purchase.quoteId ||
-      entry.extra?.expiresAt !== purchase.fundingInstructions?.expiresAt || !/^[0-9a-f]{64}$/.test(String(entry.extra?.quoteDigest))) p.push('quote_binding');
+      entry.extra?.expiresAt !== purchase.fundingInstructions?.expiresAt || !/^sha256:[0-9a-f]{64}$/.test(String(entry.extra?.quoteDigest))) p.push('quote_binding');
     if (!Number.isInteger(entry.maxTimeoutSeconds) || entry.maxTimeoutSeconds < 60 || entry.maxTimeoutSeconds > 600) p.push('timeout');
     if (entry.extra?.areFeesSponsored !== false || !deepEqual(entry.extra?.confirmationPolicy, { l1Confirmations: 1 })) p.push('confirmation_policy');
     // The challenge must agree with what the purchase view told the customer to pay.

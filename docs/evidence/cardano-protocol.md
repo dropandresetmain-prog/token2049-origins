@@ -1,6 +1,6 @@
 # Cardano funding and separate payer
 
-Local implementation and offline verification only. No live payment or external acceptance was performed. Setup tests generate disposable offline wallet files only and remove them.
+Offline safety tests plus one bounded live Preprod funding acceptance completed on 2026-10-06. The merchant was a local fixture; no live hotel, FX or bank settlement is claimed. See [Cardano funding fix evidence](../work/CARDANO_FIX.md). Setup tests generate disposable offline wallet files only and remove them.
 
 Pinned SDKs remain `@x402/*@2.26.0` and `@evolution-sdk/evolution@0.5.14`.
 
@@ -19,7 +19,7 @@ The adapter recomputes the digest from its immutable requirement, verifies auxil
 
 ## Process and configuration
 
-Gateway imports only `src/funding/cardano`; payer mnemonic loading lives in `clients/payer`. Configure gateway `CARDANO_NETWORK=cardano:preprod`, `CARDANO_FACILITATOR_URL`, `CARDANO_TREASURY_ADDRESS`, `CARDANO_ASSET_UNIT`, `CARDANO_ASSET_DECIMALS`, `BLOCKFROST_PROJECT_ID`; `BLOCKFROST_BASE_URL` defaults to Preprod. Only exact SDK-recognized tUSDM supports the USD testnet notional policy. New demo settlement uses 1:1000, not parity or FX.
+Gateway imports only `src/funding/cardano`; payer mnemonic loading lives in `clients/payer`. Configure gateway `CARDANO_NETWORK=cardano:preprod`, `CARDANO_FACILITATOR_URL`, `CARDANO_TREASURY_ADDRESS`, `CARDANO_ASSET_UNIT`, `CARDANO_ASSET_DECIMALS`, `BLOCKFROST_PROJECT_ID`; `BLOCKFROST_BASE_URL` defaults to Preprod. Only the exact SDK-default or documented Masumi-dispenser Preprod tUSDM identity supports the USD testnet notional policy; they are distinct assets and cannot substitute for one another. Both require six decimals. New demo settlement uses 1:1000, not parity or FX.
 
 The payer requires `PAYER_GATEWAY_URL`, `PAYER_GATEWAY_TOKEN_FILE`, `PAYER_CARDANO_NETWORK=cardano:preprod`, `PAYER_CARDANO_MNEMONIC_FILE`, `BLOCKFROST_PROJECT_ID`, `PAYER_ALLOWED_ASSET_UNIT`, `PAYER_EXPECTED_PAY_TO`, `PAYER_MAX_PER_PAYMENT_BASE_UNITS`, `PAYER_MAX_DAILY_BASE_UNITS`, `PAYER_MAX_CUMULATIVE_BASE_UNITS`, `PAYER_MAX_FEE_LOVELACE`, `PAYER_MAX_ADA_OUTPUT_LOVELACE`. `PAYER_LEDGER_FILE` is explicitly required, with no relative fallback; use the same absolute protected path for every CLI/bridge process holding this wallet authority. Blockfrost credentials go only to the exact official Preprod API host/path or a deliberately configured trusted loopback proxy. URLs reject credentials/query/fragment; gateway requests reject redirects and always use the configured gateway plus fixed purchase routes. Challenge resources must match the full configured funding URL.
 
@@ -33,7 +33,7 @@ Request/daily/cumulative base-unit caps count the exact settlement total (princi
 
 Offline tests cover SDK challenge/header round trips; wrong amount/asset/network/payee; expiry/decimal/resource/quote mismatches; real signed CBOR metadata tampering; independent chain metadata/hash/depth; pending confirmations; settlement ambiguity; replay response; caps, cross-process locking, corrupt history, identical retry payloads, and bridge auth/origin/host/request guards.
 
-External acceptance requires a configured reachable x402 v2 exact Preprod facilitator with l1Confirmations >= 1, a Preprod Blockfrost project, controlled treasury address, separately provisioned test-only payer mnemonic, configured gateway token and bridge token, test tUSDM plus fee/min-UTXO tADA, and explicit authorization for a bounded live test transfer. No external evidence is claimed. A facilitator losing settlement state can reject ordinary retry verification because inputs are spent. The core recovery path must use a previously durably prepared reference to independently retrieve accepted chain evidence; arbitrary unprepared hash adoption remains forbidden.
+External acceptance requires a configured reachable x402 v2 exact Preprod facilitator with l1Confirmations >= 1, a Preprod Blockfrost project, controlled treasury address, separately provisioned test-only payer mnemonic, configured gateway token and bridge token, test tUSDM plus fee/min-UTXO tADA, and explicit authorization for a bounded live test transfer. The bounded acceptance evidence is recorded in the linked work report. A facilitator losing settlement state can reject ordinary retry verification because inputs are spent. The core recovery path must use a previously durably prepared reference to independently retrieve accepted chain evidence; arbitrary unprepared hash adoption remains forbidden.
 
 ## Demo settlement policy
 
