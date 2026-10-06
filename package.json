@@ -8,7 +8,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsc -p tsconfig.build.json && node scripts/copy-migrations.mjs",
+    "build": "tsc -p tsconfig.build.json && node scripts/copy-migrations.mjs && npm run console:build:gateway",
     "typecheck": "tsc -p tsconfig.json --noEmit",
     "dev": "tsx src/main.ts",
     "start": "node dist/src/main.js",
@@ -25,6 +25,7 @@
     "db:migrate": "tsx scripts/migrate.ts",
     "console:dev": "vite --config web/vite.config.ts",
     "console:build": "vite build --config web/vite.config.ts",
+    "console:build:gateway": "vite build --config web/vite.config.ts --mode gateway",
     "console:test": "vitest run --config web/vitest.config.ts",
     "console:typecheck": "tsc -p web/tsconfig.json"
   },
