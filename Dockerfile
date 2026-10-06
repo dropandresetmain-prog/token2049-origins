@@ -8,6 +8,7 @@ COPY tsconfig.json tsconfig.build.json ./
 COPY demo ./demo
 COPY src ./src
 COPY scripts ./scripts
+COPY web ./web
 RUN npm run build
 
 FROM node:24-bookworm-slim
