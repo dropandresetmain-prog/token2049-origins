@@ -281,6 +281,14 @@ The recorded Render DB expiry above is historical metadata; recheck before using
 
 ## Solana and retained provider evidence
 
+Hosted rehearsal: configure one exact `SOLANA_FACILITATOR_TRUSTED_ORIGIN` matching the HTTPS
+`SOLANA_FACILITATOR_URL`. A secure tunnel routes that origin to the authenticated local
+127.0.0.1 listener; set `SOLANA_FACILITATOR_LISTEN_PORT` to its local port. Keep the existing
+payer/sponsor keys, histories, locks and caps local. Set the gateway's final HTTPS
+`PUBLIC_BASE_URL` before any funded hosted quote. Test connectivity only with authenticated
+`GET /supported`, and verify unauthenticated access returns 401; do not use prepare/settle
+for deployment smoke. If no approved tunnel is available, leave Solana unconfigured on Render.
+
 .env.example contains receive-only Solana Devnet configuration. .env.solana.example also
 contains separate payer/sponsor key paths and caps; do not load signer keys into the gateway.
 Run payer/sponsor independently only in a later authorized spending task. Authenticated

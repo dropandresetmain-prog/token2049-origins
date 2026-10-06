@@ -16,6 +16,10 @@ docs/evidence/raw
 
 # Signer material and private runtime state must never enter the gateway build context.
 clients/payer
+clients/solana
+integration-e2e
+external-acceptance-hardening
+human-orchestration
 *.pem
 *.key
 *.skey

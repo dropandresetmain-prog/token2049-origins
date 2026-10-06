@@ -80,10 +80,18 @@ Gateway variables:
 - SOLANA_TREASURY_TOKEN_ACCOUNT
 - SOLANA_FEE_PAYER_ADDRESS
 - SOLANA_FACILITATOR_URL
+- SOLANA_FACILITATOR_TRUSTED_ORIGIN — optional; one exact HTTPS origin for a hosted gateway
 - SOLANA_FACILITATOR_TOKEN_FILE
 - SOLANA_MAX_PAYMENT_BASE_UNITS
 
 Separate payer/sponsor histories stay protected and outside the gateway.
+
+Loopback HTTP remains supported. Remote facilitator URLs require the matching explicitly configured
+HTTPS origin, without credentials, paths, query or fragment. Redirects are rejected for supported,
+verify and settle. Provision only the bearer token as a Render secret file at
+`/etc/secrets/solana-facilitator-token`; never provision payer/sponsor keys or histories there.
+The facilitator still listens on 127.0.0.1; `SOLANA_FACILITATOR_LISTEN_PORT` selects its local port
+when its advertised URL is HTTPS. Payer and facilitator configuration must pin that same origin.
 
 Recorded evidence: finalized Devnet funding/recovery passed.
 

@@ -20,6 +20,8 @@ RUN npm ci --omit=dev && npx playwright-core install --with-deps chromium && chm
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /data && chown node:node /data
 USER node
+# Verify the installed browser can launch as the actual runtime user without provider traffic.
+RUN node --input-type=module -e "import {chromium} from 'playwright-core'; const browser=await chromium.launch({executablePath:process.env.SHOPIFY_BROWSER_EXECUTABLE,headless:true,args:['--no-sandbox']}); const page=await browser.newPage(); await page.goto('about:blank'); await browser.close(); console.log('Chromium runtime-user smoke passed')"
 EXPOSE 8787
 HEALTHCHECK --interval=30s --timeout=5s CMD node -e "fetch('http://127.0.0.1:'+process.env.PORT+'/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"
 CMD ["node", "dist/src/main.js"]
