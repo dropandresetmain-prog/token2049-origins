@@ -4,11 +4,17 @@ This branch implements the local first lane. Real Cardano funding and provider a
 
 ## Local runtime
 
-Use Node 24 or later and one gateway process with one worker and one persistent SQLite database. Do not run multiple writers or share the database across replicas. Planning sources under `docs/planning/` remain pinned.
+Use Node 24 or later and one gateway process with one worker. The database contract is
+`DATABASE_URL -> PostgreSQL`. Local development and automated integration tests use PostgreSQL.
+Hosted runtime uses Render PostgreSQL. SQLite is not supported. PostgreSQL 18 matches Render's
+current default. Planning sources under `docs/planning/` are historical snapshots for persistence choices.
 
 ```powershell
-Set-Location C:\Dev\token2049-origins-core
+Set-Location C:\Dev\token2049-origins\postgres-persistence
 npm ci
+docker compose up -d --wait
+$env:DATABASE_URL = 'postgresql://origins:origins_local_only@127.0.0.1:55432/origins'
+npm run db:migrate
 npm run typecheck
 npm test
 npm run build
@@ -85,22 +91,84 @@ Wrong-currency, scale, amount or other financial anomalies retain exposure and r
 
 The funding-attempt table is an additive startup schema change. Earlier local records lack the frozen resource URL and fall back to configured `PUBLIC_BASE_URL`; preserve their original origin for recovery. New records retain their original cryptographic resource identity across origin changes. Unfunded old-origin purchases should be re-quoted after a deployment-origin change; the payer rejects a mismatched resource.
 
-A stale payer ledger lock or signing record needs manual chain/ledger reconciliation before repair. Never delete a lock or signing record merely to retry spending. Back up SQLite consistently, including WAL state, before changing deployment or schema.
+A stale payer ledger lock or signing record needs manual chain/ledger reconciliation before repair. Never delete a lock or signing record merely to retry spending. Use a consistent PostgreSQL logical backup (pg_dump) before schema/deployment changes. Preserve journal and recovery data; the free Render plan has no managed backups.
 
-## Container
+## Database operations
 
-```powershell
-docker build -t t2o-commerce-core .
-docker run --rm --env-file .env -e APP_ENV=sandbox -e HOST=0.0.0.0 -e DATABASE_PATH=/data/gateway.db -e SHOPIFY_BROWSER_EXECUTABLE=/usr/local/bin/shopify-chromium -p 127.0.0.1:8787:8787 -v t2o-gateway-data:/data t2o-commerce-core
-```
-
-For a named-volume container, provision its clients against the database INSIDE that volume, rather than a separate host database. Run the compiled client tool with a writable working directory:
+Compose exposes PostgreSQL only on loopback port 55432. The named volume persists local development
+state across app/DB restarts. Credentials in compose.yaml are local-only and must never be used on Render.
 
 ```powershell
-# Use the actual running container name and the returned customer ID.
-docker exec -w /data CONTAINER_NAME node /app/dist/scripts/create-client.js --name "Demo MCP" --channel mcp
-docker exec -w /data CONTAINER_NAME node /app/dist/scripts/create-client.js --name "Demo payer" --channel http --role payer --customer cus_REPLACE
-# Token files are at /data/data/clients/<client-id>.token; copy each privately to a protected host location.
+# Start / health
+docker compose up -d --wait
+docker compose ps
+# Stop, preserve data
+docker compose down
+# Destructive LOCAL reset: removes only this Compose project's database volume
+docker compose down --volumes
+docker compose up -d --wait
+npm run db:migrate
+# Migration rerun and compiled runtime/auth/restart probe
+npm run db:migrate
+node dist/scripts/db-smoke.js
+# Focused checks (all use real local PostgreSQL)
+npm run test:integration -- tests/integration/postgres.test.ts tests/integration/spine.test.ts tests/integration/funding-recovery.test.ts
 ```
 
-The image installs Chromium without swallowing installation failures, runs as `node`, and excludes the payer client. `.env` is supplied at runtime, never copied into the image. Local Linux ARM64 image build, non-root browser launch, scoped auth and named-volume restart checks PASS; see [container verification](evidence/container-verification.md). No public deployment or live Shopify checkout was performed. Recheck the image and volume permissions for the actual deployment environment.
+Commands assume the local DATABASE_URL above is present. Source migrations are ordered SQL files in
+`src/migrations/`; the build copies them to `dist/src/migrations/`. Startup awaits the migration lock,
+checks the applied history/checksums, and runs missing migrations in a transaction. Unknown versions,
+changed applied files or out-of-order history fail startup. There is no startup reset/down migration.
+Append new numbered files; never edit a file already applied to a database.
+
+Amounts remain exact integer strings handled with BigInt. A five-connection pg pool binds each async
+transaction to one connection; nested operations use savepoints. Short core write transactions share
+an advisory lock to preserve multi-table capacity/journal/event invariants. Provider calls remain outside
+transactions. Job claims use row locks with FOR UPDATE SKIP LOCKED; workers respect unexpired leases,
+fence job completion/rescheduling by owner and claim attempt, and serialize provider work per purchase.
+Funding verification has a separate per-purchase session lock; lock holders reuse the same connection.
+Persisted started attempts reconcile by readback after restart and never repeat provider execution.
+This preserves one-worker operations; it is not an HA or distributed-worker launch.
+
+Each test fixture owns a random `test_<uuid>` schema. Tests can run files concurrently without truncating
+shared tables. Restart tests reuse their own schema. The crash test terminates only its registered pool's
+sessions, using its unique application_name, then verifies readback recovery. Crashed test runs can leave
+schemas; use the explicit local reset only when local development data is disposable. Do not point the
+suite at Render or a production database.
+
+## Container and Render
+
+```powershell
+docker build -t t2o-commerce-postgres .
+# Join the Compose network to reach the database by its service name.
+# Only DATABASE_URL differs from the host-local .env example; no database volume belongs to the gateway.
+docker run --rm --network token2049-origins_default --env-file .env -e APP_ENV=sandbox -e HOST=0.0.0.0 -e DATABASE_URL=postgresql://origins:origins_local_only@postgres:5432/origins -p 127.0.0.1:8787:8787 t2o-commerce-postgres
+```
+
+The gateway image still runs as node with the pinned Chromium installation and excludes the payer.
+Client provisioning writes a token file locally; the client record lives in PostgreSQL. Export token files
+privately before an ephemeral container exits. Source execution: `npm run client:create`; compiled tool:
+`node dist/scripts/create-client.js`. Both use the same DATABASE_URL as the gateway.
+
+Provisioned database (2026-10-06): **token2049-origins-db**, service ID
+`dpg-db29mujncjis73dtvf70-a`, Singapore, PostgreSQL 18, **free ($0)**, expires
+**5 November 2026 at 14:55 Singapore time**. Storage is 1 GB, with no managed backups.
+Verified TLS SQL connection, migrations and isolated non-sensitive application write/read: PASS.
+External access was restricted to a temporary single-host rule for verification, then changed to
+`127.0.0.1/32` (no reachable external client). Same-region Render services can still use the private URL.
+Existing Tencent services were inspected only and were not modified.
+
+`render.yaml` is a prepared gateway template, not a deployment. It does not create another database.
+For the later authorized deployment, select Singapore and privately set DATABASE_URL to this database's
+**internal** connection URL in the Render service secret environment. Set the actual PUBLIC_BASE_URL and
+other authorized gateway secrets separately. Auto-deploys are off. Do not sync/deploy this Blueprint as
+part of database migration. No gateway secret environment exists yet; credentials were used only in
+process memory for SQL verification, never printed or saved in Git/local connection files.
+
+For maintenance from outside Render, temporarily allow only the maintainer's exact public IP, use the
+external URL with `sslmode=verify-full`, and restore the restrictive rule afterwards. Never disable TLS
+certificate verification or open an all-IP database rule. Before the free database expires, export data
+or explicitly authorize an upgrade; this lane authorizes no paid plan.
+
+Official sources: [Postgres creation/connections](https://render.com/docs/postgresql-creating-connecting),
+[free database limits](https://render.com/docs/free), [Blueprint fields](https://render.com/docs/blueprint-spec).

@@ -17,10 +17,34 @@ gateway process.
 - Planning release `launch-2026-10-06-v1` imported from
   `dropandresetmain-prog/wip-personal@af648eece01321fec50bcddeee9ba92fd3e10d3a`
   (`token2049-hackathon/`).
-- Commerce Core local implementation is complete on `build/commerce-core`: all six lanes integrated, 396 offline tests passing.
+- Commerce Core local implementation is complete on `build/commerce-core`: all six lanes integrated, the PostgreSQL persistence lane replaces its original database before external acceptance.
 - Runtime and acceptance instructions: [RUNBOOK](docs/RUNBOOK.md), [TEST_CHECKLIST](docs/TEST_CHECKLIST.md), [KNOWN_ISSUES](docs/KNOWN_ISSUES.md), [HANDOFF](docs/HANDOFF.md).
 - No external acceptance has passed yet. Sandbox/testnet evidence is tracked separately from local
   tests in [`docs/work/ACTIVE_TASK.md`](docs/work/ACTIVE_TASK.md).
+
+## Database contract
+
+Local development and automated integration tests use PostgreSQL.
+Hosted runtime uses Render PostgreSQL.
+SQLite is not supported.
+
+Use Node 24+, Docker Desktop and the official Postgres 18 Compose service:
+
+```powershell
+npm ci
+docker compose up -d --wait
+$env:DATABASE_URL = 'postgresql://origins:origins_local_only@127.0.0.1:55432/origins'
+npm run db:migrate
+npm run typecheck
+npm run build
+npm test
+node dist/scripts/db-smoke.js
+```
+
+Tests use a random isolated schema per fixture, with explicit reuse for restart tests and
+cleanup of owned schemas only. A test PostgreSQL outage fails the suite. There is no database fallback.
+See the [runbook](docs/RUNBOOK.md) for stop/reset, migration and Render operations.
+The Render gateway configuration is prepared in `render.yaml`; it has **not** been deployed.
 
 ## Planning documents
 

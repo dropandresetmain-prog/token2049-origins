@@ -1,99 +1,98 @@
-# ACTIVE TASK — Commerce Core, first long-horizon lane
+# ACTIVE TASK — PostgreSQL persistence migration
 
-Reread before each phase, after compaction, after subagent results and before completion.
+## Objective and authority
 
-## Goal and authority
+Replace persistence completely before external acceptance: DATABASE_URL -> PostgreSQL.
+Local development and automated integration tests use PostgreSQL.
+Hosted runtime uses Render PostgreSQL. SQLite is not supported.
 
-Prove `authenticated agent -> executable quote -> real Cardano Preprod funding -> journal/reservation -> provider sandbox purchase -> independently retrieved outcome -> safe receipt`, then the same contract across Shopify retail, Atlas flights and Nuitée hotels. Publish seams for Solana, MCP/ChatGPT, Masumi/Sokosumi and console lanes. Local implementation is complete; external proof remains BLOCKED_EXTERNAL.
+Repository: dropandresetmain-prog/token2049-origins.
+Base: build/commerce-core, 2b6260b41149d36fafcb98b387dec9cf43faa31f.
+Fetch before edits confirmed the remote/base SHA unchanged and a clean starting worktree.
+Branch: build/postgres-persistence.
+Isolated worktree: C:/Dev/token2049-origins/postgres-persistence.
+The active commerce-core worktree was not edited. No merge or gateway deployment is authorized here.
 
-- Planning source: `dropandresetmain-prog/wip-personal@af648eece01321fec50bcddeee9ba92fd3e10d3a`, `token2049-hackathon/`; six files copied verbatim to `docs/planning/` through authenticated gh API. Pinned planning sources remain unchanged.
-- Target: `dropandresetmain-prog/token2049-origins`.
-- Main/root docs-only commit: `95a896c730cf893c3afd00919ebe16ad823a608b` (pushed).
-- Integration branch/worktree: `build/commerce-core`, `C:\Dev\token2049-origins-core`.
-- Tested implementation checkpoint: `beac0228eec8418380b575e1d90665da3e939989`. Operational docs follow this checkpoint; use current branch HEAD for the complete handoff.
+Read before phases: RUNBOOK, TEST_CHECKLIST, KNOWN_ISSUES, local-verification,
+IMPLEMENTATION_PLAN and CORE_CONTRACT. Original planning persistence choices are historical;
+financial/domain contracts and provider restrictions remain unchanged.
 
-## Runtime and financial decisions
+## Before-edit migration note and inventory
 
-Node 24.15.0, TypeScript 6.0.3 strict, Express 5.2.1, zod 4.6.5, Vitest 4.1.11, ESM/NodeNext; existing SDK pins x402 2.26.0 and Evolution 0.5.14 retained. Built-in SQLite, WAL, one gateway writer/worker, persistent volume. Production is refused.
+The pre-migration schema had 16 domain tables plus schema_meta: customers, api_clients, offers,
+quotes, purchases, idempotency_keys, funding_evidence, capacity_pools, reservations, jobs,
+funding_attempts, execution_attempts, journal_entries, journal_lines, purchase_events, bank_observations.
+Preserve primary keys, foreign keys, ownership, indexes and unique guards: token hashes, quote digests,
+one purchase per quote, one reservation/funding candidate per purchase, customer/operation/key,
+rail/network/transfer proof, execution key/attempt number, job dedupe, journal event and event sequence.
+Amounts remain integer text + BigInt; domain timestamps/serialized JSON remain text to preserve values.
+PostgreSQL identity replaces the historical line autoincrement; version tracking moves to schema_migrations.
 
-Cardano adapter verifies/settles through the facilitator and independently checks Blockfrost. Core persists prepared hash + frozen funding resource/requirement + recovery job BEFORE settlement. SDK-compatible signer commits quote/resource metadata and validity end. Payer keys and protected cap ledger remain in a separate process; ambiguous transfers refuse new funding and recover by chain read only. Late confirmed funds remain refundable obligations, never expired purchases.
+Preserved transaction boundaries: purchase/reservation/idempotency/events, prepared funding and recovery
+job, verified evidence/journal/queue, execution markers/results, reconciliation, expiry, clients and bank
+observation batches. Original synchronous writer serialization becomes connection-bound async transactions
+with savepoints and a short core-write advisory lock. External provider calls stay outside transactions.
+Claims use FOR UPDATE SKIP LOCKED. Startup/tick repair only expired leases; owner/attempt fences prevent
+stale completion/rescheduling. Per-purchase worker/funding session locks reuse a pooled connection.
+Persisted started attempts always recover through readback, never repeat execution.
 
-Shopify uses own dev-store Storefront cart + controlled Bogus checkout + independent Admin readback; no mark-paid/order-create Admin shortcuts. Atlas test-balance pay remains behind explicit founder approval and requires explicit zero fees; provider test-balance usage is distinct from card liability. Nuitée uses sandbox ACC_CREDIT_CARD simulation with exact independently retrieved identities. OCBC is read-only masked/historical observation and never capacity or settlement truth. Unknown provider outcomes and charge anomalies retain exposure and do not repeat writes.
+This inspection note was first recorded before implementation in checkpoint e54a1da.
 
-## Checkpoints — local implementation
+## Completed phases
 
-- [x] C0 Docs-only main first commit `95a896c`.
-- [x] C1 Contract + runnable skeleton `0955263`; lane base `3bf1b61`.
-- [x] C2 Treasury, authority, balanced journal, capacity, jobs, replay and durable funding/provider restart recovery.
-- [x] C3 Shopify/Atlas/Nuitée provider adapters and OCBC observation implemented/wired, locally tested.
-- [x] C4 Direct Cardano x402 + committed bounded payer/bridge implemented, offline verified. Real Preprod proof blocked.
-- [x] C5 HTTP + MCP + scoped evidence/public inspect + run/deploy docs; channel equivalence and fee-only Masumi seam fixtures. No live ChatGPT/Masumi integration claim.
-- [x] C6 Three independent bounded reviews, Act Now fixes, triage and handoff.
+- [x] Base/cleanliness/instructions and persistence/recovery inspection.
+- [x] Official Postgres 18 Compose service, loopback binding, healthcheck, persistent local volume.
+- [x] pg 8.23.1 and types pinned; no persistence framework or second backend.
+- [x] Ordered transactional migrations with version/checksum validation and migration advisory lock.
+- [x] Async PostgreSQL callers across core/auth/HTTP/evidence/composition/client CLI.
+- [x] Safe competing job claims, live lease preservation, stale claim fences, funding exclusion.
+- [x] Random schema per test fixture; explicit reuse for restart, owned cleanup, no global truncate.
+- [x] Complete suite: 406/406 tests in 22 files; original 396 behaviors preserved.
+- [x] Compiled gateway health/auth and two-process restart persistence probe.
+- [x] SQLite runtime/config/schema/tests/volume references removed; historical planning labelled.
+- [x] One free Render PostgreSQL database provisioned/migrated/SQL-smoked, no gateway deployed.
+- [x] Relevant run/deploy docs and prepared Render template updated.
 
-## Completion matrix (2026-10-06)
+## Migrations and verification
 
-| Row | Local implementation | External acceptance |
-|---|---|---|
-| Docs/contracts | PASS — source snapshot, executable schemas, operational docs | n/a |
-| Treasury | PASS — balanced journal, reservations, replay/restart/late obligations | n/a; simulated fiat is not settlement |
-| Cardano/payer | PASS — SDK/CBOR fixtures, metadata/TTL, independent-readback fakes, caps, recovery | BLOCKED_EXTERNAL — credentials, controlled wallet/test funds and facilitator/Blockfrost access absent |
-| Shopify | PASS — exact cart quote, payment checkpoint, strict Admin proof, raw webhook integration | BLOCKED_EXTERNAL — own dev-store/Bogus setup, credentials, installed browser/live selectors unverified |
-| Nuitée | PASS — sandbox guards, identity-bound readback, ambiguous failures | BLOCKED_EXTERNAL — sandbox API key and fresh funded booking/readback absent |
-| Atlas | PASS — gated test-balance flow, zero-fee guard, identity/amount readback, ticket refresh | BLOCKED_EXTERNAL — credentials, founder payment-path decision and latest fee proof absent |
-| OCBC/evidence | PASS — scoped read model, persisted provenance, masked observations, no ledger writes | BLOCKED_EXTERNAL — credentials/subscriptions/session, live account/card APIs unverified |
-| Security | PASS — auth/ownership/scopes, replay, redaction, URL/redirect boundaries and independent reviews | Live secret storage/deployment still NOT_RUN |
-| HTTP/MCP | PASS — real adapters mounted, CLI role separation, local MCP tools/transport | Live MCP client/ChatGPT connection NOT_RUN |
-| Deploy/container | PASS — image build, non-root Chromium, auth and named-volume restart on Linux ARM64 | NOT_RUN — no public deployment or live checkout claimed |
-| Remote checkpoint | PASS — beac022 pushed; ls-remote SHA verified | n/a |
-| Solana / live Masumi / polished console / submissions | NOT_RUN — separate subsequent lanes | NOT_RUN |
+1. src/migrations/0001_initial.sql — all domain tables/constraints/indexes and immutable journal triggers.
+2. src/migrations/0002_journal_truncate_guard.sql — PostgreSQL statement triggers prohibit journal truncation.
+The already-applied first file was preserved when adding the second migration.
 
-Full suite: **396 tests in 21 files PASS**; typecheck/build/compiled startup/client CLI roles/whitespace PASS. Informational readiness exits 0 with all five adapters MISSING_CONFIG; strict readiness exits 1. See `docs/evidence/local-verification.md` for evidence and limits.
+PASS: clean local DB startup; empty-schema migrations; migration rerun/concurrent startup/checksum failure;
+typecheck; production build; full suite; focused restart/concurrency/idempotency; integer-safe journal;
+compiled gateway health/capabilities/inspect/auth and restart; Docker build stage; Render Blueprint validation;
+Render verified-TLS SQL/migrations/isolated write-read; git diff --check.
+No external commerce/provider calls, Cardano payments, wallet changes, or live acceptance were performed.
+See docs/evidence/local-verification.md for evidence, changed-file manifest and limits.
 
-## Exact external blockers and next action
+## Render status and cost
 
-| Integration | Missing / decision | Needed evidence and next action |
-|---|---|---|
-| Cardano | CARDANO_NETWORK, FACILITATOR_URL, TREASURY_ADDRESS, ASSET_UNIT, ASSET_DECIMALS and BLOCKFROST_PROJECT_ID absent in process environment; separate payer credentials/test funds/caps not provisioned | Provision privately; fresh Preprod treasury output + signed commitment + depth + persisted journal. No fake or fee-only funding. |
-| Shopify | STORE_DOMAIN, STOREFRONT_TOKEN, CLIENT_ID/SECRET, explicit DEV_STORE/Bogus flags, browser executable; founder dev-store provisioning open | Provision own dev store, exact delivery/tax quote, synthetic checkout and independent test PAID/Bogus SALE-or-CAPTURE readback. |
-| Atlas | BASE_URL, CLIENT_ID/SECRET; approved payment mechanism | Founder approves bounded sandbox-only test balance or identifies permitted card/VCC route. Keep flag false. Verify explicit latest zero fee, then independently paid/ticketed sandbox outcome. |
-| Nuitée | NUITEE_API_KEY | Confirm sandbox key and exact booking/client/hotel readback fields, then fresh funded simulated-paid sandbox booking. |
-| OCBC | API_CLIENT_ID/SECRET, subscriptions and customer session where needed | Independently verify account/card/history contracts; capture masked fresh observations with historical-data caveats. |
-| Public deployment/client connection | NOT_RUN — separate authorized deployment/client milestone | Local image checks PASS; repeat access/TLS/browser/volume checks in the actual deployment environment. |
+Name: token2049-origins-db. ID: dpg-db29mujncjis73dtvf70-a.
+Region: singapore. PostgreSQL: 18.6. Plan: free ($0), 1 GB, no managed backups.
+Expires: 5 November 2026, 14:55 Singapore time. Any paid upgrade needs explicit authorization.
+External verification used a temporary single-host rule, then restored 127.0.0.1/32 (no reachable client).
+Same-region Render services can use the internal URL. Credentials existed only in process memory;
+no connection URL/password was printed or saved in Git/local files. No gateway environment exists yet.
+The prepared render.yaml requires the private URL in a future Render service secret environment.
+Existing Tencent resources were inspected only; none was changed.
 
-## Lane history and handoff
+## Findings, limits and handoff
 
-All original lanes merged. Pushed lane heads: MCP `12b1e03`, Atlas `d47463e`, Nuitée `5f06326`, Shopify `fecbb29`, evidence `e0f947f`, Cardano `03cff5a`. Follow-up patches cherry-picked into core; core owns wiring, financial semantics, shared contracts, root runtime and final verification. Exact paths and constraints are in `docs/HANDOFF.md`.
+Act Now — resolved: startup stole live leases, stale jobs lacked ownership fences, concurrent proof
+confirmation needed a transactional pending-state recheck, and native TRUNCATE bypassed row immutability.
+Evidence/recommendations/deferral risks are in KNOWN_ISSUES. Short serialized writes remain a throughput
+limit accepted for one-worker launch; this is not a distributed-worker or HA deployment.
 
-Recommend a fresh chat for credential-dependent external acceptance. Read RUNBOOK, TEST_CHECKLIST, KNOWN_ISSUES and HANDOFF. First resolve credentials/Shopify provisioning/Atlas founder decision, then prove Cardano-funded Shopify and update only the externally verified row; repeat approved Atlas/Nuitée and separate OCBC observation. Preserve BLOCKED_EXTERNAL where no proof exists. Do not merge main, enable production, deploy, publish, expand into unrelated lanes, erase cap history, release unknown exposure or repeat provider writes without the corresponding scope/authorization.
+No historical database-file import was performed. The new backend initializes PostgreSQL and preserves
+its state across restart; it does not read an old persistence file. The final gateway runtime image/live
+Chromium checkout was not revalidated here; build stage and compiled host gateway are verified.
 
-## PostgreSQL migration lane — authoritative current task
+Merge risks: core persistence APIs now return Promises. Coordinate service/worker/HTTP/evidence changes
+with the separate Atlas/payer patch lane; do not overwrite its policy fixes. No provider adapter, payer
+policy, MCP/payment authority or business/payment semantics were changed in this lane.
+All external purchasing acceptance remains BLOCKED_EXTERNAL as recorded in the commerce runbook.
 
-Base: build/commerce-core at 2b6260b41149d36fafcb98b387dec9cf43faa31f (fetched and unchanged).
-Worktree: C:/Dev/token2049-origins/postgres-persistence; branch build/postgres-persistence.
-No changes in the active commerce-core worktree. Provider/payer policy fixes are excluded.
-
-Before-edit inventory: 17 domain tables: customers, api_clients, offers, quotes, purchases,
-idempotency_keys, funding_evidence, capacity_pools, reservations, jobs, funding_attempts,
-execution_attempts, journal_entries, journal_lines, purchase_events, bank_observations
-plus schema_meta. Preserve all primary keys, foreign keys and indexes. Unique guards cover
-client token hashes, quote digests, one purchase/reservation per quote/purchase, customer-operation
-idempotency, rail/network/proof replay, job dedupe, funding candidates, execution keys/attempts,
-journal event keys and event sequence. Journal update/delete triggers enforce immutability.
-Amounts stay integer strings with BigInt arithmetic; timestamps and serialized domain JSON stay
-text to avoid changing API values. PostgreSQL identity replaces journal line autoincrement.
-
-Current transaction boundaries cover purchases/reservations/idempotency/events, funding candidate
-and recovery jobs, evidence/journal/queue, execution markers/results, reconciliation, expiry,
-client creation and bank observation batches. Existing BEGIN IMMEDIATE and synchronous calls
-implicitly serialize writers; async PostgreSQL must make that protection explicit. Use pg pools,
-connection-bound async transactions/savepoints and a transaction advisory lock for the small core's
-existing multi-table invariants. Job claims use FOR UPDATE SKIP LOCKED; startup must never steal
-unexpired leases. Provider calls stay outside database transactions. Persisted started attempts
-always recover by readback, never by repeating execution. Constraints remain the final guards.
-
-Schema bootstrap becomes ordered transactional SQL migrations with version/checksum tracking
-and a migration advisory lock. Tests use one random schema per harness/DB instance, explicit schema
-reuse for restart, and cleanup only their own schemas; no shared truncate. Render defaults to
-PostgreSQL 18 per official docs/CLI; local official Docker image will use major 18.
-
-Progress: inspection complete; implementation and real PostgreSQL verification pending.
+Next task: review and merge this branch through the owner; do not start another task automatically.
+Use a fresh chat for merge/external acceptance because this migration context is long.
+Read current ledger/evidence first, confirm current target HEAD and preserve excluded policy lanes.

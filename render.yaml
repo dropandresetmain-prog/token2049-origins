@@ -1,0 +1,22 @@
+# Prepared configuration only. Do not sync/deploy this Blueprint during the database migration.
+# The existing database is provisioned separately; paste its private/internal URL into DATABASE_URL.
+services:
+  - type: web
+    name: token2049-origins
+    runtime: docker
+    branch: build/postgres-persistence
+    region: singapore
+    plan: free
+    autoDeployTrigger: 'off'
+    healthCheckPath: /health
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: PUBLIC_BASE_URL
+        sync: false
+      - key: APP_ENV
+        value: sandbox
+      - key: HOST
+        value: 0.0.0.0
+      - key: PORT
+        value: 8787

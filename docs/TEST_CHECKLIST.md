@@ -2,6 +2,19 @@
 
 Local tests and external acceptance are separate. Fixtures are test-only, carry `local_fixture`, and never satisfy an external acceptance row. See [local verification](evidence/local-verification.md) for commands and [ACTIVE_TASK](work/ACTIVE_TASK.md) for blockers.
 
+## PostgreSQL migration checks
+
+- [x] Official postgres:18 local Compose service starts healthy on loopback; fresh volume/empty schema migration.
+- [x] Ordered/checksummed migrations, concurrent startup, idempotent rerun, and failed-history startup guard.
+- [x] Real PostgreSQL in all persistence tests; random schemas per fixture, no cross-file truncate/reset.
+- [x] Transaction/savepoint rollback, exact huge integer amounts, immutable balanced journal across connections.
+- [x] Two-gateway buy idempotency/quote uniqueness/capacity correctness; competing funding exclusion.
+- [x] FOR UPDATE SKIP LOCKED skips a locked job; live leases are preserved; stale claim completion is fenced.
+- [x] Funding/provider restart and readback recovery after fixture PostgreSQL session loss.
+- [x] Compiled gateway process restart retains client ownership/auth; health/capabilities/inspect/401 guard pass.
+- [x] Render free PostgreSQL TLS connection, migrations and isolated SQL write/read; external access restricted.
+- [x] No provider purchases/payments during migration; no gateway deployment or change to existing resources.
+
 ## Local checks
 
 - [x] Strict TypeScript check and gateway production build.

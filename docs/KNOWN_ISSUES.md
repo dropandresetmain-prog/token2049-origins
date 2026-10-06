@@ -2,6 +2,18 @@
 
 Implementation checkpoint: `beac0228eec8418380b575e1d90665da3e939989`, reviewed and tested locally on 2026-10-06. No external purchase has passed. Findings below distinguish fixed safety issues from operational blockers and accepted first-lane limits.
 
+## PostgreSQL migration findings
+
+| Classification | Finding / affected files / evidence | Recommendation | Risk of deferring |
+|---|---|---|---|
+| Act Now — resolved | Startup reclaimed other workers' live leases; stale workers could complete/reschedule a newer claim. src/core/worker.ts. Independent-connection lease/expiry regression passes. | Recover only expired leases; fence status writes; lock purchase work across provider I/O. | Concurrent retrieval or repeated job ownership changes. |
+| Act Now — resolved | Async confirmation could turn an already applied proof into an unapplied obligation after another confirmer committed. src/core/worker.ts. Recheck pending_confirmation in the transaction. | Keep transactional proof/state rechecks and unique journal/proof constraints. | Misclassified customer obligation or duplicate financial processing. |
+| Investigate Now | Free Render database expires 5 November 2026, 14:55 Singapore time; 1 GB and no managed backups. Official CLI metadata and Render free-plan docs. | Export before expiry; obtain explicit authorization before any paid upgrade. | Loss of access and eventual deletion; no durable hosted retention claim beyond the trial. |
+| Ignore / Accept Risk | Core writes serialize through one short PostgreSQL advisory lock. src/infrastructure/db.ts; capacity/idempotency tests across pools pass. | Keep one worker for this hackathon; external calls remain outside transactions. | Limited write throughput; lock timeouts fail safely rather than oversubscribe capacity. |
+
+Provider/payer policy findings from the separate review lane are excluded; this migration changes no
+Atlas gate, Cardano funding contract, Shopify/Nuitée payment behavior, MCP authority or payer policy.
+
 ## Act Now — resolved locally
 
 | Finding / why it matters | Action implemented | Risk if omitted; remaining evidence |
@@ -43,7 +55,7 @@ The Docker access/build concern was resolved through permitted local access: ima
 
 | Constraint / why acceptable here | Action / guard | Risk accepted |
 |---|---|---|
-| One SQLite writer and in-process worker. | Run exactly one gateway instance; preserve persistent state. | No HA/replica support. Scaling without redesign is unsafe. |
+| One gateway and in-process worker remain the launch topology. | PostgreSQL row/session locks protect accidental competing processes; preserve persisted jobs and attempt markers. | HA/replica operations are not validated or supported as a deployment architecture. |
 | Payer incidental ADA caps are per transaction; principal caps are daily/cumulative. | Use one protected absolute shared ledger and a disposable wallet with bounded ADA; reconcile stale locks manually. | Total fee ADA is bounded by the wallet rather than a daily fee ledger. No production wallet is authorized. |
 | Windows mode 0600 is best effort. | Apply Windows ACLs to private wallet/token/ledger directories. | OS file permissions remain an operator responsibility. |
 | Unmodified x402 Cardano signer is incompatible with application binding. | Use the supplied committed signer; reject missing metadata. | Third-party payer integration needs the documented signer seam. |

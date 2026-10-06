@@ -1,5 +1,7 @@
 # Container verification — 2026-10-06
 
+> Historical pre-migration container evidence. Its database-volume/restart model is obsolete. Current PostgreSQL validation is in local-verification.md; this record does not validate the new final runtime image.
+
 Evidence mode: local runtime validation. No provider calls, wallet generation or spending occurred. Public deployment and live Shopify checkout remain NOT_RUN/BLOCKED_EXTERNAL.
 
 - Source: implementation checkpoint `beac0228eec8418380b575e1d90665da3e939989`, plus tested final `.dockerignore` signer/state exclusions.

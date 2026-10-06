@@ -1,5 +1,7 @@
 # Setup, verification and reference ledger
 
+> Historical planning snapshot: persistence alternatives in this source are superseded by the PostgreSQL-only decision in docs/RUNBOOK.md. The original planning text below is retained as history.
+
 Release: `launch-2026-10-06-v1`. Configuration names below are project-facing proposals, not claims about vendor environment-variable names. The implementation lead maps them once to the chosen SDK, then keeps examples and readiness checks synchronized.
 
 ## Who does what

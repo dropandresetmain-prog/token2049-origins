@@ -1,5 +1,13 @@
 # Commerce Core handoff
 
+## PostgreSQL persistence handoff
+
+The current database lane is `build/postgres-persistence`, based on
+`2b6260b41149d36fafcb98b387dec9cf43faa31f`. Read ACTIVE_TASK and local-verification for its final status.
+The application now requires DATABASE_URL -> PostgreSQL, locally and on Render. Persistence callers
+are async; merge policy-lane changes carefully through CommerceCore/Worker and HTTP/evidence callers.
+The following commerce implementation history predates this migration.
+
 ## Current state
 
 Local implementation checkpoint `beac0228eec8418380b575e1d90665da3e939989` on `build/commerce-core`, worktree `C:\Dev\token2049-origins-core`. Documentation checkpoint follows it; use `git rev-parse HEAD` for the complete branch head. Main remains the original docs-only `95a896c`. All six implementation lanes have been integrated; this branch is not merged to main.
@@ -18,7 +26,7 @@ The executable gateway registers Shopify, Atlas, Nuitée, Cardano and OCBC; moun
 
 `docs/work/ACTIVE_TASK.md`, `docs/RUNBOOK.md`, `docs/TEST_CHECKLIST.md`, `docs/KNOWN_ISSUES.md`, `docs/evidence/local-verification.md`, `docs/contracts/CHANNEL_CONTRACT.md` are the operational starting point. Planning snapshots remain authoritative for scope.
 
-Implementation: `src/wiring.ts`, `src/core/{service,worker,store,journal,capacity}.ts`, `src/infrastructure/schema.sql.ts`, `src/contracts/ports.ts`; `src/funding/cardano/`, `clients/payer/`, `src/execution/{shopify,atlas,nuitee}/`, `src/channels/{http,mcp}/`, `src/banking/ocbc/`, `src/evidence/`. Restart/authority regressions: `tests/integration/funding-recovery.test.ts`, `safety-regressions.test.ts`, `wiring.test.ts`.
+Implementation: `src/wiring.ts`, `src/core/{service,worker,store,journal,capacity}.ts`, `src/infrastructure/{db,migrations}.ts and src/migrations/`, `src/contracts/ports.ts`; `src/funding/cardano/`, `clients/payer/`, `src/execution/{shopify,atlas,nuitee}/`, `src/channels/{http,mcp}/`, `src/banking/ocbc/`, `src/evidence/`. Restart/authority regressions: `tests/integration/funding-recovery.test.ts`, `safety-regressions.test.ts`, `wiring.test.ts`.
 
 Lane checkpoints: MCP `d3477f2` + `12b1e03`; Atlas `413469b` + `d47463e`; Nuitée `3a39939` + `5f06326`; Shopify `fecbb29`; evidence `250f1ce` + `e0f947f`; Cardano/payer `f92539f` + `03cff5a`. Follow-ups were cherry-picked onto integration (`17f6756`, `7d159c3`, `e5c0abd`, `31f1eac`); original lane branches remain pushed. Worktrees remain available for inspection. Root dependencies were not changed during continuation.
 

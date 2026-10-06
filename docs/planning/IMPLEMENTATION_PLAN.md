@@ -1,5 +1,7 @@
 # Implementation plan — first long-horizon build and integration roadmap
 
+> Historical planning snapshot: persistence alternatives in this source are superseded by the PostgreSQL-only decision in docs/RUNBOOK.md. The original planning text below is retained as history.
+
 Release: `launch-2026-10-06-v1`.
 Source baseline: `wip-personal@ae9297fca6c725f3b370ed69f97dcedeaf02b6f9`, subsequent founder decisions in this conversation, attached BuilderBase pages and the Masumi workshop/organizer message.
 
