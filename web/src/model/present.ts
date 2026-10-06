@@ -6,7 +6,7 @@
  * a confirmed payment never makes a purchase look complete, and no receipt is shown before the merchant confirms.
  */
 import * as copy from '../copy/en.js';
-import { projectProgress } from '../contracts/backend.js';
+import { projectProgress, completionReference } from '../contracts/backend.js';
 import type { Category, Channel, FundingRail, HumanProgress, Money, ProviderRoute, PurchaseState, PurchaseView, SourceOffer } from '../contracts/backend.js';
 import type { EvidenceListItem } from '../contracts/evidence.js';
 import type { ConsoleMode, PurchaseBundle, PurchaseListResult } from '../contracts/source.js';
@@ -75,6 +75,8 @@ function progressForListItem(item: EvidenceListItem): HumanProgress {
     merchantPaymentStatus: item.merchantPaymentStatus,
     receipt: item.executionEvidenceStatus === 'receipt_issued' ? {} : null,
     providerReference: null,
+    category: item.category,
+    route: item.route,
   } as unknown as PurchaseView;
   return projectProgress(fields);
 }
@@ -84,7 +86,8 @@ function progressForListItem(item: EvidenceListItem): HumanProgress {
 export function presentList(result: PurchaseListResult, ctx: PresentContext): PurchaseListVM {
   const rows: PurchaseRowVM[] = result.entries.map(({ item, context }) => {
     const cat = asCategory(item.category);
-    const key = statusKey(progressForListItem(item).stage, item.state, item.paymentState);
+    const progress = progressForListItem(item);
+    const key = statusKey(progress.stage, item.state, item.paymentState);
     const title = context.title ?? copy.category[cat].title;
     const merchantName = merchantOf(item.route).name;
     const requestedBy = context.requestedBy?.name ?? copy.unknownRequester.name;
@@ -103,7 +106,7 @@ export function presentList(result: PurchaseListResult, ctx: PresentContext): Pu
       paidWith: methodOf(rail),
       paidWithDetail: isTestNetwork(network) ? copy.testNetwork : '',
       amount: item.payable ? formatMoney(item.payable, ctx) : '',
-      status: statusVM(key),
+      status: { ...statusVM(key), ...(key === 'completed' ? { label: progress.label } : {}) },
       group: groupOf(key),
       searchText: [title, merchantName, requestedBy, id, item.id, methodOf(rail)].join(' ').toLowerCase(),
     };
@@ -142,7 +145,8 @@ interface Facts {
 function facts(b: PurchaseBundle, ctx: PresentContext): Facts {
   const p = b.purchase;
   const cat = asCategory(p.category);
-  const progress = b.proof?.progress ?? projectProgress(p);
+  // Optional proof and purchase reads can straddle a transition. The current purchase supplies the gate.
+  const progress = projectProgress(p);
   const key = statusKey(progress.stage, p.state, p.paymentState);
   const requirement = p.fundingRequirement ?? b.proof?.funding.requirement ?? null;
   const rail = requirement?.rail ?? b.evidence?.purchase.fundingRail ?? p.funding[0]?.rail ?? '';
@@ -482,16 +486,21 @@ export function presentDetail(b: PurchaseBundle, ctx: PresentContext): PurchaseD
   const steps = buildSteps(f);
   const done = steps.filter((s) => s.status === 'done').length;
   const limit = b.context.approvedMaxTotal ? copy.detail.approvedUpTo(formatMoney(b.context.approvedMaxTotal, ctx)) : null;
+  const reference = f.key === 'completed' ? completionReference(f.p) : null;
   return {
     id: f.p.purchaseId,
     displayId: f.ref,
     title: f.title,
     requestedBy: f.agent.name,
     createdLabel: formatWhen(f.p.createdAt, ctx),
-    status: statusVM(f.key),
+    status: { ...statusVM(f.key), ...(f.key === 'completed' ? { label: f.progress.label } : {}) },
     total: { amount: formatMoney(f.p.payablePrincipal, ctx), currency: f.p.payablePrincipal.currency },
     request: b.context.requestText || limit ? { text: b.context.requestText ?? null, limit } : null,
     attention: buildAttention(f),
+    completion: f.key === 'completed' ? {
+      title: f.progress.label,
+      reference: reference ? { ...reference, copyLabel: `Copy ${reference.label.toLowerCase()}` } : null,
+    } : null,
     route: buildRoute(f),
     stepsHeading: f.key === 'completed' ? copy.detail.completeHeading : copy.detail.progressHeading,
     stepsCount: copy.detail.stepsDone(done, steps.length),

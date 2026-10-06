@@ -17,6 +17,7 @@
     "test:contracts": "vitest run tests/contracts",
     "test:integration": "vitest run tests/integration",
     "readiness": "tsx scripts/readiness.ts",
+    "latency": "tsx scripts/purchase-latency.ts",
     "client:create": "tsx scripts/create-client.ts",
     "mcp": "tsx src/channels/mcp/main.ts",
     "payer": "tsx clients/payer/pay.ts",

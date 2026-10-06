@@ -10,6 +10,24 @@ export const HumanProgress = z.object({
 export type HumanProgress = z.infer<typeof HumanProgress>;
 const completeCommerce = new Set(['paid', 'confirmed', 'ticketed']);
 const paidMerchant = new Set(['paid', 'simulated_paid', 'test_balance_paid']);
+
+/** Category alone cannot prove ticket issuance or a confirmed booking. */
+function successLabel(p: PurchaseView): string {
+  if (p.category === 'retail' && ['paid', 'confirmed'].includes(p.commerceStatus)) return 'Order confirmed';
+  if (p.category === 'hotel' && p.commerceStatus === 'confirmed') return 'Booking confirmed';
+  if (p.category === 'flight' && p.commerceStatus === 'ticketed') return 'Ticket issued';
+  return 'Purchase confirmed';
+}
+
+/** Provider references are opaque: a flight order number must not be described as a PNR. */
+export function completionReference(p: PurchaseView): { label: string; value: string } | null {
+  const reference = p.providerReference || p.receipt?.providerReference;
+  if (reference) return {
+    label: p.category === 'retail' ? 'Order reference' : p.category === 'hotel' ? 'Booking reference' : p.category === 'flight' ? 'Flight reference' : 'Confirmation reference',
+    value: reference,
+  };
+  return p.receipt?.receiptId ? { label: 'Receipt number', value: p.receipt.receiptId } : null;
+}
 export function projectProgress(p: PurchaseView): HumanProgress {
   const paymentConfirmed = ['confirmed', 'escrow_locked', 'released'].includes(p.paymentState);
   const merchantAction = p.commerceStatus === 'unknown' || p.state === 'unresolved' ? 'unknown' :
@@ -25,7 +43,13 @@ export function projectProgress(p: PurchaseView): HumanProgress {
       outcomeFinal: false, nextAction: p.paymentState === 'not_received' ? 'Pay using the selected funding option.' : null };
     case 'funded_queued': return { ...base, stage: 'purchasing', label: 'Purchase queued', message: `${paymentConfirmed ? 'Payment confirmed. ' : ''}Your purchase is queued for submission.`, outcomeFinal: false, nextAction: null };
     case 'executing': return { ...base, stage: 'purchasing', label: 'Purchasing', message: `${paymentConfirmed ? 'Payment confirmed. ' : ''}Your purchase is being submitted to the provider.`, outcomeFinal: false, nextAction: null };
-    case 'succeeded': return { ...base, stage: 'complete', label: 'Complete', message: `Purchase complete.${p.providerReference ? ` Provider reference ${p.providerReference}.` : ''} Read the receipt for the environment and proof limitations.`, outcomeFinal: true, nextAction: null };
+    case 'succeeded': {
+      const label = successLabel(p);
+      const reference = completionReference(p);
+      return { ...base, stage: 'complete', label,
+        message: `${label}.${reference ? ` ${reference.label}: ${reference.value}.` : ''} Read the receipt for the environment and proof limitations.`,
+        outcomeFinal: true, nextAction: null };
+    }
     case 'requires_reauthorization': return { ...base, stage: 'needs_attention', label: 'Terms changed', message: 'Terms changed before purchase. Nothing was bought; fresh approval is required.', outcomeFinal: true, nextAction: 'Request a fresh quote, select a funding option and approve the new terms.' };
     case 'expired': return { ...base, stage: 'needs_attention', label: 'Quote expired', message: 'The quote expired before this purchase could proceed.', outcomeFinal: true, nextAction: 'Request and approve a fresh quote. Check proof for any payment already received.' };
     case 'failed': return { ...base, stage: 'needs_attention', label: 'Purchase could not be completed', message: 'The purchase could not be completed. Check the proof for the payment and merchant result.', outcomeFinal: true, nextAction: 'Review the result with the gateway operator.' };

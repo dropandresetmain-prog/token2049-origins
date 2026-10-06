@@ -198,7 +198,7 @@ describe('MCP channel', () => {
     await h.gw.worker.tick();
     const got = await m.call('get_purchase', { purchaseId: r.structuredContent.purchase.purchaseId });
     expect(got.structuredContent.purchase.state).toBe('succeeded');
-    expect(got.content[0]!.text).toContain('Purchase complete');
+    expect(got.content[0]!.text).toContain('Order confirmed');
     expect(h.retail.executeCalls).toBe(1);
 
     // Re-buying a finished purchase is an idempotent replay: no second payment, no second order.

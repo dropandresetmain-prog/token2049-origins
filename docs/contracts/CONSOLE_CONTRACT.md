@@ -54,7 +54,15 @@ The operator screens need `operator:read` as well (the `operator` role of `npm r
 | Activity log, spending allowance, technical details | `GET /v1/evidence/purchases/:id` | `EvidenceDetail` (subset of `read-model.purchaseDetail`) |
 | Title, price details, merchant terms | `GET /v1/quotes/:quoteId` | `QuoteView` |
 
-While a purchase can still change (`HumanProgress.outcomeFinal === false`), the purchase page re-reads every 5 seconds.
+While a gateway purchase can still change (`HumanProgress.outcomeFinal === false`), the purchase page re-reads
+1.5 seconds after the previous read finishes. `LIVE_REFRESH_MS` in `web/src/ui/detailRefresh.ts` supplies the default;
+`useDetail` accepts an interval override for testing/configuration. Manual reload and timer refresh share one request
+guard. Final purchases and sample data do not poll, and navigation invalidates late responses.
+
+Verified success has a separate completion panel with Order confirmed, Booking confirmed, or Ticket issued,
+derived from category and durable commerce status. A flight must be `ticketed` to say Ticket issued. The panel
+shows the stored provider reference (or receipt reference/number) with receipt and proof actions. An opaque flight
+reference is never relabeled as a PNR. The success gate still requires completed commerce, merchant payment and a receipt.
 
 **Drift protection.** `PurchaseProof` cannot be imported into the browser bundle (its module imports the database
 layer), so the console mirrors it. `tests/contracts/console-contract.test.ts` fails if the mirror and the gateway schema
@@ -104,7 +112,7 @@ that needs approval, not an implementation detail.
 | `confirming_payment`, other payment states | Confirming payment | In progress |
 | `purchasing` | In progress | In progress |
 | `verifying_result` | Checking with merchant | In progress |
-| `complete` | Completed | Completed |
+| `complete` | Order confirmed / Booking confirmed / Ticket issued (otherwise Purchase confirmed) | Completed |
 | `needs_attention` + `requires_reauthorization` | Price changed | Needs attention |
 | `needs_attention` + `failed` | Couldn't complete | Needs attention |
 | `needs_attention` + `expired` | Expired | (All only) |
@@ -136,7 +144,7 @@ render with or without them.
 | G5 | Price details and title with a read-only key | `GET /v1/quotes/:id` requires `quotes:write` | Allow `purchases:read` for quotes attached to the caller's own purchases, or add `GET /v1/purchases/:id/quote` |
 | G6 | Search, status tabs and paging beyond 50 | 50 newest, no parameters; the console filters in the browser | Add `status`, `q` and `cursor` query parameters to the list route |
 | G7 | Item details, price-line labels and merchant terms | Free text relayed from merchants. `receipt.limitations` is engineering wording, so the console writes its own receipt notes from receipt facts and keeps the gateway's text in the downloaded receipt | Optional: a customer-facing limitations field the console could show directly |
-| G8 | Live updates | Polling every 5 seconds | Optional later: a server-sent events stream per purchase |
+| G8 | Live updates | Serial polling 1.5 seconds after each completed read, only while live | Optional later: a server-sent events stream per purchase |
 
 Nothing in this list blocks the console. Each one makes a screen more complete when the gateway provides it.
 

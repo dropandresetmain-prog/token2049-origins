@@ -16,7 +16,7 @@ describe('presenters over sample purchases', () => {
   it('lists every sample with one status vocabulary and group counts', async () => {
     const vm = presentList(await source.listPurchases(), ctx);
     expect(vm.rows.map((r) => r.status.label)).toEqual([
-      'In progress', 'Completed', 'Checking with merchant', 'Completed', 'Price changed', 'Awaiting payment', 'Completed',
+      'In progress', 'Order confirmed', 'Checking with merchant', 'Booking confirmed', 'Price changed', 'Awaiting payment', 'Order confirmed',
     ]);
     expect(vm.counts).toEqual({ all: 7, in_progress: 3, attention: 1, completed: 3 });
     expect(filterRows(vm.rows, 'all', 'bangkok').map((r) => r.title)).toEqual(['One night in Bangkok']);

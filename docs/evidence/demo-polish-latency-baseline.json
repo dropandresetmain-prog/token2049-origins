@@ -1,0 +1,53 @@
+{
+  "scope": "Existing provider-only Atlas sandbox run; no blockchain or combined-flow latency measured",
+  "sourceSha": "72f95de467d4be7773e9c845e0a0fd932d242b81",
+  "sourceFile": "integration-e2e/atlas/evidence-2026-10-06T13-35-24-497Z.jsonl",
+  "sourceFileSha256": "c15e2997c65ce38df7e7c0bd191374d6b0520e0453401dc8f990333a4981b169",
+  "observations": [
+    {
+      "at": "2026-10-06T13:35:24.920Z",
+      "stage": "checkpoint",
+      "step": "create_attempt"
+    },
+    {
+      "at": "2026-10-06T13:35:25.120Z",
+      "stage": "checkpoint",
+      "step": "order"
+    },
+    {
+      "at": "2026-10-06T13:35:25.292Z",
+      "stage": "checkpoint",
+      "step": "pay_attempt"
+    },
+    {
+      "at": "2026-10-06T13:35:25.593Z",
+      "stage": "execute",
+      "step": null
+    },
+    {
+      "at": "2026-10-06T13:35:25.832Z",
+      "stage": "independent_retrieve",
+      "step": null
+    },
+    {
+      "at": "2026-10-06T13:35:36.093Z",
+      "stage": "ticket_poll",
+      "step": null
+    },
+    {
+      "at": "2026-10-06T13:35:46.319Z",
+      "stage": "ticket_poll",
+      "step": null
+    },
+    {
+      "at": "2026-10-06T13:35:56.556Z",
+      "stage": "ticket_poll",
+      "step": null
+    },
+    {
+      "at": "2026-10-06T13:36:07.146Z",
+      "stage": "ticket_poll",
+      "step": null
+    }
+  ]
+}
