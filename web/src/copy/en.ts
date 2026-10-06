@@ -38,6 +38,12 @@ export const nav = {
   presentationOff: 'Workspace view restored.',
   about: 'About Capsule',
   skipToContent: 'Skip to content',
+  brandLabel: 'Capsule, current purchase',
+  sidebarLabel: 'Workspace navigation',
+  appLabel: 'Capsule application',
+  breadcrumbLabel: 'Breadcrumb',
+  crumbSeparator: '/',
+  pageTitle: (page: string) => `${page} | ${brand.name}`,
 };
 
 export const environment = {
@@ -194,6 +200,7 @@ export const detail = {
   testPaymentNote: 'Test funds with no cash value.',
   paidAmount: (amount: string) => `${amount} paid`,
   dueAmount: (amount: string) => `${amount} due`,
+  requestQuote: (text: string) => `“${text}”`,
 };
 
 export const routeAction: Record<StatusKey, (cat: Cat) => string> = {
@@ -238,6 +245,7 @@ export const steps = {
 };
 
 export const stepState = {
+  done: 'Done',
   inProgress: 'In progress',
   pending: 'Pending',
   needsAttention: 'Needs attention',
@@ -449,4 +457,23 @@ export const errors = {
   supportCode: (code: string) => `Support code ${code}`,
   retry: 'Try again',
   backToPurchases: 'Back to purchases',
+  crumb: 'Purchase unavailable',
+};
+
+/* ---------------- Shared chrome ---------------- */
+
+export const common = {
+  close: 'Close',
+  closeDialog: 'Close dialog',
+};
+
+/** Sample scenario shortcuts, shown only when the console runs on sample data. */
+export const dock = {
+  label: 'Sample scenarios',
+  inProgress: 'In progress',
+  completed: 'Completed',
+  checking: 'Checking with merchant',
+  priceChange: 'Price change',
+  awaitingPayment: 'Awaiting payment',
+  purchases: 'Purchases',
 };
