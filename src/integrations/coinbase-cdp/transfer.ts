@@ -1,6 +1,6 @@
 import { existsSync } from 'node:fs';
 import { CdpClient } from '@coinbase/cdp-sdk';
-import { CDP_CHAIN_ID, CDP_EXPLORER, CDP_MAX_TOTAL_WEI, CDP_NETWORK, CDP_TRANSFER_IDEMPOTENCY_KEY, CDP_TRANSFER_WEI, validateTransfer } from './contracts.js';
+import { CDP_CHAIN_ID, CDP_EXPLORER, CDP_MAX_TOTAL_WEI, CDP_NETWORK, CDP_TRANSFER_WEI, validateTransfer } from './contracts.js';
 import type { CdpActionHistory, CdpPublicIdentity, CdpSettings } from './contracts.js';
 import { readHistory, withHistoryLock, writeHistoryAtomic } from './history.js';
 
@@ -85,8 +85,7 @@ export async function executeTestTransfer(
       return history;
     }
     if (history.status === 'pending' || history.status === 'unknown') {
-      // A repeated explicit invocation reuses the exact persisted CDP idempotency key and payload.
-      // CDP deduplicates the request; this cannot authorize a second transfer.
+      throw new Error('CDP transfer outcome is unknown without a transaction hash; reservation remains held for read-only operator reconciliation');
     } else {
       if (history.status !== 'idle' || history.attempted) throw new Error('CDP transfer reservation is inconsistent; operator reconciliation required');
       if (CDP_TRANSFER_WEI > CDP_MAX_TOTAL_WEI) throw new Error('CDP cumulative test transfer limit reached');
@@ -100,7 +99,7 @@ export async function executeTestTransfer(
       const scoped = await account.useNetwork(CDP_NETWORK);
       const result = await scoped.sendTransaction({
         transaction: { to: identity.recipientAddress, value: CDP_TRANSFER_WEI },
-        idempotencyKey: CDP_TRANSFER_IDEMPOTENCY_KEY,
+        idempotencyKey: history.idempotencyKey,
       });
       transactionHash = result.transactionHash;
     } catch {

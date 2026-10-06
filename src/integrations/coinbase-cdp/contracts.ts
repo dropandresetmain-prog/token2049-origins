@@ -6,8 +6,8 @@ export const CDP_EXPLORER = 'https://sepolia.basescan.org';
 export const CDP_TREASURY_NAME = 'capsule-treasury-test';
 export const CDP_RECIPIENT_NAME = 'capsule-treasury-recipient';
 export const CDP_POLICY_DESCRIPTION = 'Capsule Base Sepolia treasury test';
-export const CDP_POLICY_IDEMPOTENCY_KEY = 'capsule-cdp-policy-v1';
-export const CDP_TRANSFER_IDEMPOTENCY_KEY = 'capsule-cdp-treasury-transfer-v1';
+export const CDP_POLICY_IDEMPOTENCY_KEY = '5db11d68-1955-47e9-89d2-7d3a27a94c77';
+export const CDP_POLICY_ATTACH_IDEMPOTENCY_KEY = '9750cf26-32ae-45ab-901f-e3e17b245356';
 export const CDP_TRANSFER_WEI = 1_000_000_000_000n;
 export const CDP_MAX_ACTION_WEI = CDP_TRANSFER_WEI;
 export const CDP_MAX_TOTAL_WEI = CDP_TRANSFER_WEI;
@@ -42,7 +42,7 @@ export interface CdpActionHistory {
   maxTotalWei: string;
   attempted: boolean;
   status: 'idle' | 'pending' | 'submitted' | 'unknown' | 'confirmed';
-  idempotencyKey: typeof CDP_TRANSFER_IDEMPOTENCY_KEY;
+  idempotencyKey: string;
   txHash: `0x${string}` | null;
   updatedAt: string;
 }
@@ -88,7 +88,7 @@ export function validateHistory(history: CdpActionHistory, identity: CdpPublicId
   if (history.maxActionWei !== CDP_MAX_ACTION_WEI.toString() || history.maxTotalWei !== CDP_MAX_TOTAL_WEI.toString()) {
     throw new Error('CDP action history limits changed; operator reconciliation required');
   }
-  if (history.idempotencyKey !== CDP_TRANSFER_IDEMPOTENCY_KEY) throw new Error('CDP action history idempotency key is invalid');
+  if (!/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(history.idempotencyKey)) throw new Error('CDP action history idempotency key is invalid; operator reconciliation required');
   if (history.status !== 'idle' && history.status !== 'pending' && history.status !== 'submitted' && history.status !== 'unknown' && history.status !== 'confirmed') {
     throw new Error('CDP action history status is invalid; operator reconciliation required');
   }
@@ -96,4 +96,9 @@ export function validateHistory(history: CdpActionHistory, identity: CdpPublicId
   if ((history.status === 'pending' || history.status === 'submitted' || history.status === 'unknown' || history.status === 'confirmed') && !history.attempted) {
     throw new Error('CDP action history is inconsistent; operator reconciliation required');
   }
+  if (history.txHash !== null && !/^0x[0-9a-f]{64}$/i.test(history.txHash)) throw new Error('CDP action history transaction hash is invalid; operator reconciliation required');
+  if ((history.status === 'idle' || history.status === 'pending' || history.status === 'unknown') && history.txHash !== null) throw new Error('CDP action history transaction state is inconsistent; operator reconciliation required');
+  if ((history.status === 'submitted' || history.status === 'confirmed') && history.txHash === null) throw new Error('CDP action history transaction state is inconsistent; operator reconciliation required');
+  if (typeof history.updatedAt !== 'string' || !Number.isFinite(Date.parse(history.updatedAt))) throw new Error('CDP action history timestamp is invalid; operator reconciliation required');
+  if (typeof history.attempted !== 'boolean') throw new Error('CDP action history is invalid; operator reconciliation required');
 }

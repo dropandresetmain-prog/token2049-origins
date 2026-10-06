@@ -1,11 +1,13 @@
-import { mkdtempSync, readFileSync, rmSync } from 'node:fs';
+import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { CdpClient } from '@coinbase/cdp-sdk';
-import { CDP_CHAIN_ID, CDP_MAX_ACTION_WEI, CDP_NETWORK, CDP_TRANSFER_IDEMPOTENCY_KEY, CDP_TRANSFER_WEI, validateHistory, validateTransfer } from '../../src/integrations/coinbase-cdp/contracts.js';
+import { CDP_CHAIN_ID, CDP_MAX_ACTION_WEI, CDP_NETWORK, CDP_TRANSFER_WEI, validateHistory, validateTransfer } from '../../src/integrations/coinbase-cdp/contracts.js';
 import type { CdpPublicIdentity, CdpSettings } from '../../src/integrations/coinbase-cdp/contracts.js';
 import { makeAccountPolicy } from '../../src/integrations/coinbase-cdp/client.js';
+import { provision } from '../../src/integrations/coinbase-cdp/client.js';
+import { sanitizeCliError } from '../../src/integrations/coinbase-cdp/errors.js';
 import { createHistoryOnce, initialHistory, readHistory, writeHistoryAtomic } from '../../src/integrations/coinbase-cdp/history.js';
 import { executeTestTransfer, transactionExplorerUrl } from '../../src/integrations/coinbase-cdp/transfer.js';
 import type { CdpRpc } from '../../src/integrations/coinbase-cdp/transfer.js';
@@ -47,31 +49,39 @@ describe('Coinbase CDP treasury guards', () => {
     expect(policy.rules[0]?.criteria).toContainEqual({ type: 'evmAddress', addresses: [identity.recipientAddress], operator: 'in' });
     expect(policy.rules[0]?.criteria).toContainEqual({ type: 'ethValue', ethValue: CDP_MAX_ACTION_WEI.toString(), operator: '<=' });
     expect(policy.rules[0]?.criteria).toContainEqual({ type: 'evmNetwork', networks: [CDP_NETWORK], operator: 'in' });
+    expect(policy.rules.slice(1).map((rule) => [rule.action, rule.operation, rule.criteria])).toEqual([
+      ['reject', 'sendEvmTransaction', []], ['reject', 'signEvmTransaction', []], ['reject', 'signEvmMessage', []], ['reject', 'signEvmTypedData', []], ['reject', 'signEvmHash', []],
+    ]);
   });
 
   it('creates action history exclusively and refuses changed identities or limits', () => {
     const settings = tempSettings();
     const history = createHistoryOnce(settings.historyFile, identity);
     expect(readHistory(settings.historyFile, identity)).toEqual(history);
+    expect(history.idempotencyKey).toMatch(/^[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i);
     expect(() => validateHistory({ ...history, maxTotalWei: '999' }, identity)).toThrow(/limits changed/);
+    expect(() => validateHistory({ ...history, txHash: 'malformed' as `0x${string}` }, identity)).toThrow(/transaction hash is invalid/);
     expect(() => createHistoryOnce(settings.historyFile, { ...identity, treasuryAddress: '0x3333333333333333333333333333333333333333' })).toThrow(/identity changed/);
+    writeFileSync(settings.historyFile, JSON.stringify({ ...history, txHash: 'malformed' }));
+    expect(() => readHistory(settings.historyFile, identity)).toThrow(/transaction hash is invalid/);
+    writeFileSync(settings.historyFile, '{corrupt');
+    expect(() => readHistory(settings.historyFile, identity)).toThrow(/unavailable or corrupt/);
   });
 
-  it('retains unknown reservations and retries only the same CDP idempotency key and exact payload', async () => {
+  it('holds unknown reservations without a transaction hash and never submits again', async () => {
     const settings = tempSettings();
     createHistoryOnce(settings.historyFile, identity);
     const keys: string[] = [];
     const payloads: unknown[] = [];
-    let fail = true;
+    const sendTransaction = vi.fn(async (request: { idempotencyKey: string; transaction: unknown }) => {
+      keys.push(request.idempotencyKey);
+      payloads.push(request.transaction);
+      throw new Error('sensitive CDP response must not escape');
+    });
     const account = {
       useNetwork: vi.fn(async (network: string) => ({
         network,
-        sendTransaction: vi.fn(async (request: { idempotencyKey: string; transaction: unknown }) => {
-          keys.push(request.idempotencyKey);
-          payloads.push(request.transaction);
-          if (fail) { fail = false; throw new Error('sensitive CDP response must not escape'); }
-          return { transactionHash: '0x' + 'a'.repeat(64) };
-        }),
+        sendTransaction,
       })),
     };
     const client = { evm: { getAccount: vi.fn(async () => account) } } as unknown as CdpClient;
@@ -86,17 +96,16 @@ describe('Coinbase CDP treasury guards', () => {
     expect(unknown.attempted).toBe(true);
     expect(JSON.stringify(unknown)).not.toContain('sensitive CDP response');
 
-    const recovered = await executeTestTransfer(client, settings, identity, rpc);
-    expect(recovered.status).toBe('confirmed');
-    expect(keys).toEqual([CDP_TRANSFER_IDEMPOTENCY_KEY, CDP_TRANSFER_IDEMPOTENCY_KEY]);
-    expect(payloads[0]).toEqual(payloads[1]);
-    expect(JSON.parse(readFileSync(settings.historyFile, 'utf8')).txHash).toBe('0x' + 'a'.repeat(64));
-    expect(transactionExplorerUrl(recovered.txHash!)).toBe(`https://sepolia.basescan.org/tx/${recovered.txHash}`);
-    await expect(executeTestTransfer(client, settings, identity, rpc)).rejects.toThrow(/already completed/);
+    await expect(executeTestTransfer(client, settings, identity, rpc)).rejects.toThrow(/unknown without a transaction hash/);
+    expect(sendTransaction).toHaveBeenCalledTimes(1);
+    expect(keys).toHaveLength(1);
+    expect(payloads).toHaveLength(1);
+    expect(JSON.stringify(readHistory(settings.historyFile, identity))).not.toContain('sensitive CDP response');
   });
 
   it('does not send again while a transaction hash is awaiting independent chain readback', async () => {
     const settings = tempSettings();
+    createHistoryOnce(settings.historyFile, identity);
     const submitted = { ...initialHistory(identity), attempted: true, status: 'submitted' as const, txHash: (`0x${'b'.repeat(64)}`) as `0x${string}` };
     writeHistoryAtomic(settings.historyFile, submitted);
     const sendTransaction = vi.fn();
@@ -105,5 +114,31 @@ describe('Coinbase CDP treasury guards', () => {
     const result = await executeTestTransfer(client, settings, identity, rpc);
     expect(result.status).toBe('submitted');
     expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it('blocks provisioning when an existing public identity has lost its history before any API call', async () => {
+    const settings = tempSettings();
+    const { writeFileSync } = await import('node:fs');
+    writeFileSync(settings.identityFile, JSON.stringify(identity));
+    const getOrCreateAccount = vi.fn();
+    const client = { evm: { getOrCreateAccount } } as unknown as CdpClient;
+    await expect(provision(client, settings)).rejects.toThrow(/history is missing/);
+    expect(getOrCreateAccount).not.toHaveBeenCalled();
+  });
+
+  it('refuses to attach a Capsule policy to a treasury with existing policy authority', async () => {
+    const settings = tempSettings();
+    const getOrCreateAccount = vi.fn(async ({ name }: { name: string }) => name === identity.treasuryName
+      ? { address: identity.treasuryAddress, policies: ['pre-existing-policy'] }
+      : { address: identity.recipientAddress, policies: [] });
+    const createPolicy = vi.fn();
+    const client = { evm: { getOrCreateAccount }, policies: { createPolicy } } as unknown as CdpClient;
+    await expect(provision(client, settings)).rejects.toThrow(/already has an attached policy/);
+    expect(createPolicy).not.toHaveBeenCalled();
+  });
+
+  it('suppresses provider exception text that may contain credentials', () => {
+    expect(sanitizeCliError(new Error('Authorization: bearer-secret-123'))).not.toContain('bearer-secret-123');
+    expect(sanitizeCliError(new Error('Authorization: bearer-secret-123'))).toMatch(/provider details were suppressed/);
   });
 });

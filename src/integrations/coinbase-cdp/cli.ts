@@ -2,6 +2,7 @@ import { CDP_EXPLORER, CDP_TRANSFER_WEI_TEXT } from './contracts.js';
 import { createCdpClient, loadProvisioned, loadSettings, provision } from './client.js';
 import { readCdpTreasury } from './adapter.js';
 import { executeTestTransfer } from './transfer.js';
+import { sanitizeCliError } from './errors.js';
 
 function print(value: unknown): void {
   process.stdout.write(`${JSON.stringify(value, null, 2)}\n`);
@@ -38,7 +39,6 @@ async function main(): Promise<void> {
 }
 
 main().catch((error: unknown) => {
-  const message = error instanceof Error ? error.message : 'CDP operation failed';
-  process.stderr.write(`${message}\n`);
+  process.stderr.write(`${sanitizeCliError(error)}\n`);
   process.exitCode = 1;
 });
