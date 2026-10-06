@@ -21,6 +21,8 @@ export interface HostedMcpConfig {
   cardanoBridge?: { url: string; token: string };
   /** SHA-256 (hex) of the hosted payer's gateway token. Only the hash is configured; it registers the payer's gateway client. */
   payerTokenSha256?: string;
+  /** SHA-256 (hex) of a read-only console access key (purchases:read + evidence:read) for the hosted customer. Hash only. */
+  consoleKeySha256?: string;
   /** Test seams for slow payers (production values are set in the router). */
   bridgeTimeoutMs?: number;
   bridgeStatusTimeoutMs?: number;
@@ -105,6 +107,8 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
     cardanoBridge = { url: parsePayerBridgeUrl(env.CARDANO_PAYER_BRIDGE_URL, 'CARDANO_PAYER_BRIDGE_URL', publicUrl.origin), token: readSecret(env.CARDANO_PAYER_BRIDGE_TOKEN_FILE, 'CARDANO_PAYER_BRIDGE_TOKEN_FILE', 24) };
   }
 
+  const consoleKeySha256 = env.MCP_CONSOLE_KEY_SHA256?.trim().toLowerCase();
+  if (consoleKeySha256 !== undefined && !/^[0-9a-f]{64}$/.test(consoleKeySha256)) throw new HostedConfigError('MCP_CONSOLE_KEY_SHA256 must be a 64-character hex SHA-256');
   const payerTokenSha256 = env.MCP_PAYER_GATEWAY_TOKEN_SHA256?.trim().toLowerCase();
   if (payerTokenSha256 !== undefined && !/^[0-9a-f]{64}$/.test(payerTokenSha256)) throw new HostedConfigError('MCP_PAYER_GATEWAY_TOKEN_SHA256 must be a 64-character hex SHA-256');
 
@@ -120,6 +124,7 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
     extraRedirectUris,
     ...(cardanoBridge ? { cardanoBridge } : {}),
     ...(payerTokenSha256 ? { payerTokenSha256 } : {}),
+    ...(consoleKeySha256 ? { consoleKeySha256 } : {}),
     gatewayUrl: `http://127.0.0.1:${port}`,
   };
 }

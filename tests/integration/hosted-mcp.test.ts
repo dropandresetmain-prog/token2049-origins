@@ -823,3 +823,38 @@ describe('hosted MCP: tool calls that outlast ChatGPT\'s ~60 s patience', () => 
     });
   }
 });
+
+describe('hosted console access key (hash only, read only)', () => {
+  it('lets the console read the hosted customer\'s purchases and evidence in real time, and nothing more', async () => {
+    const f = await start({ withBridge: true });
+    const key = 't2o_' + randomBytes(32).toString('base64url');
+    await provisionPayerClient(f.h.gw.db, {
+      publicUrl: new URL(f.base), allowedOrigins: [], ownerPasscode: PASSCODE, customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO',
+      payerClientId: 'cli_HOSTEDTESTPAYER', extraRedirectUris: [], gatewayUrl: f.base, consoleKeySha256: sha256Hex(key),
+    });
+    const row = (await f.h.gw.db.all<any>("SELECT customer_id, channel, scopes_json FROM api_clients WHERE id = 'cli_HOSTEDCONSOLE'"))[0];
+    expect(row).toMatchObject({ customer_id: 'cus_HOSTEDTESTDEMO', channel: 'console' });
+    expect(JSON.parse(row.scopes_json)).toEqual(['purchases:read', 'evidence:read']);
+    expect(JSON.stringify(await f.h.gw.db.all('SELECT * FROM api_clients'))).not.toContain(key);
+
+    // A purchase made through the MCP shows up for the console key immediately, and another customer's does not.
+    const client = await mcp(f, (await fullGrant(f)).tokens.access_token);
+    try {
+      const found = await client.callTool({ name: 'find_offers', arguments: { intent: retailIntent() } }) as any;
+      const q = (await client.callTool({ name: 'create_quote', arguments: { offerId: found.structuredContent.offers[0].offerId, fulfillment: retailFulfillment } }) as any).structuredContent.quote;
+      const bought = await client.callTool({ name: 'buy', arguments: { quoteId: q.quoteId, selectedFundingOptionId: q.fundingOptions[0].fundingOptionId, maxTotal: q.payablePrincipal, quoteDigest: q.digest } }) as any;
+      const pid = bought.structuredContent.purchase.purchaseId;
+      const list = await f.h.call('GET', '/v1/evidence/purchases', { token: key });
+      expect(list.status).toBe(200);
+      expect(JSON.stringify(list.body)).toContain(pid);
+      expect((await f.h.call('GET', `/v1/purchases/${pid}`, { token: key })).status).toBe(200);
+      const mine = await f.h.call('GET', '/v1/evidence/purchases', { token: f.h.alice.token });
+      expect(JSON.stringify(mine.body)).not.toContain(pid);
+    } finally { await client.close(); }
+
+    // Read-only: it cannot search, quote, buy, fund, or read operator data.
+    expect((await f.h.call('POST', '/v1/offers/search', { token: key, body: { intent: retailIntent() } })).status).toBe(403);
+    expect((await f.h.call('POST', '/v1/purchases/pur_0000000000000/fund', { token: key })).status).toBe(403);
+    expect((await f.h.call('GET', '/v1/evidence/treasury', { token: key })).status).toBe(403);
+  });
+});

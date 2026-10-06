@@ -48,6 +48,7 @@ describe('hosted MCP configuration', () => {
     ['a payer with a query', { CARDANO_PAYER_BRIDGE_URL: `${PAYER}?x=1` }],
     ['a missing passcode file', { MCP_OAUTH_OWNER_PASSCODE_FILE: '/nonexistent/passcode' }],
     ['a malformed payer token hash', { MCP_PAYER_GATEWAY_TOKEN_SHA256: 'not-a-hash' }],
+    ['a malformed console key hash', { MCP_CONSOLE_KEY_SHA256: 'nope' }],
     ['a non-https extra redirect', { MCP_OAUTH_EXTRA_REDIRECT_URIS: 'http://evil.example/cb' }],
     ['a path-bearing allowed origin', { MCP_ALLOWED_ORIGINS: 'https://x.example/path' }],
   ])('refuses %s', (_name, over) => {

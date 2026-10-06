@@ -42,14 +42,16 @@ const limiter = (max: number, windowMs: number) => ({ windowMs, max, validate: f
  * and an operator-revoked client stays revoked.
  */
 export async function provisionPayerClient(db: Db, config: HostedMcpConfig, nowIso = new Date().toISOString()): Promise<void> {
-  if (!config.payerTokenSha256) return;
+  if (!config.payerTokenSha256 && !config.consoleKeySha256) return;
   await db.tx(async () => {
     await db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', config.customerId, 'Hosted MCP demo customer', nowIso);
-    await db.run(
-      `INSERT INTO api_clients(id, customer_id, channel, label, token_hash, scopes_json, created_at) VALUES ($1,$2,'http','Hosted Cardano payer',$3,$4,$5)
+    const upsert = (id: string, channel: string, label: string, sha: string, scopes: string[]) => db.run(
+      `INSERT INTO api_clients(id, customer_id, channel, label, token_hash, scopes_json, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT(id) DO UPDATE SET token_hash = EXCLUDED.token_hash WHERE api_clients.revoked_at IS NULL AND api_clients.customer_id = EXCLUDED.customer_id`,
-      config.payerClientId, config.customerId, config.payerTokenSha256!, JSON.stringify(['purchases:read', 'purchases:fund']), nowIso,
-    );
+      id, config.customerId, channel, label, sha, JSON.stringify(scopes), nowIso);
+    if (config.payerTokenSha256) await upsert(config.payerClientId, 'http', 'Hosted Cardano payer', config.payerTokenSha256, ['purchases:read', 'purchases:fund']);
+    // Read-only key for the console: sees this customer's purchases and evidence, can neither buy nor fund.
+    if (config.consoleKeySha256) await upsert('cli_HOSTEDCONSOLE', 'console', 'Hosted console (read only)', config.consoleKeySha256, ['purchases:read', 'evidence:read']);
   });
 }
 
