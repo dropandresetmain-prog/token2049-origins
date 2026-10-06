@@ -63,7 +63,7 @@ function retailReportsPaid(h: Harness): void {
 }
 
 /** Gateway + hosted MCP on one listener, with an optional fake Cardano payer on the "private network". */
-async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; statusDelayMs?: number; headroomBaseUnits?: string; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
+async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; statusDelayMs?: number; headroomBaseUnits?: string; backgroundWaitMs?: number; payStartDelayMs?: number; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const cleanup: Array<() => Promise<void>> = [];
@@ -84,6 +84,7 @@ async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; wi
         if (req.url === '/status') return send(200, { ok: true, source: FundingSource.parse({ sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano', network: 'cardano:preprod', publicAddress: PAYER_ADDRESS, displayAddress: PAYER_ADDRESS.slice(0, 14) + '…' + PAYER_ADDRESS.slice(-6), assetId: h.funding.acceptedAsset().assetId, readiness: 'configured' }), ...(opts.headroomBaseUnits ? { ledger: { headroomBaseUnits: opts.headroomBaseUnits, committedBaseUnits: '66830' } } : {}) });
         const { purchaseId } = JSON.parse(raw) as { purchaseId: string };
         bridge.calls.push(purchaseId);
+        await new Promise((r) => setTimeout(r, opts.payStartDelayMs ?? 0)); // slow wake-up / signing before anything is paid
         const got = await h.call('GET', `/v1/purchases/${purchaseId}`, { token: payerToken });
         const amount = got.body.purchase.fundingRequirement.amount.amountBaseUnits as string;
         const fund = await h.call('POST', `/v1/purchases/${purchaseId}/fund`, { token: payerToken, headers: { 'payment-signature': `fixture:hosted-${purchaseId}:${amount}` } });
@@ -99,7 +100,7 @@ async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; wi
   const config: HostedMcpConfig = {
     publicUrl: new URL(base), allowedOrigins: opts.allowedOrigins ?? ['https://chatgpt.com'], ownerPasscode: PASSCODE,
     customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO', payerClientId: 'cli_HOSTEDTESTPAYER', extraRedirectUris: [], gatewayUrl: base,
-    ...(opts.bridgeTimeoutMs ? { bridgeTimeoutMs: opts.bridgeTimeoutMs } : {}), ...(opts.bridgeStatusTimeoutMs ? { bridgeStatusTimeoutMs: opts.bridgeStatusTimeoutMs } : {}),
+    ...(opts.bridgeTimeoutMs ? { bridgeTimeoutMs: opts.bridgeTimeoutMs } : {}), ...(opts.backgroundWaitMs ? { backgroundWaitMs: opts.backgroundWaitMs } : {}), ...(opts.bridgeStatusTimeoutMs ? { bridgeStatusTimeoutMs: opts.bridgeStatusTimeoutMs } : {}),
     ...(bridgeUrl ? { cardanoBridge: { url: bridgeUrl, token: BRIDGE_TOKEN } } : {}),
   };
   h = await startHarness({ port, extraRouters: (core) => createHostedMcp({ db: core.deps.db, config }).mounts });
@@ -758,4 +759,67 @@ describe('hosted MCP: payer spend-cap headroom', () => {
       } finally { await client.close(); await current?.h.close(); for (const c of current?.cleanup ?? []) await c(); current = undefined; }
     }
   });
+});
+
+describe('hosted MCP: tool calls that outlast ChatGPT\'s ~60 s patience', () => {
+  const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
+
+  it('create_quote answers "still running" quickly, joins the same job on repeat, and never starts a second quote', async () => {
+    const f = await start({ withBridge: true, backgroundWaitMs: 150 });
+    let quotes = 0;
+    const orig = f.h.retail.quote.bind(f.h.retail);
+    f.h.retail.quote = async (...args: Parameters<typeof orig>) => { quotes++; await sleep(700); return orig(...args); };
+    const client = await mcp(f, (await fullGrant(f)).tokens.access_token);
+    try {
+      const found = await client.callTool({ name: 'find_offers', arguments: { intent: retailIntent() } }) as any;
+      const args = { offerId: found.structuredContent.offers[0].offerId, fulfillment: retailFulfillment };
+      const t0 = Date.now();
+      const first = await client.callTool({ name: 'create_quote', arguments: args }) as any;
+      expect(Date.now() - t0).toBeLessThan(600);
+      expect(first.isError).toBeFalsy();
+      expect(first.structuredContent).toMatchObject({ status: 'quote_pending', retryAfterSeconds: 20 });
+      expect(first.content[0].text).toMatch(/call create_quote again with EXACTLY the same offerId and fulfillment/);
+      expect((await client.callTool({ name: 'create_quote', arguments: args }) as any).structuredContent.status).toBe('quote_pending');
+      await sleep(800);
+      const done = await client.callTool({ name: 'create_quote', arguments: args }) as any;
+      expect(done.structuredContent.quote.quoteId).toMatch(/^quo_/);
+      expect(done.content[0].text).toMatch(/Exact quote for/);
+      const again = await client.callTool({ name: 'create_quote', arguments: args }) as any;
+      expect(again.structuredContent.quote.quoteId).toBe(done.structuredContent.quote.quoteId);
+      expect(quotes).toBe(1);
+      expect((await f.h.gw.db.all('SELECT id FROM quotes')).length).toBe(1);
+    } finally { await client.close(); }
+  });
+
+  for (const [name, delays, expectedStatus] of [
+    ['a payer that is slow before it has paid', { payStartDelayMs: 900 }, 'payment_in_progress'],
+    ['a payer that has paid but is slow to answer', { payResponseDelayMs: 900 }, 'execution_pending'],
+  ] as const) {
+    it(`buy returns promptly with ${name}, never repeats the payment, and get_purchase follows it`, async () => {
+      const f = await start({ withBridge: true, backgroundWaitMs: 150, ...delays });
+      const client = await mcp(f, (await fullGrant(f)).tokens.access_token);
+      try {
+        const found = await client.callTool({ name: 'find_offers', arguments: { intent: retailIntent() } }) as any;
+        const q = (await client.callTool({ name: 'create_quote', arguments: { offerId: found.structuredContent.offers[0].offerId, fulfillment: retailFulfillment } }) as any).structuredContent.quote;
+        const args = { quoteId: q.quoteId, selectedFundingOptionId: q.fundingOptions[0].fundingOptionId, maxTotal: q.payablePrincipal, quoteDigest: q.digest };
+        const t0 = Date.now();
+        const first = await client.callTool({ name: 'buy', arguments: args }) as any;
+        expect(Date.now() - t0).toBeLessThan(700);
+        expect(first.isError).toBeFalsy();
+        expect(first.structuredContent.status).toBe(expectedStatus);
+        expect(first.structuredContent.payment).toMatchObject({ attempted: true, inProgress: true });
+        if (expectedStatus === 'payment_in_progress') expect(first.content[0].text).toMatch(/Do NOT call buy again/);
+        expect(first.content[0].text).not.toMatch(/ORDER CONFIRMED/);
+        const pid = first.structuredContent.purchase.purchaseId;
+        const again = await client.callTool({ name: 'buy', arguments: args }) as any;
+        expect(again.structuredContent.purchase.purchaseId).toBe(pid);
+        await sleep(1300);
+        const polled = await client.callTool({ name: 'get_purchase', arguments: { purchaseId: pid } }) as any;
+        expect(polled.structuredContent.purchase.paymentState).not.toBe('not_received');
+        expect(f.bridge!.calls).toEqual([pid]);
+        expect((await f.h.gw.db.all('SELECT * FROM funding_evidence')).length).toBe(1);
+        expect((await f.h.gw.db.all('SELECT id FROM purchases')).length).toBe(1);
+      } finally { await client.close(); }
+    });
+  }
 });

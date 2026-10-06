@@ -6,6 +6,7 @@ import type { McpConfig } from '../mcp/config.js';
 import { sendJson, serveMcpPost } from '../mcp/http.js';
 import type { HostedMcpConfig } from './config.js';
 import { HOSTED_MCP_SCOPES, HostedOAuth } from './oauth.js';
+import { BackgroundJobs } from '../mcp/tools.js';
 
 export interface HostedMcpMount {
   path: string;
@@ -61,6 +62,8 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
     extraRedirectUris: config.extraRedirectUris, ...(opts.now ? { now: opts.now } : {}),
   });
   const metadataUrl = getOAuthProtectedResourceMetadataUrl(resource);
+  // One registry for this process: MCP servers are created per request, the long operations they start must outlive them.
+  const background = new BackgroundJobs(config.backgroundWaitMs ?? 45_000);
   const scopesSupported = [...HOSTED_MCP_SCOPES];
 
   const root = express.Router();
@@ -107,11 +110,11 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
       bridgeTimeoutMs: config.bridgeTimeoutMs ?? 100_000,
       bridgeStatusTimeoutMs: config.bridgeStatusTimeoutMs ?? 60_000,
       // Exact quotes drive a headless checkout on a small free instance and can take minutes; the quote itself continues server-side.
-      gatewayTimeoutMs: config.gatewayTimeoutMs ?? 170_000,
+      gatewayTimeoutMs: config.gatewayTimeoutMs ?? 600_000,
       ...(config.cardanoBridge ? { bridges: { cardano: config.cardanoBridge } } : {}),
       ...(opts.fetch ? { fetch: opts.fetch } : {}),
     };
-    void serveMcpPost(toolConfig, req, res, { hosted: { resourceMetadataUrl: metadataUrl } }).catch(() => {
+    void serveMcpPost(toolConfig, req, res, { hosted: { resourceMetadataUrl: metadataUrl }, background }).catch(() => {
       if (!res.headersSent) rpcError(res, 500, -32603, 'internal error');
     });
   });

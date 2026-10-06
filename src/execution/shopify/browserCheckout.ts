@@ -202,6 +202,11 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     this.clock = opts.clock ?? systemClock;
   }
 
+  /** A small shared-CPU instance renders checkout steps several times slower; its timeouts scale accordingly (same checks, more patience). */
+  private ms(base: number): number {
+    return this.opts.lowMemory ? base * 4 : base;
+  }
+
   async complete(input: CheckoutDriverInput): Promise<CheckoutDriverResult> {
     return this.withPage(input.checkoutUrl, page => this.run(page, input, input.log));
   }
@@ -238,7 +243,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     try {
       // No video, no trace, no HAR: nothing that could capture PII is ever enabled.
       const context = await browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' });
-      context.setDefaultTimeout(STEP_TIMEOUT_MS);
+      context.setDefaultTimeout(this.ms(STEP_TIMEOUT_MS));
       await context.route('**/*', async route => {
         const request = route.request();
         if (this.opts.lowMemory && LOW_MEMORY_BLOCKED_TYPES.has(request.resourceType())) return route.abort().catch(() => undefined);
@@ -291,7 +296,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     const { fulfillment: f } = input;
     const a = f.shippingAddress;
 
-    await this.step(log, 'open_checkout', () => page.goto(input.checkoutUrl, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS }));
+    await this.step(log, 'open_checkout', () => page.goto(input.checkoutUrl, { waitUntil: 'domcontentloaded', timeout: this.ms(NAV_TIMEOUT_MS) }));
 
     // Storefront password gate on development stores.
     if (await this.onPasswordGate(page)) {
@@ -300,7 +305,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
         await page.locator('input[type="password"]').first().fill(input.storePassword!);
         await page.getByRole('button', { name: /enter/i }).first().click();
         await page.waitForLoadState('domcontentloaded');
-        await page.goto(input.checkoutUrl, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS });
+        await page.goto(input.checkoutUrl, { waitUntil: 'domcontentloaded', timeout: this.ms(NAV_TIMEOUT_MS) });
       });
       if (await this.onPasswordGate(page)) throw new CheckoutAbort('password_gate_failed');
     }
@@ -405,7 +410,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     // Capture passive diagnostics before closing the page on timeout/challenge. The durable
     // Pay checkpoint and unknown-outcome semantics remain unchanged; this never retries Pay.
     await this.step(log, 'await_confirmation', async () => {
-      const deadline = this.clock.now().getTime() + CONFIRM_TIMEOUT_MS;
+      const deadline = this.clock.now().getTime() + this.ms(CONFIRM_TIMEOUT_MS);
       for (;;) {
         if (/thank[-_]?you|\/orders\/[a-f0-9]{8,}/i.test(page.url())) break;
         await this.assertNoChallenge(page);
@@ -460,7 +465,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
   }
 
   private async settledTotals(page: Page, input: CheckoutQuoteInput): Promise<CheckoutTotals> {
-    const end = this.clock.now().getTime() + STEP_TIMEOUT_MS;
+    const end = this.clock.now().getTime() + this.ms(STEP_TIMEOUT_MS);
     let previous = '';
     let stable = 0;
     for (;;) {
@@ -486,7 +491,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
 
   private async chooseQuotedShipping(page: Page, title: string): Promise<void> {
     // Shopify renders delivery methods a few seconds after the address is complete: wait, bounded.
-    const end = this.clock.now().getTime() + STEP_TIMEOUT_MS;
+    const end = this.clock.now().getTime() + this.ms(STEP_TIMEOUT_MS);
     for (;;) {
       const radios = page.getByRole('radio', { name: title, exact: false });
       if (await radios.count() === 1) {
@@ -501,7 +506,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
   }
   /** Totals settle asynchronously after shipping/tax: poll until equal, else abort before paying. */
   private async waitForTotal(page: Page, expected: Money, breakdown?: CheckoutTotals): Promise<void> {
-    const end = this.clock.now().getTime() + STEP_TIMEOUT_MS;
+    const end = this.clock.now().getTime() + this.ms(STEP_TIMEOUT_MS);
     for (;;) {
       const body = await this.bodyText(page);
       const observed = breakdown ? readCheckoutTotals(body, breakdown.subtotal, breakdown.shipping, breakdown.shippingTitle) : null;

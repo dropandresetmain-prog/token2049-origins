@@ -25,6 +25,8 @@ export interface HostedMcpConfig {
   bridgeTimeoutMs?: number;
   bridgeStatusTimeoutMs?: number;
   gatewayTimeoutMs?: number;
+  /** How long a tool call waits for a long operation before answering "still running" (ChatGPT gives up after ~60 s). */
+  backgroundWaitMs?: number;
   /** Loopback URL of this same process, used by the MCP tools to call the gateway contract. */
   gatewayUrl: string;
 }

@@ -17,9 +17,56 @@ export interface ToolDeps {
   bridges?: BridgeClient[];
   /** Secret strings (gateway token, bridge tokens) that must never appear in any output. */
   secrets: string[];
+  /**
+   * Hosted only: ChatGPT abandons a tool call after about a minute, but an exact quote on a small free instance and the payer's settlement can
+   * take longer. With this set, those operations keep running in this (persistent) process; the tool answers after `waitMs` with a "still
+   * running" result and the same call (same arguments) is safe to repeat: it joins the running job instead of starting another.
+   */
+  background?: BackgroundJobs;
   /** Present on the hosted endpoint: tools declare OAuth security schemes and enforce the token's scopes. */
   auth?: { resourceMetadataUrl: string };
 }
+
+interface JobRecord { state: 'running' | 'done' | 'failed'; promise: Promise<void>; value?: unknown; error?: unknown; expires: number }
+
+/** In-process registry of long operations, keyed by a hash of who asked for what. Results are kept briefly so repeated calls are idempotent. */
+export class BackgroundJobs {
+  private readonly jobs = new Map<string, JobRecord>();
+  constructor(readonly waitMs = 45_000, private readonly keepMs = 10 * 60_000, private readonly now: () => number = Date.now) {}
+
+  private wait(ms: number): Promise<'timeout'> {
+    return new Promise((resolve) => { const t = setTimeout(() => resolve('timeout'), ms); t.unref?.(); });
+  }
+
+  /** Start (or join) the job for `key`; resolve with its value, or `{ pending: true }` if it is still running after waitMs. Failures are rethrown once and forgotten. */
+  async run<T>(key: string, start: () => Promise<T>): Promise<{ pending: false; value: T } | { pending: true }> {
+    for (const [k, j] of this.jobs) if (j.state !== 'running' && j.expires <= this.now()) this.jobs.delete(k);
+    let job = this.jobs.get(key);
+    if (!job) {
+      const created: JobRecord = { state: 'running', expires: Number.POSITIVE_INFINITY, promise: Promise.resolve() };
+      created.promise = start().then(
+        (v) => { created.state = 'done'; created.value = v; created.expires = this.now() + this.keepMs; },
+        (e) => { created.state = 'failed'; created.error = e; created.expires = this.now(); },
+      );
+      this.jobs.set(key, created);
+      job = created;
+    }
+    await Promise.race([job.promise, this.wait(this.waitMs)]);
+    if (job.state === 'running') return { pending: true };
+    if (job.state === 'failed') { this.jobs.delete(key); throw job.error; }
+    return { pending: false, value: job.value as T };
+  }
+
+  /** Await `promise` for at most waitMs; if it is still running it keeps running (rejections are swallowed here, the durable state is authoritative). */
+  async within<T>(promise: Promise<T>): Promise<{ pending: false; value: T } | { pending: true }> {
+    const settled = promise.then((value) => ({ pending: false as const, value }));
+    settled.catch(() => undefined);
+    const first = await Promise.race([settled, this.wait(this.waitMs)]);
+    return first === 'timeout' ? { pending: true } : first;
+  }
+}
+
+const stableKey = (value: unknown): string => JSON.stringify(value, (_k, v) => (v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.entries(v as Record<string, unknown>).sort(([a], [b]) => a.localeCompare(b))) : v));
 
 /** OAuth scope each tool needs (same names as the gateway's customer scopes). */
 const TOOL_SCOPE = { find_offers: 'offers:read', create_quote: 'quotes:write', buy: 'purchases:write', get_purchase: 'purchases:read' } as const;
@@ -308,7 +355,19 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       try {
         const assessment = assessFulfillment(fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
-        const { quote } = await deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
+        const ask = () => deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
+        let created: Awaited<ReturnType<typeof ask>>;
+        if (deps.background) {
+          const customer = String((extra as { authInfo?: { extra?: Record<string, unknown> } }).authInfo?.extra?.customerId ?? 'anonymous');
+          const key = createHash('sha256').update(stableKey({ customer, offerId, fulfillment: assessment.value })).digest('hex');
+          const r = await deps.background.run(key, ask);
+          if (r.pending) {
+            return success(deps, 'The exact quote is still being prepared (the merchant checkout is slow). Nothing has been purchased. Tell the user it is in progress, wait about 20 seconds, then call create_quote again with EXACTLY the same offerId and fulfillment to collect it. Do not change the arguments and do not start another search.',
+              { status: 'quote_pending', retryAfterSeconds: 20, offerId });
+          }
+          created = r.value;
+        } else created = await ask();
+        const { quote } = created;
         const payers = await connectedPayers(deps);
         const fundingSources = payers.map(p => p.source);
         const headrooms = new Map(payers.flatMap(p => (p.headroom !== undefined ? [[p.source.sourceId, p.headroom] as [string, bigint]] : [])));
@@ -395,17 +454,21 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         // A repeated interaction follows durable truth. Submitted/unknown payments are never sent again.
         if (newlyCreated && purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && payer && !paymentAttempts.has(purchase.purchaseId)) {
           paymentAttempts.add(purchase.purchaseId);
-          const paid = await payer.pay(purchase.purchaseId);
+          const attempt = payer.pay(purchase.purchaseId);
+          const first = deps.background ? await deps.background.within(attempt) : { pending: false as const, value: await attempt };
           purchase = (await deps.gateway.getPurchase(purchase.purchaseId)).purchase;
-          if (paid.ok) payment = { attempted: true, ok: true, transferReference: paid.transferReference };
+          if (first.pending) {
+            // The payer keeps working (its own durable history makes a repeat impossible); we simply stop waiting.
+            payment = { attempted: true, ok: null, inProgress: true };
+          } else if (first.value.ok) payment = { attempted: true, ok: true, transferReference: first.value.transferReference };
           else {
-            payment = { attempted: true, ok: false, code: paid.code, message: paid.message };
+            payment = { attempted: true, ok: false, code: first.value.code, message: first.value.message };
             paymentFailed = purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received';
           }
         }
 
         const status =
-          purchase.state === 'awaiting_funding' ? (purchase.paymentState !== 'not_received' ? 'confirmation_pending' : paymentFailed ? 'payment_failed' : 'action_required') : purchase.state === 'funded_queued' || purchase.state === 'executing' ? 'execution_pending' : purchase.state;
+          purchase.state === 'awaiting_funding' ? (purchase.paymentState !== 'not_received' ? 'confirmation_pending' : payment?.inProgress ? 'payment_in_progress' : paymentFailed ? 'payment_failed' : 'action_required') : purchase.state === 'funded_queued' || purchase.state === 'executing' ? 'execution_pending' : purchase.state;
         const structured: Record<string, unknown> = { status, purchase, progress: projectProgress(purchase), ...(payment ? { payment } : {}) };
         let text = describePurchase(purchase);
         const confirmation = orderConfirmation(purchase);
@@ -417,7 +480,9 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         if (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received') {
           structured.fundingInstructions = purchase.fundingInstructions;
           structured.message =
-            paymentFailed && payment
+            payment?.inProgress
+              ? 'The payer is submitting the payment (this can take a minute or more). Do NOT call buy again and do not retry. Tell the user it is in progress and call get_purchase with this purchaseId every ~20 seconds until it reports the outcome.'
+            : paymentFailed && payment
               ? `Payment attempt failed [${String(payment.code)}]: ${String(payment.message)}. No purchase has been made yet.`
               : 'Payment required: fund via a bounded payer client; no purchase has been made yet.';
           text = `${structured.message as string}\n${text}`;

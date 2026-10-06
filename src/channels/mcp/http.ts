@@ -3,6 +3,7 @@ import type { AddressInfo } from 'node:net';
 import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/streamableHttp.js';
 import type { McpConfig } from './config.js';
 import { createMcpServer } from './server.js';
+import type { BackgroundJobs } from './tools.js';
 
 export const MAX_BODY_BYTES = 1_000_000;
 
@@ -41,7 +42,7 @@ export async function readBody(req: IncomingMessage): Promise<unknown> {
  * Serve one stateless Streamable HTTP POST: bounded body, fresh server + transport per request (no session to hijack),
  * safe errors. Callers have already authenticated the request and validated Host/Origin.
  */
-export async function serveMcpPost(config: McpConfig, req: IncomingMessage, res: ServerResponse, opts: { hosted?: { resourceMetadataUrl: string } } = {}): Promise<void> {
+export async function serveMcpPost(config: McpConfig, req: IncomingMessage, res: ServerResponse, opts: { hosted?: { resourceMetadataUrl: string }; background?: BackgroundJobs } = {}): Promise<void> {
   let body: unknown;
   try {
     body = await readBody(req);
