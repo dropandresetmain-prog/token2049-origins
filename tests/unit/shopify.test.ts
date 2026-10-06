@@ -1,7 +1,7 @@
 import { demoData } from '../../src/demo/config.js';
 import { describe, it, expect, vi } from 'vitest';
 import { createShopifyExecutor, hasPaidTestEvidence, cartSignature } from '../../src/execution/shopify/index.js';
-import { readCartTotals, cheapestSelections, StorefrontClient, type StorefrontCart } from '../../src/execution/shopify/storefront.js';
+import { readCartTotals, readCartAddress, cheapestSelections, StorefrontClient, type StorefrontCart } from '../../src/execution/shopify/storefront.js';
 import { AdminClient, type AdminOrder } from '../../src/execution/shopify/admin.js';
 import { CheckoutAbort, createStepLogger, type CheckoutDriver } from '../../src/execution/shopify/checkout.js';
 import { isTrustedCheckoutUrl, displayedTotalMatches, challengeFromText, hasTestGateway } from '../../src/execution/shopify/browserCheckout.js';
@@ -29,7 +29,7 @@ function cart(): StorefrontCart {
 }
 function order(): AdminOrder { return { id: 'gid://shopify/Order/123', name: '#1001', test: true, displayFinancialStatus: 'PAID', totalPriceSet: { presentmentMoney: amount('32.00') },
   customAttributes: [{ key: 't2o_quote', value: nonce }], transactions: [{ kind: 'SALE', status: 'SUCCESS', test: true, gateway: 'bogus', amountSet: { presentmentMoney: amount('32.00') } }] }; }
-async function setup(driver?: CheckoutDriver) {
+async function setup(driver?: Pick<CheckoutDriver, 'complete'> & Partial<Pick<CheckoutDriver, 'quote'>>) {
   let current = cart();
   let orders: AdminOrder[] = [];
   const sf = { findVariants: vi.fn(async () => [{ variantId: 'gid://shopify/ProductVariant/123', title: 'Test shirt', description: 'Fixture', unitPrice: money('USD',1250) }]),
@@ -37,14 +37,43 @@ async function setup(driver?: CheckoutDriver) {
     selectDelivery: vi.fn(async () => current), getCart: vi.fn(async () => current) };
   const admin = { searchOrders: vi.fn(async () => orders) };
   const complete = driver ?? { complete: vi.fn(async (input) => { await input.checkpoint('pay_click', { at: '2026-10-06T12:00:00.000Z' }); const o = order(); o.customAttributes[0]!.value = current.attributes[0]!.value; orders = [o]; return { orderName: '#1001' }; }) };
-  const opts = { storefront: sf, admin, driver: complete, clock: new ManualClock() };
+  const quoteRead = vi.fn(async () => readCartTotals(cart()));
+  const combinedDriver: CheckoutDriver = { ...complete, quote: driver?.quote ?? quoteRead };
+  const opts = { storefront: sf, admin, driver: combinedDriver, clock: new ManualClock() };
   const executor = createShopifyExecutor(env, opts);
   const quote = await executor.quote({ executionRef: { variantId: 'gid://shopify/ProductVariant/123', quantity: 2 }, intent }, f);
   const ctx: ExecutionContext = { purchaseId: 'purchase', attemptId: 'attempt', idempotencyKey: 'attempt', quote: { quoteId: 'quote', ...quote }, fulfillment: f, checkpoints: {}, checkpoint: vi.fn(async (step,data) => { ctx.checkpoints[step] = data; }) };
-  return { executor, ctx, quote, sf, admin, complete, current, setOrders: (value: AdminOrder[]) => { orders = value; }, opts };
+  return { executor, ctx, quote, sf, admin, complete, current, setOrders: (value: AdminOrder[]) => { orders = value; }, quoteRead, opts };
 }
 
 describe('Shopify exact quote boundary', () => {
+  it('reads required codes from the selected address when the delivery-group projection omits them', () => {
+    const c=cart(); const group=c.deliveryGroups.nodes[0]!.deliveryAddress;
+    c.delivery={addresses:[{selected:true,address:{...group,countryCode:group.countryCodeV2}}]};
+    group.countryCodeV2=null;group.provinceCode=null;
+    expect(readCartAddress(c)).toMatchObject({countryCodeV2:f.shippingAddress.countryCode,provinceCode:f.shippingAddress.province});
+  });
+  it.each(['country','province','street','multiple'])('rejects ambiguous/conflicting selected delivery %s', key => {
+    const c=cart();const group=c.deliveryGroups.nodes[0]!.deliveryAddress;
+    c.delivery={addresses:[{selected:true,address:{...group,countryCode:group.countryCodeV2}}]};
+    const a=c.delivery.addresses[0]!.address;
+    if(key==='country')a.countryCode='SG';
+    if(key==='province')a.provinceCode='CA';
+    if(key==='street')a.address1='Different street';
+    if(key==='multiple')c.delivery.addresses.push({...c.delivery.addresses[0]!});
+    expect(()=>readCartAddress(c)).toThrow();
+  });
+  it('new quote hashes bind the selected address without changing legacy hashes', () => {
+    const c=cart();const legacy=cartSignature(c);
+    const group=c.deliveryGroups.nodes[0]!.deliveryAddress;
+    c.delivery={addresses:[{selected:true,address:{...group,countryCode:group.countryCodeV2}}]};
+    expect(cartSignature(c)).toBe(legacy);
+    const bound=cartSignature(c,true);
+    c.delivery.addresses[0]!.address.provinceCode='CA';
+    expect(cartSignature(c,true)).not.toBe(bound);
+    expect(cartSignature(c)).toBe(legacy);
+  });
+
   it('quotes decimal totals, explicit tax and chosen shipping with private opaque binding', async () => {
     const s = await setup();
     expect(s.quote.merchantTotal).toEqual(money('USD',3200));
@@ -84,6 +113,63 @@ describe('Shopify exact quote boundary', () => {
     await expect(s.executor.quote({ executionRef: {}, intent }, { ...f, email: 'buyer@real.com' })).rejects.toThrow('Synthetic');
     expect(loadShopifyConfig({ ...env, SHOPIFY_STORE_DOMAIN: '127.0.0.1' }).invalid).toContain('SHOPIFY_STORE_DOMAIN');
   });
+});
+
+describe('Shopify hosted-checkout quote and execution binding', () => {
+  it('quotes estimated API costs only from independently observed checkout totals, without executing', async () => {
+    const s = await setup();
+    s.current.cost.totalAmountEstimated = true;
+    s.current.cost.subtotalAmountEstimated = true;
+    s.current.cost.totalTaxAmountEstimated = true;
+    s.current.cost.totalTaxAmount = null;
+    const q = await s.executor.quote({ executionRef: { variantId: 'gid://shopify/ProductVariant/123', quantity: 2 }, intent }, f);
+    expect(q.merchantTotal).toEqual(money('USD',3200));
+    expect(q.executionRef.checkoutTotals).toMatchObject({tax:money('USD',200)});
+    expect(s.quoteRead).toHaveBeenCalledTimes(2);
+    expect(s.complete.complete).not.toHaveBeenCalled();
+    expect(s.admin.searchOrders).not.toHaveBeenCalled();
+  });
+  it('propagates checkout observation failure without creating an approvable quote', async () => {
+    await expect(setup({complete:vi.fn(),quote:async () => {throw new CheckoutAbort('total_mismatch');}})).rejects.toThrow();
+  });
+  it.each(['tax','currency','scale','subtotal','shipping'])('rejects inconsistent observed checkout %s at the adapter boundary', async key => {
+    const observed=readCartTotals(cart());
+    if(key==='tax')observed.tax=money('USD',100);
+    if(key==='currency')observed.total.currency='SGD';
+    if(key==='scale'){observed.total.scale=3;observed.tax.scale=3;}
+    if(key==='subtotal')observed.subtotal=money('USD',2600);
+    if(key==='shipping')observed.shipping=money('USD',600);
+    await expect(setup({complete:vi.fn(),quote:async () => observed})).rejects.toThrow('Checkout breakdown');
+  });
+  it('execution revalidates estimated API cart binding while preserving the frozen checkout breakdown', async () => {
+    const s=await setup();
+    s.current.cost.totalAmountEstimated=true;
+    s.current.cost.subtotalAmountEstimated=true;
+    s.current.cost.totalTaxAmountEstimated=true;
+    s.current.cost.totalTaxAmount=null;
+    s.ctx.quote.executionRef.cartHash=cartSignature(s.current);
+    expect(await s.executor.execute(s.ctx)).toMatchObject({kind:'succeeded'});
+    expect(s.complete.complete).toHaveBeenCalledWith(expect.objectContaining({expectedCheckoutTotals:s.ctx.quote.executionRef.checkoutTotals}));
+  });
+  it('a changed cart before pay checkpoint stops execution without a payment write', async () => {
+    let clicks=0;
+    const s=await setup({complete:async input => {
+      s.current.lines.nodes[0]!.quantity=3;
+      await input.checkpoint('pay_click',{}); clicks++; return {};
+    }});
+    expect(await s.executor.execute(s.ctx)).toMatchObject({kind:'terms_changed'});
+    expect(clicks).toBe(0);
+    expect(s.ctx.checkpoints.pay_click).toBeUndefined();
+  });
+  it('legacy quotes still refuse an estimated API cart before any browser execution', async () => {
+    const s=await setup();
+    delete s.ctx.quote.executionRef.checkoutTotals;
+    s.current.cost.totalAmountEstimated=true;
+    s.ctx.quote.executionRef.cartHash=cartSignature(s.current);
+    expect(await s.executor.execute(s.ctx)).toMatchObject({kind:'terms_changed'});
+    expect(s.complete.complete).not.toHaveBeenCalled();
+  });
+
 });
 
 describe('Shopify payment checkpoint and independent readback', () => {

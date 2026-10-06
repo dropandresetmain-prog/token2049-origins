@@ -12,15 +12,19 @@
 import fs from 'node:fs';
 import path from 'node:path';
 import type { Page } from 'playwright-core';
+import { z } from 'zod';
 import { demoData } from '../src/demo/config.js';
 import { loadShopifyConfig } from '../src/execution/shopify/config.js';
 import { ShopifyExecutor } from '../src/execution/shopify/index.js';
 import { AdminClient } from '../src/execution/shopify/admin.js';
+import { StorefrontClient } from '../src/execution/shopify/storefront.js';
 import { createPlaywrightDriver, parseDisplayedTotals, type CheckoutObserver } from '../src/execution/shopify/browserCheckout.js';
 import { createStepLogger } from '../src/execution/shopify/checkout.js';
 import { systemClock } from '../src/infrastructure/clock.js';
 import { RetailIntent } from '../src/contracts/intent.js';
 import type { Money } from '../src/contracts/money.js';
+import { ProviderError } from '../src/core/errors.js';
+import type { CheckoutTotals } from '../src/execution/shopify/checkout.js';
 
 export class RehearsalStop extends Error {
   constructor() {
@@ -208,7 +212,75 @@ async function resolvePermalink(): Promise<string> {
 }
 
 // ---- real quote through the real executor, then the real driver ----
-const executor = new ShopifyExecutor(env);
+// Observe only status, operation names, estimate flags and monetary fields. Never persist cart keys,
+// checkout URLs, request headers, addresses or raw provider responses.
+let lastCartId: string | null = null;
+const requestCounts: Record<string, number> = {};
+const moneySnapshot = (value: unknown): Record<string, unknown> | null => {
+  if (!value || typeof value !== 'object') return null;
+  const m = value as Record<string, unknown>;
+  return typeof m.amount === 'string' && /^\d+(?:\.\d+)?$/.test(m.amount) && typeof m.currencyCode === 'string' && /^[A-Z]{3}$/.test(m.currencyCode)
+    ? { amount: m.amount, currency: m.currencyCode } : null;
+};
+const diagnosticCart = z.object({
+  id: z.string(),
+  buyerIdentity: z.object({email:z.string().nullable()}),
+  delivery: z.object({addresses:z.array(z.object({selected:z.boolean(),address:z.record(z.string(),z.unknown())}))}).optional(),
+  cost: z.object({
+    totalAmount: z.unknown(), subtotalAmount: z.unknown(), totalTaxAmount: z.unknown(), totalDutyAmount: z.unknown(),
+    totalAmountEstimated: z.boolean(), subtotalAmountEstimated: z.boolean(), totalTaxAmountEstimated: z.boolean(),
+  }),
+  deliveryGroups: z.object({ nodes: z.array(z.object({ deliveryAddress:z.record(z.string(),z.unknown()), selectedDeliveryOption: z.object({ estimatedCost: z.unknown() }).nullable() })) }),
+});
+const diagnosticEnvelope = z.object({
+  errors: z.array(z.object({ extensions: z.object({ code: z.string().optional() }).optional() })).optional(),
+  data: z.object({
+    cartCreate: z.object({ cart: diagnosticCart.nullable() }).optional(),
+    cartSelectedDeliveryOptionsUpdate: z.object({ cart: diagnosticCart.nullable() }).optional(),
+    cart: diagnosticCart.nullable().optional(),
+  }).nullable().optional(),
+});
+const diagnosticFetch: typeof fetch = async (url, init) => {
+  const response = await fetch(url, init);
+  if (String(url) !== `https://${cfg.storeDomain}/api/${cfg.apiVersion}/graphql.json`) return response;
+  const query = typeof init?.body === 'string' ? (JSON.parse(init.body) as { query?: string }).query ?? '' : '';
+  const operation = /mutation CartCreate\b/.test(query) ? 'cartCreate' : /mutation CartSelectDelivery\b/.test(query) ? 'selectDelivery' : /query CartRead\b/.test(query) ? 'cartRead' : 'search';
+  requestCounts[operation] = (requestCounts[operation] ?? 0) + 1;
+  const raw = await response.clone().json().catch(() => null);
+  const parsed = diagnosticEnvelope.safeParse(raw);
+  const payload = parsed.success ? parsed.data : null;
+  const codes = Array.isArray(payload?.errors) ? [...new Set(payload.errors.map((e: { extensions?: { code?: string } }) => ['THROTTLED', 'ACCESS_DENIED'].includes(e.extensions?.code ?? '') ? e.extensions!.code : 'UNKNOWN'))] : [];
+  const cart = payload?.data?.cartCreate?.cart ?? payload?.data?.cartSelectedDeliveryOptionsUpdate?.cart ?? payload?.data?.cart;
+  if (typeof cart?.id === 'string') lastCartId = cart.id;
+  const cost = cart?.cost;
+  const comparisons: Record<string, boolean> = {};
+  if (cart) {
+    const a=cart.deliveryGroups.nodes[0]?.deliveryAddress ?? {};
+    const expected=demoData.buyer.shippingAddress;
+    const normalize=(v:unknown)=>typeof v==='string'?v.trim().replace(/\s+/g,' ').toLowerCase():'';
+    for(const key of ['firstName','lastName','address1','address2','city','zip'] as const) comparisons[key]=normalize(a[key])===normalize(expected[key]);
+    comparisons.groupCountryCodePresent=typeof a.countryCodeV2==='string' && a.countryCodeV2.length>0;
+    comparisons.groupProvincePresent=typeof a.provinceCode==='string' && a.provinceCode.length>0;
+    comparisons.countryCode=a.countryCodeV2===expected.countryCode;
+    comparisons.province=normalize(a.provinceCode)===normalize(expected.province);
+    comparisons.email=cart.buyerIdentity.email===demoData.buyer.email;
+    const selected=cart.delivery?.addresses.filter(a=>a.selected);
+    if(selected?.length===1){comparisons.selectedCountryCode=selected[0]!.address.countryCode===expected.countryCode;comparisons.selectedProvince=normalize(selected[0]!.address.provinceCode)===normalize(expected.province);}
+  }
+  emit('storefront_response', {
+    operation, status: response.status, errorCodes: codes, fulfillmentFieldMatches: comparisons,
+    ...(cost ? {
+      total: moneySnapshot(cost.totalAmount), subtotal: moneySnapshot(cost.subtotalAmount), tax: moneySnapshot(cost.totalTaxAmount), duty: moneySnapshot(cost.totalDutyAmount),
+      totalEstimated: cost.totalAmountEstimated === true, subtotalEstimated: cost.subtotalAmountEstimated === true, taxEstimated: cost.totalTaxAmountEstimated === true,
+      shipping: (cart.deliveryGroups?.nodes ?? []).map((g) => moneySnapshot(g.selectedDeliveryOption?.estimatedCost)),
+    } : {}),
+  });
+  return response;
+};
+const executor = new ShopifyExecutor(env, { fetchImpl: diagnosticFetch, checkoutObserver: observer, sink: (line) => {
+  const step = /step=([a-z0-9_.-]+)/.exec(line)?.[1];
+  if (step) { stepsSeen.push(step); emit('step', { stage: 'quote', step }); }
+} });
 const intent = RetailIntent.parse({
   category: 'retail',
   productRef: demoData.retail.productRef,
@@ -220,7 +292,7 @@ const fulfillment = { category: 'retail' as const, ...demoData.buyer };
 let outcome = 'UNKNOWN';
 let failure: { code: string; message: string } | null = null;
 try {
-  let ref: { checkoutUrl: string; shippingTitle: string };
+  let ref: { checkoutUrl: string; shippingTitle: string; checkoutTotals?: CheckoutTotals };
   let expectedTotal: Money;
   if (permalinkMode) {
     // DIAGNOSTIC ONLY: official cart permalink resolved over plain HTTP (no Storefront API / cartCreate).
@@ -232,9 +304,11 @@ try {
     const offers = await executor.search(intent);
     if (offers.length !== 1) throw new Error(`expected exactly one offer, got ${offers.length}`);
     const quote = await executor.quote({ executionRef: offers[0]!.executionRef, intent }, fulfillment);
-    ref = quote.executionRef as { checkoutUrl: string; shippingTitle: string };
+    ref = quote.executionRef as { checkoutUrl: string; shippingTitle: string; checkoutTotals?: CheckoutTotals };
     expectedTotal = quote.merchantTotal;
     emit('quote', {
+      title: quote.title, productRef: demoData.retail.productRef, country: demoData.retail.shipToCountry,
+      checkoutPath: new URL(ref.checkoutUrl).pathname.startsWith('/checkouts/') ? '/checkouts/:token' : new URL(ref.checkoutUrl).pathname.startsWith('/cart/c/') ? '/cart/c/:token' : '/other',
       merchantTotalMinor: quote.merchantTotal.amountMinor,
       currency: quote.merchantTotal.currency,
       breakdown: quote.breakdown.map((b) => ({ kind: b.kind, amountMinor: b.amount.amountMinor })),
@@ -254,6 +328,7 @@ try {
     checkoutUrl: ref.checkoutUrl,
     fulfillment,
     expectedTotal,
+    expectedCheckoutTotals: ref.checkoutTotals,
     shippingTitle: ref.shippingTitle,
     storePassword: cfg.storePassword,
     log,
@@ -268,7 +343,15 @@ try {
   if (e instanceof RehearsalStop) outcome = 'REHEARSAL_STOPPED_BEFORE_PAY_CLICK';
   else {
     outcome = 'REHEARSAL_FAILED_BEFORE_PAY_CLICK';
-    failure = { code: String((e as { code?: unknown }).code ?? (e as Error).name), message: String((e as Error).message).slice(0, 120) };
+    failure = { code: e instanceof ProviderError ? e.providerCode : String((e as { code?: unknown }).code ?? (e as Error).name), message: String((e as Error).message).slice(0, 120) };
+    // A delayed total may settle. Read the same cart only; this never creates a replacement cart.
+    if (lastCartId && stepsSeen.length === 0 && !permalinkMode) {
+      const sf = new StorefrontClient(cfg, diagnosticFetch);
+      for (const delay of [1000, 3000]) {
+        await new Promise((resolve) => setTimeout(resolve, delay));
+        await sf.getCart(lastCartId, demoData.retail.shipToCountry).catch(() => null);
+      }
+    }
   }
 }
 if (stepsSeen.includes('await_confirmation')) outcome = 'SAFETY_VIOLATION_POST_CLICK_STEP_REACHED';
@@ -281,7 +364,7 @@ try {
   ordersCreated = 'readback_failed';
 }
 const blockedList = [...blocked.values()];
-emit('end', { outcome, failure, ordersCreatedSinceStart: ordersCreated, blockedRequests: blockedList });
+emit('end', { outcome, failure, ordersCreatedSinceStart: ordersCreated, requestCounts, blockedRequests: blockedList });
 fs.writeFileSync(
   path.join(outDir, '03-rehearsal-summary.md'),
   [

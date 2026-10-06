@@ -101,3 +101,26 @@ No new unresolved acceptance blocker was found in this lane. Shopify IN-1 (hoste
 forced click), Atlas IN-2 (ambiguous payment result), and Atlas IN-3 (fee readback/runbook claim) stay
 **Investigate Now** blockers. Their affected provider files were not changed. Resolve through the
 already-defined acceptance work only after independent review; this lane ran no external calls.
+
+
+## Current E2E acceptance blocker — 2026-10-06
+
+**Investigate Now: production Shopify cart cannot substantiate an exact quote.** The US Storefront cartCreate/delivery-selection response and two subsequent reads returned USD 17.95 with all estimate flags true and explicit tax null. Capsule correctly refused shopify_total_unavailable before browser/payment. Do not infer zero tax or ignore estimates. Recommended action requires a human provider-strategy decision: read-only checkout totals before quote approval/funding, with unchanged execution/pay checkpoints. Deferral blocks first external acceptance; accepting estimates risks falsely labelled exact terms. See issue 26 and complete append-only reconciliation in [E2E ledger](evidence/e2e-acceptance-log.md). Production-path rehearsal is BLOCKED; prior permalink evidence remains partial. No payment, order or Cardano transaction occurred.
+
+
+### Shopify Phase 1 resolution — 2026-10-06 21:01 Singapore
+
+The user approved read-only checkout quote discovery. Issue 26 is resolved for the unfunded production rehearsal: settled hosted checkout supplies the exact full breakdown; API estimate/null-tax fields are not treated as payable proof. New execution verifies the frozen breakdown and cart binding before the unchanged pay checkpoint; legacy guards retained. Issue 28 (delivery-group omitted country/province) is resolved by explicit selected CartDeliveryAddress plus strict conflict/request checks and modern hash binding. Real production flow stopped before Pay with USD 17.95, US/NY, normal actionability and 0 new Admin orders. Paid E2E remains NOT_RUN. Deployment token/env/Render market verification remains open; SG sellability deferred. See the append-only ledger's Checkpoint A section.
+
+### Phase 2 candidate disposition
+
+Public Storefront authentication is the intended Render profile and independently passed catalog
+readback; the local private delegate must stay unset because it has no runtime refresh. This resolves
+issue 12's deployment-token choice, while actual Render token validity/cart/browser/market remain
+Investigate Now verification at deployment. Issue 30's stale Blueprint branch is corrected to main
+with automatic deploys off. Old private env aliases are documented against live config names; actual
+secret environment verification is still open (issue 4). Broad provisioning scopes and recurring
+cartCreate throttle risk remain Ignore / Accept Risk for the bounded demo; minimize scopes later.
+Deferring deployed readiness checks could produce an unusable rail or checkout, so funding remains
+blocked until those checks pass. The candidate passed 514/514 tests; paid external acceptance is not
+claimed. Full issue classifications, evidence and seed dispositions remain in the E2E ledger.

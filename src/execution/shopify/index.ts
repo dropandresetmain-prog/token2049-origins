@@ -6,26 +6,31 @@ import { Money, compareMoney } from '../../contracts/money.js';
 import { systemClock, type Clock } from '../../infrastructure/clock.js';
 import { ProviderError } from '../../core/errors.js';
 import { loadShopifyConfig } from './config.js';
-import { StorefrontClient, QUOTE_ATTRIBUTE, cheapestSelections, readCartTotals, type StorefrontCart } from './storefront.js';
+import { StorefrontClient, QUOTE_ATTRIBUTE, cheapestSelections, readCartTotals, readCartTerms, readCartAddress, type StorefrontCart } from './storefront.js';
 import { AdminClient, type AdminOrder } from './admin.js';
-import { createPlaywrightDriver, isTrustedCheckoutUrl } from './browserCheckout.js';
+import { createPlaywrightDriver, isTrustedCheckoutUrl, type CheckoutObserver } from './browserCheckout.js';
 import { CheckoutAbort, createStepLogger, type CheckoutDriver } from './checkout.js';
 import { toMoney } from './money.js';
 import { toProviderError } from './http.js';
 
 const hash = (value: unknown): string => createHash('sha256').update(JSON.stringify(value)).digest('hex');
 const same = (a: Money, b: Money): boolean => a.currency === b.currency && a.scale === b.scale && a.amountMinor === b.amountMinor;
+const CheckoutTotalsSchema = z.object({
+  total: Money, subtotal: Money, shipping: Money, tax: Money, shippingTitle: z.string().min(1),
+});
 const Ref = z.object({
   cartId: z.string().min(1), checkoutUrl: z.string(), nonce: z.string().uuid(), country: z.string().regex(/^[A-Z]{2}$/),
   fulfillmentHash: z.string().length(64), cartHash: z.string().length(64), createdAt: z.iso.datetime(),
   shippingTitle: z.string().min(1),
+  checkoutTotals: CheckoutTotalsSchema.optional(),
 });
 
 /** Hash private provider state without storing buyer fields in evidence or checkpoints. */
-export function cartSignature(cart: StorefrontCart): string {
+export function cartSignature(cart: StorefrontCart, includeSelectedAddress = false): string {
   return hash({ buyer: cart.buyerIdentity, cost: cart.cost, quantity: cart.totalQuantity, lines: cart.lines.nodes,
     delivery: cart.deliveryGroups.nodes.map(g => ({ address: g.deliveryAddress, selected: g.selectedDeliveryOption })),
-    attributes: cart.attributes });
+    attributes: cart.attributes,
+    ...(includeSelectedAddress && cart.delivery ? { selectedAddresses: cart.delivery.addresses } : {}) });
 }
 
 /** PAID alone can also describe manual payments; require successful test gateway money movement. */
@@ -51,6 +56,8 @@ export interface ShopifyExecutorOptions {
   admin?: Pick<AdminClient, 'searchOrders'>;
   driver?: CheckoutDriver;
   sink?: (step: string) => void;
+  /** Read-only diagnostics hooks; never installed by gateway composition. */
+  checkoutObserver?: CheckoutObserver;
 }
 
 export class ShopifyExecutor implements CommerceExecutor {
@@ -72,7 +79,7 @@ export class ShopifyExecutor implements CommerceExecutor {
     const { config } = this.report;
     this.sf = opts.storefront ?? (this.report.buyerReady ? new StorefrontClient(config, opts.fetchImpl ?? fetch) : null);
     this.admin = opts.admin ?? (this.report.adminReady ? new AdminClient(config, opts.fetchImpl ?? fetch, this.clock) : null);
-    this.driver = opts.driver ?? createPlaywrightDriver({ storeDomain: config.storeDomain, executablePath: config.browserExecutable, headless: config.headless, clock: this.clock });
+    this.driver = opts.driver ?? createPlaywrightDriver({ storeDomain: config.storeDomain, executablePath: config.browserExecutable, headless: config.headless, clock: this.clock, observer: opts.checkoutObserver });
     this.log = createStepLogger(opts.sink ?? (() => undefined));
     this.fixture = Boolean(opts.storefront || opts.admin || opts.driver);
   }
@@ -127,14 +134,34 @@ export class ShopifyExecutor implements CommerceExecutor {
       const selections = cheapestSelections(cart);
       if (!selections.length) throw new ProviderError('rejected', 'shopify_shipping_unavailable', 'Shipping unavailable for this buyer');
       cart = await this.sf!.selectDelivery(cart.id, selections, intent.data.shipToCountry);
-      const totals = readCartTotals(cart);
-      const actual = cart.deliveryGroups.nodes[0]!.deliveryAddress;
+      const terms = readCartTerms(cart);
+      if (!isTrustedCheckoutUrl(cart.checkoutUrl, this.report.config.storeDomain)) throw new ProviderError('rejected', 'shopify_untrusted_url', 'Checkout URL is outside configured store');
+      const totals = CheckoutTotalsSchema.parse(await this.driver.quote({
+        checkoutUrl: cart.checkoutUrl, fulfillment: f, expectedSubtotal: terms.subtotal, expectedShipping: terms.shipping,
+        shippingTitle: terms.shippingTitle, storePassword: this.report.config.storePassword, log: this.log,
+      }));
+      if (!same(totals.subtotal, terms.subtotal) || !same(totals.shipping, terms.shipping) || totals.shippingTitle !== terms.shippingTitle ||
+          totals.tax.currency !== totals.total.currency || totals.tax.scale !== totals.total.scale || totals.total.currency !== terms.subtotal.currency || totals.total.scale !== terms.subtotal.scale ||
+          BigInt(totals.total.amountMinor) !== BigInt(totals.subtotal.amountMinor) + BigInt(totals.shipping.amountMinor) + BigInt(totals.tax.amountMinor))
+        throw new ProviderError('rejected', 'shopify_total_unavailable', 'Checkout breakdown does not match cart terms');
+      // The browser may update cart costs. Freeze the cart AFTER quote observation, and verify the
+      // requested identity/line/address below before exposing any approvable commercial terms.
+      const observedCart = await this.sf!.getCart(cart.id, intent.data.shipToCountry);
+      if (!observedCart || observedCart.id !== cart.id) throw new ProviderError('rejected', 'shopify_cart_mismatch', 'Quoted cart is unavailable');
+      const observedTerms = readCartTerms(observedCart);
+      if (!same(observedTerms.subtotal, terms.subtotal) || !same(observedTerms.shipping, terms.shipping) || observedTerms.shippingTitle !== terms.shippingTitle)
+        throw new ProviderError('rejected', 'shopify_cart_mismatch', 'Cart terms changed during quote observation');
+      cart = observedCart;
+      const actual = readCartAddress(cart);
       const expected = f.shippingAddress;
       const normalized = (s: string | null | undefined) => (s ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
-      if (cart.buyerIdentity.email !== f.email || ['firstName','lastName','address1','address2','city','zip'].some(key =>
-          normalized(actual[key as keyof typeof actual]) !== normalized(expected[key as keyof typeof expected])) ||
-          actual.countryCodeV2 !== expected.countryCode || normalized(actual.provinceCode) !== normalized(expected.province))
-        throw new ProviderError('rejected', 'shopify_address_changed', 'Provider delivery address differs from requested fulfillment');
+      const changedAddressFields = ['firstName','lastName','address1','address2','city','zip'].filter(key =>
+        normalized(actual[key as keyof typeof actual]) !== normalized(expected[key as keyof typeof expected]));
+      if (cart.buyerIdentity.email !== f.email) changedAddressFields.push('email');
+      if (actual.countryCodeV2 !== expected.countryCode) changedAddressFields.push('countryCode');
+      if (normalized(actual.provinceCode) !== normalized(expected.province)) changedAddressFields.push('province');
+      if (changedAddressFields.length)
+        throw new ProviderError('rejected', 'shopify_address_changed', 'Provider fulfillment differs in fields: ' + changedAddressFields.join(','));
       if (!isTrustedCheckoutUrl(cart.checkoutUrl, this.report.config.storeDomain)) throw new ProviderError('rejected', 'shopify_untrusted_url', 'Checkout URL is outside configured store');
       if (compareMoney(totals.total, intent.data.spendCeiling) > 0) throw new ProviderError('rejected', 'shopify_spend_limit', 'Exact total exceeds spending ceiling');
       if (cart.lines.nodes.length !== 1 || cart.lines.nodes[0]!.merchandise.id !== line.data.variantId || cart.lines.nodes[0]!.quantity !== line.data.quantity ||
@@ -142,8 +169,8 @@ export class ShopifyExecutor implements CommerceExecutor {
       return { title: cart.lines.nodes[0]!.merchandise.product.title, merchantTotal: totals.total,
         breakdown: [{ kind: 'item', label: 'Items', amount: totals.subtotal }, { kind: 'shipping', label: totals.shippingTitle, amount: totals.shipping }, { kind: 'tax', label: 'Tax', amount: totals.tax }],
         terms: [`Shipping: ${totals.shippingTitle}`, 'Development store; Bogus gateway simulated payment'], fulfillmentSummary: `Synthetic delivery to ${intent.data.shipToCountry}`,
-        executionRef: { cartId: cart.id, checkoutUrl: cart.checkoutUrl, nonce, country: intent.data.shipToCountry, fulfillmentHash: hash(f), cartHash: cartSignature(cart),
-          shippingTitle: totals.shippingTitle, createdAt: this.clock.now().toISOString() }, expiresAt: this.expiry() };
+        executionRef: { cartId: cart.id, checkoutUrl: cart.checkoutUrl, nonce, country: intent.data.shipToCountry, fulfillmentHash: hash(f), cartHash: cartSignature(cart, true),
+          shippingTitle: totals.shippingTitle, checkoutTotals: totals, createdAt: this.clock.now().toISOString() }, expiresAt: this.expiry() };
     } catch (e) { throw toProviderError(e, 'shopify_quote_failed'); }
   }
 
@@ -165,16 +192,16 @@ export class ShopifyExecutor implements CommerceExecutor {
       if (hash(f) !== ref.fulfillmentHash || this.clock.now().getTime() >= Date.parse(ctx.quote.expiresAt))
         return { kind: 'terms_changed', reason: 'Quote expired or fulfillment changed', evidence: [] };
       const cart = await this.sf!.getCart(ref.cartId, ref.country);
-      if (!cart || cartSignature(cart) !== ref.cartHash || !same(readCartTotals(cart).total, ctx.quote.merchantTotal))
+      if (!cart || !this.matchesFrozenCart(cart, ref, ctx.quote.merchantTotal))
         return { kind: 'terms_changed', reason: 'Cart contents, delivery or total changed', evidence: [] };
       await ctx.checkpoint('shopify_started', { at: this.clock.now().toISOString() });
       await this.driver.complete({ checkoutUrl: ref.checkoutUrl, fulfillment: f, expectedTotal: ctx.quote.merchantTotal,
-        shippingTitle: ref.shippingTitle, storePassword: this.report.config.storePassword, log: this.log,
+        shippingTitle: ref.shippingTitle, expectedCheckoutTotals: ref.checkoutTotals, storePassword: this.report.config.storePassword, log: this.log,
         checkpoint: async (step, data) => {
           if (step !== 'pay_click' && step !== 'order') throw new CheckoutAbort('step_failed');
           if (step === 'pay_click') {
             const current = await this.sf!.getCart(ref.cartId, ref.country);
-            if (!current || cartSignature(current) !== ref.cartHash || !same(readCartTotals(current).total, ctx.quote.merchantTotal)) throw new CheckoutAbort('total_mismatch');
+            if (!current || !this.matchesFrozenCart(current, ref, ctx.quote.merchantTotal)) throw new CheckoutAbort('total_mismatch');
           }
           await ctx.checkpoint(step, data);
           ctx.checkpoints[step] = data;
@@ -189,6 +216,18 @@ export class ShopifyExecutor implements CommerceExecutor {
       return { kind: 'failed_definite', reason, providerReference: null, evidence: [] };
     }
   }
+  private matchesFrozenCart(cart: StorefrontCart, ref: z.infer<typeof Ref>, expected: Money): boolean {
+    if (cartSignature(cart, Boolean(ref.checkoutTotals)) !== ref.cartHash) return false;
+    try {
+      // Legacy quotes retain the original exact-cart check. New quotes use checkout evidence for
+      // payable totals, while the API still binds the same buyer, line, address and delivery method.
+      if (!ref.checkoutTotals) return same(readCartTotals(cart).total, expected);
+      const terms = readCartTerms(cart);
+      return same(ref.checkoutTotals.total, expected) && same(terms.subtotal, ref.checkoutTotals.subtotal) &&
+        same(terms.shipping, ref.checkoutTotals.shipping) && terms.shippingTitle === ref.checkoutTotals.shippingTitle;
+    } catch { return false; }
+  }
+
   private reference(ctx: ExecutionContext): string | null {
     const r = ctx.checkpoints.order?.providerReference ?? ctx.checkpoints.webhook_order?.providerReference;
     return typeof r === 'string' && /^(#[0-9]{3,}|[A-Z0-9]{6,12}|gid:\/\/shopify\/Order\/\d+)$/.test(r) ? r : null;

@@ -3,16 +3,35 @@ import type { Money } from '../../contracts/money.js';
 import { redactString } from '../../infrastructure/redact.js';
 
 /**
- * Port for the controlled buyer checkout. The executor owns outcome semantics; the driver only
- * drives the page and reports. The driver is given a `checkpoint` callback and MUST persist
- * `pay_click` before clicking pay: the executor treats any failure after that checkpoint as an
- * unknown outcome (money may have moved) and any failure before it as a definite not-sent.
+ * Separate read-only quote observation from payment execution. Quote inputs have no payment
+ * checkpoint and the quote path never enters card details or touches Pay. Execution MUST await
+ * the durable pay_click checkpoint before clicking; failures after it remain unknown outcomes.
  */
+export interface CheckoutQuoteInput {
+  checkoutUrl: string;
+  fulfillment: RetailFulfillment;
+  expectedSubtotal: Money;
+  expectedShipping: Money;
+  shippingTitle: string;
+  storePassword: string | null;
+  log(step: string): void;
+}
+
+export interface CheckoutTotals {
+  total: Money;
+  subtotal: Money;
+  shipping: Money;
+  tax: Money;
+  shippingTitle: string;
+}
+
 export interface CheckoutDriverInput {
   checkoutUrl: string;
   fulfillment: RetailFulfillment;
   /** Exact total the on-page total must equal before the test card is entered or pay is clicked. */
   expectedTotal: Money;
+  /** Frozen hosted-checkout breakdown for new quotes; absent on legacy cart-exact quotes. */
+  expectedCheckoutTotals?: CheckoutTotals;
   shippingTitle: string;
   /** Dev-store storefront password, if the gate appears. */
   storePassword: string | null;
@@ -29,6 +48,8 @@ export interface CheckoutDriverResult {
 }
 
 export interface CheckoutDriver {
+  /** Reads settled checkout totals without card entry, payment checkpoints or a Pay click. */
+  quote(input: CheckoutQuoteInput): Promise<CheckoutTotals>;
   complete(input: CheckoutDriverInput): Promise<CheckoutDriverResult>;
 }
 

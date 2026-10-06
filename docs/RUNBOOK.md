@@ -228,3 +228,56 @@ are unchanged. PG-1 lease renewal stays parked.
 Shopify IN-1 hosted-field allow-list/forced pay click must be investigated in the later UNFUNDED live
 rehearsal. Atlas IN-2 ambiguous pay.do and IN-3 final-fee readback remain payment-acceptance blockers;
 the provider table is not external acceptance proof. Do not enable Atlas to bypass these blockers.
+
+## Current Capsule E2E candidate — 2026-10-06
+
+This section supersedes the earlier Shopify IN-1 rehearsal instruction for this E2E. The production
+Storefront cartCreate path now creates an exact quote by observing the settled hosted checkout before
+approval or funding. Quote observation fills the approved synthetic buyer/address and selects shipping,
+but enters no card data and has no payment checkpoint. It freezes item/shipping/tax/total and the
+post-observation cart binding. The later execution browser rechecks the full breakdown and cart before
+its one durable pay_click boundary. API estimated totals or missing tax alone never authorize payment.
+
+The US/NY Agent Commerce Test Tee rehearsal reached REHEARSAL_STOPPED_BEFORE_PAY_CLICK with USD 17.95
+(9.95 item + 8.00 Standard shipping + 0.00 checkout-balanced tax), hosted frames on
+checkout.pci.shopifyinc.com and normal Pay now actionability. Independent Admin readback found zero new
+orders. This is unfunded evidence, not a paid E2E result. Use a fresh deployed quote; never hardcode or
+reuse the local total. SG sellability remains deferred. See the append-only E2E ledger.
+
+Deployment preparation is authorized; merge and deploy require approval of the exact tested SHA.
+render.yaml now targets main in Singapore, APP_ENV=sandbox, with automatic deploys off. Fast-forward
+only to the approved candidate and verify Render deployed that commit. The existing separately
+provisioned Singapore database must use DATABASE_URL with its internal connection URL; DATABASE_PATH
+is obsolete. Set PUBLIC_BASE_URL to the actual final HTTPS service host before creating approvable
+quotes: funding commitments bind that URL.
+
+The intended Storefront deployment profile uses SHOPIFY_STOREFRONT_TOKEN (public authentication).
+Leave SHOPIFY_STOREFRONT_PRIVATE_TOKEN unset; the local delegate inherits a short parent lifetime and
+the runtime has no delegate mint/refresh lifecycle. A read-only public-auth search independently found
+the canonical live variant at USD 9.95. This proves current catalog access, not deployed cart/browser
+readiness or permanent validity. Verify deployed authentication and one-cart behavior before funding;
+never probe cartCreate repeatedly. Shopify may throttle public-auth traffic; use existing bounded
+backoff, then a quiet window and one clean retry. Do not invent a forwarded buyer IP.
+
+SHOPIFY_CLIENT_ID/SHOPIFY_CLIENT_SECRET independently mint and refresh the Admin readback token in
+memory. That refresh does not extend a Storefront delegate. Storefront requests require product-listing
+and checkout read/write access; independent Admin order readback requires read_orders. The provisioning
+app already has broader scopes; do not expand them during the E2E. Confirm actual granted scopes and
+minimize them after acceptance. SHOPIFY_STORE_PASSWORD is a gateway secret. Confirm the owned dev
+store and Bogus gateway before setting their confirmation flags true. Chromium comes from the image's
+SHOPIFY_BROWSER_EXECUTABLE default; never copy a local Windows executable path into Render.
+
+Receive-only verifier names are CARDANO_NETWORK=cardano:preprod, CARDANO_FACILITATOR_URL,
+CARDANO_TREASURY_ADDRESS, CARDANO_ASSET_UNIT, CARDANO_ASSET_DECIMALS=6 and BLOCKFROST_PROJECT_ID
+(not the old CARDANO_PROVIDER_PROJECT_ID alias). Verify the exact tUSDM asset, treasury, facilitator
+support and independent Preprod readback after deployment. Only ready funding rails may appear.
+The payer wallet, keys, mnemonic, bridge credentials and spend ledger stay local in their separate
+process; none belongs in the gateway image or Render environment. Keep Atlas payment disabled.
+
+Stop after deployed health/migrations, Shopify/Admin, Chromium, Cardano verifier and MCP readiness,
+then wait at Human Checkpoint C. New quote/source approval and one funding attempt require the later
+explicit checkpoints. Any ambiguous irreversible chain/order result stops writes and prohibits retry.
+
+Provider references: [Storefront authentication](https://shopify.dev/docs/api/storefront/latest),
+[delegate lifetime](https://shopify.dev/docs/apps/build/authentication-authorization/delegate-api-access),
+[Admin access tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens).

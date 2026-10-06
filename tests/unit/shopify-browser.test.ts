@@ -1,10 +1,10 @@
 import { demoData } from '../../src/demo/config.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Browser, Page, BrowserContext, Route } from 'playwright-core';
-import { PlaywrightCheckoutDriver } from '../../src/execution/shopify/browserCheckout.js';
+import { PlaywrightCheckoutDriver, readCheckoutTotals } from '../../src/execution/shopify/browserCheckout.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
 import { money } from '../../src/contracts/money.js';
-import type { CheckoutDriverInput } from '../../src/execution/shopify/checkout.js';
+import type { CheckoutDriverInput, CheckoutQuoteInput } from '../../src/execution/shopify/checkout.js';
 
 const mocks = vi.hoisted(() => ({ launch: vi.fn() }));
 vi.mock('playwright-core', () => ({ chromium: { launch: mocks.launch } }));
@@ -35,7 +35,11 @@ function fixture() {
     fulfillment:{category:'retail',...demoData.buyer},
     checkpoint:vi.fn(async step => { events.push(step); }), log:vi.fn(),
   };
-  return {driver,input,pay,fill,events,browser,context,page,setText:(value:string) => {text=value;},routeHandler:()=>routeHandler!};
+  const quoteInput: CheckoutQuoteInput = {
+    checkoutUrl:url, expectedSubtotal:money('USD',2500), expectedShipping:money('USD',500), shippingTitle:'Standard',
+    storePassword:null, fulfillment:{category:'retail',...demoData.buyer}, log:vi.fn(),
+  };
+  return {driver,input,quoteInput,pay,fill,events,browser,context,page,button,setText:(value:string) => {text=value;},routeHandler:()=>routeHandler!};
 }
 
 beforeEach(() => mocks.launch.mockReset());
@@ -76,5 +80,59 @@ describe('controlled Shopify browser payment boundary', () => {
       const route = { request: () => ({url:()=>url,isNavigationRequest:()=>navigation,frame:()=>({parentFrame:()=>null})}),abort,continue:proceed } as unknown as Route;
       await s.routeHandler()(route); expect(abort).toHaveBeenCalledOnce(); expect(proceed).not.toHaveBeenCalled();
     }
+  });
+});
+
+describe('hosted checkout quote-only boundary', () => {
+  it('reads a settled quote without card entry, checkpoint, or pay action', async () => {
+    const s = fixture();
+    s.setText('Standard\nBogus Gateway\nSubtotal USD $25.00\nShipping USD $5.00\nTotal tax USD $2.00\nTotal USD $32.00');
+    await expect(s.driver.quote(s.quoteInput)).resolves.toEqual({
+      subtotal:money('USD',2500), shipping:money('USD',500), tax:money('USD',200), total:money('USD',3200), shippingTitle:'Standard',
+    });
+    expect(s.page.frameLocator).not.toHaveBeenCalled();
+    expect(s.button.click).not.toHaveBeenCalled();
+    expect(s.pay).not.toHaveBeenCalled();
+    expect(s.browser.close).toHaveBeenCalledOnce();
+  });
+
+  it('accepts a missing tax row only when the settled checkout total balances to zero tax', () => {
+    expect(readCheckoutTotals('Standard\nSubtotal USD $25.00\nShipping USD $5.00\nTotal USD $30.00', money('USD',2500), money('USD',500), 'Standard'))
+      .toEqual({ subtotal:money('USD',2500), shipping:money('USD',500), tax:money('USD',0), total:money('USD',3000), shippingTitle:'Standard' });
+  });
+
+  it.each([
+    ['missing nonzero tax', 'Subtotal USD $25.00\nShipping USD $5.00\nTotal USD $32.00'],
+    ['subtotal only', 'Subtotal USD $25.00\nTotal USD $25.00'],
+    ['changed shipping', 'Subtotal USD $25.00\nShipping USD $6.00\nTax USD $2.00\nTotal USD $33.00'],
+    ['wrong currency', 'Subtotal USD $25.00\nShipping SGD $5.00\nTax USD $2.00\nTotal USD $32.00'],
+    ['unbalanced explicit tax', 'Subtotal USD $25.00\nShipping USD $5.00\nTax USD $1.00\nTotal USD $32.00'],
+    ['differing duplicate totals', 'Subtotal USD $25.00\nShipping USD $5.00\nTax USD $2.00\nTotal USD $32.00\nTotal USD $31.00'],
+    ['calculating tax', 'Subtotal USD $25.00\nShipping USD $5.00\nCalculating tax\nTotal USD $32.00'],
+  ])('rejects %s checkout evidence', (_label, body) => {
+    expect(readCheckoutTotals(body, money('USD',2500), money('USD',500), 'Standard')).toBeNull();
+  });
+
+  it('stops quote discovery on a challenge and still closes the browser', async () => {
+    const s = fixture(); s.setText('Verify you are human');
+    await expect(s.driver.quote(s.quoteInput)).rejects.toMatchObject({code:'captcha_challenge'});
+    expect(s.page.frameLocator).not.toHaveBeenCalled();
+    expect(s.button.click).not.toHaveBeenCalled();
+    expect(s.pay).not.toHaveBeenCalled();
+    expect(s.browser.close).toHaveBeenCalledOnce();
+  });
+
+  it('blocks payment when a frozen quote breakdown changes even if total is unchanged', async () => {
+    const s = fixture();
+    s.input.expectedCheckoutTotals = {
+      subtotal:money('USD',2500), shipping:money('USD',500), tax:money('USD',200), total:money('USD',3200), shippingTitle:'Standard',
+    };
+    s.setText('Standard\nBogus Gateway\nSubtotal USD $26.00\nShipping USD $4.00\nTax USD $2.00\nTotal USD $32.00');
+    await expect(s.driver.complete(s.input)).rejects.toMatchObject({code:'total_mismatch'});
+    expect(s.page.frameLocator).not.toHaveBeenCalled();
+    expect(s.input.checkpoint).not.toHaveBeenCalled();
+    expect(s.button.click).not.toHaveBeenCalled();
+    expect(s.pay).not.toHaveBeenCalled();
+    expect(s.browser.close).toHaveBeenCalledOnce();
   });
 });

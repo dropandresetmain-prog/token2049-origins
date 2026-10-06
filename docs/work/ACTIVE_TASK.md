@@ -66,3 +66,47 @@ Do not start review automatically. Recommend a fresh chat because this implement
 review model: Claude Opus at high reasoning for independent financial/security and orchestration review.
 Authoritative current files: this task, `docs/contracts/CHANNEL_CONTRACT.md`, `docs/KNOWN_ISSUES.md`,
 `docs/evidence/local-verification.md`, and `docs/decisions/scaled-testnet-settlement.md`.
+
+
+## Current execution checkpoint — 2026-10-06 (supersedes historical next-action text above)
+
+- Active E2E checkout: C:/Dev/t2o-e2e-acceptance, branch build/e2e-acceptance, HEAD/remote 4bdcc75a91b67d21c0438beb8bb61cb8656945b4. Clean on entry, ancestry from 59fc2d5 verified after fetch. Main local/remote remain 95a896c730cf893c3afd00919ebe16ad823a608b.
+- User authorized autonomous guided E2E and bounded ordinary fixes, with explicit checkpoints. The previous permalink rehearsal must not be restarted. The current task is Phase 1: real Storefront search/cartCreate/exact quote/checkout, stop before pay.
+- Two production attempts completed cartCreate and failed the exact quote guard. Instrumented attempt used one cartCreate, one delivery selection, two same-cart reads: all estimate flags true, explicit tax null, total USD 17.95, subtotal USD 9.95, shipping USD 8.00. No throttle on either attempt; no browser reached.
+- Independent US catalog lookup verified Agent Commerce Test Tee variant 50670884094009 at USD 9.95. Both Admin checks found zero new orders; payer processes absent; funding config rejected by rehearsal guard. No gateway purchase, payment or Cardano transaction.
+- Changed only rehearsal diagnostics and current evidence/docs. Shopify core financial/quote/payment guards remain unchanged. Working changes uncommitted because the product-decision stop precedes Phase 2 candidate preparation.
+- Checks on current source: Shopify 39/39 PASS; strict typecheck PASS; production build PASS; diff check PASS; bounded diff/filename secret scan clean. Prior owner's full suite 487/487 is historical; not rerun here.
+- **BLOCKED at product/provider-strategy decision.** Do not ignore estimates/null tax or hardcode 17.95. Exact next action: obtain human approval to add read-only hosted-checkout exact-total observation before quote approval/funding, preserving binding/revalidation and no-pay quote creation. Resume Phase 1 only after that approval. Human Checkpoint A not met; do not deploy/fund/proceed to Phase 2.
+- Append-only ledger includes all 27 historical/current records, dedicated seed problems, artifacts and final disposition: docs/evidence/e2e-acceptance-log.md. Sanitized current artifacts: artifacts/e2e/20261006T121900Z-production-diagnostics/.
+- Keep same chat for focused resolution. One final Opus reconciliation review is recommended at this terminal stop, in a fresh review chat; no independent review was launched.
+
+
+## Human Checkpoint A reached — supersedes the earlier product-decision stop
+
+The user approved read-only checkout exact quoting. Implemented and verified the production search/cartCreate/checkout quote path, then a fresh real driver reached REHEARSAL_STOPPED_BEFORE_PAY_CLICK at 2026-10-06 21:01 Singapore. Agent Commerce Test Tee 9.95 + Standard shipping 8.00 + checkout-balanced zero tax = USD 17.95; US/NY address; en-us checkout; checkout.pci.shopifyinc.com frames; Pay now enabled/visible and normal trial actionability passed. No Pay click, payment, order, purchase or Cardano transaction; independent Admin readback 0 new orders. One cart per attempt, no current throttle.
+
+Issue 26 resolved via isolated quote-only browser operation and frozen full breakdown; issue 28 resolved via explicit selected CartDeliveryAddress and strict group/request cross-check; issue 29 fixes sanitized path diagnostics. Modern cart hashes bind selected addresses; legacy hashes/checks preserved. 66/66 focused tests, typecheck/build/diff checks pass. Full ledger and seed dispositions: docs/evidence/e2e-acceptance-log.md. Passing artifacts: artifacts/e2e/20261006T130100Z-selected-address/.
+
+Current changes remain uncommitted on build/e2e-acceptance (base 4bdcc75); no merge/deploy. **Wait for CONTINUE** before Phase 2 candidate preparation/tests/commit/push. Then verify deployed token flow/env names/runtime/market; never assume the short-lived local private token is deployable. Later funding/merge/deploy checkpoints remain mandatory. Same chat is appropriate for Phase 2; final independent review belongs in a fresh chat after final E2E reconciliation.
+
+## Human Checkpoint B — deployable candidate prepared
+
+The user continued from Checkpoint A and authorized Phase 2 validation/commit/push. The complete
+candidate passed Shopify 66/66, focused MCP/settlement/safety 102/102, PostgreSQL concurrency/idempotency/
+funding recovery 25/25, full suite 514/514 (26 files), strict typecheck, production build/migration copy,
+diff checks and bounded secret scan. Full suite counts include the focused subsets. No payment/order.
+
+Render template now targets main, automatic deployment off, Singapore sandbox, existing private DB,
+public Storefront auth and receive-only Preprod config. Independent public catalog and Admin token
+provenance/scopes verified. Leave private delegate unset; no runtime lifecycle exists for it. Actual
+Render env/token/browser/US market/Cardano/MCP readiness remain for Phase 3. Broad provisioning grants
+accepted temporarily; SG sellability deferred. All 30 issue records and seed dispositions remain in
+docs/evidence/e2e-acceptance-log.md; passing sanitized artifacts in
+artifacts/e2e/20261006T130100Z-selected-address/.
+
+Commit and push this completed candidate on build/e2e-acceptance, verify clean local/remote SHA,
+then wait for explicit authorization to fast-forward main and deploy that exact SHA (Checkpoint B).
+Main remains 95a896c730cf893c3afd00919ebe16ad823a608b; gateway is not deployed. No payer action,
+purchase, testnet transaction or merchant order is authorized before later checkpoints. Same chat
+remains appropriate for the canonical E2E. Final independent review belongs after full PASS or a
+terminal/ambiguous blocker; do not start other project lanes.

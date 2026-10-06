@@ -1,7 +1,7 @@
 import type { Page, Browser } from 'playwright-core';
 import { parseDecimalToMinor, type Money } from '../../contracts/money.js';
 import { systemClock, type Clock } from '../../infrastructure/clock.js';
-import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver, type CheckoutDriverInput, type CheckoutDriverResult } from './checkout.js';
+import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver, type CheckoutDriverInput, type CheckoutDriverResult, type CheckoutQuoteInput, type CheckoutTotals } from './checkout.js';
 
 /**
  * Controlled buyer checkout of OUR OWN Shopify development store, completed with Shopify's
@@ -14,8 +14,8 @@ import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver, type 
  * - never solve or bypass a CAPTCHA/challenge/OTP: stop (before pay = not sent, after = unknown);
  * - `pay_click` is checkpointed durably BEFORE the single pay click, and the click is never retried.
  *
- * Selectors target Shopify's hosted one-page checkout and are UNVERIFIED against a live store
- * (no provisioned store at build time); see docs/evidence/shopify-protocol.md.
+ * The production cart-to-checkout selectors passed the unfunded US development-store rehearsal.
+ * Paid completion and independent order readback still require the funded external acceptance run.
  */
 
 /* ---------------- pure helpers (unit-tested) ---------------- */
@@ -47,7 +47,7 @@ const AMOUNT = String.raw`(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
  */
 export function parseDisplayedTotals(pageText: string, scale: number): bigint[] {
   const out: bigint[] = [];
-  const re = new RegExp(String.raw`(?<![A-Za-z])Total\b[^\d]{0,40}${AMOUNT}`, 'g');
+  const re = new RegExp(String.raw`(?<![A-Za-z])Total\b(?![ \t]+(?:tax|savings|before)\b)[^\d]{0,40}${AMOUNT}`, 'g');
   for (const m of pageText.matchAll(re)) {
     try {
       out.push(parseDecimalToMinor(m[1]!.replace(/,/g, ''), scale));
@@ -61,7 +61,7 @@ export function parseDisplayedTotals(pageText: string, scale: number): bigint[] 
 /** The final order total on the page is the LAST "Total" amount (the summary, after shipping/tax). */
 export function displayedTotalMatches(pageText: string, expected: Money): boolean {
   // Real checkout text puts the label, currency code and amount on separate lines ("Total\nUSD\n$17.95").
-  const re = new RegExp(String.raw`(?<![A-Za-z])Total\b([^\d]{0,40})${AMOUNT}([^\n]{0,12})`, 'g');
+  const re = new RegExp(String.raw`(?<![A-Za-z])Total\b(?![ \t]+(?:tax|savings|before)\b)([^\d]{0,40})${AMOUNT}([^\n]{0,12})`, 'g');
   const matches = [...pageText.matchAll(re)];
   const last = matches.at(-1);
   if (!last || !new RegExp(`\\b${expected.currency}\\b`).test(`${last[1]} ${last[3]}`)) return false;
@@ -108,6 +108,43 @@ export function isTrustedCheckoutUrl(url: string, storeDomain: string): boolean 
   }
 }
 
+
+export function sameCheckoutTotals(a: CheckoutTotals, b: CheckoutTotals): boolean {
+  return a.shippingTitle === b.shippingTitle && (['total', 'subtotal', 'shipping', 'tax'] as const).every(k =>
+    a[k].amountMinor === b[k].amountMinor && a[k].currency === b[k].currency && a[k].scale === b[k].scale);
+}
+
+/** Reads a complete checkout summary, never an API estimate or a subtotal-only page. */
+export function readCheckoutTotals(text: string, subtotal: Money, shipping: Money, shippingTitle: string): CheckoutTotals | null {
+  if (subtotal.currency !== shipping.currency || subtotal.scale !== shipping.scale || /calculating|calculated at (?:the )?next step|estimated taxes/i.test(text)) return null;
+  const row = (label: string): bigint | null => {
+    const pattern = String.raw`(?:^|\n)\s*LABEL\s*\n?\s*(?:[A-Z]{3}\s*)?\$?\s*AMOUNT(?=\s|$)`.replace('LABEL', label).replace('AMOUNT', AMOUNT);
+    const matches = [...text.matchAll(new RegExp(pattern, 'g'))];
+    if (!matches.length) return null;
+    try {
+      const values = matches.map(m => {
+        if ((m[0].match(/\b[A-Z]{3}\b/g) ?? []).some(currency => currency !== subtotal.currency)) throw new Error('row_currency_mismatch');
+        return parseDecimalToMinor(m[1]!.replace(/,/g, ''), subtotal.scale);
+      });
+      return values.every(v => v === values[0]) ? values[0]! : null;
+    } catch { return null; }
+  };
+  if (/(?:^|\n)\s*(?:Duties|Discounts?|Gift card applied)\s*\n?\s*(?:[A-Z]{3}\s*)?[-$\d]/i.test(text)) return null;
+  const item = row('Subtotal');
+  const delivery = row('Shipping');
+  const totals = parseDisplayedTotals(text, subtotal.scale);
+  const total = totals.at(-1);
+  if (item === null || delivery === null || total === undefined || !totals.every(v => v === total) || !displayedTotalMatches(text, { ...subtotal, amountMinor: total.toString() })) return null;
+  if (item !== BigInt(subtotal.amountMinor) || delivery !== BigInt(shipping.amountMinor)) return null;
+  const explicitTax = row('(?:Tax|Taxes|Total tax)');
+  const residual = total - item - delivery;
+  if (explicitTax === null && /(?:^|\n)\s*(?:Tax|Taxes|Total tax)\s*(?:\n|$)/.test(text)) return null;
+  // A settled checkout can omit a zero-tax row. Only a balanced final checkout total establishes zero;
+  // a missing Storefront tax field is never evidence. Nonzero tax requires an explicit checkout row.
+  if (residual < 0n || (explicitTax === null ? residual !== 0n : explicitTax !== residual)) return null;
+  return { total: { ...subtotal, amountMinor: total.toString() }, subtotal, shipping, tax: { ...subtotal, amountMinor: residual.toString() }, shippingTitle };
+}
+
 /* ---------------- Playwright driver ---------------- */
 
 /**
@@ -150,8 +187,19 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
   }
 
   async complete(input: CheckoutDriverInput): Promise<CheckoutDriverResult> {
-    if (!isTrustedCheckoutUrl(input.checkoutUrl, this.opts.storeDomain)) throw new CheckoutAbort('untrusted_checkout_url');
-    const log = input.log;
+    return this.withPage(input.checkoutUrl, page => this.run(page, input, input.log));
+  }
+
+  async quote(input: CheckoutQuoteInput): Promise<CheckoutTotals> {
+    return this.withPage(input.checkoutUrl, async page => {
+      await this.prepare(page, input, input.log);
+      await this.verifyGateway(page, input.log);
+      return this.step(input.log, 'read_checkout_totals', () => this.settledTotals(page, input));
+    });
+  }
+
+  private async withPage<T>(checkoutUrl: string, run: (page: Page) => Promise<T>): Promise<T> {
+    if (!isTrustedCheckoutUrl(checkoutUrl, this.opts.storeDomain)) throw new CheckoutAbort('untrusted_checkout_url');
     let browser: Browser;
     try {
       const { chromium } = await import('playwright-core');
@@ -183,7 +231,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       });
       const page = await context.newPage();
       await observe(() => this.opts.observer?.attach?.(page));
-      return await this.run(page, input, log);
+      return await run(page);
     } finally {
       await browser.close().catch(() => undefined);
     }
@@ -214,8 +262,8 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     if (c) throw new CheckoutAbort(c);
   }
 
-  private async run(page: Page, input: CheckoutDriverInput, log: (s: string) => void): Promise<CheckoutDriverResult> {
-    const { fulfillment: f, expectedTotal } = input;
+  private async prepare(page: Page, input: Pick<CheckoutQuoteInput, 'checkoutUrl' | 'fulfillment' | 'shippingTitle' | 'storePassword'>, log: (s: string) => void): Promise<void> {
+    const { fulfillment: f } = input;
     const a = f.shippingAddress;
 
     await this.step(log, 'open_checkout', () => page.goto(input.checkoutUrl, { waitUntil: 'domcontentloaded', timeout: NAV_TIMEOUT_MS }));
@@ -263,15 +311,15 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     await this.assertNoChallenge(page);
 
     await this.step(log, 'choose_shipping', () => this.chooseQuotedShipping(page, input.shippingTitle));
-    await this.step(log, 'verify_total', () => this.waitForTotal(page, expectedTotal));
+  }
+
+  private async run(page: Page, input: CheckoutDriverInput, log: (s: string) => void): Promise<CheckoutDriverResult> {
+    const { fulfillment: f, expectedTotal } = input;
+    await this.prepare(page, input, log);
+    await this.step(log, 'verify_total', () => this.waitForTotal(page, expectedTotal, input.expectedCheckoutTotals));
 
     // Test gateway must be visible BEFORE any card value is entered.
-    await this.step(log, 'verify_test_gateway', async () => {
-      const gw = page.getByText(TEST_GATEWAY_TEXT).first();
-      const seen = (await gw.count()) > 0 && hasTestGateway(await this.bodyText(page));
-      if (!seen) throw new CheckoutAbort('test_gateway_not_active');
-      await gw.click().catch(() => undefined); // select the payment method if it is a radio row
-    });
+    await this.verifyGateway(page, log, true);
     await this.step(log, 'fill_test_card', async () => {
       const inFrame = (prefix: string) => page.frameLocator(`iframe[name^="${prefix}"]`).locator('input').first();
       await inFrame('card-fields-number').fill(BOGUS_CARD.number);
@@ -282,14 +330,14 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
 
     await this.assertNoChallenge(page);
     // Re-verify immediately before paying: totals can move when fields settle.
-    await this.step(log, 'reverify_total', () => this.waitForTotal(page, expectedTotal));
+    await this.step(log, 'reverify_total', () => this.waitForTotal(page, expectedTotal, input.expectedCheckoutTotals));
 
     // Durable BEFORE the click. If this throws, nothing was clicked.
     const payButton = page.getByRole('button', { name: /pay now|complete order|place order/i }).first();
     // Trial resolves actionability before the durable boundary.
     try { await payButton.click({ trial: true }); } catch (e) { await observe(() => this.opts.observer?.stepFailed?.('pay_trial_click')); throw e; }
     await this.chooseQuotedShipping(page, input.shippingTitle);
-    await this.waitForTotal(page, expectedTotal);
+    await this.waitForTotal(page, expectedTotal, input.expectedCheckoutTotals);
     if (!hasTestGateway(await this.bodyText(page))) throw new CheckoutAbort('test_gateway_not_active');
     if (new URL(page.url()).hostname !== this.opts.storeDomain) throw new CheckoutAbort('untrusted_checkout_url');
     const payElement = await payButton.elementHandle();
@@ -323,6 +371,36 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     return ids;
   }
 
+  private async verifyGateway(page: Page, log: (s: string) => void, select = false): Promise<void> {
+    await this.step(log, 'verify_test_gateway', async () => {
+      const gw = page.getByText(TEST_GATEWAY_TEXT).first();
+      if (await gw.count() === 0 || !hasTestGateway(await this.bodyText(page))) throw new CheckoutAbort('test_gateway_not_active');
+      // A quote only observes the gateway; execution retains the existing payment-method selection.
+      if (select) await gw.click().catch(() => undefined);
+    });
+  }
+
+  private async settledTotals(page: Page, input: CheckoutQuoteInput): Promise<CheckoutTotals> {
+    const end = this.clock.now().getTime() + STEP_TIMEOUT_MS;
+    let previous = '';
+    let stable = 0;
+    for (;;) {
+      await this.assertNoChallenge(page);
+      if (new URL(page.url()).hostname !== this.opts.storeDomain) throw new CheckoutAbort('untrusted_checkout_url');
+      const totals = readCheckoutTotals(await this.bodyText(page), input.expectedSubtotal, input.expectedShipping, input.shippingTitle);
+      const busy = page.locator('[aria-busy="true"]');
+      let pending = false;
+      for (let i = 0; i < await busy.count(); i++) if (await busy.nth(i).isVisible()) pending = true;
+      const next = totals && !pending ? JSON.stringify(totals) : '';
+      stable = next && next === previous ? stable + 1 : 0;
+      previous = next;
+      // Require three equal observations after shipping selection, excluding intermediate renders.
+      if (totals && stable >= 2) return totals;
+      if (this.clock.now().getTime() > end) throw new CheckoutAbort('total_mismatch');
+      await page.waitForTimeout(750);
+    }
+  }
+
   private async onPasswordGate(page: Page): Promise<boolean> {
     return /\/password\b/.test(new URL(page.url()).pathname) || (await page.locator('form[action*="password"] input[type="password"]').count()) > 0;
   }
@@ -343,10 +421,12 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     }
   }
   /** Totals settle asynchronously after shipping/tax: poll until equal, else abort before paying. */
-  private async waitForTotal(page: Page, expected: Money): Promise<void> {
+  private async waitForTotal(page: Page, expected: Money, breakdown?: CheckoutTotals): Promise<void> {
     const end = this.clock.now().getTime() + STEP_TIMEOUT_MS;
     for (;;) {
-      if (displayedTotalMatches(await this.bodyText(page), expected)) return;
+      const body = await this.bodyText(page);
+      const observed = breakdown ? readCheckoutTotals(body, breakdown.subtotal, breakdown.shipping, breakdown.shippingTitle) : null;
+      if (displayedTotalMatches(body, expected) && (!breakdown || (observed && sameCheckoutTotals(observed, breakdown)))) return;
       if (this.clock.now().getTime() > end) throw new CheckoutAbort('total_mismatch');
       await page.waitForTimeout(500);
     }

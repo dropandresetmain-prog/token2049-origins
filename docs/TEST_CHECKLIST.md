@@ -81,3 +81,33 @@ Shopify rehearsal. Shopify IN-1 and Atlas IN-2/IN-3 are unchanged blockers; do n
 8. Save sanitized new evidence under `docs/evidence/` with environment, source, timestamp, implementation SHA, command, identifiers, readback result and caveats. Raw secrets/PII stay outside Git. Update external rows individually; readiness alone never changes a purchase row to PASS.
 
 All eight steps currently remain BLOCKED_EXTERNAL. Solana funding, live Masumi/Sokosumi listing/task acceptance, polished console, demo/video/slides and final submissions are separate launch lanes and are NOT_RUN here.
+
+## Current canonical Capsule Shopify E2E — 2026-10-06
+
+This section supersedes earlier NOT_RUN/BLOCKED_EXTERNAL statements only for the completed Shopify
+unfunded rehearsal and local candidate checks below. It does not enable the other provider lanes.
+
+- [x] Live canonical US variant and indicative USD 9.95 item price independently verified.
+- [x] Production search -> one Storefront cartCreate -> delivery selection -> exact hosted checkout
+  observation -> fresh browser execution rehearsal -> STOP before pay_click.
+- [x] Settled item/shipping/tax/total frozen; absent API tax is not treated as zero. Selected explicit
+  CartDeliveryAddress verified against the request and delivery group; post-observation cart bound.
+- [x] US/NY, Standard shipping, store password, Bogus wording, real hosted frames and normal Pay
+  actionability verified. No Pay click, new Admin order, purchase, payer process or Cardano transaction.
+- [x] Shopify focused regressions 66/66; MCP/settlement/safety 102/102; PostgreSQL concurrency,
+  idempotency and funding recovery 25/25 using isolated local schemas.
+- [x] Full current candidate suite: 26 files, 514/514 PASS; strict typecheck and production build PASS.
+- [x] Public Storefront authentication independently searched the canonical product without cart writes.
+- [ ] Exact candidate SHA approved, main fast-forwarded and deployed; final HTTPS base URL bound.
+- [ ] Actual Render environment aliases, token/scopes, migrations, browser/US market and Cardano/MCP
+  readiness verified; payer remains local and unused at the deployed checkpoint.
+- [ ] Fresh deployed exact quote and explicit Cardano funding source approved by the human.
+- [ ] One Preprod funding attempt independently confirmed with exact asset/treasury/amount/commitment.
+- [ ] Exactly one Shopify test PAID order, successful Bogus SALE/CAPTURE and independent Admin readback.
+- [ ] Exactly one purchase/funding event/execution effect, balanced journal/reservation and matching proof
+  receipt independently reconciled. Overall paid E2E remains PARTIAL until these checks pass.
+
+All issues and seed mismatches remain in docs/evidence/e2e-acceptance-log.md; current sanitized passing
+artifacts are under ignored artifacts/e2e/20261006T130100Z-selected-address/. Do not repeat the successful
+unfunded rehearsal merely to fill a checklist. One final independent reconciliation review follows a
+full PASS or a genuine terminal/ambiguous blocker; no per-fix review loop.

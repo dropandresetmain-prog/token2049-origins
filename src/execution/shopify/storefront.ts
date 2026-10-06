@@ -8,7 +8,7 @@ import { MoneyV2, toMoney } from './money.js';
 
 /**
  * Buyer-side Shopify Storefront API client (search, cart, delivery selection). It holds only the
- * public Storefront token: it cannot read orders and cannot complete a checkout. Checkout
+ * Storefront token (public or server-side private): it cannot read orders or complete a checkout. Checkout
  * completion happens in the controlled browser (browserCheckout.ts).
  *
  * Cart delivery uses the current Storefront API (2026-10): addresses go in `cartCreate`
@@ -42,6 +42,10 @@ const CartSchema = z.object({
     totalDutyAmount: MoneyV2.nullable(),
   }),
   discountAllocations: z.array(z.unknown()),
+  delivery: z.object({ addresses: z.array(z.object({
+    selected: z.boolean(),
+    address: z.object({ firstName:z.string().nullable(), lastName:z.string().nullable(), address1:z.string().nullable(), address2:z.string().nullable(), city:z.string().nullable(), zip:z.string().nullable(), countryCode:z.string().nullable(), provinceCode:z.string().nullable() }),
+  })) }).optional(),
   lines: z.object({
     nodes: z.array(
       z.object({
@@ -70,6 +74,7 @@ fragment CartFields on Cart {
   id checkoutUrl totalQuantity
   buyerIdentity { email }
   attributes { key value }
+  delivery { addresses { selected address { ... on CartDeliveryAddress { firstName lastName address1 address2 city zip countryCode provinceCode } } } }
   cost { totalAmount { amount currencyCode } subtotalAmount { amount currencyCode } totalAmountEstimated subtotalAmountEstimated totalTaxAmount { amount currencyCode } totalTaxAmountEstimated totalDutyAmount { amount currencyCode } }
   discountAllocations { discountedAmount { amount currencyCode } }
   lines(first: 10) { nodes { quantity merchandise { ... on ProductVariant { id title product { title } } } } }
@@ -284,11 +289,38 @@ export interface CartTotals {
 
 const unavailable = (why: string): ProviderError => new ProviderError('rejected', 'shopify_total_unavailable', `exact cart total unavailable: ${why}`);
 
-/**
- * Exact totals from a cart with a selected delivery option. Anything estimated, missing a selected
- * shipping option, in mixed currencies or implying a discount we did not apply is rejected: we
- * never fund an inexact total.
- */
+/** The selected CartDeliveryAddress is authoritative; the delivery-group projection may omit codes. */
+export function readCartAddress(cart: StorefrontCart): StorefrontCart['deliveryGroups']['nodes'][number]['deliveryAddress'] {
+  const group = cart.deliveryGroups.nodes[0]?.deliveryAddress;
+  if (!group) throw unavailable('delivery address missing');
+  if (!cart.delivery) return group; // Legacy/test responses retain their original address boundary.
+  const selected = cart.delivery.addresses.filter(a => a.selected);
+  if (selected.length !== 1) throw unavailable('exactly one selected delivery address required');
+  const address = selected[0]!.address;
+  const actual = { ...address, countryCodeV2: address.countryCode };
+  const normalized = (v: string | null) => (v ?? '').trim().replace(/\s+/g, ' ').toLowerCase();
+  for (const key of ['firstName','lastName','address1','address2','city','zip','countryCodeV2','provinceCode'] as const) {
+    // Missing country/province in the derived group is not a contradiction. Its other fields
+    // must still agree, and the explicit selected address must carry the requested codes.
+    if ((key === 'countryCodeV2' || key === 'provinceCode') && group[key] === null) continue;
+    if (normalized(group[key]) !== normalized(actual[key])) throw unavailable('selected address conflicts with delivery group');
+  }
+  return actual;
+}
+
+/** Cart terms used to select and bind a checkout; these amounts are not an exact payable quote. */
+export function readCartTerms(cart: StorefrontCart): Pick<CartTotals, 'subtotal' | 'shipping' | 'shippingTitle'> {
+  if (cart.discountAllocations.length || (cart.cost.totalDutyAmount && BigInt(toMoney(cart.cost.totalDutyAmount).amountMinor) !== 0n)) throw unavailable('discounts and duties are unsupported');
+  if (cart.deliveryGroups.nodes.length !== 1) throw unavailable('exactly one delivery group required');
+  const selected = cart.deliveryGroups.nodes[0]!.selectedDeliveryOption;
+  if (!selected || selected.deliveryMethodType !== 'SHIPPING' || !selected.title) throw unavailable('no named shipping option selected');
+  const subtotal = toMoney(cart.cost.subtotalAmount);
+  const shipping = toMoney(selected.estimatedCost);
+  if (subtotal.currency !== shipping.currency || subtotal.scale !== shipping.scale) throw unavailable('mixed currencies');
+  return { subtotal, shipping, shippingTitle: selected.title };
+}
+
+/** Legacy exact-cart quote validation; estimated or incomplete totals remain rejected. */
 export function readCartTotals(cart: StorefrontCart): CartTotals {
   if (cart.cost.totalAmountEstimated || cart.cost.subtotalAmountEstimated || cart.cost.totalTaxAmountEstimated || !cart.cost.totalTaxAmount) throw unavailable('totals or tax are estimated/missing');
   if (cart.discountAllocations.length || (cart.cost.totalDutyAmount && BigInt(toMoney(cart.cost.totalDutyAmount).amountMinor) !== 0n)) throw unavailable('discounts and duties are unsupported');
