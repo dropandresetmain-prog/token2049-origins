@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Capsule — Purchase workspace / Design review 02</title>
+<meta name="description" content="Interactive Capsule UI design prototype. All transactions and evidence are illustrative fixtures, with no live payments or provider calls.">
+<link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<a class="sr-only" href="#main">Skip to purchase</a>
+<div class="shell">
+ <aside class="sidebar" aria-label="Workspace navigation">
+  <a href="#purchase" class="brand" data-action="live" aria-label="Capsule live purchase"><img class="brand-full" src="./assets/wordmark-accent-crop.webp" alt="Capsule"><img class="brand-small" src="./assets/mark-crop.webp" alt="Capsule"></a>
+  <div class="workspace"><div class="workspace-symbol"><img src="./assets/mark-crop.webp" alt=""></div><div><strong>Demo workspace</strong><small>Commerce gateway</small></div></div>
+  <p class="nav-label">Workspace</p>
+  <nav class="nav">
+   <button data-action="live" id="nav-live" aria-label="Live purchase"><span class="nav-icon" data-icon="activity"></span><span>Live purchase</span></button>
+   <button data-action="history" id="nav-history" aria-label="Purchases"><span class="nav-icon" data-icon="purchases"></span><span>Purchases</span></button>
+   <button data-action="review-queue" id="nav-review" aria-label="Purchases needing review"><span class="nav-icon" data-icon="approval"></span><span>Needs review</span><span class="count" id="review-count">1</span></button>
+  </nav>
+  <div class="sidebar-bottom">
+   <div class="sandbox-label"><span data-icon="flask"></span><span>Test environments only</span></div>
+   <div class="side-divider"></div>
+   <div class="account"><div class="avatar"><span data-icon="layers"></span></div><div><strong>Design review</strong><small>Capsule · Version 02</small></div></div>
+  </div>
+ </aside>
+ <section class="surface" aria-label="Capsule application">
+  <header class="topbar">
+   <div class="breadcrumbs"><button data-action="history">Purchases</button><span class="crumb-slash" id="crumb-slash">/</span><span class="crumb-current mono" id="crumb">DEMO-0428</span></div>
+   <div class="top-tools"><span class="sample-tag"><span data-icon="flask"></span>Illustrative data</span><button class="icon-button focus-button" data-action="focus" aria-label="Toggle presentation layout" title="Presentation layout"><span data-icon="expand"></span></button><button class="icon-button" data-action="about" aria-label="About this preview" title="About this preview"><span data-icon="info"></span></button></div>
+  </header>
+  <main class="content" id="main" tabindex="-1"></main>
+ </section>
+</div>
+<footer class="review-dock" aria-label="Prototype review controls">
+ <div class="dock-label"><strong>UI review 02</strong>Sample data only</div>
+ <div class="dock-steps">
+  <button class="dock-button" data-screen="progress"><span>01</span>In progress</button>
+  <button class="dock-button" data-screen="complete"><span>02</span>Completed</button>
+  <button class="dock-button" data-screen="evidence"><span>03</span>Evidence</button>
+  <button class="dock-button" data-screen="review"><span>04</span>Price change</button>
+  <button class="dock-button" data-screen="history"><span>05</span>Purchases</button>
+ </div>
+ <div class="dock-options"><label for="scenario" class="sr-only">Sample purchase category</label><select id="scenario"><option value="hotel">Hotel sample</option><option value="retail">Retail sample</option></select><button class="dock-action" data-action="play" id="play-button"><span data-icon="play"></span><span>Run sample</span></button></div>
+ <button class="dock-sources" data-action="references" aria-label="Open Mobbin research references"><span data-icon="book"></span><span>References</span></button>
+</footer>
+<div class="scrim" id="scrim" data-action="close-inspector"></div>
+<aside class="inspector" id="inspector" role="dialog" aria-modal="true" aria-label="Purchase evidence" aria-hidden="true" inert>
+ <div class="inspector-top"><div class="inspector-title"><h2>Purchase evidence</h2><button class="icon-button" data-action="close-inspector" aria-label="Close evidence"><span data-icon="close"></span></button></div><div class="inspector-meta" id="inspector-meta"></div></div>
+ <div class="inspector-tabs" role="tablist" aria-label="Evidence sections"><button role="tab" id="evidence-summary-tab" data-evidence="summary" aria-controls="evidence-body">Summary</button><button role="tab" id="evidence-audit-tab" data-evidence="audit" aria-controls="evidence-body">Audit trail</button></div>
+ <div class="inspector-body" id="evidence-body" role="tabpanel"></div>
+ <div class="inspector-footer"><span>Illustrative records · not external proof</span><button class="btn" data-action="export-evidence"><span data-icon="download"></span>Export JSON</button></div>
+</aside>
+<dialog id="modal" aria-labelledby="modal-title"><div class="dialog-header"><h2 id="modal-title"></h2><button class="icon-button" data-action="close-modal" aria-label="Close dialog"><span data-icon="close"></span></button></div><div class="dialog-body" id="modal-body"></div></dialog>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script src="./prototype.js"></script>
+</body>
+</html>

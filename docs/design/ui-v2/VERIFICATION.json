@@ -1,0 +1,60 @@
+{
+  "environment": "Chromium via Playwright; HTML injected with set_content (local file navigation blocked by browser policy)",
+  "checks": [
+    {
+      "check": "Initial execution state has funding, no provider result and no premature receipt",
+      "result": "PASS"
+    },
+    {
+      "check": "Contextual evidence is state-aware; Escape closes and restores interaction",
+      "result": "PASS"
+    },
+    {
+      "check": "Completed state enables a disclosed, correct sample receipt and JSON export",
+      "result": "PASS"
+    },
+    {
+      "check": "Dedicated evidence preset and audit tab render the completed purchase records",
+      "result": "PASS"
+    },
+    {
+      "check": "Changed quote remains paused; no completed booking, autoapproval or automatic refund",
+      "result": "PASS"
+    },
+    {
+      "check": "History, counts, state persistence, search, empty state, filters and keyboard row navigation",
+      "result": "PASS"
+    },
+    {
+      "check": "Sokosumi fee-only fixture does not imply principal payment or commerce completion",
+      "result": "PASS"
+    },
+    {
+      "check": "Funding selector stops playback; explicit rail choice does not fund a purchase; Stripe disabled",
+      "result": "PASS"
+    },
+    {
+      "check": "Eight-second local fixture sequence reaches completion without external requests",
+      "result": "PASS"
+    },
+    {
+      "check": "Research panel links to four exact, actually inspected Mobbin screens",
+      "result": "PASS"
+    },
+    {
+      "check": "No document-level horizontal overflow across five viewport sizes; inspector stays onscreen",
+      "result": "PASS"
+    },
+    {
+      "check": "1280\u00d7720 presentation layout keeps the route, result and evidence action above review controls",
+      "result": "PASS"
+    },
+    {
+      "check": "No JavaScript page errors and no external network requests",
+      "result": "PASS"
+    }
+  ],
+  "javascript_errors": [],
+  "external_requests": [],
+  "scope": "Prototype only; no repo tests, backend tests, real API calls, payments or bookings."
+}

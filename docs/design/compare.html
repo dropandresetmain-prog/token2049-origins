@@ -1,0 +1,67 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Capsule V2 vs V3</title>
+<style>
+:root{--canvas:#f2eee7;--paper:#fffdf9;--ink:#292625;--muted:#6a635b;--line:#e8e2d9;--stone:#d8d1c6;--ox:#722d32;--on-ox:#fff8f2}
+*{box-sizing:border-box}
+body{margin:0;background:var(--canvas);color:var(--ink);font:14px/1.5 Inter,-apple-system,"Segoe UI",Arial,sans-serif}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:12px 20px;padding:14px 20px;border-bottom:1px solid var(--stone);background:var(--paper);position:sticky;top:0;z-index:2}
+h1{font-size:16px;margin:0;font-weight:600}
+.group{display:flex;gap:4px;flex-wrap:wrap}
+button{font:inherit;font-size:13px;border:1px solid var(--stone);background:var(--paper);color:var(--ink);border-radius:6px;padding:6px 12px;cursor:pointer}
+button[aria-pressed=true]{background:var(--ox);border-color:var(--ox);color:var(--on-ox)}
+.label{font-size:12px;color:var(--muted)}
+main{display:grid;grid-template-columns:1fr 1fr;gap:16px;padding:16px 20px}
+main.stacked{grid-template-columns:1fr}
+figure{margin:0}
+figcaption{font-size:13px;font-weight:600;margin-bottom:6px;display:flex;justify-content:space-between}
+figcaption a{font-weight:400;color:var(--muted)}
+.frame{position:relative;border:1px solid var(--stone);border-radius:10px;overflow:hidden;background:var(--paper)}
+iframe{border:0;transform-origin:0 0;display:block}
+</style>
+</head>
+<body>
+<header>
+ <h1>Capsule UI: V2 vs V3</h1>
+ <div class="group" id="screens" aria-label="Screen">
+  <button data-screen="progress">In progress</button><button data-screen="complete">Completed</button><button data-screen="evidence">Evidence</button><button data-screen="review">Price change</button><button data-screen="history">Purchases</button>
+ </div>
+ <div class="group" id="sizes" aria-label="Viewport">
+  <button data-size="1440x900">1440 × 900</button><button data-size="1024x768">1024 × 768</button><button data-size="390x844">390 mobile</button>
+ </div>
+ <span class="label">Both frames render the same screen at the same viewport, scaled to fit.</span>
+</header>
+<main id="main">
+ <figure><figcaption>V2 (checkpoint 607c21a)<a href="ui-v2/index.html" target="_blank">open</a></figcaption><div class="frame"><iframe id="v2" title="Capsule V2"></iframe></div></figure>
+ <figure><figcaption>V3<a href="ui-v3/index.html" target="_blank">open</a></figcaption><div class="frame"><iframe id="v3" title="Capsule V3"></iframe></div></figure>
+</main>
+<script>
+const state={screen:'progress',size:'1440x900'};
+try{const p=new URLSearchParams(location.search);if(p.get('screen'))state.screen=p.get('screen');if(p.get('size'))state.size=p.get('size')}catch{}
+function layout(){
+ const [w,h]=state.size.split('x').map(Number);
+ const main=document.getElementById('main');
+ main.classList.toggle('stacked',false);
+ const cols=w<600?2:(innerWidth<900?1:2);
+ const avail=(main.clientWidth-40-(cols-1)*16)/cols;
+ const scale=Math.min(1,avail/w);
+ for(const id of ['v2','v3']){
+  const f=document.getElementById(id);
+  f.width=w;f.height=h;f.style.transform=`scale(${scale})`;
+  f.parentElement.style.width=w*scale+'px';f.parentElement.style.height=h*scale+'px';
+ }
+}
+function load(){
+ for(const id of ['v2','v3'])document.getElementById(id).src=`ui-${id}/index.html?screen=${state.screen}`;
+ document.querySelectorAll('[data-screen]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.screen===state.screen));
+ document.querySelectorAll('[data-size]').forEach(b=>b.setAttribute('aria-pressed',b.dataset.size===state.size));
+ layout();
+}
+document.addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;if(b.dataset.screen)state.screen=b.dataset.screen;if(b.dataset.size)state.size=b.dataset.size;load()});
+addEventListener('resize',layout);
+load();
+</script>
+</body>
+</html>
