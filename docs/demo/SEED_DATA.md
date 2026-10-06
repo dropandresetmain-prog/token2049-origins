@@ -115,13 +115,13 @@ Verify:
 - no stale unresolved state will be mistaken for a new demo purchase.
 
 ### Masumi/Sokosumi
-If integrated:
+For the integrated native fee/task runtime, verify existing state read-only; do not recreate a paid task to refresh evidence. Public marketplace prerequisites remain separate and unverified:
 - MPS health;
 - Preprod wallet/payment state;
 - agent/listing/task IDs;
 - public endpoint/auth;
 - task delivery;
-- payout/funding semantics;
+- exact native fee payout and separate direct principal funding;
 - marketplace state.
 
 ### UI

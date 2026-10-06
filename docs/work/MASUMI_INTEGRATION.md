@@ -19,7 +19,7 @@ Masumi escrow is service remuneration, never merchant purchase principal. The ex
 - `scripts/masumi-*.{mjs,ts}`: isolated acceptance and recovery tools. These are not automatic provisioning and must not be blindly rerun.
 - `.env.masumi.example`, `.gitignore`, `package.json`: placeholders, private-state exclusions and `channel:masumi` launcher. No dependency added; current main's `ws@8.22.0` retained.
 - `docs/evidence/{masumi-live,sokosumi-runtime-live,sokosumi-discovery}.json`, `docs/work/MASUMI_SOKOSUMI_FIX.md`: retained sanitized native acceptance evidence and its limits.
-- README, docs index/environment/handoff/issues/roadmap/runbook/test checklist/decisions log, active task and channel contract: current integration state and remaining marketplace boundaries. Historical pre-Masumi acceptance remains separate.
+- README, docs index/environment/handoff/issues/roadmap/runbook/test checklist/decisions log, current architecture/demo seed policy, active task and channel contract: current integration state and remaining marketplace boundaries. Historical pre-Masumi acceptance remains separate.
 
 ## Checks and results
 

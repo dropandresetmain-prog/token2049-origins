@@ -1,6 +1,6 @@
 # Capsule current architecture
 
-Baseline: main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540
+Integration base: main @ 84c0aef7a7acd1851c590c54ccd8881b9dc365d5; native Masumi integration and checks: docs/work/MASUMI_INTEGRATION.md.
 
 ## System shape
 
@@ -26,10 +26,11 @@ Separate bounded payer/signer processes hold spending keys. The gateway never lo
 Implemented:
 - canonical HTTP
 - thin MCP
+- authenticated native Masumi MIP-003 task runtime, running separately on loopback
 
 Planned/unverified:
 - actual ChatGPT host connection
-- Masumi/Sokosumi channel
+- public Sokosumi marketplace listing, platform-to-agent authentication and task delivery
 
 Channels translate and authenticate. They do not own provider logic, funding truth or journal writes.
 
@@ -65,7 +66,7 @@ Quote exposes zero or more ready funding options. Human explicitly selects fundi
 
 Public-testnet settlement uses the disclosed 1:1000 notional policy. Commercial money and chain asset quantities remain distinct assets in the journal/evidence model.
 
-Masumi funding, if integrated later, must be another funding adapter and may not bypass purchase-principal verification.
+Masumi native escrow is a separately disclosed service fee. Its registered principal adapter deliberately reports unavailable; task earnings never bypass direct purchase-principal verification. The task runtime preserves core outcomes and reconciles ambiguous native writes without authorizing another payment.
 
 ### Execution/recovery
 
