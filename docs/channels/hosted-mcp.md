@@ -82,6 +82,12 @@ Also returned: merchant, receipt id, verified payment (rail + transfer reference
 
 **Caps.** Policy is copied from the most recent protected payer configuration that references the wallet's ledger and mnemonic, never from older docs or defaults, and is never raised by tooling. The payer reports `ledger` in `GET /status`: committed history, imported marker, caps and `headroomBaseUnits` (the largest single payment still allowed).
 
+**Slow steps on free instances (verified live).** ChatGPT abandons a tool call after about 60 s, but on the 0.1-vCPU free gateway an exact Shopify quote (headless checkout) takes about 2 minutes, and a payment settles slower than a minute at times. Hosted mode therefore runs `create_quote` and the payer call as in-process background jobs: the tool answers after 45 s with `quote_pending` / `payment_in_progress`, and repeating the same call (same arguments) joins the running job (no second quote, no second payment; the payer's durable history is the guard). The browser runs in low-memory mode (`SHOPIFY_BROWSER_LOW_MEMORY=true`: lean Chromium flags, no images/media/fonts, one browser at a time, step timeouts x4) at the lowest CPU priority (`nice -n 19` wrapper), because without that the 512 MB instance was OOM-killed and then health-check-killed mid-quote. The agent is told to wait ~20 s and call again.
+
+**Retail discovery.** Open retail requests search the live Shopify catalog by default (`discovery: live`), with the controlled test catalog only as a fallback.
+
+**Spend headroom is checked up front.** The payer reports its remaining headroom in `/status`; the quote lists the wallet as connected but flags a payment above the headroom ("would be refused"), and `buy` refuses before creating a purchase.
+
 **Cold starts.** Free services sleep. The gateway allows up to 60 s for the payer's `/status` (a wake-up) and up to 100 s for `/pay`. A timeout never causes a second payment: the outcome is ambiguous, `buy` reports the payment attempt as unconfirmed, and durable payer history plus the gateway purchase decide what is real (`get_purchase`). The no-spend smoke wakes the payer first (`/health`, `/status`); nothing keeps it awake afterwards.
 
 **Cost / limits.** All free: two free web services + the existing Render Postgres. Render shares 750 free instance-hours per month across the workspace's free services, and the Postgres instance shown by `render postgres list` has an `expiresAt` date (OAuth state and purchase history live there).

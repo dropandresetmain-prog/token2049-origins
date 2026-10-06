@@ -101,8 +101,21 @@ if (fresh.access_token) {
   check('find_offers returns a shortlist of at most 3 and forbids quoting before the user chooses', offers.length <= 3 && found.structuredContent?.interaction?.createQuoteAllowedNow === false);
   if (values.quote && offers[0]) {
     process.stdout.write('NOTE  --quote creates one quote (no purchase, no payment) for the first offer using synthetic fulfillment data\n');
-    const q = await mcp.callTool({ name: 'create_quote', arguments: { offerId: offers[0].offerId, fulfillment: { category: 'retail', email: 'buyer@example.com', shippingAddress: { firstName: 'Test', lastName: 'Buyer', address1: '1 Test Street', city: 'New York', province: 'NY', zip: '10001', countryCode: values.country } } } });
-    check('create_quote returns exact terms and funding sources', !q.isError && !!q.structuredContent?.quote, q.isError ? JSON.stringify(q.structuredContent?.error ?? q.structuredContent?.fields ?? '').slice(0, 200) : `fundingSources=${(q.structuredContent?.fundingSources ?? []).map((s) => s.rail).join(',') || 'none'}`);
+    // Exact quotes drive a checkout on a small instance and can take minutes; the tool answers "quote_pending" within ~45 s and the same
+    // call (same arguments) collects the result, exactly as a ChatGPT conversation does. Pick the cheapest of the shortlist.
+    const cheapest = offers.reduce((x, y) => (Number(x.indicativePrice?.amountMinor ?? Infinity) <= Number(y.indicativePrice?.amountMinor ?? Infinity) ? x : y), offers[0]);
+    const quoteArgs = { offerId: cheapest.offerId, fulfillment: { category: 'retail', email: 'buyer@example.com', shippingAddress: { firstName: 'Test', lastName: 'Buyer', address1: '1 Test Street', city: 'New York', province: 'NY', zip: '10001', countryCode: values.country } } };
+    let q;
+    const started = Date.now();
+    for (let attempt = 1; attempt <= 20; attempt++) {
+      q = await mcp.callTool({ name: 'create_quote', arguments: quoteArgs }, undefined, { timeout: 90_000 }).catch((e) => ({ isError: true, structuredContent: { error: { message: String(e).slice(0, 120) } }, content: [] }));
+      if (q.structuredContent?.status !== 'quote_pending') break;
+      process.stdout.write(`NOTE  quote still being prepared (${Math.round((Date.now() - started) / 1000)}s); collecting again\n`);
+      await new Promise((r) => setTimeout(r, 15_000));
+    }
+    check('create_quote returns exact terms and funding sources', !q.isError && !!q.structuredContent?.quote, q.isError ? JSON.stringify(q.structuredContent?.error ?? q.structuredContent?.fields ?? '').slice(0, 200) : `fundingSources=${(q.structuredContent?.fundingSources ?? []).map((x) => x.rail).join(',') || 'none'} took=${Math.round((Date.now() - started) / 1000)}s`);
+    const fundingLines = String(q.content?.[0]?.text ?? '').split('\n').filter((l) => l.startsWith('- cardano'));
+    if (fundingLines.length) process.stdout.write(`NOTE  ${fundingLines[0].replace(/ · selection .*/, '')}\n`);
   }
   await mcp.close();
 } else {
