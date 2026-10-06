@@ -4,7 +4,9 @@
   "private": true,
   "type": "module",
   "description": "Buyer-side commerce gateway: agent-native funding in, ordinary commerce out.",
-  "engines": { "node": ">=24" },
+  "engines": {
+    "node": ">=24"
+  },
   "scripts": {
     "build": "tsc -p tsconfig.build.json",
     "typecheck": "tsc -p tsconfig.json --noEmit",
@@ -18,7 +20,13 @@
     "client:create": "tsx scripts/create-client.ts"
   },
   "dependencies": {
+    "@evolution-sdk/evolution": "0.5.14",
+    "@modelcontextprotocol/sdk": "1.32.1",
+    "@x402/cardano": "2.26.0",
+    "@x402/core": "2.26.0",
+    "@x402/fetch": "2.26.0",
     "express": "5.2.1",
+    "playwright-core": "1.63.0",
     "zod": "4.6.5"
   },
   "devDependencies": {

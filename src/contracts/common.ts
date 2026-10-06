@@ -59,6 +59,8 @@ export const Scope = z.enum([
   'purchases:fund',
   'purchases:read',
   'evidence:read',
+  /** Operator-only: aggregate treasury, capacity and bank observations. Never granted to customer channels by default. */
+  'operator:read',
 ]);
 export type Scope = z.infer<typeof Scope>;
 
