@@ -13,7 +13,7 @@ const server = gw.app.listen(gw.env.PORT, gw.env.HOST, () => {
 const shutdown = () => {
   gw.worker.stop();
   server.close(async () => {
-    await gw.db.close();
+    await gw.close();
     process.exit(0);
   });
 };

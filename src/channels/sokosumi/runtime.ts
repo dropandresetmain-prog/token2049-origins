@@ -1,19 +1,23 @@
 import { createHash, randomUUID, timingSafeEqual } from 'node:crypto';
 import { Router } from 'express';
 import { z } from 'zod';
-import { CreatePurchaseRequest, PurchaseResponse } from '../../contracts/api.js';
+import { CreatePurchaseRequest, PurchaseResponse, SearchOffersDraftRequest, SearchOffersResponse } from '../../contracts/api.js';
 import { Db } from '../../infrastructure/db.js';
 import { MasumiClient, MasumiError } from '../../integrations/masumi/client.js';
 import { assertFeeBinding, observeServiceFee } from '../../funding/masumi/index.js';
+import { assessPurchaseIntent } from '../../contracts/input.js';
 
-const Start = z.object({ identifier_from_purchaser: z.string().regex(/^(?:[a-f0-9]{2}){7,13}$/), input_data: z.object({ purchase_request: z.string().min(1).max(8000) }).strict() }).strict();
+const StartBase = { identifier_from_purchaser: z.string().regex(/^(?:[a-f0-9]{2}){7,13}$/) };
+const PurchaseStart = z.object({ ...StartBase, input_data: z.object({ purchase_request: z.string().min(1).max(8000) }).strict() }).strict();
+const SearchStart = z.object({ ...StartBase, input_data: z.object({ commerce_request: z.string().min(1).max(8000) }).strict() }).strict();
 type Job = { id: string; owner: string; external_id: string; input_hash: string; request_json: string; phase: string; purchase_json: string | null; payment_json: string | null; result_json: string | null; pay_by: string; submit_by: string; unlock_at: string; dispute_until: string; transfer_ref: string | null };
 export interface SokosumiIdentity { owner: string; token: string; gatewayToken: string; }
-export interface RuntimeOptions { db: Db; masumi: MasumiClient; gatewayUrl: string; identities: SokosumiIdentity[]; fetchImpl?: typeof fetch; clock?: () => number; }
+export type SokosumiTaskMode = 'approved_purchase' | 'commerce_search';
+export interface RuntimeOptions { db: Db; masumi: MasumiClient; gatewayUrl: string; identities: SokosumiIdentity[]; taskMode?: SokosumiTaskMode; fetchImpl?: typeof fetch; clock?: () => number; }
 export class TaskError extends Error {
   constructor(readonly status: number, readonly code: string) { super(code); }
 }
-export const mipInputHash = (identifier: string, input: { purchase_request: string }) => digest(identifier + ';' + JSON.stringify(input));
+export const mipInputHash = (identifier: string, input: Record<string, string>) => digest(identifier + ';' + JSON.stringify(input));
 export const mipOutputHash = (identifier: string, output: string) => digest(identifier + ';' + output);
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
 function canonical(value: unknown): string {
@@ -34,7 +38,7 @@ export class SokosumiRuntime {
     await this.opts.db.run('CREATE TABLE IF NOT EXISTS sokosumi_jobs (id TEXT PRIMARY KEY, owner TEXT NOT NULL, external_id TEXT NOT NULL, input_hash TEXT NOT NULL, request_json TEXT NOT NULL, phase TEXT NOT NULL, purchase_json TEXT, payment_json TEXT, result_json TEXT, pay_by TEXT NOT NULL, submit_by TEXT NOT NULL, unlock_at TEXT NOT NULL, dispute_until TEXT NOT NULL, transfer_ref TEXT UNIQUE, UNIQUE(owner,external_id))');
     // Persist public terms once for this job store; credential rotation does not reprice existing jobs.
     await this.opts.db.run('CREATE TABLE IF NOT EXISTS sokosumi_runtime_terms (id INTEGER PRIMARY KEY CHECK(id=1), terms_json TEXT NOT NULL)');
-    const terms = canonical({agentIdentifier:this.opts.masumi.config.agentIdentifier,sellerVkey:this.opts.masumi.config.sellerVkey,sellerAddress:this.opts.masumi.config.sellerAddress,contractAddress:this.opts.masumi.config.contractAddress,assetUnit:this.opts.masumi.config.assetUnit,feeBaseUnits:this.opts.masumi.config.feeBaseUnits,gatewayUrl:this.opts.gatewayUrl});
+    const terms = canonical({agentIdentifier:this.opts.masumi.config.agentIdentifier,sellerVkey:this.opts.masumi.config.sellerVkey,sellerAddress:this.opts.masumi.config.sellerAddress,contractAddress:this.opts.masumi.config.contractAddress,assetUnit:this.opts.masumi.config.assetUnit,feeBaseUnits:this.opts.masumi.config.feeBaseUnits,gatewayUrl:this.opts.gatewayUrl,...(this.opts.taskMode === 'commerce_search' ? { taskMode: this.opts.taskMode } : {})});
     const jobs = await this.opts.db.all<Job>('SELECT * FROM sokosumi_jobs WHERE payment_json IS NOT NULL');
     for (const job of jobs) assertFeeBinding(JSON.parse(job.payment_json!), this.opts.masumi.config, this.binding(job, JSON.parse(job.payment_json!).blockchainIdentifier));
     await this.opts.db.run('INSERT INTO sokosumi_runtime_terms (id,terms_json) VALUES (1,$1) ON CONFLICT DO NOTHING', terms);
@@ -48,11 +52,15 @@ export class SokosumiRuntime {
     return matches[0]!;
   }
   async start(raw: unknown, identity: SokosumiIdentity): Promise<Record<string, unknown>> {
-    const parsed = Start.safeParse(raw);
+    const parsed = (this.opts.taskMode === 'commerce_search' ? SearchStart : PurchaseStart).safeParse(raw);
     if (!parsed.success) throw new TaskError(400, 'invalid_request');
-    let request: z.infer<typeof CreatePurchaseRequest>;
-    try { request = CreatePurchaseRequest.parse(JSON.parse(parsed.data.input_data.purchase_request)); } catch { throw new TaskError(400, 'invalid_purchase_request'); }
-    const inputHash = mipInputHash(parsed.data.identifier_from_purchaser, parsed.data.input_data);
+    let request: z.infer<typeof CreatePurchaseRequest> | z.infer<typeof SearchOffersDraftRequest>;
+    try {
+      request = this.opts.taskMode === 'commerce_search'
+        ? SearchOffersDraftRequest.parse(JSON.parse((parsed.data.input_data as { commerce_request: string }).commerce_request))
+        : CreatePurchaseRequest.parse(JSON.parse((parsed.data.input_data as { purchase_request: string }).purchase_request));
+    } catch { throw new TaskError(400, this.opts.taskMode === 'commerce_search' ? 'invalid_commerce_request' : 'invalid_purchase_request'); }
+    const inputHash = mipInputHash(parsed.data.identifier_from_purchaser, parsed.data.input_data as Record<string, string>);
     const key = 'sokosumi:' + digest(identity.owner + ':' + parsed.data.identifier_from_purchaser);
     const lock = await this.opts.db.withExclusiveLock(key, async () => {
       let job = await this.opts.db.get<Job>('SELECT * FROM sokosumi_jobs WHERE owner=$1 AND external_id=$2', identity.owner, parsed.data.identifier_from_purchaser);
@@ -63,15 +71,23 @@ export class SokosumiRuntime {
         job = (await this.opts.db.get<Job>('SELECT * FROM sokosumi_jobs WHERE owner=$1 AND external_id=$2', identity.owner, parsed.data.identifier_from_purchaser))!;
       }
       if (!job.purchase_json) {
+        if (this.opts.taskMode === 'commerce_search') {
+          if (job.phase === 'search_attempt') throw new TaskError(503, 'search_outcome_unknown');
+          await this.opts.db.run('UPDATE sokosumi_jobs SET phase=$1 WHERE id=$2', 'search_attempt', job.id);
+          const snapshot = await this.searchSnapshot(request as z.infer<typeof SearchOffersDraftRequest>, identity);
+          job.purchase_json = JSON.stringify(snapshot);
+          await this.opts.db.run('UPDATE sokosumi_jobs SET purchase_json=$1,phase=$2 WHERE id=$3', job.purchase_json, 'search_ready', job.id);
+        } else {
         // The core's durable idempotency key recovers an ambiguous create; this operation never spends.
         let res: Response;
         try { res = await this.fetchImpl(this.opts.gatewayUrl + '/v1/purchases', { method: 'POST', headers: { authorization: 'Bearer ' + identity.gatewayToken, 'Idempotency-Key': key, 'content-type': 'application/json' }, body: job.request_json, redirect: 'error', signal: AbortSignal.timeout(15000) }); }
         catch { throw new TaskError(503, 'gateway_outcome_unknown'); }
         if (!res.ok) throw new TaskError(res.status >= 500 ? 503 : 422, 'gateway_purchase_rejected');
         const purchase = PurchaseResponse.safeParse(await res.json().catch(() => null));
-        if (!purchase.success || purchase.data.purchase.customerId !== identity.owner || purchase.data.purchase.quoteId !== request.quoteId) throw new TaskError(503, 'gateway_response_invalid');
+        if (!purchase.success || purchase.data.purchase.customerId !== identity.owner || purchase.data.purchase.quoteId !== (request as z.infer<typeof CreatePurchaseRequest>).quoteId) throw new TaskError(503, 'gateway_response_invalid');
         job.purchase_json = JSON.stringify(purchase.data.purchase);
         await this.opts.db.run('UPDATE sokosumi_jobs SET purchase_json=$1 WHERE id=$2', job.purchase_json, job.id);
+        }
       }
       if (!job.payment_json) {
         let payment;
@@ -128,8 +144,9 @@ export class SokosumiRuntime {
         catch { throw new TaskError(409, 'payment_replayed'); }
       }
       // Refresh authenticated core truth; fee payment cannot complete or fund a merchant purchase.
-      const purchase = await this.corePurchase(job, identity);
-      if (!['succeeded', 'failed', 'expired', 'cancelled', 'requires_reauthorization'].includes(purchase.state)) {
+      const searchResult = this.opts.taskMode === 'commerce_search' ? JSON.parse(job.purchase_json!) as Record<string, unknown> : null;
+      const purchase = this.opts.taskMode === 'commerce_search' ? null : await this.corePurchase(job, identity);
+      if (purchase && !['succeeded', 'failed', 'expired', 'cancelled', 'requires_reauthorization'].includes(purchase.state)) {
         const deadlineExpired = this.now() > Number(job.submit_by);
         const type = deadlineExpired ? 'native_task_deadline_reconciliation_required'
           : purchase.state === 'awaiting_funding' ? 'direct_principal_funding'
@@ -143,7 +160,9 @@ export class SokosumiRuntime {
         }) };
       }
       // Evidence modes travel with the actual core receipt, so fixture merchants cannot masquerade as live.
-      const result = job.result_json ?? JSON.stringify({ serviceFee: this.serviceFee(), purchaseId: purchase.purchaseId, state: purchase.state, receipt: purchase.receipt, statusReason: purchase.statusReason, serviceFeePurpose: 'service_fee' });
+      const result = job.result_json ?? JSON.stringify(this.opts.taskMode === 'commerce_search'
+        ? { serviceFee: this.serviceFee(), commerceSearch: searchResult, serviceFeePurpose: 'service_fee' }
+        : { serviceFee: this.serviceFee(), purchaseId: purchase!.purchaseId, state: purchase!.state, receipt: purchase!.receipt, statusReason: purchase!.statusReason, serviceFeePurpose: 'service_fee' });
       const resultHash = mipOutputHash(job.external_id, result);
       if (job.phase !== 'submit_attempt' && job.phase !== 'submit_rejected') {
         // Keep a truthful terminal outcome, but never begin a native write after its immutable deadline.
@@ -180,7 +199,29 @@ export class SokosumiRuntime {
     if (!fresh.success || fresh.data.purchase.customerId !== identity.owner || fresh.data.purchase.purchaseId !== JSON.parse(job.purchase_json!).purchaseId || fresh.data.purchase.quoteId !== JSON.parse(job.request_json).quoteId) throw new TaskError(503,'gateway_response_invalid');
     return fresh.data.purchase;
   }
-  private serviceFee() { return { purpose: 'service_fee', assetUnit: this.opts.masumi.config.assetUnit, amountBaseUnits: this.opts.masumi.config.feeBaseUnits, network: 'cardano:preprod', additionalToApprovedCoreTotal: true }; }
+  private async searchSnapshot(request: z.infer<typeof SearchOffersDraftRequest>, identity: SokosumiIdentity): Promise<Record<string, unknown>> {
+    const assessment = assessPurchaseIntent(request.intent);
+    if (assessment.status === 'needs_input') return { kind: 'commerce_search', status: 'needs_input', needs_input: assessment, offers: [], executable: false };
+    let response: Response;
+    try {
+      response = await this.fetchImpl(this.opts.gatewayUrl + '/v1/offers/search', {
+        method: 'POST', headers: { authorization: 'Bearer ' + identity.gatewayToken, 'content-type': 'application/json' },
+        body: JSON.stringify({ intent: assessment.value }), redirect: 'error', signal: AbortSignal.timeout(15000),
+      });
+    } catch { throw new TaskError(503, 'search_outcome_unknown'); }
+    if (!response.ok) throw new TaskError(response.status >= 500 ? 503 : 422, 'gateway_search_rejected');
+    const parsed = SearchOffersResponse.safeParse(await response.json().catch(() => null));
+    if (!parsed.success) throw new TaskError(503, 'gateway_response_invalid');
+    const offers = parsed.data.offers.slice(0, 3).map(offer => ({
+      offerId: offer.offerId, ...(offer.sourceOffer ? { sourceOffer: offer.sourceOffer } : {}), category: offer.category,
+      route: offer.route, providerEnvironment: offer.providerEnvironment, title: offer.title, description: offer.description,
+      indicativePrice: offer.indicativePrice, terms: offer.terms, sourceObservedAt: offer.sourceObservedAt,
+      expiresAt: offer.expiresAt, executable: false as const,
+    }));
+    return { kind: 'commerce_search', status: 'ready', offers, executable: false,
+      nextAction: offers.length ? 'Ask the user to choose an option before any quote or purchase is created.' : 'Ask the user to refine the search. No quote or purchase was created.' };
+  }
+  private serviceFee() { return { purpose: 'service_fee', assetUnit: this.opts.masumi.config.assetUnit, amountBaseUnits: this.opts.masumi.config.feeBaseUnits, network: 'cardano:preprod', additionalToApprovedCoreTotal: this.opts.taskMode !== 'commerce_search' }; }
   private recovery(job: Job, resultHash: string): Record<string, unknown> {
     return { status: this.now() > Number(job.submit_by) ? 'failed' : 'running', result: JSON.stringify({ type: 'native_result_reconciliation_required', jobId: job.id, resultHash, coreResult: job.result_json ? JSON.parse(job.result_json) : null, submitBy: new Date(Number(job.submit_by)).toISOString(), action: 'Reconcile the existing native payment before any retry; no new payment is authorized' }) };
   }
@@ -189,8 +230,8 @@ export class SokosumiRuntime {
   }
   router(): Router {
     const r = Router();
-    r.get('/availability', (_q, s) => s.json({ status: 'available', type: 'masumi-agent', serviceFee: this.serviceFee(), message: 'Preprod commerce; purchaser nonce must be 14-26 even lowercase hex characters; principal requires direct funding' }));
-    r.get('/input_schema', (_q, s) => s.json({ input_data: [{ id: 'purchase_request', type: 'string', name: 'Canonical approved purchase request JSON', validations: [{ validation: 'min', value: '1' }, { validation: 'max', value: '8000' }] }] }));
+    r.get('/availability', (_q, s) => s.json({ status: 'available', type: 'masumi-agent', readinessScope: 'task_store_only', externalDependenciesChecked: false, serviceFee: this.serviceFee(), message: this.opts.taskMode === 'commerce_search' ? 'Task store initialized. External search and Masumi services are checked only when a task runs. Search is read-only; results are indicative and non-executable; no quote or purchase is created.' : 'Preprod commerce; purchaser nonce must be 14-26 even lowercase hex characters; principal requires direct funding' }));
+    r.get('/input_schema', (_q, s) => s.json({ input_data: [{ id: this.opts.taskMode === 'commerce_search' ? 'commerce_request' : 'purchase_request', type: 'string', name: this.opts.taskMode === 'commerce_search' ? 'Canonical read-only commerce search JSON' : 'Canonical approved purchase request JSON', validations: [{ validation: 'min', value: '1' }, { validation: 'max', value: '8000' }] }] }));
     r.post('/start_job', async (q, s) => { try { s.json(await this.start(q.body, this.identity(q.header('authorization')))); } catch (e) { this.error(s, e); } });
     r.get('/status', async (q, s) => { try { const parsed = z.uuid().safeParse(q.query.job_id); if (!parsed.success) throw new TaskError(400, 'invalid_job_id'); const id = parsed.data; s.json(await this.status(id, this.identity(q.header('authorization')))); } catch (e) { this.error(s, e); } });
     return r;
