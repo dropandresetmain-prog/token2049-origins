@@ -405,3 +405,21 @@ re-Paid. The Global paid harness retains its guard against outstanding ambiguous
 
 Provider references: [Shopify test payment instructions](https://help.shopify.com/en/manual/checkout-settings/test-orders/payments-test-mode)
 and [protected customer data in development](https://shopify.dev/docs/apps/launch/protected-customer-data).
+
+Final verification: reconciliation proof API and browser UI PASS, merchant evidence
+`fresh_external`, one applied `local_fixture` funding event, one execution attempt, one execute
+job, one receipt, consumed reservation, balanced journal. The final proof-only invocation made
+two Admin reads and zero execute/checkout/Pay calls. Its `coreReconciliationApplied=false` means
+the earlier invocation had already reconciled successfully before finding the display-redaction
+bug; it does not mean the order was manually marked paid.
+
+Repair promoted to local main as `689ea6b`, preserving the current console and Masumi integration.
+On that main: 38 test files / 779 tests PASS; typecheck PASS; production server + console build
+PASS; diff check PASS. No deployment or remote push performed. Convenient copies of sanitized
+verification are in `artifacts/e2e/shopify-repair/` on the primary checkout.
+
+Next work belongs in a fresh E2E chat: use current main, the existing protected configuration and
+signer histories, and select the final funding/provider composition. Shopify code/config fixes and
+local-fixture merchant acceptance are complete. Preserve all historical unknown purchases; never
+repeat their Pay or relabel them failed from an empty order search. Global quote PASS is distinct
+from paid Global acceptance, whose ambiguity guard remains active. No Masumi code was changed.
