@@ -98,7 +98,7 @@ export function merchantDetail(kind: string, isTest: boolean): string {
 
 /** How the assistant reached Capsule. Used when the assistant's own name is not available. */
 export const channel: Record<Channel, { name: string; kind: string }> = {
-  mcp: { name: 'AI assistant', kind: 'AI assistant' },
+  mcp: { name: 'Your assistant', kind: 'AI assistant' },
   chatgpt: { name: 'ChatGPT', kind: 'AI assistant' },
   sokosumi: { name: 'Sokosumi agent', kind: 'Agent marketplace' },
   http: { name: 'Connected app', kind: 'Connected app' },
@@ -106,6 +106,10 @@ export const channel: Record<Channel, { name: string; kind: string }> = {
   test: { name: 'Test client', kind: 'Test client' },
 };
 export const unknownRequester = { name: 'Your assistant', kind: 'AI assistant' };
+/** The generic name reads lower-case mid-sentence ("Ask your assistant"); real names stay as they are. */
+export function inSentence(name: string): string {
+  return name === unknownRequester.name ? name.charAt(0).toLowerCase() + name.slice(1) : name;
+}
 
 export const paymentMethod: Record<FundingRail, string> = {
   cardano: 'Cardano',
@@ -133,7 +137,7 @@ export function commerceOutcome(s: CommerceStatus, cat: Cat): string {
     case 'held': return cat === 'retail' ? 'On hold, not paid yet' : 'Reserved, not confirmed yet';
     case 'payment_pending': return 'Waiting for the merchant to take payment';
     case 'paid': return 'Order paid';
-    case 'confirmed': return 'Booking confirmed';
+    case 'confirmed': return cat === 'retail' || cat === 'unknown' ? 'Order confirmed' : 'Booking confirmed';
     case 'ticketing': return 'Issuing the ticket';
     case 'ticketed': return 'Ticket issued';
     case 'failed': return 'Not completed';
@@ -392,6 +396,12 @@ export const receipt = {
   rowReceiptNumber: 'Receipt number',
   rowIssued: 'Issued',
   notesHeading: 'Notes',
+  /** Written by the console from receipt facts; the gateway's own wording stays in the download. */
+  noteSimulatedFunds: 'This purchase used simulated test funds. No real payment was made.',
+  noteTestFunds: 'Paid with test tokens that have no cash value.',
+  noteScaled: 'Test payments are 1/1000 of the price.',
+  noteTestMerchant: 'The merchant ran this order in test mode. Nothing will be shipped, booked or charged for real.',
+  noteNoBankCharge: 'No bank account or card was charged.',
   close: 'Close',
   download: 'Download receipt',
   downloaded: 'Receipt downloaded.',

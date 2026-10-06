@@ -53,6 +53,8 @@ describe('presenters over sample purchases', () => {
     expect(vm.receipt?.notes[0]).toBe(boundary);
     expect(vm.proof.sections[1]!.fields.find((f) => f.label === 'Merchant')?.value).toBe('Capsule test store');
     expect(vm.quote?.source?.link.href).toBe('https://harborandpine.example/products/merino-crew-socks');
+    // Receipt notes are console copy, never the gateway's engineering wording.
+    for (const n of vm.receipt!.notes) expect(n).not.toMatch(/fixture|sandbox|provider|notional|OCBC|ledger|capacity|\u2014/i);
     // An ordinary Shopify purchase has no source store.
     expect((await detail('completed')).quote?.source).toBeNull();
   });

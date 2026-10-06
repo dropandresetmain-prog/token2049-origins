@@ -70,7 +70,8 @@ Expired. Groups: In progress, Needs attention (Price changed, Couldn't complete)
 
 ## Text the gateway writes
 
-Some text reaches the screen from the gateway rather than from `en.ts`: receipt notes (`receipt.limitations`), item details
-(`QuoteView.fulfillmentSummary`), price-line labels and merchant terms. Gateway-authored text (receipt notes especially)
-should follow these rules. Merchant text is shown as the merchant wrote it, under merchant labels such as "Merchant
+Some text reaches the screen from merchants rather than from `en.ts`: item details (`QuoteView.fulfillmentSummary`),
+price-line labels and merchant terms. The gateway's own receipt limitations (`receipt.limitations`) are engineering
+wording, so the console does not show them; it writes receipt notes from the receipt's facts instead, and the original
+text stays in the downloaded receipt. Merchant text is shown as the merchant wrote it, under merchant labels such as "Merchant
 terms". Tracked as G7 in `docs/contracts/CONSOLE_CONTRACT.md`.

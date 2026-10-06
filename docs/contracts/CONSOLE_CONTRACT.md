@@ -95,7 +95,7 @@ render with or without them.
 | G4 | "Approved up to $400.00" | `Approval.maxTotal` is recorded but not exposed | Add `approval: { maxTotal }` to `PurchaseView` |
 | G5 | Price details and title with a read-only key | `GET /v1/quotes/:id` requires `quotes:write` | Allow `purchases:read` for quotes attached to the caller's own purchases, or add `GET /v1/purchases/:id/quote` |
 | G6 | Search, status tabs and paging beyond 50 | 50 newest, no parameters; the console filters in the browser | Add `status`, `q` and `cursor` query parameters to the list route |
-| G7 | Receipt notes, item details, price-line labels and merchant terms | Free text written by the gateway (`receipt.limitations`) or relayed from merchants | Gateway-authored text shown to customers should follow `docs/design/VOCABULARY.md`. Merchant text is shown as the merchant wrote it, under merchant labels |
+| G7 | Item details, price-line labels and merchant terms | Free text relayed from merchants. `receipt.limitations` is engineering wording, so the console writes its own receipt notes from receipt facts and keeps the gateway's text in the downloaded receipt | Optional: a customer-facing limitations field the console could show directly |
 | G8 | Live updates | Polling every 5 seconds | Optional later: a server-sent events stream per purchase |
 
 Nothing in this list blocks the console. Each one makes a screen more complete when the gateway provides it.

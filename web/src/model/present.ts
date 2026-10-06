@@ -273,12 +273,12 @@ function buildAttention(f: Facts): AttentionVM | null {
   switch (f.key) {
     case 'price_changed': {
       const a = copy.attention.priceChanged;
-      return { tone: 'attention', title: a.title, body: [a.body(f.merchant.name, f.agent.name), paid ? a.paidNote : ''].filter(Boolean).join(' '),
+      return { tone: 'attention', title: a.title, body: [a.body(f.merchant.name, copy.inSentence(f.agent.name)), paid ? a.paidNote : ''].filter(Boolean).join(' '),
         action: { label: a.action, copyText: a.copyText(f.title, f.ref) } };
     }
     case 'expired': {
       const a = copy.attention.expired;
-      return { tone: 'neutral', title: a.title, body: [a.body(f.agent.name), paid ? a.paidNote : ''].filter(Boolean).join(' '),
+      return { tone: 'neutral', title: a.title, body: [a.body(copy.inSentence(f.agent.name)), paid ? a.paidNote : ''].filter(Boolean).join(' '),
         action: { label: a.action, copyText: a.copyText(f.title, f.ref) } };
     }
     case 'not_completed': {
@@ -405,6 +405,24 @@ function buildActivity(f: Facts): ActivityItemVM[] {
   return items;
 }
 
+/**
+ * Receipt notes in customer language, derived from receipt facts. The gateway's own limitation statements are
+ * engineering wording; they stay in the downloaded receipt and the technical details, not on screen.
+ */
+function receiptNotes(f: Facts, r: NonNullable<PurchaseView['receipt']>): string[] {
+  const notes: string[] = [];
+  const boundary = boundaryNote(f);
+  if (boundary) notes.push(boundary);
+  const simulated = r.evidenceMode === 'local_fixture' || r.funding.some((x) => x.evidenceMode === 'local_fixture');
+  if (simulated) notes.push(copy.receipt.noteSimulatedFunds);
+  else if (f.networkIsTest) notes.push(copy.receipt.noteTestFunds);
+  const requirement = r.fundingRequirement ?? f.p.fundingRequirement;
+  if (requirement?.settlement?.policy.mode === 'scaled_testnet') notes.push(copy.receipt.noteScaled);
+  if (f.merchantIsTest) notes.push(copy.receipt.noteTestMerchant);
+  notes.push(copy.receipt.noteNoBankCharge);
+  return notes;
+}
+
 function buildReceipt(f: Facts): ReceiptVM | null {
   const r = f.p.receipt;
   // No receipt before the merchant confirms, whatever else is true.
@@ -425,7 +443,7 @@ function buildReceipt(f: Facts): ReceiptVM | null {
     currency: f.p.payablePrincipal.currency,
     itemTitle: f.title,
     fields,
-    notes: [boundaryNote(f), ...r.limitations].filter((n): n is string => !!n),
+    notes: receiptNotes(f, r),
     downloadName: `capsule-receipt-${f.ref.slice(1).toLowerCase()}.json`,
     download: r,
   };
