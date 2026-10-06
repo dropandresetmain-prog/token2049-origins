@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { SourceOffer, SandboxExecution } from '../contracts/provenance.js';
 import type { Db } from '../infrastructure/db.js';
 import { Money } from '../contracts/money.js';
-import { HumanProgress, projectProgress } from '../contracts/presentation.js';
+import { HumanProgress, projectProgress, maskAddress } from '../contracts/presentation.js';
 import { FundingOption, type QuoteView } from '../contracts/commerce.js';
 import { buildPurchaseView } from '../core/views.js';
 import { getQuoteRow, type PurchaseRow, type FundingEvidenceRow } from '../core/store.js';
@@ -25,6 +25,9 @@ export const PurchaseProof = z.object({
   technicalEvidencePath: z.string(),
 }).strict();
 export type PurchaseProof = z.infer<typeof PurchaseProof>;
+
+/** Payer formats a proof may display, per rail. Anything else (including Masumi remuneration) shows no source. */
+const PAYER_FORMAT: Record<string, RegExp> = { cardano: /^addr_test1[0-9a-z]{10,200}$/, solana: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/ };
 
 /** Curated projection of durable facts. No provider prose, PII, checkpoints, bank data or journal internals. */
 export async function purchaseProof(db: Db, p: PurchaseRow): Promise<PurchaseProof> {
@@ -59,7 +62,7 @@ export async function purchaseProof(db: Db, p: PurchaseRow): Promise<PurchasePro
     ],
     funding: {
       requirement: purchase.fundingRequirement!, confirmationStatus: purchase.paymentState, applied,
-      sources: funding.flatMap(f => /^addr_test1[0-9a-z]{10,200}$/.test(f.payer) ? [{ displayAddress: `${f.payer.slice(0, 14)}…${f.payer.slice(-6)}`, evidenceRef: f.id }] : []),
+      sources: funding.flatMap(f => PAYER_FORMAT[f.rail]?.test(f.payer) ? [{ displayAddress: maskAddress(f.payer), evidenceRef: f.id }] : []),
       transfers: funding.map(f => ({ reference: redactString(f.transfer_reference), confirmationStatus: f.payment_state,
         application: f.application, evidenceMode: f.evidence_mode, verifiedAt: f.verified_at })),
     },

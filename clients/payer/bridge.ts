@@ -28,8 +28,13 @@ const STATUS: Record<PayerErrorCode, number> = {
   internal: 500,
 };
 
+/** What a bridge needs from a payer: pay one existing gateway purchase. `purchase` is optional (callers re-read the gateway). */
+export interface BridgePayer {
+  pay(purchaseId: string): Promise<{ purchase?: unknown; transferReference: string | null; resumed: boolean }>;
+}
+
 export interface BridgeDeps {
-  payer: Pick<Payer, 'pay'>;
+  payer: BridgePayer;
   source?: () => Promise<FundingSource>;
   /** Bearer token callers must present. */
   token: string;
@@ -112,7 +117,7 @@ export function createBridge(deps: BridgeDeps): Server {
 
         const r = await exclusive(() => deps.payer.pay(purchaseId as string));
         log({ type: 'bridge.paid', purchaseId, resumed: r.resumed });
-        return send(res, 200, { ok: true, purchase: redact(r.purchase), payment: { transferReference: r.transferReference } });
+        return send(res, 200, { ok: true, ...(r.purchase !== undefined ? { purchase: redact(r.purchase) } : {}), payment: { transferReference: r.transferReference } });
       } catch (e) {
         if (e instanceof PayerError) {
           log({ type: 'bridge.refused', code: e.code });
@@ -129,17 +134,21 @@ export function createBridge(deps: BridgeDeps): Server {
   return server;
 }
 
+/** 127.0.0.1 only: a bridge can cause spending and must not be reachable off-host. */
+export async function listenLoopback(server: Server, port: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '127.0.0.1', resolve);
+  });
+}
+
 export async function startBridge(env: NodeJS.ProcessEnv): Promise<Server> {
   const b = loadBridgeConfig(env);
   const token = readSecretFile(b.tokenFile, 'PAYER_BRIDGE_TOKEN_FILE');
   if (token.length < 24) throw new Error('PAYER_BRIDGE_TOKEN_FILE must hold a token of at least 24 characters');
   const payer = new Payer({ config: loadPayerConfig(env), log: (e) => process.stdout.write(`${JSON.stringify(e)}\n`) });
   const server = createBridge({ payer, token, source: () => payer.source(), log: (e) => process.stdout.write(`${JSON.stringify(e)}\n`) });
-  await new Promise<void>((resolve, reject) => {
-    server.once('error', reject);
-    // 127.0.0.1 only: this endpoint can cause spending and must not be reachable off-host.
-    server.listen(b.port, '127.0.0.1', resolve);
-  });
+  await listenLoopback(server, b.port);
   return server;
 }
 

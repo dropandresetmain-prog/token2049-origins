@@ -11,16 +11,31 @@ import { redact, redactString } from '../../infrastructure/redact.js';
 import { GatewayClient, GatewayError } from './client.js';
 import type { BridgeClient } from './bridge.js';
 
-/** Dependencies of the tool layer. `bridge` is optional: without it `buy` can never move money. */
+/** Dependencies of the tool layer. `bridges` may be empty: without one `buy` can never move money. */
 export interface ToolDeps {
   gateway: GatewayClient;
-  bridge?: BridgeClient;
-  /** Secret strings (gateway token, bridge token) that must never appear in any output. */
+  bridges?: BridgeClient[];
+  /** Secret strings (gateway token, bridge tokens) that must never appear in any output. */
   secrets: string[];
 }
 
 /** Same shape the core enforces on Idempotency-Key, so we fail fast before any HTTP call. */
 const IdempotencyKey = z.string().regex(/^[A-Za-z0-9._:-]{8,128}$/, '8-128 chars of A-Z a-z 0-9 . _ : -');
+
+/* ---------------- connected payers ---------------- */
+
+type FundingOptionView = QuoteView['fundingOptions'][number];
+
+/** Identity match is rail + network + asset id, never a ticker or display name. */
+export function sourceMatches(source: FundingSource, option: FundingOptionView): boolean {
+  return source.readiness === 'configured' && source.rail === option.rail && source.network === option.amount.network && source.assetId === option.amount.assetId;
+}
+
+/** Every reachable connected payer with its bridge. Read-only: /status never moves money. */
+async function connectedPayers(deps: ToolDeps): Promise<Array<{ bridge: BridgeClient; source: FundingSource }>> {
+  const all = await Promise.all((deps.bridges ?? []).map(async (bridge) => ({ bridge, source: await bridge.source() })));
+  return all.flatMap((p) => (p.source ? [{ bridge: p.bridge, source: p.source }] : []));
+}
 
 /* ---------------- output sanitising ---------------- */
 
@@ -88,15 +103,15 @@ function describeOffers(offers: OfferView[]): string {
   return `${offers.length} offer(s). Offers are indicative and NOT executable; call create_quote for exact terms.\n${lines.join('\n')}`;
 }
 
-export function describeQuote(q: QuoteView, source: FundingSource | null): string {
+export function describeQuote(q: QuoteView, sources: FundingSource[]): string {
   const fund = q.fundingOptions.map(f => {
     const digits = f.amount.amountBaseUnits.padStart(f.amount.decimals + 1, '0');
     const amount = f.amount.decimals ? digits.slice(0, -f.amount.decimals) + '.' + digits.slice(-f.amount.decimals) : digits;
-    const connected = source?.readiness === 'configured' && source.rail === f.rail && source.network === f.amount.network && source.assetId === f.amount.assetId;
+    const connected = sources.find(s => sourceMatches(s, f));
     const scale = f.settlement?.policy;
     return '- ' + f.rail + ' / ' + f.amount.network + ': ' + amount + ' ' + (f.amount.symbol ?? f.amount.assetId) +
       (scale ? ' · testnet notional ' + scale.numerator + ':' + scale.denominator : '') +
-      ' · ' + (connected ? 'Connected wallet ' + source.displayAddress + ' (configured; balance not verified)' : 'External payment action required') +
+      ' · ' + (connected ? 'Connected wallet ' + connected.displayAddress + ' (configured; balance not verified)' : 'External payment action required') +
       ' · selection ' + f.fundingOptionId;
   });
   return [
@@ -149,8 +164,8 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const assessment = assessFulfillment(fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
         const { quote } = await deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
-        const source = deps.bridge ? await deps.bridge.source() : null;
-        return success(deps, describeQuote(quote, source), { quote, fundingSource: source });
+        const fundingSources = (await connectedPayers(deps)).map(p => p.source);
+        return success(deps, describeQuote(quote, fundingSources), { quote, fundingSources });
       } catch (e) {
         return gatewayFailure(deps, e);
       }
@@ -197,12 +212,18 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           return failure(deps, message, { error: { code: 'conflict' }, purchase, progress: projectProgress(purchase) });
         }
         let newlyCreated = false;
+        // The one payer allowed to act for the selected option. Never another rail, never a fallback.
+        let payer: BridgeClient | undefined;
         if (!purchase) {
-          if (deps.bridge) {
-            const source = await deps.bridge.source();
-            if (!source || source.readiness !== 'configured' || source.rail !== option.rail || source.network !== option.amount.network || source.assetId !== option.amount.assetId) {
+          if (deps.bridges?.length) {
+            const matching = (await connectedPayers(deps)).filter(p => sourceMatches(p.source, option));
+            if (matching.length > 1) {
+              return failure(deps, 'More than one connected payer claims the selected funding option. Fix the payer configuration. Nothing has been purchased.', { error: { code: 'payer_ambiguous' }, selectedFundingOptionId });
+            }
+            if (!matching[0]) {
               return success(deps, 'The connected payer cannot use the selected funding option. Connect a matching source or use a channel for external payment. Nothing has been purchased.', { status: 'action_required', quote, selectedFundingOptionId });
             }
+            payer = matching[0].bridge;
           }
           const key = idempotencyKey ?? 'mcp:' + createHash('sha256').update(quoteId + ':' + selectedFundingOptionId).digest('hex');
           try {
@@ -218,9 +239,9 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         let payment: Record<string, unknown> | undefined;
         let paymentFailed = false;
         // A repeated interaction follows durable truth. Submitted/unknown payments are never sent again.
-        if (newlyCreated && purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && deps.bridge && !paymentAttempts.has(purchase.purchaseId)) {
+        if (newlyCreated && purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && payer && !paymentAttempts.has(purchase.purchaseId)) {
           paymentAttempts.add(purchase.purchaseId);
-          const paid = await deps.bridge.pay(purchase.purchaseId);
+          const paid = await payer.pay(purchase.purchaseId);
           purchase = (await deps.gateway.getPurchase(purchase.purchaseId)).purchase;
           if (paid.ok) payment = { attempted: true, ok: true, transferReference: paid.transferReference };
           else {

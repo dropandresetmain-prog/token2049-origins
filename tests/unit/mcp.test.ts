@@ -183,7 +183,7 @@ describe('MCP channel', () => {
 
   it('buy with a bridge funds the purchase; after the worker runs, get_purchase shows succeeded', async () => {
     const bridge = await startFakeBridge(h);
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     const quote = await quoteViaMcp(m);
     const r = await m.call('buy', buyArgs(quote));
     expect(r.isError).toBeFalsy();
@@ -258,11 +258,11 @@ describe('MCP channel', () => {
 
   it('shows connected public source and refuses a mismatched source before creating purchase', async () => {
     const bridge = await startFakeBridge(h);
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     try {
       const quote = await quoteViaMcp(m);
       const quoted = await m.call('create_quote', { offerId: quote.offerId, fulfillment: retailFulfillment });
-      expect(quoted.structuredContent.fundingSource.displayAddress).toBe('addr_test1…epayer');
+      expect(quoted.structuredContent.fundingSources[0].displayAddress).toBe('addr_test1…epayer');
       expect(quoted.content[0]!.text).toContain('Connected wallet');
       expect(quoted.content[0]!.text).toContain('explicit approval');
       const stored = await h.gw.db.get<{ public_json: string }>('SELECT public_json FROM quotes WHERE id=$1', quote.quoteId);
@@ -278,7 +278,7 @@ describe('MCP channel', () => {
 
   it.each(['submitted', 'unknown', 'confirmed'] as const)('follows repeated buy without another payment when payment is %s', async paymentState => {
     const bridge = await startFakeBridge(h); bridge.mode = 'reject';
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     try {
       const quote = await quoteViaMcp(m);
       const first = await m.call('buy', buyArgs(quote));
@@ -332,7 +332,7 @@ describe('MCP channel', () => {
 
   it('does not trigger another funding attempt after an unfunded payer refusal', async () => {
     const bridge = await startFakeBridge(h); bridge.mode = 'reject';
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     try {
       const quote = await quoteViaMcp(m);
       const first = await m.call('buy', buyArgs(quote));
@@ -344,7 +344,7 @@ describe('MCP channel', () => {
 
   it('concurrent repeated buy uses one purchase and one payer action', async () => {
     const bridge = await startFakeBridge(h);
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     try {
       const quote = await quoteViaMcp(m);
       const results = await Promise.all([m.call('buy', buyArgs(quote)), m.call('buy', buyArgs(quote))]);
@@ -368,7 +368,7 @@ describe('MCP channel', () => {
   it('a bridge that fails leaves an honest, unfunded result', async () => {
     const bridge = await startFakeBridge(h);
     bridge.mode = 'reject';
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     const quote = await quoteViaMcp(m);
     const r = await m.call('buy', buyArgs(quote));
     expect(r.isError).toBe(true);
@@ -385,7 +385,7 @@ describe('MCP channel', () => {
   it('a bridge error after the payment landed is reported from the re-read gateway state, not as a failure', async () => {
     const bridge = await startFakeBridge(h);
     bridge.mode = 'fund_then_500';
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     const quote = await quoteViaMcp(m);
     const r = await m.call('buy', buyArgs(quote));
     expect(r.structuredContent.purchase.state).toBe('funded_queued');
@@ -397,7 +397,7 @@ describe('MCP channel', () => {
 
   it('get_purchase describes unresolved outcomes without claiming success or failure', async () => {
     const bridge = await startFakeBridge(h);
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     h.retail.behavior = 'unknown';
     const quote = await quoteViaMcp(m);
     const r = await m.call('buy', buyArgs(quote));
@@ -452,7 +452,7 @@ describe('MCP channel', () => {
     await new Promise<void>((r) => reflect.close(() => r()));
 
     // Normal flow, not-found, invalid input, and a bridge that leaks both tokens in its error text.
-    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    const m = await connect({ ...cfg, bridges: { cardano: { url: bridge.url, token: BRIDGE_TOKEN } } });
     const quote = await quoteViaMcp(m);
     outputs.push(await m.call('get_purchase', { purchaseId: 'pur_doesnotexist0001' }));
     outputs.push(await m.call('get_purchase', { purchaseId: 'not-an-id' }));
@@ -516,9 +516,9 @@ describe('MCP channel', () => {
     const c = loadConfigFromEnv({ GATEWAY_URL: `${h.url}/`, GATEWAY_TOKEN_FILE: gwFile, PAYER_BRIDGE_URL: 'http://127.0.0.1:9/', PAYER_BRIDGE_TOKEN_FILE: brFile, MCP_HTTP_PORT: '0' });
     expect(c.gatewayToken).toBe(mcpToken);
     expect(c.gatewayUrl).toBe(h.url);
-    expect(c.bridge).toEqual({ url: 'http://127.0.0.1:9', token: BRIDGE_TOKEN });
+    expect(c.bridges).toEqual({ cardano: { url: 'http://127.0.0.1:9', token: BRIDGE_TOKEN } });
     expect(c.httpPort).toBe(0);
-    expect(loadConfigFromEnv({ GATEWAY_URL: h.url, GATEWAY_TOKEN_FILE: gwFile }).bridge).toBeUndefined();
+    expect(loadConfigFromEnv({ GATEWAY_URL: h.url, GATEWAY_TOKEN_FILE: gwFile }).bridges).toBeUndefined();
     expect(() => loadConfigFromEnv({ GATEWAY_URL: h.url, GATEWAY_TOKEN_FILE: gwFile, PAYER_BRIDGE_URL: 'http://127.0.0.1:9' })).toThrow(ConfigError);
     expect(() => loadConfigFromEnv({ GATEWAY_URL: h.url })).toThrow(ConfigError);
     expect(() => loadConfigFromEnv({ GATEWAY_URL: 'ftp://x', GATEWAY_TOKEN_FILE: gwFile })).toThrow(ConfigError);

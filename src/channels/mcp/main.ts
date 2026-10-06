@@ -1,7 +1,9 @@
 import { StdioServerTransport } from '@modelcontextprotocol/sdk/server/stdio.js';
-import { ConfigError, loadConfigFromEnv } from './config.js';
+import { ConfigError, loadConfigFromEnv, type McpConfig } from './config.js';
 import { createMcpServer } from './server.js';
 import { startMcpHttpServer } from './http.js';
+
+const bridgeSummary = (c: McpConfig) => Object.keys(c.bridges ?? {}).join(', ') || 'none';
 
 /**
  * Entrypoint. stdio by default (stdout is the protocol channel, so diagnostics go to stderr only);
@@ -11,14 +13,14 @@ async function main(): Promise<void> {
   const config = loadConfigFromEnv(process.env);
   if (config.httpPort !== undefined) {
     const h = await startMcpHttpServer(config, config.httpPort);
-    process.stderr.write(`mcp: streamable HTTP listening at ${h.url} (bridge ${config.bridge ? 'configured' : 'not configured'})\n`);
+    process.stderr.write(`mcp: streamable HTTP listening at ${h.url} (payer bridges: ${bridgeSummary(config)})\n`);
     const stop = () => void h.close().then(() => process.exit(0));
     process.on('SIGINT', stop);
     process.on('SIGTERM', stop);
     return;
   }
   await createMcpServer(config).connect(new StdioServerTransport());
-  process.stderr.write(`mcp: stdio ready (bridge ${config.bridge ? 'configured' : 'not configured'})\n`);
+  process.stderr.write(`mcp: stdio ready (payer bridges: ${bridgeSummary(config)})\n`);
 }
 
 main().catch((e: unknown) => {

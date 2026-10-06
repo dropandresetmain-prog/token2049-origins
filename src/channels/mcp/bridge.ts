@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import type { McpConfig } from './config.js';
+import { PAYER_RAILS, type McpConfig, type PayerRail } from './config.js';
 import { FundingSource } from '../../contracts/presentation.js';
 
 /** Outcome of asking the payer bridge to fund a purchase. Never throws; failures are values. */
@@ -14,26 +14,31 @@ const BridgeSuccess = z.object({
 const DEFAULT_TIMEOUT_MS = 60_000;
 
 /**
- * Client for the separate bounded payer process (`POST {PAYER_BRIDGE_URL}/pay`). This process holds
+ * Client for one separate bounded payer process (`POST {bridge url}/pay`), bound to exactly one rail. This process holds
  * no payer keys: it only asks the bridge to fund a purchase id. The bridge's own `purchase` echo is
  * ignored; callers re-read the purchase from the gateway, which is the source of truth.
  */
 export class BridgeClient {
   private readonly f: typeof fetch;
 
-  constructor(private readonly cfg: { url: string; token: string; fetch?: typeof fetch; timeoutMs?: number }) {
+  constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; fetch?: typeof fetch; timeoutMs?: number }) {
     this.f = cfg.fetch ?? fetch;
   }
 
-  static from(config: McpConfig): BridgeClient | undefined {
-    if (!config.bridge) return undefined;
-    return new BridgeClient({
-      ...config.bridge,
-      ...(config.fetch ? { fetch: config.fetch } : {}),
-      ...(config.bridgeTimeoutMs ? { timeoutMs: config.bridgeTimeoutMs } : {}),
+  /** One client per configured rail, in a fixed order. */
+  static fromConfig(config: McpConfig): BridgeClient[] {
+    return PAYER_RAILS.flatMap((rail) => {
+      const endpoint = config.bridges?.[rail];
+      if (!endpoint) return [];
+      return [new BridgeClient(rail, {
+        ...endpoint,
+        ...(config.fetch ? { fetch: config.fetch } : {}),
+        ...(config.bridgeTimeoutMs ? { timeoutMs: config.bridgeTimeoutMs } : {}),
+      })];
     });
   }
 
+  /** Sanitized identity of the payer behind this bridge; null if unreachable or if it is not a source of this client's rail. */
   async source(): Promise<FundingSource | null> {
     try {
       const response = await this.f(`${this.cfg.url}/status`, {
@@ -42,7 +47,8 @@ export class BridgeClient {
       });
       if (!response.ok) return null;
       const body = z.object({ ok: z.literal(true), source: FundingSource.nullable() }).strict().safeParse(await response.json());
-      return body.success ? body.data.source : null;
+      // A bridge configured for one rail must never be accepted as another rail's payer.
+      return body.success && body.data.source?.rail === this.rail ? body.data.source : null;
     } catch { return null; }
   }
 

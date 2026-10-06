@@ -42,7 +42,7 @@ describe('MCP credential destination configuration', () => {
     expect(config(url).gatewayUrl).toBe(new URL(url).toString().replace(/\/+$/, ''));
   });
   it.each(LOOPBACK_URLS)('accepts loopback payer bridge %s', (url) => {
-    expect(config('https://gateway.example', `${url}/`).bridge).toEqual({ url, token: TOKEN });
+    expect(config('https://gateway.example', `${url}/`).bridges?.cardano).toEqual({ url, token: TOKEN });
   });
   it.each(['http://gateway.example', 'http://192.168.1.10', 'http://0.0.0.0', 'http://localhost.evil.example', 'http://[::ffff:127.0.0.1]'])('refuses nonloopback cleartext gateway %s', (url) => {
     expect(() => config(url)).toThrow(ConfigError);
@@ -85,7 +85,7 @@ describe('MCP bearer redirect protection', () => {
       const url = await listen(redirector);
       const cfg = config(url, url);
       await expect(new GatewayClient(cfg).getPurchase('purchase-review')).rejects.toMatchObject({ code: 'gateway_unreachable' });
-      await expect(BridgeClient.from(cfg)!.pay('purchase-review')).resolves.toMatchObject({ ok: false, code: 'bridge_unreachable' });
+      await expect(BridgeClient.fromConfig(cfg)[0]!.pay('purchase-review')).resolves.toMatchObject({ ok: false, code: 'bridge_unreachable' });
       expect(requests).toEqual([{ method: 'GET', authorization: `Bearer ${TOKEN}` }, { method: 'POST', authorization: `Bearer ${TOKEN}` }]);
       expect(redirectedCalls).toBe(0);
     } finally {

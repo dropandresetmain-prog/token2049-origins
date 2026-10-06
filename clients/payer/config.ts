@@ -104,12 +104,15 @@ export function loadPayerConfig(env: NodeJS.ProcessEnv = process.env): PayerConf
   };
 }
 
-export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env): BridgeConfig {
-  const tokenFile = String(env.PAYER_BRIDGE_TOKEN_FILE ?? '').trim();
-  const port = Number(String(env.PAYER_BRIDGE_PORT ?? '8788').trim());
+const CARDANO_BRIDGE_VARS = { tokenFile: 'PAYER_BRIDGE_TOKEN_FILE', port: 'PAYER_BRIDGE_PORT', defaultPort: 8788 };
+
+/** Bridge listener settings. Defaults to the Cardano bridge variables; the Solana bridge passes its own names. */
+export function loadBridgeConfig(env: NodeJS.ProcessEnv = process.env, vars = CARDANO_BRIDGE_VARS): BridgeConfig {
+  const tokenFile = String(env[vars.tokenFile] ?? '').trim();
+  const port = Number(String(env[vars.port] ?? String(vars.defaultPort)).trim());
   const bad: string[] = [];
-  if (!tokenFile) bad.push('PAYER_BRIDGE_TOKEN_FILE');
-  if (!Number.isInteger(port) || port < 1 || port > 65535) bad.push('PAYER_BRIDGE_PORT');
+  if (!tokenFile) bad.push(vars.tokenFile);
+  if (!Number.isInteger(port) || port < 1 || port > 65535) bad.push(vars.port);
   if (bad.length) throw new Error(`invalid bridge configuration: ${bad.join(', ')}`);
   return { port, tokenFile };
 }
