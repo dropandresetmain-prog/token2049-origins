@@ -31,7 +31,7 @@ internal terms, so engineers, designers and anyone writing gateway text that cus
 | Gateway | Capsule |
 | Agent, channel, API client | Assistant (by name: "ChatGPT", "Claude"); fallback "Your assistant" |
 | Channel `mcp` / `http` / `sokosumi` | AI assistant / Connected app / Agent marketplace |
-| Provider, route (`shopify`, `nuitee`, `atlas`) | Merchant ("Shopify store", "Nuitée, hotel booking partner", "Atlas, flight booking partner") |
+| Provider, route (`shopify`, `nuitee`, `atlas`) | Merchant by name ("Shopify, online store", "Nuitée, hotel booking partner", "Atlas, flight booking partner") |
 | Provider environment `sandbox`, `test`, `fixture` | Test mode |
 | Offer, quote | Quote, price (a quote is the approved price) |
 | Quote digest, quote version | Not shown. "Quote number" shows a short ID |

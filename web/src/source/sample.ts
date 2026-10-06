@@ -40,7 +40,8 @@ interface Spec {
 
 const LIMIT = 50;
 const usd = (cents: number): Money => ({ currency: 'USD', amountMinor: String(cents), scale: 2 });
-const pad = (s: string, n = 26) => (s + '0'.repeat(n)).slice(0, n).toUpperCase().replace(/[^0-9A-Z]/g, '0');
+/** Fixed-width opaque ID body. The unique part goes last, because people see the last six characters. */
+const pad = (s: string, n = 26) => ('0'.repeat(n) + s).slice(-n).toUpperCase().replace(/[^0-9A-Z]/g, '0');
 const hex64 = (seed: string) => Array.from({ length: 64 }, (_, i) => '0123456789abcdef'[(seed.charCodeAt(i % seed.length) + i * 7) % 16]).join('');
 
 const NETWORK: Record<Rail, { network: string; assetId: string; symbol: string; payTo: string }> = {
@@ -109,7 +110,8 @@ const SPECS: Spec[] = [
 
 function build(spec: Spec, now: number) {
   const created = new Date(now - spec.ageMinutes * 60_000);
-  const at = (i: number) => new Date(created.getTime() + i * 4_000).toISOString();
+  // Events land about 25 seconds apart, roughly how long each stage takes in test mode.
+  const at = (i: number) => new Date(created.getTime() + i * 25_000).toISOString();
   const purchaseId = `pur_${pad(spec.idSuffix)}`;
   const quoteId = `quo_${pad(spec.idSuffix + 'Q')}`;
   const fundingOptionId = `fop_${pad(spec.idSuffix + 'F')}`;

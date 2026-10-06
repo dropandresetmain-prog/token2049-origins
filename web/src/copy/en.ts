@@ -32,7 +32,7 @@ export const nav = {
   attention: 'Needs attention',
   navLabel: 'Workspace',
   workspaceName: 'Your workspace',
-  workspaceDetail: 'Purchases by your assistants',
+  workspaceDetail: 'Assistant purchases',
   presentation: 'Presentation view',
   presentationOn: 'Presentation view. Same purchase, fewer controls.',
   presentationOff: 'Workspace view restored.',
@@ -86,7 +86,7 @@ export const category: Record<Cat, { noun: string; title: string; verbing: strin
 };
 
 export const merchant: Record<ProviderRoute, { name: string; kind: string }> = {
-  shopify: { name: 'Shopify store', kind: 'Online store' },
+  shopify: { name: 'Shopify', kind: 'Online store' },
   nuitee: { name: 'Nuitée', kind: 'Hotel booking partner' },
   atlas: { name: 'Atlas', kind: 'Flight booking partner' },
 };

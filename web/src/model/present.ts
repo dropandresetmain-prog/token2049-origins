@@ -401,7 +401,7 @@ function buildReceipt(f: Facts): ReceiptVM | null {
     { label: copy.receipt.rowOutcome, value: copy.commerceOutcome(r.commerceStatus, f.cat) },
   ];
   if (r.providerReference) fields.push({ label: copy.receipt.rowMerchantReference, value: r.providerReference, mono: true });
-  fields.push({ label: copy.receipt.rowReceiptNumber, value: r.receiptId, mono: true });
+  fields.push({ label: copy.receipt.rowReceiptNumber, value: displayId(r.receiptId), mono: true });
   fields.push({ label: copy.receipt.rowIssued, value: formatWhen(r.issuedAt, f.ctx) });
   return {
     sample: f.ctx.mode === 'sample',
