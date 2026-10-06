@@ -423,3 +423,31 @@ signer histories, and select the final funding/provider composition. Shopify cod
 local-fixture merchant acceptance are complete. Preserve all historical unknown purchases; never
 repeat their Pay or relabel them failed from an empty order search. Global quote PASS is distinct
 from paid Global acceptance, whose ambiguity guard remains active. No Masumi code was changed.
+
+## 7 October 2026 — real Cardano + Global Catalog travel adapter acceptance
+
+PASS after bounded readback reconciliation. Base origin/main: 26eabf86cc05bb7d9c1a7a4c93a638f4b561ec56, with the bounded proof-redaction and console-refresh fix recorded alongside this evidence. The run used the isolated combined-shopify-cardano checkout. No commerce MCP used.
+
+Global Catalog freshly discovered EPICKA's Epicka TA-105C Universal Travel Adapter (6-Port), source item USD 16.99. Capsule prepared a real development-store shadow and exact quote: item USD 16.99, Standard shipping USD 8.00, zero tax/fee, total USD 24.99. EPICKA received no order/payment.
+
+Quote quo_01M497WTP26G02TW4VB81SQ8E1; purchase pur_01M4980CS4C64J4HXKR93C8CBN; explicit Cardano option fop_01M497WTP2ETX7PPBSGDNC5YHE. One real Cardano Preprod transfer of 0.024990 tUSDM: 4a3ca21a0618a6bbe0da5cf5fbe88b89eb2ffeb5392cec8a2470ab2f3a55e1d2; independently verified 7 confirmations, exact treasury asset output and purchase commitment. Protected payer history was retained; user explicitly authorized 100x cap configuration, never a history reset. Final committed 43,960 base units; remaining cap 58,040; no signing lock.
+
+Exactly one Shopify execution attempt and Pay checkpoint. Confirmation VU9X5V8H9 initially produced UNKNOWN; the watcher stopped the worker at 18:37:36.985 UTC. Read-only Admin search found #1003, gid://shopify/Order/18933428453433, test=true, PAID, SALE/SUCCESS/bogus/test=true for USD 24.99, exact quote nonce. One bounded native readback-only reconciliation used one Admin query, zero checkout/payment calls, and completed the existing attempt. Receipt rcp_01M4986ZM32GPBF5W8QSESN3GN; reservation consumed; three journal entries (observed funding_received, simulated merchant_payment_simulated_card, observed prepayment_applied), USD/native trial balances zero. Funding and merchant proof both fresh_external; source and shadow identities/digest match the frozen quote.
+
+Actual UI at http://127.0.0.1:18880/console/#/purchases/pur_01M4980CS4C64J4HXKR93C8CBN: auto-switched to the newest active purchase at 02:35:55 SGT; Awaiting payment 02:35:55; Confirming payment 02:36:30; sent/waiting confirmation 02:36:45; payment received + Placing your order 02:37:20; Checking with merchant 02:37:40; Completed 02:39:30. Final proof showed 2 of 2, full Cardano reference and canonical Shopify order GID. Receipt visible with Cardano, Found at EPICKA, Order paid, and test-store boundary. These are real gateway state observations, not samples.
+
+Why the original travel purchase did not go through: quote quo_01M4977S2W8KJJ23FENDS8DQME and purchase pur_01M497F2RZ0NCM0MXBPDTY9TQK expired unfunded at 02:32:26 SGT while fixing a genuine blocker. The generic privacy redactor interpreted 13-digit Shopify product/variant IDs as card numbers, corrupting sourceOffer.variantId and sandboxExecution shadow IDs in the proof HTTP response. Strict console validation then displayed Purchase unavailable. Funding was withheld before any transfer or checkout. Verified original record: expired, payment not_received, zero funding evidence, zero execution attempts, reservation released. It was preserved; the user separately approved the renewed exact quote and new purchase.
+
+The earlier controlled Test Tee composition also completed separately: purchase pur_01M496MR5Z8ADJ24C58YSDX8VY, real Cardano 0.017950 tUSDM, tx 93a8cad7a27037ca84ba437ec8aef98d890553591e3926c9b1a86650becc459c, paid Shopify #1002 / gid://shopify/Order/18933390344249, receipt rcp_01M49719Q8F7M5AYM89NCT407J. That controlled run omitted Global discovery; the adapter run above proves discovery + shadow + funding + checkout.
+
+Issue triage:
+
+- Act Now — fixed: canonical Order/Product/ProductVariant/Shop/Publication GIDs survive redaction only as complete structured strings. Surrounding untrusted text, card-like numbers, sensitive keys and tokens remain masked. Regression includes redacted Global proof parsing.
+- Act Now — fixed: console purchase-list polling now discovers new API purchases and follows a newly current active purchase when viewing the previous current purchase. Historical detail selection is preserved. Actual automatic switch observed before adapter funding.
+- Investigate Now: immediate Admin lookup using checkout confirmation did not find either fresh paid order; nonce-bound readback succeeded later. Investigate query/filter propagation against retained orders, read-only. Deferring means slower receipt completion and temporary unresolved reservations; never repeat Pay.
+- Park for Later: the redacted proof's source product URL masks its numeric variant query. Structured source variant ID remains exact and the quote retains the real product URL. Review source-link formatting without weakening free-text privacy redaction.
+- Accept Risk: development-store bogus gateway and scaled valueless testnet funding prove sandbox behavior, not bank settlement or fulfillment.
+
+Checks: 14 focused privacy/console-proof contract tests PASS; server and console typechecks PASS; gateway console build PASS; strict run-harness checks PASS; diff whitespace check PASS; live independent chain/Admin/receipt/journal/proof checks PASS. No Hotels or Flights. Historical unknown purchases were not retried or mutated.
+
+Sanitized evidence: artifacts/e2e/global-travel-adapter-cardano-20261007/ on the primary checkout. Code changes: src/infrastructure/redact.ts, web/src/ui/App.tsx, tests/unit/redact.test.ts, tests/contracts/console-contract.test.ts. This acceptance log records the original failure and renewed authorization. Next work: promote the bounded fix at a reviewed checkpoint, then investigate Admin readback in a fresh chat. No further purchase is authorized.
