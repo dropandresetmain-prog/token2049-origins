@@ -518,3 +518,88 @@ body.focus .step::before{display:none}
   .surface{box-shadow:none;border:0}
   .content{padding:10px}
 }
+
+/* ---------------------------------------------------------------------------
+ * React console additions. Tokens only: no raw colour values below this line.
+ * ------------------------------------------------------------------------- */
+
+/* Without the sample dock there is nothing to reserve room for. */
+body.no-dock{--dock-h:0px}
+
+.skip-link:focus{position:fixed;top:8px;left:8px;width:auto;height:auto;overflow:visible;clip:auto;z-index:120;padding:8px 12px;background:var(--paper);color:var(--ink);border:1px solid var(--stone);border-radius:var(--r-sm);font-size:var(--fs-sm)}
+.content:focus{outline:none}
+textarea:focus-visible{outline:2px solid var(--ox);outline-offset:3px}
+.inspector-body:focus-visible{outline:2px solid var(--ox);outline-offset:-2px}
+
+/* Opening is immediate so focus can move in at once; closing still slides out before hiding. */
+.inspector.open{transition:transform .22s cubic-bezier(.16,1,.3,1),visibility 0s}
+
+/* Route and search tweaks for the longer production copy. */
+.endpoint-funding{flex-wrap:wrap}
+.endpoint-network{white-space:nowrap}
+.search{max-width:380px}
+
+/* The sample dock holds six shortcuts, so it scrolls instead of clipping on narrow screens. */
+.mobile-nav,.tabs{scrollbar-width:thin}
+.review-dock{overflow-x:auto;scrollbar-width:thin;justify-content:safe center}
+.dock-steps{flex:none}
+
+/* Detail screen */
+.foot-links{display:flex;flex-wrap:wrap;align-items:center;gap:6px 18px}
+.price-link{margin-top:10px}
+.small-heading h3{font-size:inherit;font-weight:inherit}
+.status-message.neutral{background:var(--neutral-bg);border-color:var(--stone)}
+.status-message.neutral>svg{color:var(--muted)}
+.status-message.neutral p{color:var(--muted)}
+.step.attention .step-circle{border-color:var(--warning-line);background:var(--warning-bg);color:var(--warning)}
+.step.attention strong{color:var(--warning)}
+.step.attention time{color:var(--warning);font-weight:var(--fw-medium)}
+.conduit.active .packet-track{animation:crossing 2s linear infinite}
+
+/* Purchases list */
+.empty .clear-search{margin-top:15px}
+.error-panel .mono{display:block;margin-top:8px}
+.error-actions{display:flex;flex-wrap:wrap;justify-content:center;gap:8px;margin-top:16px}
+
+/* Dialogs */
+.receipt-item{font-size:var(--fs-sm)}
+.quote-scope>div>:last-child{text-align:right}
+.quote-total{padding-top:8px;border-top:1px solid var(--line)}
+.terms-heading{font-size:var(--fs-md);font-weight:var(--fw-semibold);margin-top:20px}
+.terms-list{margin:8px 0 0;padding-left:18px;font-size:var(--fs-sm);color:var(--muted);line-height:1.6}
+.terms-none{font-size:var(--fs-sm);color:var(--muted);margin-top:8px}
+.copy-textarea{display:block;width:100%;height:120px;padding:12px;border:1px solid var(--line);border-radius:var(--r-sm);background:var(--paper);color:var(--ink);font:inherit;font-size:var(--fs-sm);resize:vertical}
+
+/* Sign-in (gateway mode) */
+.signin-wrap{min-height:100vh;display:grid;place-items:center;padding:24px}
+.signin-card{width:min(420px,100%);background:var(--paper);border:1px solid var(--line);border-radius:var(--r-lg);box-shadow:var(--shadow);padding:32px 28px}
+.signin-brand{width:140px;margin-bottom:24px;mix-blend-mode:multiply}
+.signin-card h1{margin-bottom:8px}
+.notice{font-size:var(--fs-sm);color:var(--muted);padding:10px 12px;background:var(--ivory);border:1px solid var(--line);border-radius:var(--r-sm);margin-bottom:16px}
+.field{display:grid;gap:8px;margin-bottom:20px}
+.field label{font-size:var(--fs-sm);font-weight:var(--fw-medium)}
+.field input{width:100%;border:1px solid var(--stone);border-radius:var(--r-sm);padding:9px 12px;font-size:var(--fs-sm);background:var(--paper);color:var(--ink)}
+.field input:focus-visible{border-color:var(--ox)}
+.field input[aria-invalid="true"]{border-color:var(--warning)}
+.field-error{font-size:var(--fs-sm);color:var(--warning)}
+.field .fineprint{margin-top:0}
+.signin-submit{width:100%}
+
+/* Loading skeletons: shaped like the screens they stand in for. Static under reduced motion. */
+.skeleton{display:block;height:14px;border-radius:var(--r-sm);background:var(--neutral-bg);max-width:100%}
+@media (prefers-reduced-motion:no-preference){.skeleton{animation:skeleton-pulse 1.4s ease-in-out infinite}}
+@keyframes skeleton-pulse{50%{opacity:.5}}
+.sk-gap{margin-top:10px}
+.sk-tabs{display:flex;gap:20px;padding:10px 0 12px;border-bottom:1px solid var(--line);margin-bottom:16px}
+.sk-table{border-top:1px solid var(--line);margin-top:16px}
+.sk-row{display:flex;align-items:center;gap:14px;padding:14px;border-bottom:1px solid var(--line)}
+.sk-row>.skeleton{flex:none}
+.sk-row-main{flex:1;display:grid;gap:8px;min-width:0}
+.sk-block{height:140px;border:1px solid var(--line);border-radius:var(--r-md);background:var(--ivory);margin-top:24px}
+.sk-steps{display:grid;gap:18px;align-content:start}
+.sk-step{display:flex;gap:12px;align-items:flex-start}
+.sk-step>.skeleton{flex:none}
+
+@media (max-width:560px){
+  .conduit.active .packet-track{animation:none}
+}
