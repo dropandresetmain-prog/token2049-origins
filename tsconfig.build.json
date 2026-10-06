@@ -1,4 +1,11 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["src", "scripts/create-client.ts", "scripts/migrate.ts", "scripts/readiness.ts", "scripts/db-smoke.ts"]
+  "include": [
+    "src",
+    "scripts/create-client.ts",
+    "scripts/migrate.ts",
+    "scripts/readiness.ts",
+    "scripts/db-smoke.ts",
+    "scripts/solana/hosted-preflight.ts"
+  ]
 }

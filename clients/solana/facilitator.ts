@@ -1,7 +1,8 @@
 import { readFileSync } from 'node:fs';
 import express from 'express';
 import type { Server } from 'node:http';
-import { createHash } from 'node:crypto';
+import { createHash, timingSafeEqual } from 'node:crypto';
+import { isPrivatePeer } from '../payer/bridge.js';
 import { toFacilitatorSvmSigner,type FacilitatorSvmSigner } from '@x402/svm';
 import { ExactSvmScheme } from '@x402/svm/exact/facilitator';
 import { encodePaymentSignatureHeader,decodePaymentSignatureHeader } from '@x402/core/http';
@@ -26,14 +27,24 @@ export function guardSponsorSigner(baseSigner:FacilitatorSvmSigner,ledger:Pick<S
     return baseSigner.sendTransaction(tx,network);
   } };
 }
-export async function startSolanaFacilitator(cfg: SolanaPayerConfig, port = 0): Promise<Server> {
+export interface FacilitatorAccess { allowedHosts: string[]; }
+export function facilitatorRequestAllowed(peer: string | undefined, host: string | undefined, origin: string | undefined, access: FacilitatorAccess): boolean {
+  return isPrivatePeer(peer) && origin === undefined && access.allowedHosts.includes((host ?? '').toLowerCase());
+}
+export async function startSolanaFacilitator(cfg: SolanaPayerConfig, port = 0, access?: FacilitatorAccess): Promise<Server> {
   const rpc = new SolanaRpc(cfg.rpcUrl), ledger = new SolanaLedger(cfg.sponsorLedger,cfg.sponsor);
   ledger.read(); await rpc.assertNetwork();
   const key = await loadSigner(cfg.sponsorKeyFile,cfg.sponsor), baseSigner = toFacilitatorSvmSigner(key,{defaultRpcUrl:cfg.rpcUrl});
   const signer = guardSponsorSigner(baseSigner,ledger,cfg);
   const scheme = new ExactSvmScheme(signer,undefined,{maxComputeUnits:20000,maxPriorityFeeMicroLamports:1,maxRequiredSignatures:2});
-  const app = express(), authHash=createHash('sha256').update(readFileSync(cfg.facilitatorTokenFile,'utf8').trim()).digest('hex');
-  app.use((req,res,next)=>{const received=req.header('authorization');if(!received?.startsWith('Bearer ')||createHash('sha256').update(received.slice(7)).digest('hex')!==authHash){res.status(401).json({error:'facilitator authentication required'});return;}next();});
+  const token = readFileSync(cfg.facilitatorTokenFile,'utf8').trim();
+  if (access && token.length < 24) throw new Error('hosted facilitator token too short');
+  const app = express().disable('x-powered-by'), authHash=createHash('sha256').update(token).digest();
+  app.use((req,res,next)=>{
+    if (access && !facilitatorRequestAllowed(req.socket.remoteAddress, req.headers.host, req.headers.origin, access)) {res.status(403).json({error:'private facilitator required'});return;}
+    const received=req.header('authorization');
+    if(!received?.startsWith('Bearer ')||!timingSafeEqual(createHash('sha256').update(received.slice(7)).digest(),authHash)){res.status(401).json({error:'facilitator authentication required'});return;}next();
+  });
   app.use(express.json({limit:'20kb'}));
   app.get('/supported',(_req,res)=>res.json({kinds:[{x402Version:2,scheme:'exact',network:NETWORK,extra:{feePayer:cfg.sponsor,preparation:{url:cfg.facilitatorUrl+'/prepare',method:'POST',authentication:'Bearer',requiresFullySignedTransaction:true}}}],extensions:[],signers:{[NETWORK]:[cfg.sponsor]}}));
   app.post(['/prepare','/verify','/settle'],async (request,response)=>{
@@ -76,7 +87,10 @@ export async function startSolanaFacilitator(cfg: SolanaPayerConfig, port = 0): 
       response.json(result);
     } catch { response.status(400).json({error:'Solana sponsor policy, ledger or RPC rejected request'}); }
   });
-  return await new Promise(resolve=>{ const server=app.listen(port,'127.0.0.1',()=>resolve(server)); });
+  return await new Promise((resolve,reject)=>{
+    const server=app.listen(port,access ? '0.0.0.0' : '127.0.0.1',()=>resolve(server));
+    server.once('error', reject); server.requestTimeout=60000; server.headersTimeout=10000; server.maxHeadersCount=32;
+  });
 }
 if (process.argv[1]?.replaceAll('\\','/').endsWith('/clients/solana/facilitator.ts')) {
   const cfg=loadSolanaPayerConfig(process.env), port=Number(process.env.SOLANA_FACILITATOR_LISTEN_PORT ?? new URL(cfg.facilitatorUrl).port);

@@ -1,0 +1,12 @@
+# Private Devnet signer service; never deploy this image as a public web service.
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+ENV NODE_ENV=production
+COPY tsconfig.json ./
+COPY src ./src
+COPY clients ./clients
+# Render's disk is root-owned. Ledger checks require 0700 directory / 0600 files.
+EXPOSE 8789 8790
+CMD ["node_modules/.bin/tsx", "clients/solana/hosted.ts"]

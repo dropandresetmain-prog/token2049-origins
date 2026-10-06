@@ -36,19 +36,25 @@ const limiter = (max: number, windowMs: number) => ({ windowMs, max, validate: f
  * platform keeps exactly one public listener. Returns routers for the gateway's extraRouters list.
  */
 /**
- * Register the hosted payer's gateway client for the hosted customer: scopes purchases:read + purchases:fund, nothing else.
+ * Register each hosted payer's dedicated gateway client for the hosted customer: scopes purchases:read + purchases:fund, nothing else.
  * Only the token's SHA-256 is configured, so no plaintext token exists on this service. Idempotent; rotating the hash replaces it,
  * and an operator-revoked client stays revoked.
  */
 export async function provisionPayerClient(db: Db, config: HostedMcpConfig, nowIso = new Date().toISOString()): Promise<void> {
-  if (!config.payerTokenSha256) return;
+  if (!config.payerTokenSha256 && !config.solanaPayerTokenSha256) return;
   await db.tx(async () => {
     await db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', config.customerId, 'Hosted MCP demo customer', nowIso);
-    await db.run(
-      `INSERT INTO api_clients(id, customer_id, channel, label, token_hash, scopes_json, created_at) VALUES ($1,$2,'http','Hosted Cardano payer',$3,$4,$5)
-       ON CONFLICT(id) DO UPDATE SET token_hash = EXCLUDED.token_hash WHERE api_clients.revoked_at IS NULL AND api_clients.customer_id = EXCLUDED.customer_id`,
-      config.payerClientId, config.customerId, config.payerTokenSha256!, JSON.stringify(['purchases:read', 'purchases:fund']), nowIso,
-    );
+    for (const client of [
+      { id: config.payerClientId, hash: config.payerTokenSha256, label: 'Hosted Cardano payer' },
+      { id: config.solanaPayerClientId ?? 'cli_HOSTEDSOLANAPAYER', hash: config.solanaPayerTokenSha256, label: 'Hosted Solana payer' },
+    ]) {
+      if (!client.hash) continue;
+      await db.run(
+        `INSERT INTO api_clients(id, customer_id, channel, label, token_hash, scopes_json, created_at) VALUES ($1,$2,'http',$6,$3,$4,$5)
+         ON CONFLICT(id) DO UPDATE SET token_hash = EXCLUDED.token_hash WHERE api_clients.revoked_at IS NULL AND api_clients.customer_id = EXCLUDED.customer_id`,
+        client.id, config.customerId, client.hash, JSON.stringify(['purchases:read', 'purchases:fund']), nowIso, client.label,
+      );
+    }
   });
 }
 
@@ -104,7 +110,7 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
       gatewayUrl: config.gatewayUrl,
       gatewayToken: token,
       bridgeTimeoutMs: 100_000,
-      ...(config.cardanoBridge ? { bridges: { cardano: config.cardanoBridge } } : {}),
+      bridges: { ...(config.cardanoBridge ? { cardano: config.cardanoBridge } : {}), ...(config.solanaBridge ? { solana: config.solanaBridge } : {}) },
       ...(opts.fetch ? { fetch: opts.fetch } : {}),
     };
     void serveMcpPost(toolConfig, req, res, { hosted: { resourceMetadataUrl: metadataUrl } }).catch(() => {

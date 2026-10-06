@@ -21,6 +21,9 @@ export interface HostedMcpConfig {
   cardanoBridge?: { url: string; token: string };
   /** SHA-256 (hex) of the hosted payer's gateway token. Only the hash is configured; it registers the payer's gateway client. */
   payerTokenSha256?: string;
+  solanaBridge?: { url: string; token: string };
+  solanaPayerTokenSha256?: string;
+  solanaPayerClientId?: string;
   /** Loopback URL of this same process, used by the MCP tools to call the gateway contract. */
   gatewayUrl: string;
 }
@@ -89,8 +92,11 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
   const extraRedirectUris = (env.MCP_OAUTH_EXTRA_REDIRECT_URIS ?? '').split(',').map((s) => s.trim()).filter(Boolean);
   for (const uri of extraRedirectUris) if (!/^https:\/\//.test(uri) || /[\s#]/.test(uri)) throw new HostedConfigError('MCP_OAUTH_EXTRA_REDIRECT_URIS must be exact https URLs');
 
-  // Hosted payments are Cardano-only for this milestone: a Solana bridge here would be a silent misconfiguration.
-  if (env.SOLANA_PAYER_BRIDGE_URL || env.SOLANA_PAYER_BRIDGE_TOKEN_FILE) throw new HostedConfigError('hosted MCP supports the Cardano payer only');
+  let solanaBridge: HostedMcpConfig['solanaBridge'];
+  if (env.SOLANA_PAYER_BRIDGE_URL || env.SOLANA_PAYER_BRIDGE_TOKEN_FILE) {
+    if (!env.SOLANA_PAYER_BRIDGE_URL || !env.SOLANA_PAYER_BRIDGE_TOKEN_FILE) throw new HostedConfigError('SOLANA_PAYER_BRIDGE_URL and SOLANA_PAYER_BRIDGE_TOKEN_FILE must be set together');
+    solanaBridge = { url: parsePrivateBridgeUrl(env.SOLANA_PAYER_BRIDGE_URL, 'SOLANA_PAYER_BRIDGE_URL'), token: readSecret(env.SOLANA_PAYER_BRIDGE_TOKEN_FILE, 'SOLANA_PAYER_BRIDGE_TOKEN_FILE', 24) };
+  }
   let cardanoBridge: HostedMcpConfig['cardanoBridge'];
   if (env.CARDANO_PAYER_BRIDGE_URL || env.CARDANO_PAYER_BRIDGE_TOKEN_FILE) {
     if (!env.CARDANO_PAYER_BRIDGE_URL || !env.CARDANO_PAYER_BRIDGE_TOKEN_FILE) throw new HostedConfigError('CARDANO_PAYER_BRIDGE_URL and CARDANO_PAYER_BRIDGE_TOKEN_FILE must be set together');
@@ -99,6 +105,12 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
 
   const payerTokenSha256 = env.MCP_PAYER_GATEWAY_TOKEN_SHA256?.trim().toLowerCase();
   if (payerTokenSha256 !== undefined && !/^[0-9a-f]{64}$/.test(payerTokenSha256)) throw new HostedConfigError('MCP_PAYER_GATEWAY_TOKEN_SHA256 must be a 64-character hex SHA-256');
+
+  if (cardanoBridge && solanaBridge && cardanoBridge.token === solanaBridge.token) throw new HostedConfigError('Hosted bridge tokens must be distinct');
+  if (cardanoBridge && solanaBridge && cardanoBridge.url === solanaBridge.url) throw new HostedConfigError('Cardano and Solana bridges must be distinct');
+  const solanaPayerTokenSha256 = env.MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256?.trim().toLowerCase();
+  if (solanaPayerTokenSha256 !== undefined && !/^[0-9a-f]{64}$/.test(solanaPayerTokenSha256)) throw new HostedConfigError('MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256 must be a 64-character hex SHA-256');
+  if (solanaPayerTokenSha256 && solanaPayerTokenSha256 === payerTokenSha256) throw new HostedConfigError('Hosted payer gateway tokens must be distinct');
 
   const port = Number(env.PORT ?? '8787');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new HostedConfigError('PORT must be 1-65535');
@@ -112,6 +124,8 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
     extraRedirectUris,
     ...(cardanoBridge ? { cardanoBridge } : {}),
     ...(payerTokenSha256 ? { payerTokenSha256 } : {}),
+    ...(solanaBridge ? { solanaBridge } : {}),
+    ...(solanaPayerTokenSha256 ? { solanaPayerTokenSha256, solanaPayerClientId: 'cli_HOSTEDSOLANAPAYER' } : {}),
     gatewayUrl: `http://127.0.0.1:${port}`,
   };
 }
