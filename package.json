@@ -36,7 +36,7 @@
     "console:test": "vitest run --config web/vitest.config.ts",
     "console:typecheck": "tsc -p web/tsconfig.json",
     "payer:hosted": "tsx clients/payer/hosted.ts",
-    "provision:hosted-mcp": "node scripts/provision-hosted-mcp-render.mjs"
+    "provision:hosted-mcp": "tsx scripts/provision-hosted-mcp-render.mjs"
   },
   "dependencies": {
     "@evolution-sdk/evolution": "0.5.14",
