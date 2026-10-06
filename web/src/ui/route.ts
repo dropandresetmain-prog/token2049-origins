@@ -1,6 +1,8 @@
 /**
- * Hash routes: #/purchases (optionally ?filter=attention) and #/purchases/<id>. Anything else is "home",
- * which resolves to the current purchase. Hash routing needs no server support under /console.
+ * Hash routes: #/purchases (optionally ?filter=attention), #/purchases/<id>, and the operator screens
+ * #/treasury and #/connections. Anything else is "home", which resolves to the current purchase.
+ * Hash routing needs no server support under /console. Reaching an operator route does not grant access:
+ * the screens read operator-only endpoints and show nothing unless the access key allows it.
  */
 import { useSyncExternalStore } from 'react';
 import type { ListFilter } from '../model/types.js';
@@ -8,7 +10,9 @@ import type { ListFilter } from '../model/types.js';
 export type Route =
   | { kind: 'home' }
   | { kind: 'list'; filter: ListFilter }
-  | { kind: 'detail'; id: string };
+  | { kind: 'detail'; id: string }
+  | { kind: 'treasury' }
+  | { kind: 'connections' };
 
 const FILTERS: readonly ListFilter[] = ['all', 'in_progress', 'attention', 'completed'];
 
@@ -18,6 +22,8 @@ export function parseHash(hash: string): Route {
   const path = at < 0 ? raw : raw.slice(0, at);
   const query = at < 0 ? '' : raw.slice(at + 1);
   const parts = path.split('/').filter(Boolean);
+  if (parts.length === 1 && parts[0] === 'treasury') return { kind: 'treasury' };
+  if (parts.length === 1 && parts[0] === 'connections') return { kind: 'connections' };
   if (parts[0] === 'purchases') {
     if (parts.length === 1) {
       const f = new URLSearchParams(query).get('filter');
@@ -35,6 +41,8 @@ export function parseHash(hash: string): Route {
 }
 
 export const listHref = (filter: ListFilter): string => (filter === 'all' ? '/purchases' : `/purchases?filter=${filter}`);
+export const TREASURY_HREF = '/treasury';
+export const CONNECTIONS_HREF = '/connections';
 export const detailHref = (id: string): string => `/purchases/${encodeURIComponent(id)}`;
 
 export function navigate(to: string, opts: { replace?: boolean } = {}): void {
@@ -58,5 +66,5 @@ export function useRoute(): Route {
 }
 
 export function routeKey(r: Route): string {
-  return r.kind === 'detail' ? `detail:${r.id}` : r.kind === 'list' ? 'list' : 'home';
+  return r.kind === 'detail' ? `detail:${r.id}` : r.kind === 'home' ? 'home' : r.kind;
 }

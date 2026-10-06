@@ -12,7 +12,8 @@ The console lane does not change gateway contracts. Gateway changes the console 
 
 1. **Read-only.** The console never creates, approves, funds or changes a purchase. Approvals and payments happen through
    the customer's assistant (agent channels). The only "actions" are copying text and downloading the customer's own
-   records.
+   records. The operator screens ([below](#operator-screens)) are also read-only: they never ask a bank or provider
+   anything and never call `POST /v1/evidence/bank/refresh`.
 2. **One data boundary.** Screens never call `fetch`. They read a `ConsoleSource` (`web/src/contracts/source.ts`).
    There are two sources: the **sample source** (local sample purchases) and the **gateway source** (authenticated HTTP).
    Both return the gateway's own contract shapes, validated with the gateway's schemas. Going live means switching the
@@ -39,6 +40,9 @@ The console asks for a gateway API client token ("access key" on screen). It nee
 Missing optional scopes degrade gracefully: proof, activity and price details become unavailable with a plain message;
 the purchase itself still loads.
 
+The operator screens need `operator:read` as well (the `operator` role of `npm run client:create` has `purchases:read`,
+`evidence:read` and `operator:read`). A customer key never has it. See [Operator screens](#operator-screens).
+
 ## Reads
 
 | Screen element | Endpoint | Schema (console side) |
@@ -55,6 +59,42 @@ While a purchase can still change (`HumanProgress.outcomeFinal === false`), the 
 **Drift protection.** `PurchaseProof` cannot be imported into the browser bundle (its module imports the database
 layer), so the console mirrors it. `tests/contracts/console-contract.test.ts` fails if the mirror and the gateway schema
 differ, and type-checks the read-model return types against the console's list and detail schemas.
+
+## Operator screens
+
+Two secondary screens, **Treasury** (`#/treasury`) and **Connections** (`#/connections`), expose operator evidence the
+gateway already stores. They are demo and operator surfaces, not part of the customer purchase flow, and they change
+nothing about the purchase screens.
+
+| Screen element | Endpoint | Scope | Schema (console side) |
+|---|---|---|---|
+| Treasury: simulated capacity, observed funds, obligations, purchases by state, ledger health | `GET /v1/evidence/treasury` | `operator:read` | `TreasuryResponse` (`web/src/contracts/operator.ts`, mirrors `read-model.treasuryView`) |
+| Connections: stored OCBC observations and adapter readiness | `GET /v1/evidence/bank` | `operator:read` | `BankResponse` (mirrors the route in `src/evidence/router.ts`) |
+| Connections: Cardano, Solana, Masumi, Shopify, Nuitée, Atlas readiness | `GET /v1/capabilities` (no auth) | none | `CapabilitiesResponse` |
+
+**Permissions.** The links to both screens appear only after a read of `/v1/evidence/treasury` succeeds for the entered
+key. A key without `operator:read` sees no operator links, and a typed `#/treasury` or `#/connections` address shows
+"Operator access required" with no operator data; the gateway answers 403 and the console shows nothing from it.
+Hiding the links is a convenience. The gateway's scope check is the control.
+
+**What the screens must keep true** (pinned by `web/src/model/operator.test.ts` and
+`tests/integration/operator-console.test.ts`):
+
+- Observed money (test crypto the gateway verified, and what it owes customers) and simulated money (the synthetic
+  purchasing allowance) sit in separate sections and are never added, netted or listed together. Test crypto is not
+  bank cash and the allowance is not a bank or card balance.
+- OCBC observations are labelled read-only observations with their source and provenance. They are not purchase
+  settlement and not treasury truth, and nothing on screen says a purchase reached a bank or card account. References
+  show at most the last four characters (masked again in the console), and a bank `description` can never reach a
+  screen: the console schema drops fields it does not list.
+- Amounts are formatted exactly from integer strings. An asset the console cannot identify is shown in raw base units,
+  never guessed at. "Test" is said only when the network id says so.
+- Raw JSON appears only inside "Technical details", as the parsed (and re-masked) response.
+
+**No refresh button.** The gateway has `POST /v1/evidence/bank/refresh`, and the console deliberately does not call it:
+the console is read-only, and a manual refresh is a bank call made on an operator's behalf. Observations are loaded
+outside the console. The page's Reload button re-reads stored data only. Adding a refresh action is a product decision
+that needs approval, not an implementation detail.
 
 ## How statuses read on screen
 

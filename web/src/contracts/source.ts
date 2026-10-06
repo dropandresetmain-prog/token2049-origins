@@ -9,8 +9,9 @@
  * with the same schemas. Turning the console "live" means switching the source, not rewriting screens.
  * The console is read-only: it never creates, approves or pays for a purchase.
  */
-import type { PurchaseView, QuoteView, ErrorCode } from './backend.js';
+import type { CapabilitiesResponse, PurchaseView, QuoteView, ErrorCode } from './backend.js';
 import type { EvidenceDetail, EvidenceListItem, PurchaseProof } from './evidence.js';
+import type { BankResponse, TreasuryResponse } from './operator.js';
 import type { PurchaseContext } from './proposed.js';
 
 export type ConsoleMode = 'sample' | 'test' | 'live';
@@ -45,11 +46,28 @@ export interface PurchaseBundle {
   context: PurchaseContext;
 }
 
+/** Everything the Connections screen reads: public readiness plus stored bank observations (operator:read). */
+export interface ConnectionsData {
+  capabilities: CapabilitiesResponse;
+  bank: BankResponse;
+}
+
 export interface ConsoleSource {
   readonly kind: 'sample' | 'gateway';
   environment(): Promise<ConsoleEnvironment>;
   listPurchases(): Promise<PurchaseListResult>;
   getPurchase(purchaseId: string): Promise<PurchaseBundle>;
+  /**
+   * Operator reads (scope operator:read). They reject with ConsoleError('forbidden') when the access key lacks
+   * the scope. Both are GET-only: the console never triggers a bank refresh.
+   */
+  getTreasury(): Promise<TreasuryResponse>;
+  getConnections(): Promise<ConnectionsData>;
+  /**
+   * Whether this access key may open the operator screens: true when a read succeeds, false only when the
+   * gateway answers forbidden. Any other failure (network, 5xx) is thrown, so the caller can stay undecided.
+   */
+  hasOperatorAccess(): Promise<boolean>;
 }
 
 /** Every source failure surfaces as this. `code` follows the gateway ErrorCode, plus transport failures. */

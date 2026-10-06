@@ -75,3 +75,31 @@ export function displayId(purchaseId: string): string {
 export function isTestNetwork(network: string): boolean {
   return /preprod|preview|devnet|testnet|test/i.test(network);
 }
+
+/** Splits "-1234" into sign and magnitude so signed integer strings can be formatted without Number. */
+function splitSign(value: string): { negative: boolean; digits: string } {
+  const negative = value.startsWith('-');
+  const digits = (negative ? value.slice(1) : value).replace(/^0+(?=\d)/, '');
+  return { negative: negative && digits !== '0', digits };
+}
+
+/** "-$12.50" from a signed minor-unit string. Exact; no float arithmetic. */
+export function formatSignedMoney(currency: string, amountMinor: string, scale: number, ctx: Pick<FormatContext, 'locale'>): string {
+  const { negative, digits } = splitSign(amountMinor);
+  const text = formatMoney({ currency, amountMinor: digits, scale }, ctx);
+  return negative ? `-${text}` : text;
+}
+
+/** "1.5 test ADA" from signed base units. With unknown decimals the raw units are shown, labelled as such. */
+export function formatSignedUnits(units: string, decimals: number | null, unit: string, ctx: Pick<FormatContext, 'locale'>): string {
+  const { negative, digits } = splitSign(units);
+  let body: string;
+  if (decimals === null) {
+    body = `${group(digits, ctx.locale)} ${unit}`;
+  } else {
+    const { int, frac } = splitMinor(digits, decimals);
+    const trimmed = frac.replace(/0+$/, '');
+    body = `${group(int, ctx.locale)}${trimmed ? `.${trimmed}` : ''} ${unit}`;
+  }
+  return negative ? `-${body}` : body;
+}
