@@ -15,8 +15,9 @@ FROM node:24-bookworm-slim
 ENV NODE_ENV=production APP_ENV=sandbox HOST=0.0.0.0 PORT=8787
 WORKDIR /app
 COPY package.json package-lock.json ./
+# Chromium runs at the lowest CPU priority (wrapper below) so a small shared-CPU instance keeps answering health checks while it renders.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright SHOPIFY_BROWSER_EXECUTABLE=/usr/local/bin/shopify-chromium
-RUN npm ci --omit=dev && npx playwright-core install --with-deps chromium && chmod -R a+rX /ms-playwright && node --input-type=module -e "import {chromium} from 'playwright-core'; import {symlinkSync} from 'node:fs'; symlinkSync(chromium.executablePath(),'/usr/local/bin/shopify-chromium')"
+RUN npm ci --omit=dev && npx playwright-core install --with-deps chromium && chmod -R a+rX /ms-playwright && node --input-type=module -e "import {chromium} from 'playwright-core'; import {writeFileSync} from 'node:fs'; writeFileSync('/usr/local/bin/shopify-chromium','#!/bin/sh\nexec nice -n 19 '+chromium.executablePath()+' \"\$@\"\n',{mode:0o755})"
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /data && chown node:node /data
 USER node
