@@ -9,7 +9,7 @@ const CoreEnv = z.object({
   APP_ENV: z.enum(['development', 'test', 'sandbox', 'production']).default('development'),
   PORT: z.coerce.number().int().min(1).max(65535).default(8787),
   HOST: z.string().default('127.0.0.1'),
-  DATABASE_PATH: z.string().default('./data/gateway.db'),
+  DATABASE_URL: z.url().refine(value => /^postgres(?:ql)?:\/\//.test(value), 'PostgreSQL URL required'),
   PUBLIC_BASE_URL: z.url().default('http://127.0.0.1:8787'),
   QUOTE_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(900),
   OFFER_TTL_SECONDS: z.coerce.number().int().min(60).max(3600).default(1800),

@@ -1,3 +1,4 @@
+import { createTestDb, testDatabaseUrl } from '../support/database.js';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -6,13 +7,13 @@ import { buildGateway } from '../../src/composition.js';
 import type { BankObservation, BankObservationAdapter } from '../../src/contracts/ports.js';
 import { FixtureExecutor, FixtureFundingAdapter } from '../support/fixtures.js';
 import { createClient, authenticate } from '../../src/infrastructure/auth.js';
-import { Db } from '../../src/infrastructure/db.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
 import { createEvidenceRouter, createInspectRouter } from '../../src/evidence/router.js';
 import { OCBC_APIS } from '../../src/banking/ocbc/client.js';
 
 const TEST_ENV = {
   APP_ENV: 'test',
+  DATABASE_URL: testDatabaseUrl,
   PUBLIC_BASE_URL: 'http://127.0.0.1:0',
   DEMO_PER_PURCHASE_LIMIT_USD_MINOR: '50000',
   SIMULATED_CARD_CAPACITY_USD_MINOR: '20000',
@@ -26,7 +27,7 @@ afterEach(async () => {
 
 async function setup() {
   const clock = new ManualClock();
-  const db = new Db(':memory:');
+  const db = await createTestDb();
   const bankAdapter: BankObservationAdapter = {
     bank: 'ocbc',
     readiness: async () => ({ component: 'ocbc', status: 'LOCAL_TESTS_ONLY', environment: 'sandbox', missing: [], checkedAt: clock.now().toISOString() }),
@@ -45,7 +46,7 @@ async function setup() {
     }],
   };
   const funding = new FixtureFundingAdapter(clock);
-  const gw = buildGateway({
+  const gw = await buildGateway({
     executors: [
       new FixtureExecutor('shopify', 'retail', clock),
       new FixtureExecutor('nuitee', 'hotel', clock, 12000n),
@@ -61,9 +62,9 @@ async function setup() {
 
   const now = clock.now().toISOString();
   const customerScopes = ['offers:read', 'quotes:write', 'purchases:write', 'purchases:fund', 'purchases:read', 'evidence:read'] as const;
-  const alice = createClient(db, { displayName: 'Alice', channel: 'test', label: 'evidence-alice', scopes: [...customerScopes] }, now);
-  const bob = createClient(db, { displayName: 'Bob', channel: 'test', label: 'evidence-bob', scopes: [...customerScopes] }, now);
-  const operator = createClient(db, { displayName: 'Operator', channel: 'console', label: 'evidence-operator', scopes: ['operator:read'] }, now);
+  const alice = await createClient(db, { displayName: 'Alice', channel: 'test', label: 'evidence-alice', scopes: [...customerScopes] }, now);
+  const bob = await createClient(db, { displayName: 'Bob', channel: 'test', label: 'evidence-bob', scopes: [...customerScopes] }, now);
+  const operator = await createClient(db, { displayName: 'Operator', channel: 'console', label: 'evidence-operator', scopes: ['operator:read'] }, now);
 
   const server = await new Promise<Server>((resolve) => {
     const s = gw.app.listen(0, '127.0.0.1', () => resolve(s));
@@ -80,7 +81,7 @@ async function setup() {
   };
   cleanup = async () => {
     await new Promise<void>((resolve) => server.close(() => resolve()));
-    db.close();
+    await db.close();
   };
   return { clock, db, gw, alice, bob, operator, call };
 }
@@ -88,7 +89,7 @@ async function setup() {
 describe('evidence API and inspect shell', () => {
   it('keeps customer data owner-scoped and projects only curated evidence fields', async () => {
     const h = await setup();
-    const actor = authenticate(h.db, `Bearer ${h.alice.token}`, 'test-request');
+    const actor = await authenticate(h.db, `Bearer ${h.alice.token}`, 'test-request');
     const offers = await h.gw.core.searchOffers(actor, {
       category: 'retail', query: 'test tee', quantity: 1, shipToCountry: 'SG',
       spendCeiling: { currency: 'USD', amountMinor: '10000', scale: 2 },
@@ -103,7 +104,7 @@ describe('evidence API and inspect shell', () => {
       fundingRail: 'cardano',
     }, 'evidence-owner-test');
     const purchaseId = created.purchase.purchaseId;
-    appendEvent(h.db, purchaseId, 'provider.debug', { email: 'private-event@example.com', note: 'untrusted provider payload' }, h.clock.now().toISOString());
+    await appendEvent(h.db, purchaseId, 'provider.debug', { email: 'private-event@example.com', note: 'untrusted provider payload' }, h.clock.now().toISOString());
 
     expect((await h.call('GET', '/v1/evidence/purchases')).status).toBe(401);
     const aliceList = await h.call('GET', '/v1/evidence/purchases', h.alice.token);
@@ -129,7 +130,7 @@ describe('evidence API and inspect shell', () => {
 
   it('uses persisted fixture result provenance in list and detail without claiming a pending result is complete', async () => {
     const h = await setup();
-    const actor = authenticate(h.db, `Bearer ${h.alice.token}`, 'provenance-request');
+    const actor = await authenticate(h.db, `Bearer ${h.alice.token}`, 'provenance-request');
     const offers = await h.gw.core.searchOffers(actor, {
       category: 'retail', query: 'test tee', quantity: 1, shipToCountry: 'SG',
       spendCeiling: { currency: 'USD', amountMinor: '10000', scale: 2 },
@@ -144,10 +145,10 @@ describe('evidence API and inspect shell', () => {
       fundingRail: 'cardano',
     }, 'evidence-provenance-test');
     const purchaseId = created.purchase.purchaseId;
-    const quoteRow = h.db.get<{ public_json: string }>('SELECT public_json FROM quotes WHERE id = ?', quote.quoteId)!;
+    const quoteRow = (await h.db.get<{ public_json: string }>('SELECT public_json FROM quotes WHERE id = $1', quote.quoteId))!;
     const publicQuote = JSON.parse(quoteRow.public_json) as Record<string, unknown>;
     publicQuote.providerEnvironment = 'test';
-    h.db.run('UPDATE quotes SET provider_environment = ?, public_json = ? WHERE id = ?', 'test', JSON.stringify(publicQuote), quote.quoteId);
+    await h.db.run('UPDATE quotes SET provider_environment = $1, public_json = $2 WHERE id = $3', 'test', JSON.stringify(publicQuote), quote.quoteId);
 
     const before = await h.call('GET', '/v1/evidence/purchases', h.alice.token);
     const beforeRow = before.body.purchases.find((row: { id: string }) => row.id === purchaseId);
@@ -173,9 +174,9 @@ describe('evidence API and inspect shell', () => {
         details: {},
       }],
     };
-    h.db.run(
+    await h.db.run(
       `INSERT INTO execution_attempts(id, purchase_id, attempt_no, idempotency_key, status, provider_reference, checkpoints_json, result_json, started_at, finished_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
       'att_evidenceprovenance01',
       purchaseId,
       1,

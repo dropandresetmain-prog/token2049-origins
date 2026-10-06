@@ -1,16 +1,16 @@
+import { createTestDb } from '../support/database.js';
 import {describe,it,expect} from 'vitest';
 import {createHmac} from 'node:crypto';
 import type {AddressInfo} from 'node:net';
 import {realParts} from '../../src/wiring.js';
 import {buildGateway} from '../../src/composition.js';
 import {createHttpApp} from '../../src/channels/http/app.js';
-import {Db} from '../../src/infrastructure/db.js';
 import {startHarness,createFundablePurchase,TEST_ENV} from '../support/harness.js';
 
 const secret='fixture-webhook-secret',shop='test-shop.myshopify.com',nonce='596fef08-64d7-4e3a-8dfd-2930d6c5b8e7';
 describe('production composition boundaries (offline)',()=>{
   it('registers real adapters, reports missing credentials, and keeps inspect public while evidence requires auth',async()=>{
-    const db=new Db(':memory:'),parts=realParts({},()=>undefined),gw=buildGateway(parts,{env:TEST_ENV,db});
+    const db=await createTestDb(),parts=realParts({},()=>undefined),gw=await buildGateway(parts,{env:TEST_ENV,db});
     const server=gw.app.listen(0,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
     const url='http://127.0.0.1:'+(server.address() as AddressInfo).port;
     try {
@@ -21,8 +21,8 @@ describe('production composition boundaries (offline)',()=>{
       expect((await fetch(url+'/v1/evidence/purchases')).status).toBe(401);
       const webhook=await fetch(url+'/v1/webhooks/shopify',{method:'POST'});
       expect(webhook.status).toBe(503);expect((await webhook.json() as any).error).toMatchObject({code:'route_unavailable',requestId:expect.any(String)});
-      expect(db.get<{n:number}>('SELECT COUNT(*) n FROM journal_entries')!.n).toBe(0); // Readiness and public inspection cannot create financial facts.
-    } finally {await new Promise<void>(r=>server.close(()=>r()));db.close();}
+      expect((await db.get<{n:number}>('SELECT COUNT(*)::int n FROM journal_entries'))!.n).toBe(0); // Readiness and public inspection cannot create financial facts.
+    } finally {await new Promise<void>(r=>server.close(()=>r()));await db.close();}
   });
 
   it('preserves exact HMAC bytes and durably deduplicates readback hints without trusting claimed payment',async()=>{
@@ -31,21 +31,21 @@ describe('production composition boundaries (offline)',()=>{
     const url='http://127.0.0.1:'+(server.address() as AddressInfo).port;
     try {
       const a=await createFundablePurchase(h),id=a.purchase.purchaseId;
-      h.gw.db.run("UPDATE quotes SET execution_ref_json = json_set(execution_ref_json,'$.nonce',?) WHERE id = ?",nonce,a.quote.quoteId);
+      await h.gw.db.run("UPDATE quotes SET execution_ref_json = jsonb_set(execution_ref_json::jsonb,'{nonce}',to_jsonb($1::text))::text WHERE id = $2",nonce,a.quote.quoteId);
       h.retail.behavior='unknown';await h.call('POST','/v1/purchases/'+id+'/fund',{token:h.alice.token,headers:{'payment-signature':'fixture:webhook-funding:'+a.required}});await h.gw.worker.tick();
       const payload=JSON.stringify({admin_graphql_api_id:'gid://shopify/Order/123',financial_status:'paid',email:'private@example.com',note_attributes:[{name:'t2o_quote',value:nonce}]},null,2)+'\n';
       const headers={'content-type':'application/json','x-shopify-shop-domain':shop,'x-shopify-topic':'orders/paid','x-shopify-webhook-id':'delivery-1','x-shopify-hmac-sha256':createHmac('sha256',secret).update(payload).digest('base64')};
       const send=(body=payload)=>fetch(url+'/v1/webhooks/shopify',{method:'POST',headers,body});
       const bad=await send(payload+' ');expect(bad.status).toBe(401);expect((await bad.json() as any).error.code).toBe('unauthenticated');
       expect((await send()).status).toBe(202);expect((await send()).status).toBe(202);
-      expect(h.gw.db.get<{n:number}>("SELECT COUNT(*) n FROM jobs WHERE dedupe_key='shopify_webhook:delivery-1'")!.n).toBe(1);
-      expect(h.gw.db.get<{n:number}>("SELECT COUNT(*) n FROM purchase_events WHERE type='provider.webhook_received'")!.n).toBe(1);
-      expect(h.gw.db.get<{state:string}>('SELECT state FROM purchases WHERE id = ?',id)!.state).toBe('unresolved');
-      expect(h.gw.db.get<{n:number}>("SELECT COUNT(*) n FROM journal_entries WHERE kind='prepayment_applied'")!.n).toBe(0);
+      expect((await h.gw.db.get<{n:number}>("SELECT COUNT(*)::int n FROM jobs WHERE dedupe_key='shopify_webhook:delivery-1'"))!.n).toBe(1);
+      expect((await h.gw.db.get<{n:number}>("SELECT COUNT(*)::int n FROM purchase_events WHERE type='provider.webhook_received'"))!.n).toBe(1);
+      expect((await h.gw.db.get<{state:string}>('SELECT state FROM purchases WHERE id = $1',id))!.state).toBe('unresolved');
+      expect((await h.gw.db.get<{n:number}>("SELECT COUNT(*)::int n FROM journal_entries WHERE kind='prepayment_applied'"))!.n).toBe(0);
       let reads=0;h.retail.retrieve=async ctx=>{reads++;expect(ctx.checkpoints.webhook_order?.providerReference).toBe('gid://shopify/Order/123');return {kind:'succeeded',providerReference:'gid://shopify/Order/123',commerceStatus:'confirmed',merchantPaymentStatus:'simulated_paid',chargedAmount:ctx.quote.merchantTotal,evidence:[{source:'fixture:shopify',environment:'fixture',evidenceMode:'local_fixture',reference:'gid://shopify/Order/123',observedAt:h.clock.now().toISOString(),details:{}}]};};
       await h.gw.worker.tick();expect(reads).toBe(1);
-      expect(h.gw.db.get<{state:string}>('SELECT state FROM purchases WHERE id = ?',id)!.state).toBe('succeeded');expect((await send()).status).toBe(202);expect(reads).toBe(1);
-      const stored=JSON.stringify(h.gw.db.all('SELECT data_json FROM purchase_events'));expect(stored).not.toContain('private@example.com');
-    } finally {await new Promise<void>(r=>server.close(()=>r()));await h.close();h.gw.db.close();}
+      expect((await h.gw.db.get<{state:string}>('SELECT state FROM purchases WHERE id = $1',id))!.state).toBe('succeeded');expect((await send()).status).toBe(202);expect(reads).toBe(1);
+      const stored=JSON.stringify((await h.gw.db.all('SELECT data_json FROM purchase_events')));expect(stored).not.toContain('private@example.com');
+    } finally {await new Promise<void>(r=>server.close(()=>r()));await h.close();await h.gw.db.close();}
   });
 });

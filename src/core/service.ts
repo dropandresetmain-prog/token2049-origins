@@ -99,7 +99,7 @@ export class CommerceCore {
     const found = await ex.search(intent);
     const now = this.d.clock.now();
     const views: OfferView[] = [];
-    this.d.db.tx(() => {
+    await this.d.db.tx(async () => {
       for (const o of found) {
         const offerId = newId('off');
         const ttl = new Date(now.getTime() + this.d.config.offerTtlSeconds * 1000);
@@ -117,9 +117,9 @@ export class CommerceCore {
           expiresAt,
           executable: false,
         };
-        this.d.db.run(
+        await this.d.db.run(
           `INSERT INTO offers(id, customer_id, category, route, provider_environment, intent_json, public_json, execution_ref_json, expires_at, created_at)
-           VALUES (?,?,?,?,?,?,?,?,?,?)`,
+           VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10)`,
           offerId,
           actor.customerId,
           intent.category,
@@ -142,7 +142,7 @@ export class CommerceCore {
   async createQuote(actor: ActorContext, offerId: string, rawFulfillment: unknown, supersedes?: QuoteRow): Promise<QuoteView> {
     this.requireScope(actor, 'quotes:write');
     const fulfillment = FulfillmentSchema.parse(rawFulfillment);
-    const offer = this.d.db.get<{
+    const offer = await this.d.db.get<{
       id: string;
       customer_id: string;
       category: Category;
@@ -150,7 +150,7 @@ export class CommerceCore {
       intent_json: string;
       execution_ref_json: string;
       expires_at: string;
-    }>('SELECT * FROM offers WHERE id = ?', offerId);
+    }>('SELECT * FROM offers WHERE id = $1', offerId);
     if (!offer || offer.customer_id !== actor.customerId) throw new CoreError('not_found', 'offer not found');
     if (Date.parse(offer.expires_at) <= this.d.clock.now().getTime()) throw new CoreError('quote_expired', 'offer expired; search again');
     if (fulfillment.category !== offer.category) throw new CoreError('invalid_request', 'fulfillment category does not match offer');
@@ -212,9 +212,9 @@ export class CommerceCore {
       digest,
       createdAt: iso(now),
     };
-    this.d.db.run(
+    await this.d.db.run(
       `INSERT INTO quotes(id, version, supersedes_quote_id, customer_id, offer_id, category, route, provider_environment, public_json, fulfillment_json, execution_ref_json, digest, expires_at, created_at)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14)`,
       quoteId,
       version,
       supersedes?.id ?? null,
@@ -270,9 +270,9 @@ export class CommerceCore {
     return out;
   }
 
-  getQuote(actor: ActorContext, quoteId: string): QuoteView {
+  async getQuote(actor: ActorContext, quoteId: string): Promise<QuoteView> {
     this.requireScope(actor, 'quotes:write');
-    const q = getQuoteRow(this.d.db, quoteId);
+    const q = await getQuoteRow(this.d.db, quoteId);
     if (!q || q.customer_id !== actor.customerId) throw new CoreError('not_found', 'quote not found');
     return JSON.parse(q.public_json) as QuoteView;
   }
@@ -285,18 +285,18 @@ export class CommerceCore {
       throw new CoreError('invalid_request', 'Idempotency-Key header (8-128 chars) is required');
     }
     const requestDigest = digestOf(req);
-    const prior = this.d.db.get<{ request_digest: string; status_code: number; response_json: string }>(
-      "SELECT request_digest, status_code, response_json FROM idempotency_keys WHERE customer_id = ? AND operation = 'createPurchase' AND idem_key = ?",
+    const prior = await this.d.db.get<{ request_digest: string; status_code: number; response_json: string }>(
+      "SELECT request_digest, status_code, response_json FROM idempotency_keys WHERE customer_id = $1 AND operation = 'createPurchase' AND idem_key = $2",
       actor.customerId,
       idempotencyKey,
     );
     if (prior) {
       if (prior.request_digest !== requestDigest) throw new CoreError('idempotency_conflict', 'Idempotency-Key reused with a different request');
       const { purchaseId } = JSON.parse(prior.response_json) as { purchaseId: string };
-      return { status: prior.status_code, purchase: this.getPurchase(actor, purchaseId) };
+      return { status: prior.status_code, purchase: (await this.getPurchase(actor, purchaseId)) };
     }
 
-    const quote = getQuoteRow(this.d.db, req.quoteId);
+    const quote = await getQuoteRow(this.d.db, req.quoteId);
     if (!quote || quote.customer_id !== actor.customerId) throw new CoreError('not_found', 'quote not found');
     const qv = JSON.parse(quote.public_json) as QuoteView;
     const ex = this.executorFor(qv.route);
@@ -309,17 +309,17 @@ export class CommerceCore {
     }
 
     const nowIso = this.now();
-    return this.d.db.tx(() => {
+    return await this.d.db.tx(async () => {
       // Re-check idempotency inside the write transaction (concurrent identical requests).
-      const raced = this.d.db.get<{ request_digest: string; status_code: number; response_json: string }>(
-        "SELECT request_digest, status_code, response_json FROM idempotency_keys WHERE customer_id = ? AND operation = 'createPurchase' AND idem_key = ?",
+      const raced = await this.d.db.get<{ request_digest: string; status_code: number; response_json: string }>(
+        "SELECT request_digest, status_code, response_json FROM idempotency_keys WHERE customer_id = $1 AND operation = 'createPurchase' AND idem_key = $2",
         actor.customerId,
         idempotencyKey,
       );
       if (raced) {
         if (raced.request_digest !== requestDigest) throw new CoreError('idempotency_conflict', 'Idempotency-Key reused with a different request');
         const { purchaseId } = JSON.parse(raced.response_json) as { purchaseId: string };
-        return { status: raced.status_code, purchase: this.getPurchase(actor, purchaseId) };
+        return { status: raced.status_code, purchase: (await this.getPurchase(actor, purchaseId)) };
       }
       if (Date.parse(quote.expires_at) <= Date.parse(nowIso)) throw new CoreError('quote_expired', 'quote expired; request a new quote');
       if (req.approval.quoteDigest !== quote.digest) {
@@ -336,11 +336,11 @@ export class CommerceCore {
       }
       const option = qv.fundingOptions.find((o) => o.rail === req.fundingRail);
       if (!option) throw new CoreError('route_unavailable', `quote has no ${req.fundingRail} funding option`);
-      const existing = this.d.db.get<{ id: string }>('SELECT id FROM purchases WHERE quote_id = ?', quote.id);
+      const existing = await this.d.db.get<{ id: string }>('SELECT id FROM purchases WHERE quote_id = $1', quote.id);
       if (existing) throw new CoreError('conflict', 'a purchase already exists for this quote', { purchaseId: existing.id });
 
       // Capacity reservation for the merchant spend (simulated card capacity), not the fee.
-      const cap = capacitySnapshot(this.d.db, qv.merchantTotal.currency);
+      const cap = await capacitySnapshot(this.d.db, qv.merchantTotal.currency);
       if (!cap || cap.scale !== qv.merchantTotal.scale) {
         throw new CoreError('insufficient_capacity', `no simulated capacity configured for ${qv.merchantTotal.currency}`);
       }
@@ -362,9 +362,9 @@ export class CommerceCore {
         quoteDigest: quote.digest,
         valuation: option.valuation,
       };
-      this.d.db.run(
+      await this.d.db.run(
         `INSERT INTO purchases(id, customer_id, quote_id, channel, state, payment_state, commerce_status, merchant_payment_status, funding_rail, funding_requirement_json, approval_json, created_at, updated_at)
-         VALUES (?,?,?,?, 'awaiting_funding', 'not_received', 'not_started', 'none', ?,?,?,?,?)`,
+         VALUES ($1,$2,$3,$4, 'awaiting_funding', 'not_received', 'not_started', 'none', $5,$6,$7,$8,$9)`,
         purchaseId,
         actor.customerId,
         quote.id,
@@ -375,9 +375,9 @@ export class CommerceCore {
         nowIso,
         nowIso,
       );
-      this.d.db.run(
+      await this.d.db.run(
         `INSERT INTO reservations(id, purchase_id, currency, scale, amount_minor, status, expires_at, created_at, updated_at)
-         VALUES (?,?,?,?,?, 'active', ?,?,?)`,
+         VALUES ($1,$2,$3,$4,$5, 'active', $6,$7,$8)`,
         newId('res'),
         purchaseId,
         qv.merchantTotal.currency,
@@ -387,45 +387,45 @@ export class CommerceCore {
         nowIso,
         nowIso,
       );
-      appendEvent(this.d.db, purchaseId, 'purchase.created', { quoteId: quote.id, channel: actor.channel, rail: req.fundingRail }, nowIso);
-      appendEvent(this.d.db, purchaseId, 'capacity.reserved', { amount: qv.merchantTotal, ledgerMode: 'simulated' }, nowIso);
-      this.d.db.run(
+      await appendEvent(this.d.db, purchaseId, 'purchase.created', { quoteId: quote.id, channel: actor.channel, rail: req.fundingRail }, nowIso);
+      await appendEvent(this.d.db, purchaseId, 'capacity.reserved', { amount: qv.merchantTotal, ledgerMode: 'simulated' }, nowIso);
+      await this.d.db.run(
         `INSERT INTO idempotency_keys(customer_id, operation, idem_key, request_digest, status_code, response_json, created_at)
-         VALUES (?, 'createPurchase', ?, ?, 201, ?, ?)`,
+         VALUES ($1, 'createPurchase', $2, $3, 201, $4, $5)`,
         actor.customerId,
         idempotencyKey,
         requestDigest,
         JSON.stringify({ purchaseId }),
         nowIso,
       );
-      return { status: 201, purchase: this.viewOf(getPurchaseRow(this.d.db, purchaseId)!) };
+      return { status: 201, purchase: (await this.viewOf((await getPurchaseRow(this.d.db, purchaseId))!)) };
     });
   }
 
-  private ownedPurchase(actor: ActorContext, id: string): PurchaseRow {
-    const p = getPurchaseRow(this.d.db, id);
+  private async ownedPurchase(actor: ActorContext, id: string): Promise<PurchaseRow> {
+    const p = await getPurchaseRow(this.d.db, id);
     if (!p || p.customer_id !== actor.customerId) throw new CoreError('not_found', 'purchase not found');
     return p;
   }
 
-  getPurchase(actor: ActorContext, id: string): PurchaseView {
+  async getPurchase(actor: ActorContext, id: string): Promise<PurchaseView> {
     this.requireScope(actor, 'purchases:read');
-    return this.viewOf(this.ownedPurchase(actor, id));
+    return await this.viewOf((await this.ownedPurchase(actor, id)));
   }
 
-  purchaseEvents(actor: ActorContext, id: string): PurchaseEventView[] {
+  async purchaseEvents(actor: ActorContext, id: string): Promise<PurchaseEventView[]> {
     this.requireScope(actor, 'purchases:read');
-    this.ownedPurchase(actor, id);
-    return this.d.db
+    await this.ownedPurchase(actor, id);
+    return (await this.d.db
       .all<{ id: string; sequence: number; purchase_id: string; type: string; data_json: string; created_at: string }>(
-        'SELECT * FROM purchase_events WHERE purchase_id = ? ORDER BY sequence',
+        'SELECT * FROM purchase_events WHERE purchase_id = $1 ORDER BY sequence',
         id,
-      )
+      ))
       .map((e) => ({ eventId: e.id, sequence: e.sequence, purchaseId: e.purchase_id, type: e.type, data: JSON.parse(e.data_json), at: e.created_at }));
   }
 
-  private viewOf(p: PurchaseRow): PurchaseView {
-    return buildPurchaseView(this.d.db, p, this.d.config.publicBaseUrl);
+  private async viewOf(p: PurchaseRow): Promise<PurchaseView> {
+    return await buildPurchaseView(this.d.db, p, this.d.config.publicBaseUrl);
   }
 
   requirementInput(p: PurchaseRow): FundingRequirementInput {
@@ -455,7 +455,7 @@ export class CommerceCore {
    */
   async fundPurchase(actor: ActorContext, purchaseId: string, paymentHeader: string | undefined): Promise<FundResult> {
     this.requireScope(actor, 'purchases:fund');
-    let p = this.ownedPurchase(actor, purchaseId);
+    let p = await this.ownedPurchase(actor, purchaseId);
     const adapter = this.d.fundingAdapters.get(p.funding_rail as FundingRail);
     if (!adapter) throw new CoreError('route_unavailable', `funding rail ${p.funding_rail} unavailable`);
 
@@ -467,12 +467,12 @@ export class CommerceCore {
     }
     const input = this.requirementInput(p);
     if (Date.parse(input.expiresAt) <= this.d.clock.now().getTime()) {
-      this.expirePurchase(p.id, 'quote expired before funding');
+      await this.expirePurchase(p.id, 'quote expired before funding');
       throw new CoreError('quote_expired', 'quote expired before funding; request a new quote');
     }
     const requirements = adapter.paymentRequirements(input);
     if (!paymentHeader) {
-      return { kind: 'payment_required', requirements, purchase: this.viewOf(p) };
+      return { kind: 'payment_required', requirements, purchase: (await this.viewOf(p)) };
     }
 
     // One settlement attempt per purchase at a time: a concurrent second payment is refused before it
@@ -482,118 +482,135 @@ export class CommerceCore {
     }
     this.fundingInFlight.add(purchaseId);
     try {
-      if (adapter.prepare) {
-        const candidate = adapter.prepare(paymentHeader, input);
-        if (!candidate.ok) throw new CoreError(candidate.code, candidate.reason);
-        if (!adapter.recover) throw new CoreError('route_unavailable', 'funding adapter has no durable recovery');
-        this.persistFundingCandidate(purchaseId, adapter.rail, input.amount.network, candidate.transferReference);
-      }
-      return await this.verifyAndRecord(purchaseId, adapter, paymentHeader, input);
+      const locked = await this.d.db.withExclusiveLock(`funding:${purchaseId}`, async () => {
+        // Another process may have committed funding between the initial read and the lock.
+        p = (await this.ownedPurchase(actor, purchaseId));
+        if (p.state !== 'awaiting_funding' || p.payment_state === 'submitted' || p.payment_state === 'unknown') {
+          throw new CoreError('conflict', 'purchase no longer accepts a new funding transfer');
+        }
+        if (adapter.prepare) {
+          const candidate = adapter.prepare(paymentHeader, input);
+          if (!candidate.ok) throw new CoreError(candidate.code, candidate.reason);
+          if (!adapter.recover) throw new CoreError('route_unavailable', 'funding adapter has no durable recovery');
+          await this.persistFundingCandidate(purchaseId, adapter.rail, input.amount.network, candidate.transferReference);
+        }
+        return await this.verifyAndRecord(purchaseId, adapter, paymentHeader, input);
+      });
+      if (!locked.acquired) throw new CoreError('conflict', 'a funding attempt for this purchase is already in progress');
+      return locked.value;
     } finally {
       this.fundingInFlight.delete(purchaseId);
     }
   }
 
   private async verifyAndRecord(purchaseId: string, adapter: FundingAdapter, paymentHeader: string, input: FundingRequirementInput): Promise<FundResult> {
-    let p = getPurchaseRow(this.d.db, purchaseId)!;
+    let p = (await getPurchaseRow(this.d.db, purchaseId))!;
     const verification = await adapter.verify(paymentHeader, input);
     if (!verification.ok) {
       const nowIso = this.now();
-      this.d.db.tx(() => {
-        appendEvent(this.d.db,p.id,'funding.rejected',{code:verification.code,reason:verification.reason},nowIso);
+      await this.d.db.tx(async () => {
+        await appendEvent(this.d.db,p.id,'funding.rejected',{code:verification.code,reason:verification.reason},nowIso);
         if(verification.settlementAttempted===false) {
-          const removed=this.d.db.run("DELETE FROM funding_attempts WHERE purchase_id = ? AND status = 'pending'",p.id).changes;
-          if(removed) this.d.db.run("UPDATE purchases SET payment_state = 'not_received', updated_at = ? WHERE id = ? AND state = 'awaiting_funding' AND payment_state = 'unknown'",nowIso,p.id);
+          const removed=(await this.d.db.run("DELETE FROM funding_attempts WHERE purchase_id = $1 AND status = 'pending'",p.id)).changes;
+          if(removed) await this.d.db.run("UPDATE purchases SET payment_state = 'not_received', updated_at = $1 WHERE id = $2 AND state = 'awaiting_funding' AND payment_state = 'unknown'",nowIso,p.id);
         }
       });
       throw new CoreError(verification.code, verification.reason);
     }
-    return this.recordVerifiedFunding(purchaseId, verification.funding, input);
+    return await this.recordVerifiedFunding(purchaseId, verification.funding, input);
   }
 
-  private recordVerifiedFunding(purchaseId: string, f: VerifiedFunding, input: FundingRequirementInput): FundResult {
-    let p = getPurchaseRow(this.d.db, purchaseId)!;
+  private async recordVerifiedFunding(purchaseId: string, f: VerifiedFunding, input: FundingRequirementInput): Promise<FundResult> {
+    let p = (await getPurchaseRow(this.d.db, purchaseId))!;
     if (f.rail !== p.funding_rail) throw new CoreError('payment_invalid', 'funding rail does not match purchase');
     if (p.state === 'awaiting_funding' && Date.parse(input.expiresAt) <= this.d.clock.now().getTime()) {
-      this.expirePurchase(p.id,'quote expired before funding was independently confirmed');
-      p=getPurchaseRow(this.d.db,purchaseId)!;
+      await this.expirePurchase(p.id,'quote expired before funding was independently confirmed');
+      p=(await getPurchaseRow(this.d.db,purchaseId))!;
     }
     // Recovery can race the original response after a confirmed chain read; never post twice.
-    const existing = this.d.db.get<{purchase_id:string}>('SELECT purchase_id FROM funding_evidence WHERE rail = ? AND network = ? AND transfer_reference = ?', f.rail, f.network, f.transferReference);
+    const existing = await this.d.db.get<{purchase_id:string}>('SELECT purchase_id FROM funding_evidence WHERE rail = $1 AND network = $2 AND transfer_reference = $3', f.rail, f.network, f.transferReference);
     if (existing) {
       if (existing.purchase_id !== purchaseId) throw new CoreError('payment_replayed', 'this transfer has already been used');
-      return {kind:'funded', purchase:this.viewOf(p)};
+      return {kind:'funded', purchase:(await this.viewOf(p))};
     }
     // Defense in depth: core re-checks the adapter's claims against the stored requirement.
     this.assertFundingMatches(f, input);
 
     const nowIso = this.now();
-    this.d.db.tx(() => {
-      p = getPurchaseRow(this.d.db, purchaseId)!;
+    await this.d.db.tx(async () => {
+      p = (await getPurchaseRow(this.d.db, purchaseId))!;
+      const raced = await this.d.db.get<{ purchase_id: string }>(
+        'SELECT purchase_id FROM funding_evidence WHERE rail = $1 AND network = $2 AND transfer_reference = $3',
+        f.rail, f.network, f.transferReference,
+      );
+      if (raced) {
+        if (raced.purchase_id !== purchaseId) throw new CoreError('payment_replayed', 'this transfer has already been used');
+        return;
+      }
       const stillOpen = p.state === 'awaiting_funding' && p.payment_state !== 'submitted';
       const required = BigInt(input.amount.amountBaseUnits);
       const received = BigInt(f.amountBaseUnits);
       const confirmed = f.paymentState === 'confirmed';
       const application: FundingEvidenceRow['application'] = !confirmed ? 'pending_confirmation' : stillOpen ? 'applied' : 'unapplied';
       try {
-        this.insertEvidence(p.id, f, application, nowIso);
+        await this.insertEvidence(p.id, f, application, nowIso);
       } catch (e) {
-        if (String((e as Error).message).includes('UNIQUE')) throw new CoreError('payment_replayed', 'this transfer has already been used');
+        if ((e as { code?: string }).code === '23505') throw new CoreError('payment_replayed', 'this transfer has already been used');
         throw e;
       }
-      this.d.db.run("UPDATE funding_attempts SET status = 'recorded', updated_at = ? WHERE purchase_id = ? AND transfer_reference = ?", nowIso, p.id, f.transferReference);
+      await this.d.db.run("UPDATE funding_attempts SET status = 'recorded', updated_at = $1 WHERE purchase_id = $2 AND transfer_reference = $3", nowIso, p.id, f.transferReference);
       if (!confirmed) {
-        this.d.db.run("UPDATE purchases SET payment_state = 'submitted', updated_at = ? WHERE id = ?", nowIso, p.id);
-        appendEvent(this.d.db, p.id, 'funding.submitted', { transfer: f.transferReference, network: f.network }, nowIso);
-        this.enqueueJob('confirm_funding', p.id, `confirm:${p.id}:${f.transferReference}`, nowIso);
+        await this.d.db.run("UPDATE purchases SET payment_state = 'submitted', updated_at = $1 WHERE id = $2", nowIso, p.id);
+        await appendEvent(this.d.db, p.id, 'funding.submitted', { transfer: f.transferReference, network: f.network }, nowIso);
+        await this.enqueueJob('confirm_funding', p.id, `confirm:${p.id}:${f.transferReference}`, nowIso);
         return;
       }
       if (!stillOpen) {
-        this.recordConfirmedUnappliedFunding(p.id, f, nowIso);
+        await this.recordConfirmedUnappliedFunding(p.id, f, nowIso);
         return;
       }
-      this.applyConfirmedFunding(p, f, required, received, nowIso);
+      await this.applyConfirmedFunding(p, f, required, received, nowIso);
     });
-    const after = getPurchaseRow(this.d.db, purchaseId)!;
+    const after = (await getPurchaseRow(this.d.db, purchaseId))!;
     if (after.state === 'awaiting_funding' && after.payment_state !== 'submitted') {
       throw new CoreError('conflict', 'funding was received but could not be applied; it is recorded as a refundable obligation');
     }
     return {
       kind: 'funded',
-      purchase: this.viewOf(after),
+      purchase: (await this.viewOf(after)),
       ...(f.settlementResponseHeader ? { settlementHeader: f.settlementResponseHeader } : {}),
     };
   }
 
-  private persistFundingCandidate(purchaseId: string, rail: FundingRail, network: string, reference: string): void {
+  private async persistFundingCandidate(purchaseId: string, rail: FundingRail, network: string, reference: string): Promise<void> {
     if (!reference || reference.length > 256) throw new CoreError('payment_invalid', 'invalid funding recovery reference');
     const nowIso = this.now();
-    this.d.db.tx(() => {
-      const prior = this.d.db.get<{purchase_id:string;transfer_reference:string}>('SELECT purchase_id, transfer_reference FROM funding_attempts WHERE rail = ? AND network = ? AND transfer_reference = ?',rail,network,reference);
+    await this.d.db.tx(async () => {
+      const prior = await this.d.db.get<{purchase_id:string;transfer_reference:string}>('SELECT purchase_id, transfer_reference FROM funding_attempts WHERE rail = $1 AND network = $2 AND transfer_reference = $3',rail,network,reference);
       if (prior && prior.purchase_id !== purchaseId) throw new CoreError('payment_replayed','this transfer is already bound to another purchase');
-      const current = this.d.db.get<{transfer_reference:string}>('SELECT transfer_reference FROM funding_attempts WHERE purchase_id = ?',purchaseId);
+      const current = await this.d.db.get<{transfer_reference:string}>('SELECT transfer_reference FROM funding_attempts WHERE purchase_id = $1',purchaseId);
       if (current && current.transfer_reference !== reference) throw new CoreError('conflict','a different payment is already pending recovery');
-      this.d.db.run("INSERT INTO funding_attempts(id,purchase_id,rail,network,transfer_reference,status,created_at,updated_at) VALUES(?,?,?,?,?,'pending',?,?) ON CONFLICT(purchase_id) DO NOTHING",newId('fat'),purchaseId,rail,network,reference,nowIso,nowIso);
-      this.d.db.run("UPDATE purchases SET payment_state = 'unknown', updated_at = ? WHERE id = ? AND state = 'awaiting_funding'",nowIso,purchaseId);
-      const candidate=this.d.db.get<{id:string}>('SELECT id FROM funding_attempts WHERE purchase_id = ?',purchaseId)!;
-      this.enqueueJob('recover_funding',purchaseId,'recover_funding:'+candidate.id,new Date(Date.parse(nowIso)+15_000).toISOString());
-      appendEvent(this.d.db,purchaseId,'funding.attempt_prepared',{transfer:reference},nowIso);
+      await this.d.db.run("INSERT INTO funding_attempts(id,purchase_id,rail,network,transfer_reference,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,'pending',$6,$7) ON CONFLICT(purchase_id) DO NOTHING",newId('fat'),purchaseId,rail,network,reference,nowIso,nowIso);
+      await this.d.db.run("UPDATE purchases SET payment_state = 'unknown', updated_at = $1 WHERE id = $2 AND state = 'awaiting_funding'",nowIso,purchaseId);
+      const candidate=(await this.d.db.get<{id:string}>('SELECT id FROM funding_attempts WHERE purchase_id = $1',purchaseId))!;
+      await this.enqueueJob('recover_funding',purchaseId,'recover_funding:'+candidate.id,new Date(Date.parse(nowIso)+15_000).toISOString());
+      await appendEvent(this.d.db,purchaseId,'funding.attempt_prepared',{transfer:reference},nowIso);
     });
   }
 
   /** Only durable candidate references can enter this read-only recovery path. */
   async recoverPendingFunding(purchaseId: string): Promise<boolean> {
-    const candidate=this.d.db.get<{rail:FundingRail;transfer_reference:string}>("SELECT rail, transfer_reference FROM funding_attempts WHERE purchase_id = ? AND status = 'pending'",purchaseId);
+    const candidate=await this.d.db.get<{rail:FundingRail;transfer_reference:string}>("SELECT rail, transfer_reference FROM funding_attempts WHERE purchase_id = $1 AND status = 'pending'",purchaseId);
     if(!candidate) return true;
-    const p=getPurchaseRow(this.d.db,purchaseId)!;
+    const p=(await getPurchaseRow(this.d.db,purchaseId))!;
     const adapter=this.d.fundingAdapters.get(candidate.rail);
     if(!adapter?.recover) throw new Error('funding adapter recovery unavailable');
     const input=this.requirementInput(p);
-    if(p.state==='awaiting_funding' && Date.parse(input.expiresAt)<=this.d.clock.now().getTime()) this.expirePurchase(p.id,'quote expired during funding recovery');
+    if(p.state==='awaiting_funding' && Date.parse(input.expiresAt)<=this.d.clock.now().getTime()) await this.expirePurchase(p.id,'quote expired during funding recovery');
     const verification=await adapter.recover(candidate.transfer_reference,input);
     if(!verification.ok) return false;
     if(verification.funding.transferReference!==candidate.transfer_reference) throw new Error('funding recovery reference mismatch');
-    this.recordVerifiedFunding(purchaseId,verification.funding,input);
+    await this.recordVerifiedFunding(purchaseId,verification.funding,input);
     return true;
   }
 
@@ -609,11 +626,11 @@ export class CommerceCore {
     if (problems.length) throw new CoreError('payment_invalid', `funding does not satisfy requirement: ${problems.join(', ')}`);
   }
 
-  private insertEvidence(purchaseId: string, f: VerifiedFunding, application: FundingEvidenceRow['application'], nowIso: string): string {
+  private async insertEvidence(purchaseId: string, f: VerifiedFunding, application: FundingEvidenceRow['application'], nowIso: string): Promise<string> {
     const id = newId('fev');
-    this.d.db.run(
+    await this.d.db.run(
       `INSERT INTO funding_evidence(id, purchase_id, rail, network, asset_id, decimals, amount_base_units, payer, payee, transfer_reference, payment_state, confirmations, purpose, application, evidence_mode, observed_at, verified_at, details_json)
-       VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18)`,
       id,
       purchaseId,
       f.rail,
@@ -637,13 +654,13 @@ export class CommerceCore {
   }
 
   /** Journal the observed receipt: applied part to prepayment liability, any excess to unapplied (refundable). */
-  private postReceipt(purchaseId: string, f: VerifiedFunding, applied: bigint, received: bigint, nowIso: string): void {
+  private async postReceipt(purchaseId: string, f: VerifiedFunding, applied: bigint, received: bigint, nowIso: string): Promise<void> {
     const asset = cryptoAsset(f.network, f.assetId);
     const excess = received - applied;
     const lines: JournalLine[] = [{ account: Accounts.cryptoTreasury, asset, side: 'debit', amount: received }];
     if (applied > 0n) lines.push({ account: Accounts.customerPrepayment, asset, side: 'credit' as const, amount: applied });
     if (excess > 0n) lines.push({ account: Accounts.customerUnapplied, asset, side: 'credit' as const, amount: excess });
-    postEntry(
+    await postEntry(
       this.d.db,
       {
         eventKey: `funding:${f.rail}:${f.network}:${f.transferReference}`,
@@ -659,32 +676,32 @@ export class CommerceCore {
   }
 
   /** A late confirmed transfer remains an observed refundable obligation, even after closure. */
-  recordConfirmedUnappliedFunding(purchaseId: string, funding: VerifiedFunding, nowIso: string): void {
-    this.postReceipt(purchaseId, funding, 0n, BigInt(funding.amountBaseUnits), nowIso);
-    this.d.db.run("UPDATE purchases SET payment_state = 'confirmed', updated_at = ? WHERE id = ?",nowIso,purchaseId);
-    appendEvent(this.d.db, purchaseId, 'funding.unapplied', { reason: 'confirmed after purchase closed', transfer: funding.transferReference }, nowIso);
+  async recordConfirmedUnappliedFunding(purchaseId: string, funding: VerifiedFunding, nowIso: string): Promise<void> {
+    await this.postReceipt(purchaseId, funding, 0n, BigInt(funding.amountBaseUnits), nowIso);
+    await this.d.db.run("UPDATE purchases SET payment_state = 'confirmed', updated_at = $1 WHERE id = $2",nowIso,purchaseId);
+    await appendEvent(this.d.db, purchaseId, 'funding.unapplied', { reason: 'confirmed after purchase closed', transfer: funding.transferReference }, nowIso);
   }
 
   /** Called inside a tx with a confirmed, matching transfer for an open purchase. */
-  applyConfirmedFunding(p: PurchaseRow, f: VerifiedFunding, required: bigint, received: bigint, nowIso: string): void {
-    this.postReceipt(p.id, f, required, received, nowIso);
-    const ok = transitionPurchase(this.d.db, p.id, ['awaiting_funding'], { state: 'funded_queued', payment_state: 'confirmed' }, nowIso);
+  async applyConfirmedFunding(p: PurchaseRow, f: VerifiedFunding, required: bigint, received: bigint, nowIso: string): Promise<void> {
+    await this.postReceipt(p.id, f, required, received, nowIso);
+    const ok = await transitionPurchase(this.d.db, p.id, ['awaiting_funding'], { state: 'funded_queued', payment_state: 'confirmed' }, nowIso);
     if (!ok) throw new Error('purchase state changed during funding');
-    appendEvent(
+    await appendEvent(
       this.d.db,
       p.id,
       'funding.confirmed',
       { rail: f.rail, network: f.network, asset: f.assetId, amountBaseUnits: f.amountBaseUnits, transfer: f.transferReference, excessBaseUnits: (received - required).toString() },
       nowIso,
     );
-    this.enqueueJob('execute_purchase', p.id, `execute:${p.id}`, nowIso);
-    appendEvent(this.d.db, p.id, 'execution.queued', {}, nowIso);
+    await this.enqueueJob('execute_purchase', p.id, `execute:${p.id}`, nowIso);
+    await appendEvent(this.d.db, p.id, 'execution.queued', {}, nowIso);
   }
 
-  enqueueJob(kind: string, purchaseId: string, dedupeKey: string, runAfterIso: string): void {
-    this.d.db.run(
+  async enqueueJob(kind: string, purchaseId: string, dedupeKey: string, runAfterIso: string): Promise<void> {
+    await this.d.db.run(
       `INSERT INTO jobs(id, kind, purchase_id, dedupe_key, status, run_after, attempts, created_at, updated_at)
-       VALUES (?,?,?,?, 'pending', ?, 0, ?, ?) ON CONFLICT(dedupe_key) DO NOTHING`,
+       VALUES ($1,$2,$3,$4, 'pending', $5, 0, $6, $7) ON CONFLICT(dedupe_key) DO NOTHING`,
       newId('job'),
       kind,
       purchaseId,
@@ -695,14 +712,14 @@ export class CommerceCore {
     );
   }
 
-  expirePurchase(purchaseId: string, reason: string): void {
+  async expirePurchase(purchaseId: string, reason: string): Promise<void> {
     const nowIso = this.now();
-    this.d.db.tx(() => {
-      const ok = transitionPurchase(this.d.db, purchaseId, ['awaiting_funding'], { state: 'expired', status_reason: reason }, nowIso);
+    await this.d.db.tx(async () => {
+      const ok = await transitionPurchase(this.d.db, purchaseId, ['awaiting_funding'], { state: 'expired', status_reason: reason }, nowIso);
       if (!ok) return;
-      setReservationStatus(this.d.db, purchaseId, ['active'], 'released', nowIso);
-      appendEvent(this.d.db, purchaseId, 'purchase.expired', { reason }, nowIso);
-      appendEvent(this.d.db, purchaseId, 'capacity.released', { reason }, nowIso);
+      await setReservationStatus(this.d.db, purchaseId, ['active'], 'released', nowIso);
+      await appendEvent(this.d.db, purchaseId, 'purchase.expired', { reason }, nowIso);
+      await appendEvent(this.d.db, purchaseId, 'capacity.released', { reason }, nowIso);
     });
   }
 
@@ -726,8 +743,8 @@ export class CommerceCore {
   }
 
   /** Header the funding rail expects the payment payload in (x402 v2: PAYMENT-SIGNATURE). */
-  paymentHeaderName(purchaseId: string, actor: ActorContext): string {
-    const p = getPurchaseRow(this.d.db, purchaseId);
+  async paymentHeaderName(purchaseId: string, actor: ActorContext): Promise<string> {
+    const p = await getPurchaseRow(this.d.db, purchaseId);
     if (!p || p.customer_id !== actor.customerId) return 'payment-signature';
     return this.d.fundingAdapters.get(p.funding_rail as FundingRail)?.paymentHeaderName ?? 'payment-signature';
   }
@@ -737,7 +754,7 @@ export class CommerceCore {
     return this.d;
   }
 
-  reservationOf(purchaseId: string) {
-    return getReservation(this.d.db, purchaseId);
+  async reservationOf(purchaseId: string) {
+    return await getReservation(this.d.db, purchaseId);
   }
 }

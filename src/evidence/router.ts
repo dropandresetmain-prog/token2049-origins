@@ -79,22 +79,22 @@ export function createEvidenceRouter(deps: EvidenceRouterDeps): Router {
   const router = Router();
   let refreshing = false;
 
-  router.get('/purchases', (req, res) => {
+  router.get('/purchases', async (req, res) => {
     const actor = requireScope(req, 'evidence:read');
-    send(res, { purchases: listPurchases(db, actor.customerId, PURCHASE_LIST_LIMIT), limit: PURCHASE_LIST_LIMIT });
+    send(res, { purchases: (await listPurchases(db, actor.customerId, PURCHASE_LIST_LIMIT)), limit: PURCHASE_LIST_LIMIT });
   });
 
-  router.get('/purchases/:id', (req, res) => {
+  router.get('/purchases/:id', async (req, res) => {
     const actor = requireScope(req, 'evidence:read');
-    const p = loadOwnedPurchase(db, actor.customerId, String(req.params.id));
+    const p = await loadOwnedPurchase(db, actor.customerId, String(req.params.id));
     // Foreign and nonexistent purchases are the same 404: no existence oracle.
     if (!p) throw new CoreError('not_found', 'purchase not found');
-    send(res, purchaseDetail(db, p));
+    send(res, (await purchaseDetail(db, p)));
   });
 
-  router.get('/treasury', (req, res) => {
+  router.get('/treasury', async (req, res) => {
     requireScope(req, 'operator:read');
-    send(res, treasuryView(db));
+    send(res, (await treasuryView(db)));
   });
 
   router.get('/bank', async (req, res) => {
@@ -104,7 +104,7 @@ export function createEvidenceRouter(deps: EvidenceRouterDeps): Router {
     send(res, {
       note: 'Observations of external bank/card state. They are stored facts with provenance, separate from the gateway journal and from simulated card capacity; they do not show that any gateway purchase reached the bank.',
       adapters,
-      observations: latestBankObservations(db),
+      observations: (await latestBankObservations(db)),
     });
   });
 
@@ -119,7 +119,7 @@ export function createEvidenceRouter(deps: EvidenceRouterDeps): Router {
           const observed = await adapter.observe();
           let inserted = 0;
           let rejected = 0;
-          db.tx(() => {
+          await db.tx(async () => {
             for (const o of observed) {
               const parsed = StoredObservation.safeParse(o);
               if (!parsed.success) {
@@ -127,9 +127,9 @@ export function createEvidenceRouter(deps: EvidenceRouterDeps): Router {
                 continue;
               }
               const v = parsed.data;
-              db.run(
+              await db.run(
                 `INSERT INTO bank_observations(id, bank, kind, masked_reference, currency, amount_json, available_json, description, environment, source, provider_timestamp, observed_at, caveats_json)
-                 VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)`,
+                 VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13)`,
                 newId('bob'),
                 adapter.bank,
                 v.kind,

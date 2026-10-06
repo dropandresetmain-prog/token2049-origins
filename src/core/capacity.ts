@@ -17,10 +17,10 @@ export interface CapacitySnapshot {
   ledgerMode: 'simulated';
 }
 
-export function seedCapacityPool(db: Db, currency: string, scale: number, limitMinor: bigint, nowIso: string): void {
-  db.run(
+export async function seedCapacityPool(db: Db, currency: string, scale: number, limitMinor: bigint, nowIso: string): Promise<void> {
+  await db.run(
     `INSERT INTO capacity_pools(currency, scale, limit_minor, ledger_mode, description, created_at)
-     VALUES (?,?,?,'simulated',?,?)
+     VALUES ($1,$2,$3,'simulated',$4,$5)
      ON CONFLICT(currency) DO UPDATE SET limit_minor = excluded.limit_minor, scale = excluded.scale`,
     currency,
     scale,
@@ -30,21 +30,21 @@ export function seedCapacityPool(db: Db, currency: string, scale: number, limitM
   );
 }
 
-export function capacitySnapshot(db: Db, currency: string): CapacitySnapshot | null {
-  const pool = db.get<{ currency: string; scale: number; limit_minor: string }>(
-    'SELECT currency, scale, limit_minor FROM capacity_pools WHERE currency = ?',
+export async function capacitySnapshot(db: Db, currency: string): Promise<CapacitySnapshot | null> {
+  const pool = await db.get<{ currency: string; scale: number; limit_minor: string }>(
+    'SELECT currency, scale, limit_minor FROM capacity_pools WHERE currency = $1',
     currency,
   );
   if (!pool) return null;
-  const reserved = db
+  const reserved = (await db
     .all<{ amount_minor: string }>(
-      "SELECT amount_minor FROM reservations WHERE currency = ? AND status IN ('active','held_unresolved')",
+      "SELECT amount_minor FROM reservations WHERE currency = $1 AND status IN ('active','held_unresolved')",
       currency,
-    )
+    ))
     .reduce((s, r) => s + BigInt(r.amount_minor), 0n);
   // card payable is a credit-balance liability: negate debit-positive balance
-  const payable = -accountBalance(db, Accounts.cardPayable, fiatAsset(currency, pool.scale));
-  const testBalanceUsed = -accountBalance(db, Accounts.providerTestBalanceUsed, fiatAsset(currency, pool.scale));
+  const payable = -(await accountBalance(db, Accounts.cardPayable, fiatAsset(currency, pool.scale)));
+  const testBalanceUsed = -(await accountBalance(db, Accounts.providerTestBalanceUsed, fiatAsset(currency, pool.scale)));
   const limit = BigInt(pool.limit_minor);
   return {
     currency,

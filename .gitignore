@@ -17,14 +17,8 @@ secrets/
 *wallet*.json
 !**/fixtures/**/*wallet*.json
 
-# Local data and runtime databases
+# Local runtime data
 data/
-*.db
-*.db-journal
-*.db-wal
-*.db-shm
-*.sqlite
-*.sqlite3
 
 # Raw logs, traces, artifacts (publish only sanitized evidence)
 logs/

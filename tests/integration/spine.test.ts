@@ -1,18 +1,16 @@
+import { createTestDb, crashTestDb } from '../support/database.js';
+import { newTestSchema } from '../support/database.js';
 import { describe, it, expect, beforeEach, afterEach } from 'vitest';
 import { startHarness, createFundablePurchase, retailIntent, retailFulfillment, type Harness } from '../support/harness.js';
 import { trialBalance, accountBalance, Accounts, cryptoAsset, fiatAsset } from '../../src/core/journal.js';
 import { capacitySnapshot } from '../../src/core/capacity.js';
 import { FIXTURE_ASSET, FIXTURE_NETWORK } from '../support/fixtures.js';
-import { mkdtempSync } from 'node:fs';
-import { tmpdir } from 'node:os';
-import { join } from 'node:path';
-import { Db } from '../../src/infrastructure/db.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
 
 const ASSET = cryptoAsset(FIXTURE_NETWORK, FIXTURE_ASSET);
 
-function assertBalanced(h: Harness) {
-  for (const [asset, sum] of trialBalance(h.gw.db)) expect(sum, `asset ${asset}`).toBe(0n);
+async function assertBalanced(h: Harness) {
+  for (const [asset, sum] of (await trialBalance(h.gw.db))) expect(sum, `asset ${asset}`).toBe(0n);
 }
 
 describe('commerce spine (local fixtures)', () => {
@@ -55,12 +53,12 @@ describe('commerce spine (local fixtures)', () => {
     expect(receipt.limitations[0]).toMatch(/LOCAL FIXTURE/);
     expect(receipt.funding[0].transferReference).toBe('tx1');
 
-    assertBalanced(h);
-    expect(accountBalance(h.gw.db, Accounts.cryptoTreasury, ASSET)).toBe(49_990_000n);
-    expect(accountBalance(h.gw.db, Accounts.customerPrepayment, ASSET)).toBe(0n);
-    expect(-accountBalance(h.gw.db, Accounts.cardPayable, fiatAsset('USD', 2))).toBe(4999n);
+    await assertBalanced(h);
+    expect((await accountBalance(h.gw.db, Accounts.cryptoTreasury, ASSET))).toBe(49_990_000n);
+    expect((await accountBalance(h.gw.db, Accounts.customerPrepayment, ASSET))).toBe(0n);
+    expect(-(await accountBalance(h.gw.db, Accounts.cardPayable, fiatAsset('USD', 2)))).toBe(4999n);
     // Capacity: consumed reservation moved to card payable, not double counted.
-    const cap = capacitySnapshot(h.gw.db, 'USD')!;
+    const cap = (await capacitySnapshot(h.gw.db, 'USD'))!;
     expect(cap.reservedMinor).toBe(0n);
     expect(cap.availableMinor).toBe(20000n - 4999n);
 
@@ -84,8 +82,8 @@ describe('commerce spine (local fixtures)', () => {
     expect(malformed.body.error.code).toBe('payment_invalid');
     await h.gw.worker.tick();
     expect(h.retail.executeCalls).toBe(0);
-    assertBalanced(h);
-    expect(accountBalance(h.gw.db, Accounts.cryptoTreasury, ASSET)).toBe(0n);
+    await assertBalanced(h);
+    expect((await accountBalance(h.gw.db, Accounts.cryptoTreasury, ASSET))).toBe(0n);
   });
 
   it('replayed proof cannot fund a second purchase', async () => {
@@ -98,7 +96,7 @@ describe('commerce spine (local fixtures)', () => {
     expect(replay.body.error.code).toBe('payment_replayed');
     await h.gw.worker.tick();
     expect(h.retail.executeCalls).toBe(1);
-    assertBalanced(h);
+    await assertBalanced(h);
   });
 
   it('second payment to an already funded purchase is refused before verification/settlement', async () => {
@@ -119,16 +117,16 @@ describe('commerce spine (local fixtures)', () => {
     ]);
     expect([r1.status, r2.status].sort()).toEqual([202, 409]);
     expect(h.funding.verifyCalls).toBe(1);
-    expect(h.gw.db.get<{ n: number }>('SELECT COUNT(*) n FROM funding_evidence')!.n).toBe(1);
+    expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int n FROM funding_evidence'))!.n).toBe(1);
   });
 
   it('overpayment: excess recorded as unapplied refundable obligation', async () => {
     const a = await createFundablePurchase(h);
     const over = (BigInt(a.required) + 1_000_000n).toString();
     await h.call('POST', `/v1/purchases/${a.purchase.purchaseId}/fund`, { token: h.alice.token, headers: { 'payment-signature': `fixture:tOver:${over}` } });
-    assertBalanced(h);
-    expect(-accountBalance(h.gw.db, Accounts.customerUnapplied, ASSET)).toBe(1_000_000n);
-    expect(-accountBalance(h.gw.db, Accounts.customerPrepayment, ASSET)).toBe(BigInt(a.required));
+    await assertBalanced(h);
+    expect(-(await accountBalance(h.gw.db, Accounts.customerUnapplied, ASSET))).toBe(1_000_000n);
+    expect(-(await accountBalance(h.gw.db, Accounts.customerPrepayment, ASSET))).toBe(BigInt(a.required));
   });
 
   it('idempotent purchase creation: same key same body returns same purchase; different body conflicts', async () => {
@@ -152,15 +150,15 @@ describe('commerce spine (local fixtures)', () => {
     const otherKey = await h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'other-key-456' }, body });
     expect(otherKey.status).toBe(409);
     expect(otherKey.body.error.code).toBe('conflict');
-    expect(h.gw.db.get<{ n: number }>('SELECT COUNT(*) n FROM reservations')!.n).toBe(1);
+    expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int n FROM reservations'))!.n).toBe(1);
   });
 
   it('concurrent workers/ticks never execute twice', async () => {
     const a = await createFundablePurchase(h);
     await h.call('POST', `/v1/purchases/${a.purchase.purchaseId}/fund`, { token: h.alice.token, headers: { 'payment-signature': `fixture:tc:${a.required}` } });
-    await Promise.all([h.gw.worker.tick(), h.gw.worker.tick(), h.gw.worker.tick()]);
+    await Promise.all([(await h.gw.worker.tick()), (await h.gw.worker.tick()), (await h.gw.worker.tick())]);
     expect(h.retail.executeCalls).toBe(1);
-    expect(h.gw.db.get<{ n: number }>("SELECT COUNT(*) n FROM journal_entries WHERE kind = 'merchant_payment_simulated_card'")!.n).toBe(1);
+    expect((await h.gw.db.get<{ n: number }>("SELECT COUNT(*)::int n FROM journal_entries WHERE kind = 'merchant_payment_simulated_card'"))!.n).toBe(1);
   });
 
   it('unknown outcome keeps exposure, never re-executes, reconciles via readback', async () => {
@@ -171,14 +169,14 @@ describe('commerce spine (local fixtures)', () => {
     let p = (await h.call('GET', `/v1/purchases/${a.purchase.purchaseId}`, { token: h.alice.token })).body.purchase;
     expect(p.state).toBe('unresolved');
     expect(p.reservation.status).toBe('held_unresolved');
-    expect(capacitySnapshot(h.gw.db, 'USD')!.reservedMinor).toBe(4999n);
+    expect((await capacitySnapshot(h.gw.db, 'USD'))!.reservedMinor).toBe(4999n);
     h.clock.advance(20_000);
     await h.gw.worker.tick();
     p = (await h.call('GET', `/v1/purchases/${a.purchase.purchaseId}`, { token: h.alice.token })).body.purchase;
     expect(p.state).toBe('succeeded');
     expect(h.retail.executeCalls).toBe(1);
     expect(h.retail.retrieveCalls).toBeGreaterThanOrEqual(1);
-    assertBalanced(h);
+    await assertBalanced(h);
   });
 
   it('thrown network error is unknown (not a definite failure); no release, no refund implied', async () => {
@@ -199,7 +197,7 @@ describe('commerce spine (local fixtures)', () => {
     const p = (await h.call('GET', `/v1/purchases/${a.purchase.purchaseId}`, { token: h.alice.token })).body.purchase;
     expect(p.state).toBe('unresolved');
     expect(p.receipt).toBeNull();
-    expect(h.gw.db.get<{ n: number }>("SELECT COUNT(*) n FROM journal_entries WHERE kind = 'merchant_payment_simulated_card'")!.n).toBe(0);
+    expect((await h.gw.db.get<{ n: number }>("SELECT COUNT(*)::int n FROM journal_entries WHERE kind = 'merchant_payment_simulated_card'"))!.n).toBe(0);
   });
 
   it('definite failure releases capacity; funds stay a refundable prepayment liability', async () => {
@@ -210,7 +208,7 @@ describe('commerce spine (local fixtures)', () => {
     const p = (await h.call('GET', `/v1/purchases/${a.purchase.purchaseId}`, { token: h.alice.token })).body.purchase;
     expect(p.state).toBe('failed');
     expect(p.reservation.status).toBe('released');
-    expect(-accountBalance(h.gw.db, Accounts.customerPrepayment, ASSET)).toBe(BigInt(a.required));
+    expect(-(await accountBalance(h.gw.db, Accounts.customerPrepayment, ASSET))).toBe(BigInt(a.required));
     const types = (await h.call('GET', `/v1/purchases/${a.purchase.purchaseId}/events`, { token: h.alice.token })).body.events.map((e: { type: string }) => e.type);
     expect(types).toContain('refund.due');
   });
@@ -326,39 +324,45 @@ describe('commerce spine (local fixtures)', () => {
     expect(r.body.purchase.paymentState).toBe('submitted');
     await h.gw.worker.tick();
     expect(h.retail.executeCalls).toBe(0);
-    assertBalanced(h);
-    expect(accountBalance(h.gw.db, Accounts.cryptoTreasury, ASSET)).toBe(0n);
+    await assertBalanced(h);
+    expect((await accountBalance(h.gw.db, Accounts.cryptoTreasury, ASSET))).toBe(0n);
     h.funding.confirmResult = 'confirmed';
     h.clock.advance(40_000);
     await h.gw.worker.tick();
     await h.gw.worker.tick();
     expect(h.retail.executeCalls).toBe(1);
-    assertBalanced(h);
+    await assertBalanced(h);
   });
 });
 
 describe('restart durability', () => {
   it('crash mid-execution: restart reconciles, never re-executes; state survives', async () => {
-    const dir = mkdtempSync(join(tmpdir(), 't2o-'));
-    const dbPath = join(dir, 'gw.db');
+    const schema = newTestSchema();
     const clock = new ManualClock();
-    const h1 = await startHarness({ dbPath, clock });
+    const h1 = await startHarness({ schema, clock });
     const a = await createFundablePurchase(h1);
     await h1.call('POST', `/v1/purchases/${a.purchase.purchaseId}/fund`, { token: h1.alice.token, headers: { 'payment-signature': `fixture:tr:${a.required}` } });
     h1.retail.block();
+    let signalStarted!: () => void;
+    const started = new Promise<void>(resolve => { signalStarted = resolve; });
+    const execute = h1.retail.execute.bind(h1.retail);
+    h1.retail.execute = async ctx => { signalStarted(); return execute(ctx); };
     const inflight = h1.gw.worker.tick(); // attempt persisted, provider call hangs
-    await new Promise((r) => setTimeout(r, 50));
+    await started;
     expect(h1.retail.executeCalls).toBe(1);
     // "crash": abandon process state without applying the result
     await h1.close();
-    h1.gw.db.close();
+    await crashTestDb(h1.gw.db);
+    h1.retail.unblock();
+    await inflight.catch(() => undefined);
+    await h1.gw.db.close();
 
-    const db2 = new Db(dbPath);
+    const db2 = await createTestDb(schema);
     const h2 = await startHarness({ db: db2, clock });
     // The provider actually accepted the order before the crash.
     h2.retail.orders.set(`${a.purchase.purchaseId}:1`, { ref: `FIX-${a.purchase.purchaseId}:1`, paid: true });
     clock.advance(130_000); // lease expiry
-    h2.gw.worker.recoverLeases();
+    await h2.gw.worker.recoverLeases();
     await h2.gw.worker.tick();
     h2.clock.advance(20_000);
     await h2.gw.worker.tick();
@@ -366,7 +370,7 @@ describe('restart durability', () => {
     expect(p.state).toBe('succeeded');
     expect(h2.retail.executeCalls).toBe(0); // never re-executed after restart
     expect(h2.retail.retrieveCalls).toBeGreaterThanOrEqual(1);
-    for (const [, sum] of trialBalance(db2)) expect(sum).toBe(0n);
+    for (const [, sum] of (await trialBalance(db2))) expect(sum).toBe(0n);
     h1.retail.unblock();
     await inflight.catch(() => undefined);
     await h2.close();

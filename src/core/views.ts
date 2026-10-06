@@ -2,9 +2,9 @@ import type { Db } from '../infrastructure/db.js';
 import type { PurchaseView, QuoteView, FundingSummary, ReceiptView } from '../contracts/commerce.js';
 import { getQuoteRow, getReservation, type PurchaseRow, type FundingEvidenceRow, type FundingRequirementRecord } from './store.js';
 
-export function fundingSummaries(db: Db, purchaseId: string): FundingSummary[] {
-  return db
-    .all<FundingEvidenceRow>('SELECT * FROM funding_evidence WHERE purchase_id = ? ORDER BY verified_at, id', purchaseId)
+export async function fundingSummaries(db: Db, purchaseId: string): Promise<FundingSummary[]> {
+  return (await db
+    .all<FundingEvidenceRow>('SELECT * FROM funding_evidence WHERE purchase_id = $1 ORDER BY verified_at, id', purchaseId))
     .map((f) => ({
       rail: f.rail as FundingSummary['rail'],
       network: f.network,
@@ -19,11 +19,11 @@ export function fundingSummaries(db: Db, purchaseId: string): FundingSummary[] {
     }));
 }
 
-export function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: string): PurchaseView {
-  const q = getQuoteRow(db, p.quote_id)!;
+export async function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: string): Promise<PurchaseView> {
+  const q = (await getQuoteRow(db, p.quote_id))!;
   const qv = JSON.parse(q.public_json) as QuoteView;
   const req = JSON.parse(p.funding_requirement_json) as FundingRequirementRecord;
-  const res = getReservation(db, p.id);
+  const res = await getReservation(db, p.id);
   const awaiting = p.state === 'awaiting_funding' && p.payment_state === 'not_received';
   return {
     purchaseId: p.id,
@@ -46,7 +46,7 @@ export function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: string)
           note: 'POST the fund URL without a payment header to receive the x402 challenge; pay with a bounded payer client. No merchant spend occurs until funding is independently verified and confirmed.',
         }
       : null,
-    funding: fundingSummaries(db, p.id),
+    funding: (await fundingSummaries(db, p.id)),
     reservation: res
       ? { status: res.status, amount: { currency: res.currency, scale: res.scale, amountMinor: res.amount_minor } }
       : null,

@@ -1,3 +1,4 @@
+import { createTestDb, testDatabaseUrl } from './database.js';
 import { buildGateway, type Gateway } from '../../src/composition.js';
 import { Db } from '../../src/infrastructure/db.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
@@ -24,26 +25,27 @@ export interface Harness {
 
 export const TEST_ENV = {
   APP_ENV: 'test',
+  DATABASE_URL: testDatabaseUrl,
   PUBLIC_BASE_URL: 'http://127.0.0.1:0',
   DEMO_PER_PURCHASE_LIMIT_USD_MINOR: '50000',
   SIMULATED_CARD_CAPACITY_USD_MINOR: '20000',
 } as NodeJS.ProcessEnv;
 
-export async function startHarness(opts: { dbPath?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[] } = {}): Promise<Harness> {
+export async function startHarness(opts: { schema?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[] } = {}): Promise<Harness> {
   const clock = opts.clock ?? new ManualClock();
-  const db = opts.db ?? new Db(opts.dbPath ?? ':memory:');
+  const db = opts.db ?? await createTestDb(opts.schema);
   const retail = new FixtureExecutor('shopify', 'retail', clock);
   const hotel = new FixtureExecutor('nuitee', 'hotel', clock, 12000n);
   const flight = new FixtureExecutor('atlas', 'flight', clock, 15000n);
   const funding = new FixtureFundingAdapter(clock);
-  const gw = buildGateway(
+  const gw = await buildGateway(
     { executors: [retail, hotel, flight], fundingAdapters: [funding], bankAdapters: opts.bankAdapters ?? [] },
     { env: TEST_ENV, clock, db },
   );
   const now = clock.now().toISOString();
-  const existing = db.get<{ n: number }>('SELECT COUNT(*) AS n FROM api_clients')!;
-  const alice = createClient(db, { displayName: 'Alice', channel: 'test', label: `alice-${existing.n}` }, now);
-  const bob = createClient(db, { displayName: 'Bob', channel: 'test', label: `bob-${existing.n}` }, now);
+  const existing = (await db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM api_clients'))!;
+  const alice = await createClient(db, { displayName: 'Alice', channel: 'test', label: `alice-${existing.n}` }, now);
+  const bob = await createClient(db, { displayName: 'Bob', channel: 'test', label: `bob-${existing.n}` }, now);
   const server = await new Promise<Server>((r) => {
     const s = gw.app.listen(0, '127.0.0.1', () => r(s));
   });

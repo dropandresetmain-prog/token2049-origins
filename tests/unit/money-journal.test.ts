@@ -1,6 +1,6 @@
+import { createTestDb } from '../support/database.js';
 import { describe, it, expect } from 'vitest';
 import { parseDecimalToMinor, rescaleMinor, rescaleMinorCeil, money, addMoney, compareMoney, formatMinor, Money } from '../../src/contracts/money.js';
-import { Db } from '../../src/infrastructure/db.js';
 import { postEntry, trialBalance, JournalError, Accounts } from '../../src/core/journal.js';
 import { redact } from '../../src/infrastructure/redact.js';
 
@@ -34,33 +34,29 @@ describe('money', () => {
 describe('journal', () => {
   const now = '2026-10-06T12:00:00.000Z';
   const A = 'cardano:preprod/x.y';
-  it('rejects unbalanced entries and mixed ledger modes', () => {
-    const db = new Db(':memory:');
-    expect(() =>
-      postEntry(db, { eventKey: 'e1', purchaseId: null, kind: 'k', ledgerMode: 'observed', description: 'd', lines: [
+  it('rejects unbalanced entries and mixed ledger modes', async () => {
+    const db = await createTestDb();
+    await expect(postEntry(db, { eventKey: 'e1', purchaseId: null, kind: 'k', ledgerMode: 'observed', description: 'd', lines: [
         { account: Accounts.cryptoTreasury, asset: A, side: 'debit', amount: 10n },
         { account: Accounts.customerPrepayment, asset: A, side: 'credit', amount: 9n },
-      ] }, now),
-    ).toThrow(JournalError);
-    expect(() =>
-      postEntry(db, { eventKey: 'e2', purchaseId: null, kind: 'k', ledgerMode: 'observed', description: 'd', lines: [
+      ] }, now)).rejects.toThrow(JournalError);
+    await expect(postEntry(db, { eventKey: 'e2', purchaseId: null, kind: 'k', ledgerMode: 'observed', description: 'd', lines: [
         { account: Accounts.merchantPurchases, asset: 'fiat:USD/2', side: 'debit', amount: 10n },
         { account: Accounts.cardPayable, asset: 'fiat:USD/2', side: 'credit', amount: 10n },
-      ] }, now),
-    ).toThrow(/not allowed/);
+      ] }, now)).rejects.toThrow(/not allowed/);
   });
-  it('is idempotent per event key and immutable', () => {
-    const db = new Db(':memory:');
+  it('is idempotent per event key and immutable', async () => {
+    const db = await createTestDb();
     const entry = { eventKey: 'e3', purchaseId: null, kind: 'k', ledgerMode: 'observed' as const, description: 'd', lines: [
       { account: Accounts.cryptoTreasury, asset: A, side: 'debit' as const, amount: 10n },
       { account: Accounts.customerPrepayment, asset: A, side: 'credit' as const, amount: 10n },
     ] };
-    expect(postEntry(db, entry, now).duplicate).toBe(false);
-    expect(postEntry(db, entry, now).duplicate).toBe(true);
-    expect(() => postEntry(db, { ...entry, lines: entry.lines.map((l) => ({ ...l, amount: 11n })) }, now)).toThrow(/different lines/);
-    expect(() => db.run('UPDATE journal_lines SET amount = ?', '1')).toThrow(/immutable/);
-    expect(() => db.run('DELETE FROM journal_entries')).toThrow(/immutable/);
-    expect([...trialBalance(db).values()].every((v) => v === 0n)).toBe(true);
+    expect((await postEntry(db, entry, now)).duplicate).toBe(false);
+    expect((await postEntry(db, entry, now)).duplicate).toBe(true);
+    await expect(postEntry(db, { ...entry, lines: entry.lines.map((l) => ({ ...l, amount: 11n })) }, now)).rejects.toThrow(/different lines/);
+    await expect(db.run('UPDATE journal_lines SET amount = $1', '1')).rejects.toThrow(/immutable/);
+    await expect(db.run('DELETE FROM journal_entries')).rejects.toThrow(/immutable/);
+    expect([...(await trialBalance(db)).values()].every((v) => v === 0n)).toBe(true);
   });
 });
 

@@ -12,8 +12,8 @@ describe('channel equivalence and Masumi seam', () => {
 
   it('HTTP, MCP and Sokosumi clients of one customer hit the same core with the same isolation', async () => {
     const now = h.clock.now().toISOString();
-    const mcp = createClient(h.gw.db, { customerId: h.alice.customerId, displayName: 'Alice', channel: 'mcp', label: 'alice-mcp' }, now);
-    const soko = createClient(h.gw.db, { customerId: h.alice.customerId, displayName: 'Alice', channel: 'sokosumi', label: 'alice-soko' }, now);
+    const mcp = await createClient(h.gw.db, { customerId: h.alice.customerId, displayName: 'Alice', channel: 'mcp', label: 'alice-mcp' }, now);
+    const soko = await createClient(h.gw.db, { customerId: h.alice.customerId, displayName: 'Alice', channel: 'sokosumi', label: 'alice-soko' }, now);
     const viaHttp = await createFundablePurchase(h, h.alice.token);
     const viaSoko = await createFundablePurchase(h, soko.token, 'sokosumi:task-0001');
     for (const t of [h.alice.token, mcp.token, soko.token]) {
@@ -48,7 +48,7 @@ describe('channel equivalence and Masumi seam', () => {
   });
 
   it('a scope-limited channel cannot exceed its scopes', async () => {
-    const ro = createClient(h.gw.db, { customerId: h.alice.customerId, displayName: 'Alice', channel: 'console', label: 'ro', scopes: ['purchases:read'] }, h.clock.now().toISOString());
+    const ro = await createClient(h.gw.db, { customerId: h.alice.customerId, displayName: 'Alice', channel: 'console', label: 'ro', scopes: ['purchases:read'] }, h.clock.now().toISOString());
     const a = await createFundablePurchase(h);
     expect((await h.call('GET', `/v1/purchases/${a.purchase.purchaseId}`, { token: ro.token })).status).toBe(200);
     const fund = await h.call('POST', `/v1/purchases/${a.purchase.purchaseId}/fund`, { token: ro.token });

@@ -7,18 +7,18 @@ import { CoreError } from '../core/errors.js';
 export const ALL_CUSTOMER_SCOPES: Scope[] = ['offers:read', 'quotes:write', 'purchases:write', 'purchases:fund', 'purchases:read', 'evidence:read'];
 
 /** Create a customer + API client. Returns the bearer token ONCE; only its hash is stored. */
-export function createClient(
+export async function createClient(
   db: Db,
   opts: { customerId?: string; displayName: string; channel: Channel; label: string; scopes?: Scope[] },
   nowIso: string,
-): { customerId: string; clientId: string; token: string } {
+): Promise<{ customerId: string; clientId: string; token: string }> {
   const token = newSecretToken('t2o');
   const customerId = opts.customerId ?? newId('cus');
   const clientId = newId('cli');
-  db.tx(() => {
-    db.run('INSERT INTO customers(id, display_name, created_at) VALUES (?,?,?) ON CONFLICT(id) DO NOTHING', customerId, opts.displayName, nowIso);
-    db.run(
-      'INSERT INTO api_clients(id, customer_id, channel, label, token_hash, scopes_json, created_at) VALUES (?,?,?,?,?,?,?)',
+  await db.tx(async () => {
+    await db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', customerId, opts.displayName, nowIso);
+    await db.run(
+      'INSERT INTO api_clients(id, customer_id, channel, label, token_hash, scopes_json, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)',
       clientId,
       customerId,
       opts.channel,
@@ -31,11 +31,11 @@ export function createClient(
   return { customerId, clientId, token };
 }
 
-export function authenticate(db: Db, authorization: string | undefined, requestId: string): ActorContext {
+export async function authenticate(db: Db, authorization: string | undefined, requestId: string): Promise<ActorContext> {
   const m = /^Bearer\s+(\S+)$/.exec(authorization ?? '');
   if (!m) throw new CoreError('unauthenticated', 'bearer token required');
-  const row = db.get<{ id: string; customer_id: string; channel: Channel; scopes_json: string; revoked_at: string | null }>(
-    'SELECT id, customer_id, channel, scopes_json, revoked_at FROM api_clients WHERE token_hash = ?',
+  const row = await db.get<{ id: string; customer_id: string; channel: Channel; scopes_json: string; revoked_at: string | null }>(
+    'SELECT id, customer_id, channel, scopes_json, revoked_at FROM api_clients WHERE token_hash = $1',
     sha256Hex(m[1]!),
   );
   if (!row || row.revoked_at) throw new CoreError('unauthenticated', 'invalid credentials');

@@ -30,11 +30,12 @@ export interface Gateway {
  * fixture adapters through this same function. There is no environment switch that swaps a
  * real rail for a fixture inside the deployed process.
  */
-export function buildGateway(parts: GatewayParts, opts: { env?: NodeJS.ProcessEnv; clock?: Clock; db?: Db; log?: (l: Record<string, unknown>) => void } = {}): Gateway {
+export async function buildGateway(parts: GatewayParts, opts: { env?: NodeJS.ProcessEnv; clock?: Clock; db?: Db; log?: (l: Record<string, unknown>) => void } = {}): Promise<Gateway> {
   const env = loadCoreEnv(opts.env ?? process.env);
   const clock = opts.clock ?? systemClock;
-  const db = opts.db ?? new Db(env.DATABASE_PATH);
-  seedCapacityPool(db, 'USD', 2, env.SIMULATED_CARD_CAPACITY_USD_MINOR, iso(clock.now()));
+  const db = opts.db ?? new Db(env.DATABASE_URL);
+  await db.initialize();
+  await db.tx(() => seedCapacityPool(db, 'USD', 2, env.SIMULATED_CARD_CAPACITY_USD_MINOR, iso(clock.now())));
   const core = new CommerceCore({
     db,
     clock,

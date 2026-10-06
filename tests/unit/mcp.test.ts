@@ -54,8 +54,8 @@ async function startFakeBridge(h: Harness): Promise<FakeBridge> {
   const server: Server = createServer((req, res) => {
     let raw = '';
     req.on('data', (c) => (raw += c));
-    req.on('end', () => {
-      void (async () => {
+    req.on('end', async () => {
+      void (await (async () => {
         const send = (status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
         if (req.url !== '/pay' || req.method !== 'POST') return send(404, { ok: false, error: { code: 'not_found', message: 'no route' } });
         if (req.headers.authorization !== `Bearer ${BRIDGE_TOKEN}`) return send(401, { ok: false, error: { code: 'unauthenticated', message: 'bad bridge token' } });
@@ -75,7 +75,7 @@ async function startFakeBridge(h: Harness): Promise<FakeBridge> {
         if (state.mode === 'fund_then_500') return send(500, { ok: false, error: { code: 'bridge_crash', message: 'crashed after paying' } });
         if (fund.status !== 202) return send(502, { ok: false, error: { code: fund.body.error.code, message: fund.body.error.message } });
         send(200, { ok: true, purchase: fund.body.purchase, payment: { transferReference: `bridge-${purchaseId}` } });
-      })();
+      })());
     });
   });
   await new Promise<void>((r) => server.listen(0, '127.0.0.1', r));
@@ -94,8 +94,8 @@ describe('MCP channel', () => {
     h = await startHarness();
     const now = h.clock.now().toISOString();
     // A dedicated MCP-channel client for each customer, as production would issue.
-    mcpToken = createClient(h.gw.db, { customerId: h.alice.customerId, displayName: 'Alice', channel: 'mcp', label: 'alice-mcp' }, now).token;
-    bobMcpToken = createClient(h.gw.db, { customerId: h.bob.customerId, displayName: 'Bob', channel: 'mcp', label: 'bob-mcp' }, now).token;
+    mcpToken = (await createClient(h.gw.db, { customerId: h.alice.customerId, displayName: 'Alice', channel: 'mcp', label: 'alice-mcp' }, now)).token;
+    bobMcpToken = (await createClient(h.gw.db, { customerId: h.bob.customerId, displayName: 'Bob', channel: 'mcp', label: 'bob-mcp' }, now)).token;
     cfg = { gatewayUrl: h.url, gatewayToken: mcpToken };
   });
   afterEach(async () => h.close());

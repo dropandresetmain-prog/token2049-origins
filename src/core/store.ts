@@ -98,42 +98,44 @@ export interface FundingRequirementRecord {
   valuation: Record<string, unknown>;
 }
 
-export function appendEvent(db: Db, purchaseId: string, type: string, data: Record<string, unknown>, nowIso: string): void {
-  const row = db.get<{ s: number | null }>('SELECT MAX(sequence) AS s FROM purchase_events WHERE purchase_id = ?', purchaseId);
-  const seq = (row?.s ?? 0) + 1;
-  db.run(
-    'INSERT INTO purchase_events(id, purchase_id, sequence, type, data_json, created_at) VALUES (?,?,?,?,?,?)',
-    newId('evt'),
-    purchaseId,
-    seq,
-    type,
-    JSON.stringify(redact(data)),
-    nowIso,
-  );
+export async function appendEvent(db: Db, purchaseId: string, type: string, data: Record<string, unknown>, nowIso: string): Promise<void> {
+  return db.tx(async () => {
+    const row = await db.get<{ s: number | null }>('SELECT MAX(sequence) AS s FROM purchase_events WHERE purchase_id = $1', purchaseId);
+    const seq = (row?.s ?? 0) + 1;
+    await db.run(
+      'INSERT INTO purchase_events(id, purchase_id, sequence, type, data_json, created_at) VALUES ($1,$2,$3,$4,$5,$6)',
+      newId('evt'),
+      purchaseId,
+      seq,
+      type,
+      JSON.stringify(redact(data)),
+      nowIso,
+    );
+  });
 }
 
-export function getPurchaseRow(db: Db, id: string): PurchaseRow | undefined {
-  return db.get<PurchaseRow>('SELECT * FROM purchases WHERE id = ?', id);
+export async function getPurchaseRow(db: Db, id: string): Promise<PurchaseRow | undefined> {
+  return await db.get<PurchaseRow>('SELECT * FROM purchases WHERE id = $1', id);
 }
 
-export function getQuoteRow(db: Db, id: string): QuoteRow | undefined {
-  return db.get<QuoteRow>('SELECT * FROM quotes WHERE id = ?', id);
+export async function getQuoteRow(db: Db, id: string): Promise<QuoteRow | undefined> {
+  return await db.get<QuoteRow>('SELECT * FROM quotes WHERE id = $1', id);
 }
 
-export function getReservation(db: Db, purchaseId: string): ReservationRow | undefined {
-  return db.get<ReservationRow>('SELECT * FROM reservations WHERE purchase_id = ?', purchaseId);
+export async function getReservation(db: Db, purchaseId: string): Promise<ReservationRow | undefined> {
+  return await db.get<ReservationRow>('SELECT * FROM reservations WHERE purchase_id = $1', purchaseId);
 }
 
-export function setReservationStatus(
+export async function setReservationStatus(
   db: Db,
   purchaseId: string,
   from: ReservationRow['status'][],
   to: ReservationRow['status'],
   nowIso: string,
-): boolean {
-  const placeholders = from.map(() => '?').join(',');
-  const r = db.run(
-    `UPDATE reservations SET status = ?, updated_at = ? WHERE purchase_id = ? AND status IN (${placeholders})`,
+): Promise<boolean> {
+  const placeholders = from.map((_, index) => `$${index + 4}`).join(',');
+  const r = await db.run(
+    `UPDATE reservations SET status = $1, updated_at = $2 WHERE purchase_id = $3 AND status IN (${placeholders})`,
     to,
     nowIso,
     purchaseId,
@@ -143,23 +145,23 @@ export function setReservationStatus(
 }
 
 /** Compare-and-set purchase state transition. Returns false if the purchase was not in an expected state. */
-export function transitionPurchase(
+export async function transitionPurchase(
   db: Db,
   id: string,
   from: string[],
   patch: Partial<Pick<PurchaseRow, 'state' | 'payment_state' | 'commerce_status' | 'merchant_payment_status' | 'provider_reference' | 'receipt_json' | 'status_reason'>>,
   nowIso: string,
-): boolean {
+): Promise<boolean> {
   const sets: string[] = [];
   const vals: (string | null)[] = [];
   for (const [k, v] of Object.entries(patch)) {
-    sets.push(`${k} = ?`);
+    sets.push(`${k} = $${vals.length + 1}`);
     vals.push(v as string | null);
   }
-  sets.push('updated_at = ?');
+  sets.push(`updated_at = $${vals.length + 1}`);
   vals.push(nowIso);
-  const placeholders = from.map(() => '?').join(',');
-  const r = db.run(`UPDATE purchases SET ${sets.join(', ')} WHERE id = ? AND state IN (${placeholders})`, ...vals, id, ...from);
+  const placeholders = from.map((_, index) => `$${vals.length + index + 2}`).join(',');
+  const r = await db.run(`UPDATE purchases SET ${sets.join(', ')} WHERE id = $${vals.length + 1} AND state IN (${placeholders})`, ...vals, id, ...from);
   return r.changes === 1;
 }
 

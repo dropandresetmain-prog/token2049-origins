@@ -36,10 +36,10 @@ describe('MCP channel isolation', () => {
     }
   });
 
-  it('does not reference payer key material or sqlite', () => {
+  it('does not reference payer key material or database drivers', () => {
     for (const f of files) {
       const src = readFileSync(f, 'utf8');
-      expect(src, f).not.toMatch(/node:sqlite|better-sqlite3|@x402\/|evolution-sdk|mnemonic|skey/i);
+      expect(src, f).not.toMatch(/from ['"]pg['"]|@x402\/|evolution-sdk|mnemonic|skey/i);
     }
   });
 });

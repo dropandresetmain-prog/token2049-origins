@@ -22,8 +22,3 @@ clients/payer
 *.mnemonic
 *seed*.txt
 *wallet*.json
-*.db
-*.db-wal
-*.db-shm
-*.sqlite
-*.sqlite3

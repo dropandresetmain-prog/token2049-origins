@@ -79,56 +79,58 @@ function assertBalanced(input: JournalEntryInput): void {
  * a repeat with different lines is an error (never silently "fixed").
  * Must be called inside a Db.tx for atomicity with the state change it records.
  */
-export function postEntry(db: Db, input: JournalEntryInput, nowIso: string): { entryId: string; duplicate: boolean } {
-  assertBalanced(input);
-  const existing = db.get<{ id: string }>('SELECT id FROM journal_entries WHERE event_key = ?', input.eventKey);
-  if (existing) {
-    const lines = db.all<{ account: string; asset: string; side: string; amount: string }>(
-      'SELECT account, asset, side, amount FROM journal_lines WHERE entry_id = ? ORDER BY id',
-      existing.id,
-    );
-    const same =
-      lines.length === input.lines.length &&
-      lines.every(
-        (l, i) =>
-          l.account === input.lines[i]!.account &&
-          l.asset === input.lines[i]!.asset &&
-          l.side === input.lines[i]!.side &&
-          l.amount === input.lines[i]!.amount.toString(),
+export async function postEntry(db: Db, input: JournalEntryInput, nowIso: string): Promise<{ entryId: string; duplicate: boolean }> {
+  return db.tx(async () => {
+    assertBalanced(input);
+    const existing = await db.get<{ id: string }>('SELECT id FROM journal_entries WHERE event_key = $1', input.eventKey);
+    if (existing) {
+      const lines = await db.all<{ account: string; asset: string; side: string; amount: string }>(
+        'SELECT account, asset, side, amount FROM journal_lines WHERE entry_id = $1 ORDER BY id',
+        existing.id,
       );
-    if (!same) throw new JournalError(`event ${input.eventKey} already posted with different lines`);
-    return { entryId: existing.id, duplicate: true };
-  }
-  const entryId = newId('jen');
-  db.run(
-    `INSERT INTO journal_entries(id, event_key, purchase_id, kind, ledger_mode, description, external_reference, created_at)
-     VALUES (?,?,?,?,?,?,?,?)`,
-    entryId,
-    input.eventKey,
-    input.purchaseId,
-    input.kind,
-    input.ledgerMode,
-    input.description,
-    input.externalReference ?? null,
-    nowIso,
-  );
-  for (const l of input.lines) {
-    db.run(
-      'INSERT INTO journal_lines(entry_id, account, asset, side, amount) VALUES (?,?,?,?,?)',
+      const same =
+        lines.length === input.lines.length &&
+        lines.every(
+          (l, i) =>
+            l.account === input.lines[i]!.account &&
+            l.asset === input.lines[i]!.asset &&
+            l.side === input.lines[i]!.side &&
+            l.amount === input.lines[i]!.amount.toString(),
+        );
+      if (!same) throw new JournalError(`event ${input.eventKey} already posted with different lines`);
+      return { entryId: existing.id, duplicate: true };
+    }
+    const entryId = newId('jen');
+    await db.run(
+      `INSERT INTO journal_entries(id, event_key, purchase_id, kind, ledger_mode, description, external_reference, created_at)
+       VALUES ($1,$2,$3,$4,$5,$6,$7,$8)`,
       entryId,
-      l.account,
-      l.asset,
-      l.side,
-      l.amount.toString(),
+      input.eventKey,
+      input.purchaseId,
+      input.kind,
+      input.ledgerMode,
+      input.description,
+      input.externalReference ?? null,
+      nowIso,
     );
-  }
-  return { entryId, duplicate: false };
+    for (const l of input.lines) {
+      await db.run(
+        'INSERT INTO journal_lines(entry_id, account, asset, side, amount) VALUES ($1,$2,$3,$4,$5)',
+        entryId,
+        l.account,
+        l.asset,
+        l.side,
+        l.amount.toString(),
+      );
+    }
+    return { entryId, duplicate: false };
+  });
 }
 
 /** Debit-positive balance of an account in one asset. */
-export function accountBalance(db: Db, account: string, asset: string): bigint {
-  const rows = db.all<{ side: string; amount: string }>(
-    'SELECT side, amount FROM journal_lines WHERE account = ? AND asset = ?',
+export async function accountBalance(db: Db, account: string, asset: string): Promise<bigint> {
+  const rows = await db.all<{ side: string; amount: string }>(
+    'SELECT side, amount FROM journal_lines WHERE account = $1 AND asset = $2',
     account,
     asset,
   );
@@ -136,23 +138,25 @@ export function accountBalance(db: Db, account: string, asset: string): bigint {
 }
 
 /** Trial balance per asset across the whole journal: every asset must net to zero. */
-export function trialBalance(db: Db): Map<string, bigint> {
-  const rows = db.all<{ asset: string; side: string; amount: string }>('SELECT asset, side, amount FROM journal_lines');
+export async function trialBalance(db: Db): Promise<Map<string, bigint>> {
+  const rows = await db.all<{ asset: string; side: string; amount: string }>('SELECT asset, side, amount FROM journal_lines');
   const m = new Map<string, bigint>();
   for (const r of rows) m.set(r.asset, (m.get(r.asset) ?? 0n) + (r.side === 'debit' ? BigInt(r.amount) : -BigInt(r.amount)));
   return m;
 }
 
-export function entriesForPurchase(db: Db, purchaseId: string) {
-  const entries = db.all<{ id: string; event_key: string; kind: string; ledger_mode: string; created_at: string }>(
-    'SELECT id, event_key, kind, ledger_mode, created_at FROM journal_entries WHERE purchase_id = ? ORDER BY created_at, id',
+export async function entriesForPurchase(db: Db, purchaseId: string) {
+  const entries = await db.all<{ id: string; event_key: string; kind: string; ledger_mode: string; created_at: string }>(
+    'SELECT id, event_key, kind, ledger_mode, created_at FROM journal_entries WHERE purchase_id = $1 ORDER BY created_at, id',
     purchaseId,
   );
-  return entries.map((e) => ({
+  const result = [];
+  for (const e of entries) result.push({
     ...e,
-    lines: db.all<{ account: string; asset: string; side: string; amount: string }>(
-      'SELECT account, asset, side, amount FROM journal_lines WHERE entry_id = ? ORDER BY id',
+    lines: (await db.all<{ account: string; asset: string; side: string; amount: string }>(
+      'SELECT account, asset, side, amount FROM journal_lines WHERE entry_id = $1 ORDER BY id',
       e.id,
-    ),
-  }));
+    )),
+  });
+  return result;
 }

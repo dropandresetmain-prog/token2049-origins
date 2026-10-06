@@ -121,8 +121,8 @@ function purchaseEvidenceProjection(
 
 /* ---------------- purchases ---------------- */
 
-export function listPurchases(db: Db, customerId: string, limit = 50) {
-  const rows = db.all<PurchaseRow & {
+export async function listPurchases(db: Db, customerId: string, limit = 50) {
+  const rows = await db.all<PurchaseRow & {
     q_category: string;
     q_route: string;
     q_env: string;
@@ -136,9 +136,9 @@ export function listPurchases(db: Db, customerId: string, limit = 50) {
        LEFT JOIN execution_attempts latest
          ON latest.purchase_id = p.id
         AND latest.attempt_no = (SELECT MAX(a.attempt_no) FROM execution_attempts a WHERE a.purchase_id = p.id)
-      WHERE p.customer_id = ?
+      WHERE p.customer_id = $1
       ORDER BY p.created_at DESC, p.id DESC
-      LIMIT ?`,
+      LIMIT $2`,
     customerId,
     limit,
   );
@@ -162,17 +162,17 @@ export function listPurchases(db: Db, customerId: string, limit = 50) {
 }
 
 /** Owner-scoped load. Returns undefined for unknown AND foreign purchases so the caller can 404 both alike. */
-export function loadOwnedPurchase(db: Db, customerId: string, purchaseId: string): PurchaseRow | undefined {
-  return db.get<PurchaseRow>('SELECT * FROM purchases WHERE id = ? AND customer_id = ?', purchaseId, customerId);
+export async function loadOwnedPurchase(db: Db, customerId: string, purchaseId: string): Promise<PurchaseRow | undefined> {
+  return await db.get<PurchaseRow>('SELECT * FROM purchases WHERE id = $1 AND customer_id = $2', purchaseId, customerId);
 }
 
-export function purchaseDetail(db: Db, p: PurchaseRow) {
-  const q = getQuoteRow(db, p.quote_id)!;
+export async function purchaseDetail(db: Db, p: PurchaseRow) {
+  const q = (await getQuoteRow(db, p.quote_id))!;
   const qv = parse<QuoteView>(q.public_json);
   const receipt = parse<ReceiptView>(p.receipt_json);
   const quoteMode = modeForProviderEnvironment(q.provider_environment);
-  const latestExecution = db.get<{ status: AttemptRow['status']; result_json: string | null }>(
-    'SELECT status, result_json FROM execution_attempts WHERE purchase_id = ? ORDER BY attempt_no DESC LIMIT 1',
+  const latestExecution = await db.get<{ status: AttemptRow['status']; result_json: string | null }>(
+    'SELECT status, result_json FROM execution_attempts WHERE purchase_id = $1 ORDER BY attempt_no DESC LIMIT 1',
     p.id,
   );
   const evidence = purchaseEvidenceProjection(
@@ -184,8 +184,8 @@ export function purchaseDetail(db: Db, p: PurchaseRow) {
   const purchaseMode = evidence.provenance.evidenceMode;
   const provenance = evidence.provenance;
 
-  const funding = db
-    .all<FundingEvidenceRow>('SELECT * FROM funding_evidence WHERE purchase_id = ? ORDER BY verified_at, id', p.id)
+  const funding = (await db
+    .all<FundingEvidenceRow>('SELECT * FROM funding_evidence WHERE purchase_id = $1 ORDER BY verified_at, id', p.id))
     .map((f) => ({
       id: f.id,
       rail: f.rail,
@@ -207,9 +207,9 @@ export function purchaseDetail(db: Db, p: PurchaseRow) {
   const fundingByRef = new Map(funding.map((f) => [f.transferReference, f]));
 
   const extRefs = new Map(
-    db.all<{ id: string; external_reference: string | null }>('SELECT id, external_reference FROM journal_entries WHERE purchase_id = ?', p.id).map((r) => [r.id, r.external_reference]),
+    (await db.all<{ id: string; external_reference: string | null }>('SELECT id, external_reference FROM journal_entries WHERE purchase_id = $1', p.id)).map((r) => [r.id, r.external_reference]),
   );
-  const journal = entriesForPurchase(db, p.id).map((e) => {
+  const journal = (await entriesForPurchase(db, p.id)).map((e) => {
     // Observed funding entries inherit the funding row's mode; the rest follow the purchase.
     const linked = e.kind === 'funding_received' ? fundingByRef.get(extRefs.get(e.id) ?? '') : undefined;
     return {
@@ -228,11 +228,11 @@ export function purchaseDetail(db: Db, p: PurchaseRow) {
     };
   });
 
-  const attempts = db
+  const attempts = (await db
     .all<Pick<AttemptRow, 'attempt_no' | 'status' | 'started_at' | 'finished_at' | 'result_json'>>(
-      'SELECT attempt_no, status, started_at, finished_at, result_json FROM execution_attempts WHERE purchase_id = ? ORDER BY attempt_no',
+      'SELECT attempt_no, status, started_at, finished_at, result_json FROM execution_attempts WHERE purchase_id = $1 ORDER BY attempt_no',
       p.id,
-    )
+    ))
     .map((a) => ({
       attemptNo: a.attempt_no,
       status: a.status,
@@ -244,16 +244,16 @@ export function purchaseDetail(db: Db, p: PurchaseRow) {
       },
     }));
 
-  const events = db
+  const events = (await db
     .all<{ sequence: number; type: string; created_at: string }>(
-      'SELECT sequence, type, created_at FROM purchase_events WHERE purchase_id = ? ORDER BY sequence',
+      'SELECT sequence, type, created_at FROM purchase_events WHERE purchase_id = $1 ORDER BY sequence',
       p.id,
-    )
+    ))
     // Event payloads are intentionally not projected: provider-controlled reasons and references can
     // contain customer data. Type and timing are enough to explain the purchase timeline.
     .map((e) => ({ sequence: e.sequence, type: e.type, at: e.created_at }));
 
-  const res = getReservation(db, p.id);
+  const res = await getReservation(db, p.id);
   return {
     purchase: {
       id: p.id,
@@ -309,8 +309,8 @@ interface LineRow {
   ledger_mode: string;
 }
 
-export function treasuryView(db: Db) {
-  const lines = db.all<LineRow>(
+export async function treasuryView(db: Db) {
+  const lines = await db.all<LineRow>(
     `SELECT jl.account, jl.asset, jl.side, jl.amount, je.ledger_mode
        FROM journal_lines jl JOIN journal_entries je ON je.id = jl.entry_id`,
   );
@@ -335,7 +335,7 @@ export function treasuryView(db: Db) {
     accts.set(k2, a);
   }
   // Cross-check against the core helper: every asset must net to zero across the whole journal.
-  const coreBalanced = [...trialBalance(db).values()].every((v) => v === 0n);
+  const coreBalanced = [...(await trialBalance(db)).values()].every((v) => v === 0n);
 
   const trial = [...tb.values()]
     .sort((x, y) => (x.ledgerMode + x.asset).localeCompare(y.ledgerMode + y.asset))
@@ -359,13 +359,14 @@ export function treasuryView(db: Db) {
       normalSide: a.account.startsWith('assets:') || a.account === Accounts.merchantPurchases ? 'debit' : 'credit',
     }));
 
-  const pools = db.all<{ currency: string }>('SELECT currency FROM capacity_pools ORDER BY currency');
-  const capacity = pools.map((p) => {
-    const s = capacitySnapshot(db, p.currency)!;
+  const pools = await db.all<{ currency: string }>('SELECT currency FROM capacity_pools ORDER BY currency');
+  const capacity = [];
+  for (const p of pools) {
+    const s = (await capacitySnapshot(db, p.currency))!;
     const providerTestBalanceUsedMinor = 'providerTestBalanceUsedMinor' in s
       ? String((s as typeof s & { providerTestBalanceUsedMinor: bigint }).providerTestBalanceUsedMinor)
       : '0';
-    return {
+    capacity.push({
       ledgerMode: 'simulated' as const,
       label: 'SIMULATED synthetic purchasing capacity: not a bank balance and not an OCBC observation',
       currency: s.currency,
@@ -375,11 +376,11 @@ export function treasuryView(db: Db) {
       cardPayableMinor: s.cardPayableMinor.toString(),
       providerTestBalanceUsedMinor,
       availableMinor: s.availableMinor.toString(),
-    };
-  });
+    });
+  }
 
   const byState = Object.fromEntries(
-    db.all<{ state: string; n: number }>('SELECT state, COUNT(*) AS n FROM purchases GROUP BY state ORDER BY state').map((r) => [r.state, Number(r.n)]),
+    (await db.all<{ state: string; n: number }>('SELECT state, COUNT(*)::int AS n FROM purchases GROUP BY state ORDER BY state')).map((r) => [r.state, Number(r.n)]),
   );
 
   // Obligations to customers, per funding asset.
@@ -393,26 +394,26 @@ export function treasuryView(db: Db) {
     return m;
   };
   const unapplied = credit(
-    db.all<{ asset: string; side: string; amount: string }>('SELECT asset, side, amount FROM journal_lines WHERE account = ?', Accounts.customerUnapplied),
+    (await db.all<{ asset: string; side: string; amount: string }>('SELECT asset, side, amount FROM journal_lines WHERE account = $1', Accounts.customerUnapplied)),
   );
   const prepaymentAll = credit(
-    db.all<{ asset: string; side: string; amount: string }>('SELECT asset, side, amount FROM journal_lines WHERE account = ?', Accounts.customerPrepayment),
+    (await db.all<{ asset: string; side: string; amount: string }>('SELECT asset, side, amount FROM journal_lines WHERE account = $1', Accounts.customerPrepayment)),
   );
   // Funds received for purchases that ended without delivery: owed back, not yet refunded by anything in this system.
   const refundDue = credit(
-    db.all<{ asset: string; side: string; amount: string }>(
+    (await db.all<{ asset: string; side: string; amount: string }>(
       `SELECT jl.asset, jl.side, jl.amount
          FROM journal_lines jl
          JOIN journal_entries je ON je.id = jl.entry_id
          JOIN purchases p ON p.id = je.purchase_id
-        WHERE jl.account = ? AND p.state IN ('failed','expired','requires_reauthorization')`,
+        WHERE jl.account = $1 AND p.state IN ('failed','expired','requires_reauthorization')`,
       Accounts.customerPrepayment,
-    ),
+    )),
   );
   const asObj = (m: Map<string, bigint>) => Object.fromEntries([...m.entries()].filter(([, v]) => v !== 0n).map(([k, v]) => [k, v.toString()]));
 
-  const reservations = db
-    .all<{ status: string; currency: string; scale: number; amount_minor: string }>('SELECT status, currency, scale, amount_minor FROM reservations')
+  const reservations = (await db
+    .all<{ status: string; currency: string; scale: number; amount_minor: string }>('SELECT status, currency, scale, amount_minor FROM reservations'))
     .reduce<Record<string, { count: number; currency: string; scale: number; totalMinor: bigint }>>((acc, r) => {
       const k = `${r.status}|${r.currency}`;
       const cur = acc[k] ?? { count: 0, currency: r.currency, scale: r.scale, totalMinor: 0n };
@@ -467,8 +468,8 @@ interface BankRow {
  * transactions keep the newest row per identical fact. References are re-masked on the way out even though they
  * are masked on the way in.
  */
-export function latestBankObservations(db: Db, scan = 500) {
-  const rows = db.all<BankRow>('SELECT * FROM bank_observations ORDER BY observed_at DESC, id DESC LIMIT ?', scan);
+export async function latestBankObservations(db: Db, scan = 500) {
+  const rows = await db.all<BankRow>('SELECT * FROM bank_observations ORDER BY observed_at DESC, id DESC LIMIT $1', scan);
   const seen = new Set<string>();
   const out = [];
   for (const r of rows) {

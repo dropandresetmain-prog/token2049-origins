@@ -57,9 +57,9 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
     }),
   );
 
-  const auth = (req: Request, _res: Response, next: NextFunction) => {
+  const auth = async (req: Request, _res: Response, next: NextFunction) => {
     try {
-      req.actor = authenticate(core.deps.db, req.header('authorization'), req.requestId);
+      req.actor = (await authenticate(core.deps.db, req.header('authorization'), req.requestId));
       next();
     } catch (e) {
       next(e);
@@ -96,8 +96,8 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
   app.get(
     '/v1/quotes/:id',
     auth,
-    asyncH((req, res) => {
-      res.json({ quote: core.getQuote(req.actor!, String(req.params.id)) });
+    asyncH(async (req, res) => {
+      res.json({ quote: (await core.getQuote(req.actor!, String(req.params.id))) });
     }),
   );
 
@@ -116,7 +116,7 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
     auth,
     asyncH(async (req, res) => {
       const id = String(req.params.id);
-      const adapterHeader = core.paymentHeaderName(id, req.actor!);
+      const adapterHeader = await core.paymentHeaderName(id, req.actor!);
       const r = await core.fundPurchase(req.actor!, id, req.header(adapterHeader) ?? undefined);
       if (r.kind === 'payment_required') {
         const encoded = Buffer.from(JSON.stringify(r.requirements)).toString('base64');
@@ -132,16 +132,16 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
   app.get(
     '/v1/purchases/:id',
     auth,
-    asyncH((req, res) => {
-      res.json({ purchase: core.getPurchase(req.actor!, String(req.params.id)) });
+    asyncH(async (req, res) => {
+      res.json({ purchase: (await core.getPurchase(req.actor!, String(req.params.id))) });
     }),
   );
 
   app.get(
     '/v1/purchases/:id/events',
     auth,
-    asyncH((req, res) => {
-      res.json({ events: core.purchaseEvents(req.actor!, String(req.params.id)) });
+    asyncH(async (req, res) => {
+      res.json({ events: (await core.purchaseEvents(req.actor!, String(req.params.id))) });
     }),
   );
 

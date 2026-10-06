@@ -12,7 +12,7 @@ const rows: Array<{ component: string; status: string; environment: string; miss
 for (const e of parts.executors) rows.push(await e.readiness());
 for (const f of parts.fundingAdapters) rows.push(await f.readiness());
 for (const b of parts.bankAdapters) rows.push(await b.readiness());
-process.stdout.write(`appEnv=${env.APP_ENV} database=${env.DATABASE_PATH ? 'set' : 'unset'}\n`);
+process.stdout.write(`appEnv=${env.APP_ENV} database=${env.DATABASE_URL ? 'set' : 'unset'}\n`);
 for (const r of rows) {
   process.stdout.write(`${r.component.padEnd(18)} ${r.status.padEnd(22)} env=${r.environment}${r.missing.length ? ` missing=${r.missing.join(',')}` : ''}${r.detail ? ` — ${r.detail}` : ''}\n`);
 }

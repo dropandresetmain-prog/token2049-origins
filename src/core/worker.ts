@@ -58,9 +58,9 @@ export class Worker {
     return iso(this.core.deps.clock.now());
   }
 
-  start(intervalMs = 1000): void {
-    this.recoverLeases();
-    this.recoverOrphans();
+  async start(intervalMs = 1000): Promise<void> {
+    await this.recoverLeases();
+    await this.recoverOrphans();
     this.timer = setInterval(() => void this.tick().catch(() => undefined), intervalMs);
   }
 
@@ -70,29 +70,30 @@ export class Worker {
   }
 
   /** Expired leases (crash mid-job) go back to pending. Execute jobs then see the started attempt and reconcile. */
-  recoverLeases(): number {
+  async recoverLeases(): Promise<number> {
     const nowIso = this.now();
-    return this.db.run(
-      "UPDATE jobs SET status = 'pending', claimed_by = NULL, lease_until = NULL, updated_at = ? WHERE status = 'claimed' AND (lease_until IS NULL OR lease_until < ? OR claimed_by != ?)",
+    return (await this.db.run(
+      "UPDATE jobs SET status = 'pending', claimed_by = NULL, lease_until = NULL, updated_at = $1 WHERE status = 'claimed' AND (lease_until IS NULL OR lease_until <= $2)",
       nowIso,
       nowIso,
-      this.workerId,
-    ).changes;
+    )).changes;
   }
 
   /** Purchases left executing/unresolved without any live job get a reconcile job (startup safety net). */
-  recoverOrphans(): number {
-    const nowIso = this.now();
-    const orphans = this.db.all<{ id: string }>(
-      `SELECT p.id FROM purchases p WHERE p.state IN ('executing','unresolved')
-       AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.purchase_id = p.id AND j.status IN ('pending','claimed'))`,
-    );
-    for (const o of orphans) this.db.tx(() => this.core.enqueueJob('reconcile_purchase', o.id, `reconcile:${o.id}:${nowIso}`, nowIso));
-    const funding=this.db.all<{id:string;purchase_id:string}>(
-      "SELECT f.id,f.purchase_id FROM funding_attempts f WHERE f.status='pending' AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.purchase_id=f.purchase_id AND j.kind='recover_funding' AND j.status IN ('pending','claimed'))"
-    );
-    for(const f of funding) this.db.tx(()=>this.core.enqueueJob('recover_funding',f.purchase_id,'recover_funding:'+f.id+':'+newId('repair'),nowIso));
-    return orphans.length+funding.length;
+  async recoverOrphans(): Promise<number> {
+    return this.db.tx(async () => {
+      const nowIso = this.now();
+      const orphans = await this.db.all<{ id: string }>(
+        `SELECT p.id FROM purchases p WHERE p.state IN ('executing','unresolved')
+         AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.purchase_id = p.id AND j.status IN ('pending','claimed'))`,
+      );
+      for (const o of orphans) await this.db.tx(async () => (await this.core.enqueueJob('reconcile_purchase', o.id, `reconcile:${o.id}:${nowIso}`, nowIso)));
+      const funding=await this.db.all<{id:string;purchase_id:string}>(
+        "SELECT f.id,f.purchase_id FROM funding_attempts f WHERE f.status='pending' AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.purchase_id=f.purchase_id AND j.kind='recover_funding' AND j.status IN ('pending','claimed'))"
+      );
+      for(const f of funding) await this.db.tx(async ()=>(await this.core.enqueueJob('recover_funding',f.purchase_id,'recover_funding:'+f.id+':'+newId('repair'),nowIso)));
+      return orphans.length+funding.length;
+    });
   }
 
   /** Run all currently due work once. Returns number of jobs processed. */
@@ -100,17 +101,21 @@ export class Worker {
     if (this.running) return 0;
     this.running = true;
     try {
-      this.sweepExpired();
+      await this.recoverLeases();
+      await this.sweepExpired();
       let n = 0;
       for (;;) {
-        const job = this.claim();
+        const job = await this.claim();
         if (!job) break;
         n++;
-        try {
-          await this.run(job);
-        } catch (e) {
-          this.failJob(job, e);
-        }
+        const locked = await this.db.withExclusiveLock(`worker:${job.purchase_id}`, async () => {
+          try {
+            await this.run(job);
+          } catch (e) {
+            await this.failJob(job, e);
+          }
+        });
+        if (!locked.acquired) await this.reschedule(job, 1000, 'purchase work is in progress');
       }
       return n;
     } finally {
@@ -118,67 +123,69 @@ export class Worker {
     }
   }
 
-  private claim(): JobRow | undefined {
+  private async claim(): Promise<JobRow | undefined> {
     const nowIso = this.now();
-    return this.db.tx(() => {
-      const job = this.db.get<JobRow>(
-        "SELECT * FROM jobs WHERE status = 'pending' AND run_after <= ? ORDER BY run_after, created_at LIMIT 1",
+    return await this.db.tx(async () => {
+      const job = await this.db.get<JobRow>(
+        "SELECT * FROM jobs WHERE status = 'pending' AND run_after <= $1 ORDER BY run_after, created_at, id LIMIT 1 FOR UPDATE SKIP LOCKED",
         nowIso,
       );
       if (!job) return undefined;
       const lease = new Date(Date.parse(nowIso) + LEASE_MS).toISOString();
-      const r = this.db.run(
-        "UPDATE jobs SET status = 'claimed', claimed_by = ?, lease_until = ?, attempts = attempts + 1, updated_at = ? WHERE id = ? AND status = 'pending'",
+      const r = await this.db.run(
+        "UPDATE jobs SET status = 'claimed', claimed_by = $1, lease_until = $2, attempts = attempts + 1, updated_at = $3 WHERE id = $4 AND status = 'pending'",
         this.workerId,
         lease,
         nowIso,
         job.id,
       );
       return r.changes === 1 ? { ...job, attempts: job.attempts + 1 } : undefined;
-    });
+    }, false);
   }
 
-  private complete(job: JobRow): void {
-    this.db.run("UPDATE jobs SET status = 'done', lease_until = NULL, updated_at = ? WHERE id = ?", this.now(), job.id);
+  private async complete(job: JobRow): Promise<void> {
+    await this.db.run("UPDATE jobs SET status = 'done', lease_until = NULL, updated_at = $1 WHERE id = $2 AND status = 'claimed' AND claimed_by = $3 AND attempts = $4", this.now(), job.id, this.workerId, job.attempts);
   }
 
-  private reschedule(job: JobRow, delayMs: number, lastError?: string): void {
+  private async reschedule(job: JobRow, delayMs: number, lastError?: string): Promise<void> {
     const runAfter = new Date(Date.parse(this.now()) + delayMs).toISOString();
-    this.db.run(
-      "UPDATE jobs SET status = 'pending', claimed_by = NULL, lease_until = NULL, run_after = ?, last_error = ?, updated_at = ? WHERE id = ?",
+    await this.db.run(
+      "UPDATE jobs SET status = 'pending', claimed_by = NULL, lease_until = NULL, run_after = $1, last_error = $2, updated_at = $3 WHERE id = $4 AND status = 'claimed' AND claimed_by = $5 AND attempts = $6",
       runAfter,
       lastError ?? null,
       this.now(),
       job.id,
+      this.workerId,
+      job.attempts,
     );
   }
 
-  private failJob(job: JobRow, e: unknown): void {
+  private async failJob(job: JobRow, e: unknown): Promise<void> {
     const msg = String(redact((e as Error)?.message ?? e)).slice(0, 500);
     if (job.attempts >= MAX_RECONCILE_ATTEMPTS && (job.kind === 'recover_funding' || job.kind === 'confirm_funding' || job.kind === 'refresh_outcome')) {
-      if(job.attempts === MAX_RECONCILE_ATTEMPTS) this.db.tx(()=>appendEvent(this.db,job.purchase_id,job.kind==='refresh_outcome'?'outcome.manual_required':'funding.manual_required',{reason:'readback repeatedly failed; recovery continues hourly'},this.now()));
-      this.reschedule(job,3_600_000,msg);
+      if(job.attempts === MAX_RECONCILE_ATTEMPTS) await this.db.tx(async ()=>(await appendEvent(this.db,job.purchase_id,job.kind==='refresh_outcome'?'outcome.manual_required':'funding.manual_required',{reason:'readback repeatedly failed; recovery continues hourly'},this.now())));
+      await this.reschedule(job,3_600_000,msg);
       return;
     }
     if (job.attempts >= MAX_RECONCILE_ATTEMPTS) {
-      this.db.run("UPDATE jobs SET status = 'dead', last_error = ?, updated_at = ? WHERE id = ?", msg, this.now(), job.id);
+      await this.db.run("UPDATE jobs SET status = 'dead', last_error = $1, updated_at = $2 WHERE id = $3 AND status = 'claimed' AND claimed_by = $4 AND attempts = $5", msg, this.now(), job.id, this.workerId, job.attempts);
       return;
     }
-    this.reschedule(job, RECONCILE_BACKOFF_MS[Math.min(job.attempts, RECONCILE_BACKOFF_MS.length - 1)]!, msg);
+    await this.reschedule(job, RECONCILE_BACKOFF_MS[Math.min(job.attempts, RECONCILE_BACKOFF_MS.length - 1)]!, msg);
   }
 
   private async run(job: JobRow): Promise<void> {
     switch (job.kind) {
       case 'execute_purchase':
-        return this.executePurchase(job);
+        return await this.executePurchase(job);
       case 'reconcile_purchase':
-        return this.reconcilePurchase(job);
+        return await this.reconcilePurchase(job);
       case 'refresh_outcome':
-        return this.refreshOutcome(job);
+        return await this.refreshOutcome(job);
       case 'recover_funding':
-        return this.recoverFunding(job);
+        return await this.recoverFunding(job);
       case 'confirm_funding':
-        return this.confirmFunding(job);
+        return await this.confirmFunding(job);
       default:
         throw new Error(`unknown job kind ${job.kind}`);
     }
@@ -186,29 +193,29 @@ export class Worker {
 
   /* ---------------- expiry ---------------- */
 
-  private sweepExpired(): void {
+  private async sweepExpired(): Promise<void> {
     const nowIso = this.now();
-    const due = this.db.all<{ id: string }>(
+    const due = await this.db.all<{ id: string }>(
       `SELECT p.id FROM purchases p JOIN reservations r ON r.purchase_id = p.id
-       WHERE p.state = 'awaiting_funding' AND r.expires_at IS NOT NULL AND r.expires_at <= ?`,
+       WHERE p.state = 'awaiting_funding' AND r.expires_at IS NOT NULL AND r.expires_at <= $1`,
       nowIso,
     );
-    for (const { id } of due) this.core.expirePurchase(id, 'quote expired before funding');
+    for (const { id } of due) await this.core.expirePurchase(id, 'quote expired before funding');
   }
 
   /* ---------------- execution ---------------- */
 
-  private executor(p: PurchaseRow) {
-    const q = getQuoteRow(this.db, p.quote_id)!;
+  private async executor(p: PurchaseRow) {
+    const q = (await getQuoteRow(this.db, p.quote_id))!;
     const ex = this.core.deps.executors.get(q.route as ProviderRoute);
     if (!ex) throw new Error(`executor ${q.route} missing`);
     return { ex, q };
   }
 
-  private context(p: PurchaseRow, attempt: AttemptRow): ExecutionContext {
-    const q = getQuoteRow(this.db, p.quote_id)!;
+  private async context(p: PurchaseRow, attempt: AttemptRow): Promise<ExecutionContext> {
+    const q = (await getQuoteRow(this.db, p.quote_id))!;
     const qv = JSON.parse(q.public_json) as QuoteView;
-    const current = this.db.get<{ checkpoints_json: string }>('SELECT checkpoints_json FROM execution_attempts WHERE id = ?', attempt.id);
+    const current = await this.db.get<{ checkpoints_json: string }>('SELECT checkpoints_json FROM execution_attempts WHERE id = $1', attempt.id);
     const ctx: ExecutionContext = {
       purchaseId: p.id,
       attemptId: attempt.id,
@@ -223,22 +230,22 @@ export class Worker {
         if (['create_attempt','book_attempt','pay_attempt','pay_click'].includes(step) && Date.parse(q.expires_at)<=Date.parse(nowIso)) {
           throw new ProviderError('not_sent','quote_expired','quote expired before provider commit');
         }
-        this.db.tx(() => {
-          const cur = this.db.get<{ checkpoints_json: string }>('SELECT checkpoints_json FROM execution_attempts WHERE id = ?', attempt.id)!;
+        await this.db.tx(async () => {
+          const cur = (await this.db.get<{ checkpoints_json: string }>('SELECT checkpoints_json FROM execution_attempts WHERE id = $1', attempt.id))!;
           const cps = JSON.parse(cur.checkpoints_json) as Record<string, unknown>;
           const safe = redact(data);
           // Opaque provider handles are needed intact after restart; public events remain redacted.
           if (typeof data.providerReference === 'string') safe.providerReference = data.providerReference;
           cps[step] = safe;
           const ref = typeof data.providerReference === 'string' ? data.providerReference : null;
-          this.db.run(
-            'UPDATE execution_attempts SET checkpoints_json = ?, provider_reference = COALESCE(?, provider_reference) WHERE id = ?',
+          await this.db.run(
+            'UPDATE execution_attempts SET checkpoints_json = $1, provider_reference = COALESCE($2, provider_reference) WHERE id = $3',
             JSON.stringify(cps),
             ref,
             attempt.id,
           );
-          if (ref) this.db.run('UPDATE purchases SET provider_reference = ?, updated_at = ? WHERE id = ?', ref, nowIso, p.id);
-          appendEvent(this.db, p.id, 'execution.checkpoint', { step, providerReference: ref }, nowIso);
+          if (ref) await this.db.run('UPDATE purchases SET provider_reference = $1, updated_at = $2 WHERE id = $3', ref, nowIso, p.id);
+          await appendEvent(this.db, p.id, 'execution.checkpoint', { step, providerReference: ref }, nowIso);
         });
         // Keep the in-memory checkpoint aligned with the durable reconciliation data.
         ctx.checkpoints[step] = data;
@@ -247,33 +254,33 @@ export class Worker {
     return ctx;
   }
 
-  private appliedFunding(purchaseId: string): FundingEvidenceRow[] {
-    return this.db.all<FundingEvidenceRow>(
-      "SELECT * FROM funding_evidence WHERE purchase_id = ? AND application = 'applied' AND payment_state = 'confirmed'",
+  private async appliedFunding(purchaseId: string): Promise<FundingEvidenceRow[]> {
+    return await this.db.all<FundingEvidenceRow>(
+      "SELECT * FROM funding_evidence WHERE purchase_id = $1 AND application = 'applied' AND payment_state = 'confirmed'",
       purchaseId,
     );
   }
 
   private async executePurchase(job: JobRow): Promise<void> {
-    const p0 = getPurchaseRow(this.db, job.purchase_id)!;
-    const existingAttempt = this.db.get<AttemptRow>('SELECT * FROM execution_attempts WHERE purchase_id = ? ORDER BY attempt_no DESC LIMIT 1', p0.id);
+    const p0 = (await getPurchaseRow(this.db, job.purchase_id))!;
+    const existingAttempt = await this.db.get<AttemptRow>('SELECT * FROM execution_attempts WHERE purchase_id = $1 ORDER BY attempt_no DESC LIMIT 1', p0.id);
     if (existingAttempt) {
       // Crash/restart after an attempt began: never re-execute. Reconcile instead.
-      this.complete(job);
-      if (existingAttempt.status === 'started' || existingAttempt.status === 'unknown') this.toUnresolved(p0.id, existingAttempt, 'execution interrupted; reconciling via provider readback');
+      await this.complete(job);
+      if (existingAttempt.status === 'started' || existingAttempt.status === 'unknown') await this.toUnresolved(p0.id, existingAttempt, 'execution interrupted; reconciling via provider readback');
       return;
     }
     if (p0.state !== 'funded_queued') {
-      this.complete(job);
+      await this.complete(job);
       return;
     }
-    const { ex, q } = this.executor(p0);
+    const { ex, q } = await this.executor(p0);
     const qv = JSON.parse(q.public_json) as QuoteView;
     let nowIso = this.now();
 
     // Pre-execution gate: funding, authority, quote validity, capacity, route readiness.
     let gateFailure = await (async (): Promise<{ state: 'requires_reauthorization' | 'failed'; reason: string } | null> => {
-      const funding = this.appliedFunding(p0.id);
+      const funding = await this.appliedFunding(p0.id);
       const req = JSON.parse(p0.funding_requirement_json) as { amountBaseUnits: string; network: string; assetId: string };
       const covered = funding
         .filter((f) => f.network === req.network && f.asset_id === req.assetId)
@@ -282,7 +289,7 @@ export class Worker {
       const approval = JSON.parse(p0.approval_json) as { quoteDigest: string };
       if (approval.quoteDigest !== q.digest) return { state: 'requires_reauthorization', reason: 'approval does not bind quote' };
       if (Date.parse(q.expires_at) <= Date.parse(nowIso)) return { state: 'requires_reauthorization', reason: 'quote expired before execution; renewed authority required' };
-      const res = getReservation(this.db, p0.id);
+      const res = await getReservation(this.db, p0.id);
       if (!res || res.status !== 'active' || BigInt(res.amount_minor) < minor(qv.merchantTotal)) return { state: 'failed', reason: 'no active capacity reservation' };
       const r = await ex.readiness();
       if (!['CONFIGURED_UNVERIFIED', 'EXTERNAL_CHECK_PASSED', 'LOCAL_TESTS_ONLY'].includes(r.status)) return { state: 'failed', reason: `route not ready (${r.status})` };
@@ -293,44 +300,44 @@ export class Worker {
     if (!gateFailure && Date.parse(q.expires_at) <= this.core.deps.clock.now().getTime()) gateFailure = { state: 'requires_reauthorization', reason: 'quote expired while checking readiness; renewed authority required' };
     nowIso = this.now();
     if (gateFailure) {
-      this.db.tx(() => {
-        transitionPurchase(this.db, p0.id, ['funded_queued'], { state: gateFailure.state, status_reason: gateFailure.reason }, nowIso);
-        setReservationStatus(this.db, p0.id, ['active'], 'released', nowIso);
-        appendEvent(this.db, p0.id, 'execution.blocked', { reason: gateFailure.reason }, nowIso);
-        appendEvent(this.db, p0.id, 'refund.due', { reason: 'funding received but purchase not executed; customer prepayment remains a refundable obligation' }, nowIso);
+      await this.db.tx(async () => {
+        await transitionPurchase(this.db, p0.id, ['funded_queued'], { state: gateFailure.state, status_reason: gateFailure.reason }, nowIso);
+        await setReservationStatus(this.db, p0.id, ['active'], 'released', nowIso);
+        await appendEvent(this.db, p0.id, 'execution.blocked', { reason: gateFailure.reason }, nowIso);
+        await appendEvent(this.db, p0.id, 'refund.due', { reason: 'funding received but purchase not executed; customer prepayment remains a refundable obligation' }, nowIso);
       });
-      this.complete(job);
+      await this.complete(job);
       return;
     }
 
     // Persist the attempt BEFORE the external request.
     const attemptId = newId('att');
-    const attempt: AttemptRow = this.db.tx(() => {
-      const ok = transitionPurchase(this.db, p0.id, ['funded_queued'], { state: 'executing' }, nowIso);
+    const attempt: AttemptRow = await this.db.tx(async () => {
+      const ok = await transitionPurchase(this.db, p0.id, ['funded_queued'], { state: 'executing' }, nowIso);
       if (!ok) throw new Error('purchase left funded_queued concurrently');
-      this.db.run(
+      await this.db.run(
         `INSERT INTO execution_attempts(id, purchase_id, attempt_no, idempotency_key, status, checkpoints_json, started_at)
-         VALUES (?,?,1,?, 'started', '{}', ?)`,
+         VALUES ($1,$2,1,$3, 'started', '{}', $4)`,
         attemptId,
         p0.id,
         `${p0.id}:1`,
         nowIso,
       );
-      appendEvent(this.db, p0.id, 'execution.started', { attemptId, route: ex.route }, nowIso);
-      return this.db.get<AttemptRow>('SELECT * FROM execution_attempts WHERE id = ?', attemptId)!;
+      await appendEvent(this.db, p0.id, 'execution.started', { attemptId, route: ex.route }, nowIso);
+      return (await this.db.get<AttemptRow>('SELECT * FROM execution_attempts WHERE id = $1', attemptId))!;
     });
 
-    const p = getPurchaseRow(this.db, p0.id)!;
+    const p = (await getPurchaseRow(this.db, p0.id))!;
     let result: ExecutionResult;
     try {
-      result = await ex.execute(this.context(p, attempt));
+      result = await ex.execute((await this.context(p, attempt)));
     } catch (e) {
       result = this.resultFromError(e);
     }
-    this.applyResult(p.id, attemptId, result);
+    await this.applyResult(p.id, attemptId, result);
     // The job stays claimed until the result is durable: a crash before this point leaves a
     // leased job that, once recovered, sees the started attempt and reconciles instead of re-executing.
-    this.complete(job);
+    await this.complete(job);
   }
 
   private resultFromError(e: unknown): ExecutionResult {
@@ -342,7 +349,7 @@ export class Worker {
   }
 
   /** Apply an execution or reconciliation result exactly once. */
-  applyResult(purchaseId: string, attemptId: string, result: ExecutionResult): void {
+  async applyResult(purchaseId: string, attemptId: string, result: ExecutionResult): Promise<void> {
     const nowIso = this.now();
     // Core-side semantic guard: "succeeded" requires a paid, complete commerce state.
     if (result.kind === 'succeeded' && (NOT_COMPLETE.has(result.commerceStatus) || !PAID.has(result.merchantPaymentStatus))) {
@@ -355,7 +362,7 @@ export class Worker {
     }
     let financialAnomaly: {expected: Money; actual: unknown} | null = null;
     if (result.kind === 'succeeded') {
-      const qv=JSON.parse(getQuoteRow(this.db,getPurchaseRow(this.db,purchaseId)!.quote_id)!.public_json) as QuoteView;
+      const qv=JSON.parse((await getQuoteRow(this.db,(await getPurchaseRow(this.db,purchaseId))!.quote_id))!.public_json) as QuoteView;
       const parsed=Money.safeParse(result.chargedAmount);
       if(!parsed.success || parsed.data.currency!==qv.merchantTotal.currency || parsed.data.scale!==qv.merchantTotal.scale || parsed.data.amountMinor!==qv.merchantTotal.amountMinor) {
         financialAnomaly={expected:qv.merchantTotal,actual:result.chargedAmount};
@@ -364,22 +371,22 @@ export class Worker {
       }
     }
     // A later success, cancellation or terms change cannot erase an earlier observed charge.
-    if(result.kind!=='unknown' && this.db.get("SELECT id FROM purchase_events WHERE purchase_id = ? AND type='execution.financial_anomaly' LIMIT 1",purchaseId)) {
+    if(result.kind!=='unknown' && (await this.db.get("SELECT id FROM purchase_events WHERE purchase_id = $1 AND type='execution.financial_anomaly' LIMIT 1",purchaseId))) {
       result={kind:'unknown',reason:'an earlier charge anomaly requires operator review; exposure remains held',providerReference:'providerReference' in result?result.providerReference:null,evidence:result.evidence};
     }
-    this.db.tx(() => {
-      const p = getPurchaseRow(this.db, purchaseId)!;
+    await this.db.tx(async () => {
+      const p = (await getPurchaseRow(this.db, purchaseId))!;
       if (!['executing', 'unresolved'].includes(p.state)) return; // finalized already: never regress
       if(financialAnomaly) {
         const actual=Money.safeParse(financialAnomaly.actual);
         // Retain at least the original reservation; greater same-unit charges increase held exposure.
-        if(actual.success && actual.data.currency===financialAnomaly.expected.currency && actual.data.scale===financialAnomaly.expected.scale && minor(actual.data)>BigInt(getReservation(this.db,p.id)!.amount_minor))
-          this.db.run('UPDATE reservations SET amount_minor = ?, updated_at = ? WHERE purchase_id = ?',actual.data.amountMinor,nowIso,p.id);
-        appendEvent(this.db,p.id,'execution.financial_anomaly',financialAnomaly,nowIso);
+        if(actual.success && actual.data.currency===financialAnomaly.expected.currency && actual.data.scale===financialAnomaly.expected.scale && minor(actual.data)>BigInt((await getReservation(this.db,p.id))!.amount_minor))
+          await this.db.run('UPDATE reservations SET amount_minor = $1, updated_at = $2 WHERE purchase_id = $3',actual.data.amountMinor,nowIso,p.id);
+        await appendEvent(this.db,p.id,'execution.financial_anomaly',financialAnomaly,nowIso);
       }
       const evidence = result.evidence.map((e) => redact(e));
-      this.db.run(
-        'UPDATE execution_attempts SET status = ?, provider_reference = COALESCE(?, provider_reference), result_json = ?, finished_at = ? WHERE id = ?',
+      await this.db.run(
+        'UPDATE execution_attempts SET status = $1, provider_reference = COALESCE($2, provider_reference), result_json = $3, finished_at = $4 WHERE id = $5',
         result.kind,
         'providerReference' in result ? result.providerReference : null,
         JSON.stringify({ ...result, evidence }),
@@ -388,12 +395,12 @@ export class Worker {
       );
       switch (result.kind) {
         case 'succeeded':
-          this.finalizeSuccess(p, result, nowIso);
+          await this.finalizeSuccess(p, result, nowIso);
           break;
         case 'failed_definite':
         case 'terms_changed': {
           const state = result.kind === 'failed_definite' ? 'failed' : 'requires_reauthorization';
-          transitionPurchase(
+          await transitionPurchase(
             this.db,
             p.id,
             ['executing', 'unresolved'],
@@ -406,45 +413,45 @@ export class Worker {
             },
             nowIso,
           );
-          setReservationStatus(this.db, p.id, ['active', 'held_unresolved'], 'released', nowIso);
-          appendEvent(this.db, p.id, `execution.${result.kind}`, { reason: result.reason }, nowIso);
-          appendEvent(this.db, p.id, 'capacity.released', {}, nowIso);
-          appendEvent(this.db, p.id, 'refund.due', { reason: 'purchase not completed; customer prepayment remains a refundable obligation' }, nowIso);
+          await setReservationStatus(this.db, p.id, ['active', 'held_unresolved'], 'released', nowIso);
+          await appendEvent(this.db, p.id, `execution.${result.kind}`, { reason: result.reason }, nowIso);
+          await appendEvent(this.db, p.id, 'capacity.released', {}, nowIso);
+          await appendEvent(this.db, p.id, 'refund.due', { reason: 'purchase not completed; customer prepayment remains a refundable obligation' }, nowIso);
           break;
         }
         case 'unknown':
           if (p.state === 'executing') {
-            transitionPurchase(this.db, p.id, ['executing'], { state: 'unresolved', commerce_status: 'unknown', status_reason: result.reason, ...(result.providerReference ? { provider_reference: result.providerReference } : {}) }, nowIso);
-            setReservationStatus(this.db, p.id, ['active'], 'held_unresolved', nowIso);
-            appendEvent(this.db, p.id, 'execution.unknown', { reason: result.reason }, nowIso);
+            await transitionPurchase(this.db, p.id, ['executing'], { state: 'unresolved', commerce_status: 'unknown', status_reason: result.reason, ...(result.providerReference ? { provider_reference: result.providerReference } : {}) }, nowIso);
+            await setReservationStatus(this.db, p.id, ['active'], 'held_unresolved', nowIso);
+            await appendEvent(this.db, p.id, 'execution.unknown', { reason: result.reason }, nowIso);
           }
-          this.core.enqueueJob('reconcile_purchase', p.id, `reconcile:${p.id}`, new Date(Date.parse(nowIso) + RECONCILE_BACKOFF_MS[0]!).toISOString());
+          await this.core.enqueueJob('reconcile_purchase', p.id, `reconcile:${p.id}`, new Date(Date.parse(nowIso) + RECONCILE_BACKOFF_MS[0]!).toISOString());
           break;
       }
     });
   }
 
-  private toUnresolved(purchaseId: string, attempt: AttemptRow, reason: string): void {
+  private async toUnresolved(purchaseId: string, attempt: AttemptRow, reason: string): Promise<void> {
     const nowIso = this.now();
-    this.db.tx(() => {
-      const p = getPurchaseRow(this.db, purchaseId)!;
+    await this.db.tx(async () => {
+      const p = (await getPurchaseRow(this.db, purchaseId))!;
       if (p.state === 'executing') {
-        transitionPurchase(this.db, p.id, ['executing'], { state: 'unresolved', commerce_status: 'unknown', status_reason: reason }, nowIso);
-        setReservationStatus(this.db, p.id, ['active'], 'held_unresolved', nowIso);
-        this.db.run("UPDATE execution_attempts SET status = 'unknown' WHERE id = ? AND status = 'started'", attempt.id);
-        appendEvent(this.db, p.id, 'execution.unknown', { reason }, nowIso);
+        await transitionPurchase(this.db, p.id, ['executing'], { state: 'unresolved', commerce_status: 'unknown', status_reason: reason }, nowIso);
+        await setReservationStatus(this.db, p.id, ['active'], 'held_unresolved', nowIso);
+        await this.db.run("UPDATE execution_attempts SET status = 'unknown' WHERE id = $1 AND status = 'started'", attempt.id);
+        await appendEvent(this.db, p.id, 'execution.unknown', { reason }, nowIso);
       }
-      this.core.enqueueJob('reconcile_purchase', p.id, `reconcile:${p.id}`, nowIso);
+      await this.core.enqueueJob('reconcile_purchase', p.id, `reconcile:${p.id}`, nowIso);
     });
   }
 
-  private finalizeSuccess(p: PurchaseRow, r: Extract<ExecutionResult, { kind: 'succeeded' }>, nowIso: string): void {
-    const q = getQuoteRow(this.db, p.quote_id)!;
+  private async finalizeSuccess(p: PurchaseRow, r: Extract<ExecutionResult, { kind: 'succeeded' }>, nowIso: string): Promise<void> {
+    const q = (await getQuoteRow(this.db, p.quote_id))!;
     const qv = JSON.parse(q.public_json) as QuoteView;
     const charged = r.chargedAmount;
     const testBalance = r.merchantPaymentStatus === 'test_balance_paid';
     // Provider test-balance usage must never be presented as card spend or a bank debit.
-    postEntry(
+    await postEntry(
       this.db,
       {
         eventKey: `merchant_payment:${p.id}`,
@@ -471,7 +478,7 @@ export class Worker {
       { account: Accounts.principalApplied, asset, side: 'credit' as const, amount: principalBase },
     ];
     if (feeBase > 0n) lines.push({ account: Accounts.serviceFee, asset, side: 'credit' as const, amount: feeBase });
-    postEntry(
+    await postEntry(
       this.db,
       {
         eventKey: `prepayment_applied:${p.id}`,
@@ -484,10 +491,10 @@ export class Worker {
       },
       nowIso,
     );
-    setReservationStatus(this.db, p.id, ['active', 'held_unresolved'], 'consumed', nowIso);
+    await setReservationStatus(this.db, p.id, ['active', 'held_unresolved'], 'consumed', nowIso);
     const overReservation = charged.currency !== qv.merchantTotal.currency || charged.scale !== qv.merchantTotal.scale || minor(charged) > minor(qv.merchantTotal);
 
-    transitionPurchase(
+    await transitionPurchase(
       this.db,
       p.id,
       ['executing', 'unresolved'],
@@ -500,20 +507,20 @@ export class Worker {
       },
       nowIso,
     );
-    const receipt = this.buildReceipt(getPurchaseRow(this.db, p.id)!, r, nowIso);
-    this.db.run('UPDATE purchases SET receipt_json = ? WHERE id = ?', JSON.stringify(receipt), p.id);
-    appendEvent(this.db, p.id, 'execution.succeeded', { providerReference: r.providerReference, commerceStatus: r.commerceStatus, merchantPaymentStatus: r.merchantPaymentStatus }, nowIso);
-    appendEvent(this.db, p.id, 'capacity.consumed', {}, nowIso);
-    appendEvent(this.db, p.id, 'receipt.issued', { receiptId: receipt.receiptId }, nowIso);
+    const receipt = await this.buildReceipt((await getPurchaseRow(this.db, p.id))!, r, nowIso);
+    await this.db.run('UPDATE purchases SET receipt_json = $1 WHERE id = $2', JSON.stringify(receipt), p.id);
+    await appendEvent(this.db, p.id, 'execution.succeeded', { providerReference: r.providerReference, commerceStatus: r.commerceStatus, merchantPaymentStatus: r.merchantPaymentStatus }, nowIso);
+    await appendEvent(this.db, p.id, 'capacity.consumed', {}, nowIso);
+    await appendEvent(this.db, p.id, 'receipt.issued', { receiptId: receipt.receiptId }, nowIso);
     if (r.commerceStatus === 'ticketing') {
-      this.core.enqueueJob('refresh_outcome', p.id, `refresh:${p.id}`, new Date(Date.parse(nowIso) + 30_000).toISOString());
+      await this.core.enqueueJob('refresh_outcome', p.id, `refresh:${p.id}`, new Date(Date.parse(nowIso) + 30_000).toISOString());
     }
   }
 
-  buildReceipt(p: PurchaseRow, r: { providerReference: string; commerceStatus: CommerceStatus; merchantPaymentStatus: MerchantPaymentStatus; evidence: ExecutionResult['evidence'] }, nowIso: string): ReceiptView {
-    const q = getQuoteRow(this.db, p.quote_id)!;
+  async buildReceipt(p: PurchaseRow, r: { providerReference: string; commerceStatus: CommerceStatus; merchantPaymentStatus: MerchantPaymentStatus; evidence: ExecutionResult['evidence'] }, nowIso: string): Promise<ReceiptView> {
+    const q = (await getQuoteRow(this.db, p.quote_id))!;
     const qv = JSON.parse(q.public_json) as QuoteView;
-    const entries = entriesForPurchase(this.db, p.id);
+    const entries = await entriesForPurchase(this.db, p.id);
     const evidenceMode = r.evidence[0]?.evidenceMode ?? (qv.providerEnvironment === 'fixture' ? 'local_fixture' : 'fresh_external');
     const limitations = [
       'Testnet funding uses valueless test assets; no crypto-to-fiat conversion occurred.',
@@ -537,7 +544,7 @@ export class Worker {
       evidenceMode,
       principal: qv.merchantTotal,
       serviceFee: qv.serviceFee,
-      funding: fundingSummaries(this.db, p.id),
+      funding: (await fundingSummaries(this.db, p.id)),
       providerReference: r.providerReference,
       commerceStatus: r.commerceStatus,
       merchantPaymentStatus: r.merchantPaymentStatus,
@@ -558,53 +565,53 @@ export class Worker {
   /* ---------------- reconciliation ---------------- */
 
   private async reconcilePurchase(job: JobRow): Promise<void> {
-    const p = getPurchaseRow(this.db, job.purchase_id)!;
+    const p = (await getPurchaseRow(this.db, job.purchase_id))!;
     if (p.state !== 'unresolved' && p.state !== 'executing') {
-      this.complete(job);
+      await this.complete(job);
       return;
     }
-    const attempt = this.db.get<AttemptRow>('SELECT * FROM execution_attempts WHERE purchase_id = ? ORDER BY attempt_no DESC LIMIT 1', p.id);
+    const attempt = await this.db.get<AttemptRow>('SELECT * FROM execution_attempts WHERE purchase_id = $1 ORDER BY attempt_no DESC LIMIT 1', p.id);
     if (!attempt) {
-      this.complete(job);
+      await this.complete(job);
       return;
     }
-    const { ex } = this.executor(p);
+    const { ex } = await this.executor(p);
     let result: ExecutionResult;
     try {
-      result = await ex.retrieve(this.context(p, attempt));
+      result = await ex.retrieve((await this.context(p, attempt)));
     } catch (e) {
       result = { kind: 'unknown', reason: `readback failed: ${redact((e as Error).message ?? String(e)).slice(0, 200)}`, providerReference: null, evidence: [] };
     }
     if (result.kind === 'unknown') {
       if (job.attempts >= MAX_RECONCILE_ATTEMPTS) {
-        this.db.run("UPDATE jobs SET status = 'dead', last_error = ?, updated_at = ? WHERE id = ?", 'manual reconciliation required', this.now(), job.id);
-        this.db.tx(() => appendEvent(this.db, p.id, 'reconciliation.manual_required', { reason: result.reason }, this.now()));
+        await this.db.run("UPDATE jobs SET status = 'dead', last_error = $1, updated_at = $2 WHERE id = $3 AND status = 'claimed' AND claimed_by = $4 AND attempts = $5", 'manual reconciliation required', this.now(), job.id, this.workerId, job.attempts);
+        await this.db.tx(async () => (await appendEvent(this.db, p.id, 'reconciliation.manual_required', { reason: result.reason }, this.now())));
         return;
       }
-      this.db.tx(() => appendEvent(this.db, p.id, 'reconciliation.pending', { reason: result.reason, attempt: job.attempts }, this.now()));
-      this.reschedule(job, RECONCILE_BACKOFF_MS[Math.min(job.attempts, RECONCILE_BACKOFF_MS.length - 1)]!, result.reason);
+      await this.db.tx(async () => (await appendEvent(this.db, p.id, 'reconciliation.pending', { reason: result.reason, attempt: job.attempts }, this.now())));
+      await this.reschedule(job, RECONCILE_BACKOFF_MS[Math.min(job.attempts, RECONCILE_BACKOFF_MS.length - 1)]!, result.reason);
       return;
     }
-    this.applyResult(p.id, attempt.id, result);
+    await this.applyResult(p.id, attempt.id, result);
     // A financial anomaly can turn a provider success into an unresolved core outcome.
-    if (getPurchaseRow(this.db,p.id)!.state === 'unresolved') {
-      if(job.attempts === MAX_RECONCILE_ATTEMPTS) this.db.tx(()=>appendEvent(this.db,p.id,'reconciliation.manual_required',{reason:'provider charge remains outside authorized terms; exposure retained'},this.now()));
-      this.reschedule(job,job.attempts >= MAX_RECONCILE_ATTEMPTS ? 3_600_000 : 30_000,'provider outcome requires operator review');
+    if ((await getPurchaseRow(this.db,p.id))!.state === 'unresolved') {
+      if(job.attempts === MAX_RECONCILE_ATTEMPTS) await this.db.tx(async ()=>(await appendEvent(this.db,p.id,'reconciliation.manual_required',{reason:'provider charge remains outside authorized terms; exposure retained'},this.now())));
+      await this.reschedule(job,job.attempts >= MAX_RECONCILE_ATTEMPTS ? 3_600_000 : 30_000,'provider outcome requires operator review');
       return;
     }
-    this.complete(job);
+    await this.complete(job);
   }
 
   /** Post-success status refresh (e.g. ticketing -> ticketed). Never changes financial state. */
   private async refreshOutcome(job: JobRow): Promise<void> {
-    const p = getPurchaseRow(this.db, job.purchase_id)!;
-    const attempt = this.db.get<AttemptRow>('SELECT * FROM execution_attempts WHERE purchase_id = ? ORDER BY attempt_no DESC LIMIT 1', p.id);
+    const p = (await getPurchaseRow(this.db, job.purchase_id))!;
+    const attempt = await this.db.get<AttemptRow>('SELECT * FROM execution_attempts WHERE purchase_id = $1 ORDER BY attempt_no DESC LIMIT 1', p.id);
     if (p.state !== 'succeeded' || !attempt) {
-      this.complete(job);
+      await this.complete(job);
       return;
     }
-    const { ex } = this.executor(p);
-    const r = await ex.retrieve(this.context(p, attempt));
+    const { ex } = await this.executor(p);
+    const r = await ex.retrieve((await this.context(p, attempt)));
     const receipt=JSON.parse(p.receipt_json!) as ReceiptView;
     const coherent = r.kind==='succeeded' && !NOT_COMPLETE.has(r.commerceStatus) && PAID.has(r.merchantPaymentStatus) &&
       r.providerReference===p.provider_reference && r.merchantPaymentStatus===p.merchant_payment_status &&
@@ -612,37 +619,37 @@ export class Worker {
     // Refresh can confirm ticket issuance; it cannot rewrite payment facts or regress the receipt.
     if(coherent && p.commerce_status==='ticketing' && r.commerceStatus==='ticketed') {
       const nowIso=this.now();
-      this.db.tx(()=>{
-        this.db.run('UPDATE purchases SET commerce_status = ?, updated_at = ? WHERE id = ?','ticketed',nowIso,p.id);
+      await this.db.tx(async ()=>{
+        await this.db.run('UPDATE purchases SET commerce_status = $1, updated_at = $2 WHERE id = $3','ticketed',nowIso,p.id);
         receipt.commerceStatus='ticketed';
-        this.db.run('UPDATE purchases SET receipt_json = ? WHERE id = ?',JSON.stringify(receipt),p.id);
-        appendEvent(this.db,p.id,'outcome.refreshed',{commerceStatus:'ticketed'},nowIso);
+        await this.db.run('UPDATE purchases SET receipt_json = $1 WHERE id = $2',JSON.stringify(receipt),p.id);
+        await appendEvent(this.db,p.id,'outcome.refreshed',{commerceStatus:'ticketed'},nowIso);
       });
-      this.complete(job);return;
+      await this.complete(job);return;
     }
     if(p.commerce_status==='ticketing') {
-      if(job.attempts===MAX_RECONCILE_ATTEMPTS) this.db.tx(()=>appendEvent(this.db,p.id,'outcome.manual_required',{reason:'ticket issuance remains unverified; read-only refresh continues hourly'},this.now()));
-      this.reschedule(job,job.attempts>=MAX_RECONCILE_ATTEMPTS?3_600_000:30_000,'ticket issuance not independently confirmed');
+      if(job.attempts===MAX_RECONCILE_ATTEMPTS) await this.db.tx(async ()=>(await appendEvent(this.db,p.id,'outcome.manual_required',{reason:'ticket issuance remains unverified; read-only refresh continues hourly'},this.now())));
+      await this.reschedule(job,job.attempts>=MAX_RECONCILE_ATTEMPTS?3_600_000:30_000,'ticket issuance not independently confirmed');
       return;
     }
-    this.complete(job);
+    await this.complete(job);
   }
 
   private async recoverFunding(job: JobRow): Promise<void> {
-    if (await this.core.recoverPendingFunding(job.purchase_id)) { this.complete(job); return; }
-    if (job.attempts === MAX_RECONCILE_ATTEMPTS) this.db.tx(() => appendEvent(this.db,job.purchase_id,'funding.manual_required',{reason:'candidate transfer still unavailable; automatic read-only recovery continues hourly'},this.now()));
-    this.reschedule(job,job.attempts >= MAX_RECONCILE_ATTEMPTS ? 3_600_000 : RECONCILE_BACKOFF_MS[Math.min(job.attempts,RECONCILE_BACKOFF_MS.length-1)]!);
+    if (await this.core.recoverPendingFunding(job.purchase_id)) { await this.complete(job); return; }
+    if (job.attempts === MAX_RECONCILE_ATTEMPTS) await this.db.tx(async () => (await appendEvent(this.db,job.purchase_id,'funding.manual_required',{reason:'candidate transfer still unavailable; automatic read-only recovery continues hourly'},this.now())));
+    await this.reschedule(job,job.attempts >= MAX_RECONCILE_ATTEMPTS ? 3_600_000 : RECONCILE_BACKOFF_MS[Math.min(job.attempts,RECONCILE_BACKOFF_MS.length-1)]!);
   }
 
   /** Re-check a submitted (not yet confirmed) transfer; apply it once confirmed. */
   private async confirmFunding(job: JobRow): Promise<void> {
-    const p = getPurchaseRow(this.db, job.purchase_id)!;
-    const ev = this.db.get<FundingEvidenceRow>(
-      "SELECT * FROM funding_evidence WHERE purchase_id = ? AND application = 'pending_confirmation' ORDER BY verified_at LIMIT 1",
+    const p = (await getPurchaseRow(this.db, job.purchase_id))!;
+    const ev = await this.db.get<FundingEvidenceRow>(
+      "SELECT * FROM funding_evidence WHERE purchase_id = $1 AND application = 'pending_confirmation' ORDER BY verified_at LIMIT 1",
       p.id,
     );
     if (!ev) {
-      this.complete(job);
+      await this.complete(job);
       return;
     }
     const adapter = this.core.deps.fundingAdapters.get(ev.rail as FundingRail);
@@ -666,13 +673,16 @@ export class Worker {
     const c = await adapter.confirm(vf);
     const nowIso = this.now();
     if (c.paymentState === 'confirmed') {
-      const current=getPurchaseRow(this.db,p.id)!;
-      if(current.state==='awaiting_funding' && Date.parse(getQuoteRow(this.db,current.quote_id)!.expires_at)<=this.core.deps.clock.now().getTime()) this.core.expirePurchase(p.id,'quote expired while confirming funding');
-      this.db.tx(() => {
-        const cur = getPurchaseRow(this.db, p.id)!;
+      const current=(await getPurchaseRow(this.db,p.id))!;
+      if(current.state==='awaiting_funding' && Date.parse((await getQuoteRow(this.db,current.quote_id))!.expires_at)<=this.core.deps.clock.now().getTime()) await this.core.expirePurchase(p.id,'quote expired while confirming funding');
+      await this.db.tx(async () => {
+        // A competing/recovered confirmation may have committed while this readback was awaited.
+        const pending = await this.db.get("SELECT id FROM funding_evidence WHERE id = $1 AND application = 'pending_confirmation'", ev.id);
+        if (!pending) return;
+        const cur = (await getPurchaseRow(this.db, p.id))!;
         const open = cur.state === 'awaiting_funding';
-        this.db.run(
-          "UPDATE funding_evidence SET payment_state = 'confirmed', confirmations = ?, application = ?, observed_at = ? WHERE id = ?",
+        await this.db.run(
+          "UPDATE funding_evidence SET payment_state = 'confirmed', confirmations = $1, application = $2, observed_at = $3 WHERE id = $4",
           c.confirmations,
           open ? 'applied' : 'unapplied',
           c.observedAt,
@@ -681,30 +691,32 @@ export class Worker {
         const req = JSON.parse(cur.funding_requirement_json) as { amountBaseUnits: string };
         const confirmed = { ...vf, paymentState: 'confirmed' as const, confirmations: c.confirmations };
         if (open) {
-          this.core.applyConfirmedFunding(cur, confirmed, BigInt(req.amountBaseUnits), BigInt(ev.amount_base_units), nowIso);
+          await this.core.applyConfirmedFunding(cur, confirmed, BigInt(req.amountBaseUnits), BigInt(ev.amount_base_units), nowIso);
         } else {
-          this.core.recordConfirmedUnappliedFunding(p.id, confirmed, nowIso);
+          await this.core.recordConfirmedUnappliedFunding(p.id, confirmed, nowIso);
         }
       });
-      this.complete(job);
+      await this.complete(job);
       return;
     }
     if (c.paymentState === 'invalid') {
-      this.db.tx(() => {
-        this.db.run("UPDATE funding_evidence SET payment_state = 'invalid', application = 'unapplied' WHERE id = ?", ev.id);
-        this.db.run('DELETE FROM funding_attempts WHERE purchase_id = ? AND transfer_reference = ?',p.id,ev.transfer_reference);
-        transitionPurchase(this.db, p.id, ['awaiting_funding'], { payment_state: 'not_received' }, nowIso);
-        appendEvent(this.db, p.id, 'funding.invalid', { transfer: ev.transfer_reference }, nowIso);
+      await this.db.tx(async () => {
+        const pending = await this.db.get("SELECT id FROM funding_evidence WHERE id = $1 AND application = 'pending_confirmation'", ev.id);
+        if (!pending) return;
+        await this.db.run("UPDATE funding_evidence SET payment_state = 'invalid', application = 'unapplied' WHERE id = $1", ev.id);
+        await this.db.run('DELETE FROM funding_attempts WHERE purchase_id = $1 AND transfer_reference = $2',p.id,ev.transfer_reference);
+        await transitionPurchase(this.db, p.id, ['awaiting_funding'], { payment_state: 'not_received' }, nowIso);
+        await appendEvent(this.db, p.id, 'funding.invalid', { transfer: ev.transfer_reference }, nowIso);
       });
-      this.complete(job);
+      await this.complete(job);
       return;
     }
     if (job.attempts >= MAX_RECONCILE_ATTEMPTS) {
-      if (job.attempts === MAX_RECONCILE_ATTEMPTS) this.db.tx(() => appendEvent(this.db,p.id,'funding.manual_required',{reason:'confirmation delayed; automatic read-only confirmation continues hourly'},nowIso));
-      this.reschedule(job,3_600_000,'confirmation delayed; operator review required');
+      if (job.attempts === MAX_RECONCILE_ATTEMPTS) await this.db.tx(async () => (await appendEvent(this.db,p.id,'funding.manual_required',{reason:'confirmation delayed; automatic read-only confirmation continues hourly'},nowIso)));
+      await this.reschedule(job,3_600_000,'confirmation delayed; operator review required');
       return;
     }
-    this.reschedule(job, RECONCILE_BACKOFF_MS[Math.min(job.attempts, RECONCILE_BACKOFF_MS.length - 1)]!);
+    await this.reschedule(job, RECONCILE_BACKOFF_MS[Math.min(job.attempts, RECONCILE_BACKOFF_MS.length - 1)]!);
   }
 }
 

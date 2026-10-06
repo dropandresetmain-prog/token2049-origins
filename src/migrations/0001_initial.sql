@@ -1,21 +1,11 @@
-/**
- * Schema v1. Single SQLite file, one writer/worker process.
- * Money/base-unit amounts are TEXT integer strings handled with BigInt in code.
- */
-export const SCHEMA_VERSION = 1;
-
-export const SCHEMA_SQL = /* sql */ `
-PRAGMA foreign_keys = ON;
-
-CREATE TABLE IF NOT EXISTS schema_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-
-CREATE TABLE IF NOT EXISTS customers (
+-- PostgreSQL domain schema. Money remains exact integer text, evaluated with BigInt.
+CREATE TABLE customers (
   id TEXT PRIMARY KEY,
   display_name TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS api_clients (
+CREATE TABLE api_clients (
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL REFERENCES customers(id),
   channel TEXT NOT NULL,
@@ -26,7 +16,7 @@ CREATE TABLE IF NOT EXISTS api_clients (
   revoked_at TEXT
 );
 
-CREATE TABLE IF NOT EXISTS offers (
+CREATE TABLE offers (
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL REFERENCES customers(id),
   category TEXT NOT NULL,
@@ -38,9 +28,9 @@ CREATE TABLE IF NOT EXISTS offers (
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS offers_customer ON offers(customer_id);
+CREATE INDEX offers_customer ON offers(customer_id);
 
-CREATE TABLE IF NOT EXISTS quotes (
+CREATE TABLE quotes (
   id TEXT PRIMARY KEY,
   version INTEGER NOT NULL,
   supersedes_quote_id TEXT REFERENCES quotes(id),
@@ -56,9 +46,9 @@ CREATE TABLE IF NOT EXISTS quotes (
   expires_at TEXT NOT NULL,
   created_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS quotes_customer ON quotes(customer_id);
+CREATE INDEX quotes_customer ON quotes(customer_id);
 
-CREATE TABLE IF NOT EXISTS purchases (
+CREATE TABLE purchases (
   id TEXT PRIMARY KEY,
   customer_id TEXT NOT NULL REFERENCES customers(id),
   quote_id TEXT NOT NULL REFERENCES quotes(id),
@@ -76,11 +66,11 @@ CREATE TABLE IF NOT EXISTS purchases (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS purchases_customer ON purchases(customer_id);
+CREATE INDEX purchases_customer ON purchases(customer_id);
 -- One live purchase per quote: a quote cannot be bought twice through competing channels.
-CREATE UNIQUE INDEX IF NOT EXISTS purchases_one_per_quote ON purchases(quote_id);
+CREATE UNIQUE INDEX purchases_one_per_quote ON purchases(quote_id);
 
-CREATE TABLE IF NOT EXISTS idempotency_keys (
+CREATE TABLE idempotency_keys (
   customer_id TEXT NOT NULL,
   operation TEXT NOT NULL,
   idem_key TEXT NOT NULL,
@@ -91,7 +81,7 @@ CREATE TABLE IF NOT EXISTS idempotency_keys (
   PRIMARY KEY (customer_id, operation, idem_key)
 );
 
-CREATE TABLE IF NOT EXISTS funding_evidence (
+CREATE TABLE funding_evidence (
   id TEXT PRIMARY KEY,
   purchase_id TEXT REFERENCES purchases(id),
   rail TEXT NOT NULL,
@@ -113,9 +103,9 @@ CREATE TABLE IF NOT EXISTS funding_evidence (
   details_json TEXT NOT NULL
 );
 -- A transfer proof can be consumed exactly once, across all purchases and channels.
-CREATE UNIQUE INDEX IF NOT EXISTS funding_proof_once ON funding_evidence(rail, network, transfer_reference);
+CREATE UNIQUE INDEX funding_proof_once ON funding_evidence(rail, network, transfer_reference);
 
-CREATE TABLE IF NOT EXISTS capacity_pools (
+CREATE TABLE capacity_pools (
   currency TEXT PRIMARY KEY,
   scale INTEGER NOT NULL,
   limit_minor TEXT NOT NULL,
@@ -124,7 +114,7 @@ CREATE TABLE IF NOT EXISTS capacity_pools (
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS reservations (
+CREATE TABLE reservations (
   id TEXT PRIMARY KEY,
   purchase_id TEXT NOT NULL UNIQUE REFERENCES purchases(id),
   currency TEXT NOT NULL REFERENCES capacity_pools(currency),
@@ -136,7 +126,7 @@ CREATE TABLE IF NOT EXISTS reservations (
   updated_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS jobs (
+CREATE TABLE jobs (
   id TEXT PRIMARY KEY,
   kind TEXT NOT NULL,
   purchase_id TEXT NOT NULL REFERENCES purchases(id),
@@ -150,10 +140,10 @@ CREATE TABLE IF NOT EXISTS jobs (
   created_at TEXT NOT NULL,
   updated_at TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS jobs_ready ON jobs(status, run_after);
+CREATE INDEX jobs_ready ON jobs(status, run_after);
 
 -- Candidate hashes are durable before settlement; signed payloads and keys are never stored here.
-CREATE TABLE IF NOT EXISTS funding_attempts (
+CREATE TABLE funding_attempts (
   id TEXT PRIMARY KEY,
   purchase_id TEXT NOT NULL UNIQUE REFERENCES purchases(id),
   rail TEXT NOT NULL,
@@ -165,7 +155,7 @@ CREATE TABLE IF NOT EXISTS funding_attempts (
   UNIQUE (rail, network, transfer_reference)
 );
 
-CREATE TABLE IF NOT EXISTS execution_attempts (
+CREATE TABLE execution_attempts (
   id TEXT PRIMARY KEY,
   purchase_id TEXT NOT NULL REFERENCES purchases(id),
   attempt_no INTEGER NOT NULL,
@@ -179,7 +169,7 @@ CREATE TABLE IF NOT EXISTS execution_attempts (
   UNIQUE (purchase_id, attempt_no)
 );
 
-CREATE TABLE IF NOT EXISTS journal_entries (
+CREATE TABLE journal_entries (
   id TEXT PRIMARY KEY,
   event_key TEXT NOT NULL UNIQUE,
   purchase_id TEXT REFERENCES purchases(id),
@@ -190,28 +180,27 @@ CREATE TABLE IF NOT EXISTS journal_entries (
   created_at TEXT NOT NULL
 );
 
-CREATE TABLE IF NOT EXISTS journal_lines (
-  id INTEGER PRIMARY KEY AUTOINCREMENT,
+CREATE TABLE journal_lines (
+  id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
   entry_id TEXT NOT NULL REFERENCES journal_entries(id),
   account TEXT NOT NULL,
   asset TEXT NOT NULL,
   side TEXT NOT NULL CHECK (side IN ('debit','credit')),
   amount TEXT NOT NULL
 );
-CREATE INDEX IF NOT EXISTS journal_lines_entry ON journal_lines(entry_id);
-CREATE INDEX IF NOT EXISTS journal_lines_account ON journal_lines(account, asset);
+CREATE INDEX journal_lines_entry ON journal_lines(entry_id);
+CREATE INDEX journal_lines_account ON journal_lines(account, asset);
 
--- Immutability: journal rows can never be updated or deleted.
-CREATE TRIGGER IF NOT EXISTS journal_entries_no_update BEFORE UPDATE ON journal_entries
-BEGIN SELECT RAISE(ABORT, 'journal entries are immutable'); END;
-CREATE TRIGGER IF NOT EXISTS journal_entries_no_delete BEFORE DELETE ON journal_entries
-BEGIN SELECT RAISE(ABORT, 'journal entries are immutable'); END;
-CREATE TRIGGER IF NOT EXISTS journal_lines_no_update BEFORE UPDATE ON journal_lines
-BEGIN SELECT RAISE(ABORT, 'journal lines are immutable'); END;
-CREATE TRIGGER IF NOT EXISTS journal_lines_no_delete BEFORE DELETE ON journal_lines
-BEGIN SELECT RAISE(ABORT, 'journal lines are immutable'); END;
+-- The application role cannot update/delete journal rows. Inserts remain transactional.
+CREATE FUNCTION reject_journal_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN RAISE EXCEPTION 'journal rows are immutable'; END;
+$$;
+CREATE TRIGGER journal_entries_immutable BEFORE UPDATE OR DELETE ON journal_entries
+FOR EACH ROW EXECUTE FUNCTION reject_journal_mutation();
+CREATE TRIGGER journal_lines_immutable BEFORE UPDATE OR DELETE ON journal_lines
+FOR EACH ROW EXECUTE FUNCTION reject_journal_mutation();
 
-CREATE TABLE IF NOT EXISTS purchase_events (
+CREATE TABLE purchase_events (
   id TEXT PRIMARY KEY,
   purchase_id TEXT NOT NULL REFERENCES purchases(id),
   sequence INTEGER NOT NULL,
@@ -221,7 +210,7 @@ CREATE TABLE IF NOT EXISTS purchase_events (
   UNIQUE (purchase_id, sequence)
 );
 
-CREATE TABLE IF NOT EXISTS bank_observations (
+CREATE TABLE bank_observations (
   id TEXT PRIMARY KEY,
   bank TEXT NOT NULL,
   kind TEXT NOT NULL,
@@ -236,4 +225,3 @@ CREATE TABLE IF NOT EXISTS bank_observations (
   observed_at TEXT NOT NULL,
   caveats_json TEXT NOT NULL
 );
-`;
