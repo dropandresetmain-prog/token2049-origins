@@ -79,18 +79,22 @@ describe('Coinbase CDP treasury guards', () => {
       throw new Error('sensitive CDP response must not escape');
     });
     const account = {
-      useNetwork: vi.fn(async (network: string) => ({
-        network,
+      useNetwork: vi.fn(async (_rpcUrl: string) => ({
         sendTransaction,
       })),
     };
     const client = { evm: { getAccount: vi.fn(async () => account) } } as unknown as CdpClient;
     const rpc: CdpRpc = {
+      assertNetwork: vi.fn(async () => {}),
       transaction: vi.fn(async () => ({ from: identity.treasuryAddress, to: identity.recipientAddress, value: `0x${CDP_TRANSFER_WEI.toString(16)}`, chainId: `0x${CDP_CHAIN_ID.toString(16)}` })),
       receipt: vi.fn(async () => ({ status: '0x1', transactionHash: '0x' + 'a'.repeat(64) })),
     };
 
-    await expect(executeTestTransfer(client, settings, identity, rpc)).rejects.toThrow(/result is unknown/);
+    let resultError: unknown;
+    try { await executeTestTransfer(client, settings, identity, rpc); } catch (error) { resultError = error; }
+    expect(resultError).toBeInstanceOf(Error);
+    expect((resultError as Error).message).toMatch(/Do not retry or resend/);
+    expect((resultError as Error).message).toMatch(/read-only operator reconciliation/);
     const unknown = readHistory(settings.historyFile, identity);
     expect(unknown.status).toBe('unknown');
     expect(unknown.attempted).toBe(true);
@@ -110,29 +114,44 @@ describe('Coinbase CDP treasury guards', () => {
     writeHistoryAtomic(settings.historyFile, submitted);
     const sendTransaction = vi.fn();
     const client = { evm: { getAccount: vi.fn(async () => ({ useNetwork: async () => ({ sendTransaction }) })) } } as unknown as CdpClient;
-    const rpc: CdpRpc = { transaction: vi.fn(async () => null), receipt: vi.fn(async () => null) };
+    const rpc: CdpRpc = { assertNetwork: vi.fn(async () => {}), transaction: vi.fn(async () => null), receipt: vi.fn(async () => null) };
     const result = await executeTestTransfer(client, settings, identity, rpc);
     expect(result.status).toBe('submitted');
     expect(sendTransaction).not.toHaveBeenCalled();
+  });
+
+  it('verifies Base Sepolia through the configured RPC before reserving or sending', async () => {
+    const settings = tempSettings();
+    const initial = createHistoryOnce(settings.historyFile, identity);
+    const sendTransaction = vi.fn();
+    const client = { evm: { getAccount: vi.fn(async () => ({ useNetwork: vi.fn(async () => ({ sendTransaction })) })) } } as unknown as CdpClient;
+    const rpc: CdpRpc = {
+      assertNetwork: vi.fn(async () => { throw new Error('wrong network'); }),
+      transaction: vi.fn(async () => null),
+      receipt: vi.fn(async () => null),
+    };
+    await expect(executeTestTransfer(client, settings, identity, rpc)).rejects.toThrow(/wrong network/);
+    expect(sendTransaction).not.toHaveBeenCalled();
+    expect(readHistory(settings.historyFile, identity)).toEqual(initial);
   });
 
   it('blocks provisioning when an existing public identity has lost its history before any API call', async () => {
     const settings = tempSettings();
     const { writeFileSync } = await import('node:fs');
     writeFileSync(settings.identityFile, JSON.stringify(identity));
-    const getOrCreateAccount = vi.fn();
-    const client = { evm: { getOrCreateAccount } } as unknown as CdpClient;
+    const createAccount = vi.fn();
+    const client = { evm: { createAccount } } as unknown as CdpClient;
     await expect(provision(client, settings)).rejects.toThrow(/history is missing/);
-    expect(getOrCreateAccount).not.toHaveBeenCalled();
+    expect(createAccount).not.toHaveBeenCalled();
   });
 
   it('refuses to attach a Capsule policy to a treasury with existing policy authority', async () => {
     const settings = tempSettings();
-    const getOrCreateAccount = vi.fn(async ({ name }: { name: string }) => name === identity.treasuryName
+    const createAccount = vi.fn(async ({ name }: { name: string }) => name === identity.treasuryName
       ? { address: identity.treasuryAddress, policies: ['pre-existing-policy'] }
       : { address: identity.recipientAddress, policies: [] });
     const createPolicy = vi.fn();
-    const client = { evm: { getOrCreateAccount }, policies: { createPolicy } } as unknown as CdpClient;
+    const client = { evm: { createAccount }, policies: { createPolicy } } as unknown as CdpClient;
     await expect(provision(client, settings)).rejects.toThrow(/already has an attached policy/);
     expect(createPolicy).not.toHaveBeenCalled();
   });

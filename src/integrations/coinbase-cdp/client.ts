@@ -1,4 +1,5 @@
 import { closeSync, existsSync, fsyncSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { dirname } from 'node:path';
 import { CdpClient } from '@coinbase/cdp-sdk';
 import { CDP_NETWORK, CDP_POLICY_ATTACH_IDEMPOTENCY_KEY, CDP_POLICY_DESCRIPTION, CDP_POLICY_IDEMPOTENCY_KEY, CDP_RECIPIENT_NAME, CDP_TREASURY_NAME, requireAbsoluteFile, validatePair } from './contracts.js';
 import type { CdpPublicIdentity, CdpSettings } from './contracts.js';
@@ -63,6 +64,10 @@ function saveIdentityOnce(path: string, identity: CdpPublicIdentity): CdpPublicI
     const fd = openSync(path, 'wx', 0o600);
     try { writeFileSync(fd, JSON.stringify(identity, null, 2) + '\n', 'utf8'); fsyncSync(fd); }
     finally { closeSync(fd); }
+    if (process.platform !== 'win32') {
+      const directory = openSync(dirname(path), 'r');
+      try { fsyncSync(directory); } finally { closeSync(directory); }
+    }
     return identity;
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code !== 'EEXIST') throw new Error('could not persist CDP public identity');
@@ -87,8 +92,8 @@ export async function provision(client: CdpClient, settings: CdpSettings): Promi
   if (hasHistory) throw new Error('CDP action history exists without its public identity; provisioning blocked for reconciliation');
   protectHistoryDirectory(settings.historyFile);
 
-  const recipient = await client.evm.getOrCreateAccount({ name: CDP_RECIPIENT_NAME });
-  const treasury = await client.evm.getOrCreateAccount({ name: CDP_TREASURY_NAME });
+  const recipient = await client.evm.createAccount({ name: CDP_RECIPIENT_NAME });
+  const treasury = await client.evm.createAccount({ name: CDP_TREASURY_NAME });
   const pair = validatePair(treasury.address, recipient.address);
   if (treasury.policies?.length) throw new Error('dedicated CDP treasury already has an attached policy; refusing to alter wallet authority');
 

@@ -77,6 +77,10 @@ export function createHistoryOnce(path: string, identity: CdpPublicIdentity): Cd
   const history = initialHistory(identity);
   try {
     syncWrite(path, JSON.stringify(history, null, 2) + '\n');
+    if (process.platform !== 'win32') {
+      const directory = openSync(dirname(path), 'r');
+      try { fsyncSync(directory); } finally { closeSync(directory); }
+    }
   } catch (error) {
     if ((error as NodeJS.ErrnoException).code === 'EEXIST') return readHistory(path, identity);
     throw new Error('could not create protected CDP action history');
