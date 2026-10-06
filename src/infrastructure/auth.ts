@@ -38,7 +38,23 @@ export async function authenticate(db: Db, authorization: string | undefined, re
     'SELECT id, customer_id, channel, scopes_json, revoked_at FROM api_clients WHERE token_hash = $1',
     sha256Hex(m[1]!),
   );
-  if (!row || row.revoked_at) throw new CoreError('unauthenticated', 'invalid credentials');
+  if (!row) return authenticateOAuthAccessToken(db, m[1]!, requestId);
+  if (row.revoked_at) throw new CoreError('unauthenticated', 'invalid credentials');
   const scopes = new Set<Scope>((JSON.parse(row.scopes_json) as string[]).filter((s): s is Scope => Scope.safeParse(s).success));
   return { customerId: row.customer_id, clientId: row.id, channel: row.channel, scopes, requestId };
+}
+
+/**
+ * OAuth access tokens issued by the hosted MCP authorization server resolve to the same customer/api_client identity as
+ * a static client token, restricted to the (never larger) scope set recorded on the token.
+ */
+async function authenticateOAuthAccessToken(db: Db, token: string, requestId: string): Promise<ActorContext> {
+  const row = await db.get<{ customer_id: string; api_client_id: string; channel: Channel; scopes_json: string; client_scopes_json: string; expires_at: string; revoked_at: string | null; client_revoked_at: string | null }>(
+    "SELECT t.customer_id, t.api_client_id, a.channel, t.scopes_json, a.scopes_json AS client_scopes_json, t.expires_at, t.revoked_at, a.revoked_at AS client_revoked_at FROM oauth_tokens t JOIN api_clients a ON a.id = t.api_client_id WHERE t.token_hash = $1 AND t.kind = 'access'",
+    sha256Hex(token),
+  );
+  if (!row || row.revoked_at || row.client_revoked_at || row.expires_at <= new Date().toISOString()) throw new CoreError('unauthenticated', 'invalid credentials');
+  const held = new Set<string>(JSON.parse(row.client_scopes_json) as string[]);
+  const scopes = new Set<Scope>((JSON.parse(row.scopes_json) as string[]).filter((s): s is Scope => Scope.safeParse(s).success && held.has(s)));
+  return { customerId: row.customer_id, clientId: row.api_client_id, channel: row.channel, scopes, requestId };
 }

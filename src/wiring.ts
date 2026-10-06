@@ -14,6 +14,9 @@ import { createEvidenceRouter, createInspectRouter } from './evidence/router.js'
 import { CoreError } from './core/errors.js';
 import { appendEvent } from './core/store.js';
 import type { CommerceCore } from './core/service.js';
+import { loadHostedMcpConfig } from './channels/hosted-mcp/config.js';
+import { createHostedMcp } from './channels/hosted-mcp/router.js';
+import { createConsoleRedirect, createConsoleRouter } from './console/router.js';
 
 /** A verified webhook provides a lookup hint, never payment truth. Admin readback binds the quote again. */
 export async function enqueueShopifyReadback(core: CommerceCore, hint: ShopifyReconcileHint): Promise<void> {
@@ -45,6 +48,8 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
     buildRouters:core=>{
       runtimeDb = core.deps.db;
       const routers:NonNullable<GatewayParts['extraRouters']>=[
+        // Hosted MCP + its OAuth server share this process and public port. Opt-in: absent unless MCP_HOSTED_ENABLED=true.
+        ...(()=>{const hosted=loadHostedMcpConfig(env); return hosted?createHostedMcp({db:core.deps.db,config:hosted}).mounts:[];})(),
         {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:core.deps.clock,bankAdapters}),auth:true},
         {path:'/inspect',router:createInspectRouter(),auth:false},
         // The console is the customer frontend; the earlier /proof page now sends people there.
@@ -61,4 +66,4 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
     },
   };
 }
-import { createConsoleRedirect, createConsoleRouter } from './console/router.js';
+

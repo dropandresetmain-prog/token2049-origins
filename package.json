@@ -33,7 +33,9 @@
     "console:build": "vite build --config web/vite.config.ts",
     "console:build:gateway": "vite build --config web/vite.config.ts --mode gateway",
     "console:test": "vitest run --config web/vitest.config.ts",
-    "console:typecheck": "tsc -p web/tsconfig.json"
+    "console:typecheck": "tsc -p web/tsconfig.json",
+    "payer:hosted": "tsx clients/payer/hosted.ts",
+    "payer:hosted:init-ledger": "tsx clients/payer/hosted.ts --init-ledger"
   },
   "dependencies": {
     "@evolution-sdk/evolution": "0.5.14",

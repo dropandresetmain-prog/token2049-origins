@@ -7,7 +7,9 @@
  *     200 { ok:true, purchase, payment:{ transferReference } }
  *     4xx { ok:false, error:{ code, message } }
  *
- * Listens on 127.0.0.1 only. One payment at a time (mutex). Responses never include signed payloads.
+ * Listens on 127.0.0.1 only by default. The hosted deployment opts into `access.mode = 'private'`: bound to the platform's
+ * private network, accepting only private-range peers and an exact Host allowlist (never a public name, never a browser).
+ * One payment at a time (mutex). Responses never include signed payloads.
  */
 import { createHash, timingSafeEqual } from 'node:crypto';
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from 'node:http';
@@ -33,12 +35,29 @@ export interface BridgePayer {
   pay(purchaseId: string): Promise<{ purchase?: unknown; transferReference: string | null; resumed: boolean }>;
 }
 
+/** Where a bridge may be reached from. Loopback is the default; `private` is for a private-network-only hosted service. */
+export type BridgeAccess = { mode: 'loopback' } | { mode: 'private'; allowedHosts: string[] };
+
 export interface BridgeDeps {
   payer: BridgePayer;
+  access?: BridgeAccess;
   source?: () => Promise<FundingSource>;
   /** Bearer token callers must present. */
   token: string;
   log?: (e: Record<string, unknown>) => void;
+}
+
+/** Loopback or RFC 1918 / ULA peers only; used in private mode as defence in depth behind the platform's network isolation. */
+export function isPrivatePeer(address: string | undefined): boolean {
+  if (!address) return false;
+  const a = address.replace(/^::ffff:/i, '').toLowerCase();
+  if (a === '127.0.0.1' || a === '::1') return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(a);
+  if (v4) {
+    const [x, y] = [Number(v4[1]), Number(v4[2])];
+    return x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168);
+  }
+  return /^f[cd][0-9a-f]{2}:/.test(a);
 }
 
 function sameToken(presented: string, expected: string): boolean {
@@ -84,9 +103,17 @@ export function createBridge(deps: BridgeDeps): Server {
     void (async () => {
       try {
         const remote = req.socket.remoteAddress;
-        if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') return fail(res, 'unauthenticated', 'bridge is local only');
-        if (!/^(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]+)?$/i.test(req.headers.host ?? '') || req.headers.origin) {
-          return fail(res, 'unauthenticated', 'bridge requires a local non-browser caller');
+        const access = deps.access ?? { mode: 'loopback' };
+        if (access.mode === 'private') {
+          if (!isPrivatePeer(remote)) return fail(res, 'unauthenticated', 'bridge is private-network only');
+          if (!access.allowedHosts.includes((req.headers.host ?? '').toLowerCase()) || req.headers.origin) {
+            return fail(res, 'unauthenticated', 'bridge requires a private non-browser caller');
+          }
+        } else {
+          if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') return fail(res, 'unauthenticated', 'bridge is local only');
+          if (!/^(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]+)?$/i.test(req.headers.host ?? '') || req.headers.origin) {
+            return fail(res, 'unauthenticated', 'bridge requires a local non-browser caller');
+          }
         }
         const path = req.url ?? '';
         if (req.method === 'GET' && path === '/health') return send(res, 200, { ok: true });
@@ -132,6 +159,14 @@ export function createBridge(deps: BridgeDeps): Server {
   server.headersTimeout = 10_000;
   server.maxHeadersCount = 32;
   return server;
+}
+
+/** Bind a private-network bridge on all interfaces; reachability is restricted by the platform plus isPrivatePeer/Host checks. */
+export async function listenPrivate(server: Server, port: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '0.0.0.0', resolve);
+  });
 }
 
 /** 127.0.0.1 only: a bridge can cause spending and must not be reachable off-host. */

@@ -17,6 +17,24 @@ export interface ToolDeps {
   bridges?: BridgeClient[];
   /** Secret strings (gateway token, bridge tokens) that must never appear in any output. */
   secrets: string[];
+  /** Present on the hosted endpoint: tools declare OAuth security schemes and enforce the token's scopes. */
+  auth?: { resourceMetadataUrl: string };
+}
+
+/** OAuth scope each tool needs (same names as the gateway's customer scopes). */
+const TOOL_SCOPE = { find_offers: 'offers:read', create_quote: 'quotes:write', buy: 'purchases:write', get_purchase: 'purchases:read' } as const;
+type ToolName = keyof typeof TOOL_SCOPE;
+
+/** `securitySchemes` is how ChatGPT learns a tool needs OAuth (and which scopes) before it links an account. */
+function securityMeta(deps: ToolDeps, tool: ToolName): { _meta: Record<string, unknown> } | Record<string, never> {
+  return deps.auth ? { _meta: { securitySchemes: [{ type: 'oauth2', scopes: [TOOL_SCOPE[tool]] }] } } : {};
+}
+
+/** A token without the tool's scope gets a result that asks ChatGPT to re-link, never a silent downgrade. */
+function missingScope(deps: ToolDeps, tool: ToolName, extra: { authInfo?: { scopes: string[] } }): CallToolResult | null {
+  if (!deps.auth || extra.authInfo?.scopes.includes(TOOL_SCOPE[tool])) return null;
+  const challenge = `Bearer resource_metadata="${deps.auth.resourceMetadataUrl}", error="insufficient_scope", error_description="${TOOL_SCOPE[tool]} is required", scope="${TOOL_SCOPE[tool]}"`;
+  return { isError: true, content: [{ type: 'text', text: 'This connection does not grant the permission required by this tool. Reconnect Capsule to approve it.' }], _meta: { 'mcp/www_authenticate': [challenge] } };
 }
 
 /** Same shape the core enforces on Idempotency-Key, so we fail fast before any HTTP call. */
@@ -100,7 +118,11 @@ export function describePurchase(p: PurchaseView): string {
 function describeOffers(offers: OfferView[]): string {
   if (offers.length === 0) return 'No offers found. Try a different query or a higher spend ceiling.';
   const lines = offers.map((o) => `- ${o.offerId} | ${o.title} | ${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)} | expires ${o.expiresAt}${o.sourceOffer ? ' | source ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl + ' | execution: Capsule Shopify Sandbox' : ''}`);
-  return `${offers.length} offer(s). Offers are indicative and NOT executable; call create_quote for exact terms.\n${lines.join('\n')}`;
+  return [
+    `${offers.length} offer(s). Offers are indicative and NOT executable.`,
+    ...lines,
+    'NEXT STEP FOR YOU: do not choose for the user and do not call create_quote yet. Present the best 3 viable options (fewer if fewer exist), mark exactly one "Recommended" with a brief reason grounded in the request of the user and these results, and ask which one they want. Call create_quote only after they choose.',
+  ].join('\n');
 }
 
 export function describeQuote(q: QuoteView, sources: FundingSource[]): string {
@@ -125,6 +147,38 @@ export function describeQuote(q: QuoteView, sources: FundingSource[]): string {
   ].join('\n');
 }
 
+/* ---------------- order confirmation ---------------- */
+
+/**
+ * Present ONLY when the purchase state proves retail success (state succeeded, paid commerce + merchant status, receipt issued).
+ * Anything else (pending, unresolved, held) yields no confirmation, so the agent has nothing to over-claim.
+ */
+export function orderConfirmation(p: PurchaseView): Record<string, unknown> | null {
+  if (projectProgress(p).stage !== 'complete' || !p.receipt) return null;
+  const r = p.receipt;
+  return {
+    headline: 'Order confirmed',
+    environment: r.providerEnvironment,
+    merchant: r.sourceOffer?.merchantName ?? null,
+    product: r.sourceOffer?.productUrl ?? null,
+    orderReference: p.providerReference,
+    receiptId: r.receiptId,
+    purchaseId: p.purchaseId,
+    quoteId: p.quoteId,
+    merchantStatus: r.commerceStatus,
+    merchantPaymentStatus: r.merchantPaymentStatus,
+    principal: formatMinor(r.principal),
+    serviceFee: formatMinor(r.serviceFee),
+    payments: r.funding.map((f) => ({ rail: f.rail, network: f.network, transferReference: f.transferReference, verifiedAt: f.verifiedAt })),
+    limitations: r.limitations,
+    issuedAt: r.issuedAt,
+  };
+}
+
+function confirmationText(c: Record<string, unknown>): string {
+  return `${c.headline as string}. ${c.merchant ? `Merchant: ${c.merchant as string}. ` : ''}Order reference: ${String(c.orderReference)}. Receipt: ${String(c.receiptId)}. Amount ${String(c.principal)} + service fee ${String(c.serviceFee)} (${String(c.environment)} environment). Tell the user "Order confirmed" and share these references.`;
+}
+
 /* ---------------- tool registration ---------------- */
 
 export function registerTools(server: McpServer, deps: ToolDeps): void {
@@ -134,16 +188,19 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       title: 'Find offers',
       description:
-        'Search supported retail, hotel and flight offers from a structured purchase intent. Results are indicative and NOT executable: call create_quote on an offerId for exact terms. Nothing is bought or reserved.',
+        'Search supported retail, hotel and flight offers from a structured purchase intent. Results are indicative and NOT executable. Nothing is bought or reserved. Afterwards present the best 3 options to the user, mark one "Recommended" with a short reason, and let the user choose before calling create_quote.',
       inputSchema: { intent: PurchaseIntentDraft },
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+      ...securityMeta(deps, 'find_offers'),
     },
-    async ({ intent }) => {
+    async ({ intent }, extra) => {
+      const denied = missingScope(deps, 'find_offers', extra);
+      if (denied) return denied;
       try {
         const assessment = assessPurchaseIntent(intent);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
         const { offers } = await deps.gateway.searchOffers(assessment.value);
-        return success(deps, describeOffers(offers), { offers });
+        return success(deps, describeOffers(offers), { offers, selection: { required: offers.length > 0, presentBest: Math.min(3, offers.length), markOneRecommended: true, askUserToChoose: true } });
       } catch (e) {
         return gatewayFailure(deps, e);
       }
@@ -155,11 +212,14 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       title: 'Create exact quote',
       description:
-        'Turn an offerId into an immutable quote with the exact price breakdown, funding requirement, expiry and digest. Takes buyer/shipping/traveller details in `fulfillment`. In sandbox, ask the user to supply synthetic traveller and shipping data. Never invent required customer information or silently fill demo defaults. Nothing is bought.',
+        'Turn the offerId the USER CHOSE into an immutable quote with the exact price breakdown, funding requirement, expiry and digest. Call only after the user picked one of the presented offers. Takes buyer/shipping/traveller details in `fulfillment`. In sandbox, ask the user to supply synthetic traveller and shipping data. Never invent required customer information or silently fill demo defaults. Nothing is bought.',
       inputSchema: { offerId: OfferId, fulfillment: FulfillmentDraft },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
+      ...securityMeta(deps, 'create_quote'),
     },
-    async ({ offerId, fulfillment }) => {
+    async ({ offerId, fulfillment }, extra) => {
+      const denied = missingScope(deps, 'create_quote', extra);
+      if (denied) return denied;
       try {
         const assessment = assessFulfillment(fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
@@ -185,9 +245,12 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         selectedFundingOptionId: z.string().regex(/^fop_[0-9A-Za-z]{10,40}$/).optional(),
         idempotencyKey: IdempotencyKey.optional(),
       },
-      annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
+      ...securityMeta(deps, 'buy'),
     },
-    async ({ quoteId, maxTotal, quoteDigest, selectedFundingOptionId, idempotencyKey }) => {
+    async ({ quoteId, maxTotal, quoteDigest, selectedFundingOptionId, idempotencyKey }, extra) => {
+      const denied = missingScope(deps, 'buy', extra);
+      if (denied) return denied;
       try {
         const { quote } = await deps.gateway.getQuote(quoteId);
         if (!selectedFundingOptionId) return inputNeeded(deps, {
@@ -254,6 +317,11 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           purchase.state === 'awaiting_funding' ? (purchase.paymentState !== 'not_received' ? 'confirmation_pending' : paymentFailed ? 'payment_failed' : 'action_required') : purchase.state === 'funded_queued' || purchase.state === 'executing' ? 'execution_pending' : purchase.state;
         const structured: Record<string, unknown> = { status, purchase, progress: projectProgress(purchase), ...(payment ? { payment } : {}) };
         let text = describePurchase(purchase);
+        const confirmation = orderConfirmation(purchase);
+        if (confirmation) {
+          structured.orderConfirmation = confirmation;
+          text = confirmationText(confirmation) + '\n' + text;
+        }
 
         if (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received') {
           structured.fundingInstructions = purchase.fundingInstructions;
@@ -279,13 +347,21 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       description:
         'Read the status and receipt of a purchase. Reports funding (paymentState), provider order (commerceStatus) and merchant payment separately: a held or unpaid order is not complete, and "unresolved" means the outcome is still being reconciled. Set includeEvents for the most recent redacted events.',
       inputSchema: { purchaseId: PurchaseId, includeEvents: z.boolean().optional() },
-      annotations: { readOnlyHint: true, openWorldHint: true },
+      annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
+      ...securityMeta(deps, 'get_purchase'),
     },
-    async ({ purchaseId, includeEvents }) => {
+    async ({ purchaseId, includeEvents }, extra) => {
+      const denied = missingScope(deps, 'get_purchase', extra);
+      if (denied) return denied;
       try {
         const { purchase } = await deps.gateway.getPurchase(purchaseId);
         const structured: Record<string, unknown> = { purchase, progress: projectProgress(purchase) };
         let text = describePurchase(purchase);
+        const confirmation = orderConfirmation(purchase);
+        if (confirmation) {
+          structured.orderConfirmation = confirmation;
+          text = confirmationText(confirmation) + '\n' + text;
+        }
         if (includeEvents) {
           const { events } = await deps.gateway.getEvents(purchaseId);
           const recent = events.slice(-10);

@@ -6,6 +6,8 @@ Current baseline: main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540
 
 Protocol/local MCP tests pass. Actual ChatGPT host connection is not yet verified.
 
+The publicly hosted, OAuth-protected endpoint (`/mcp` on the gateway origin) and its hosted Cardano payer are documented in [hosted-mcp.md](hosted-mcp.md); this page describes the tools and the local stdio/loopback modes.
+
 ## Tools
 
 | Tool | Meaning |

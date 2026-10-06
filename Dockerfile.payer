@@ -1,0 +1,15 @@
+# Hosted Cardano Preprod payer (private service). It holds spending authority (a mnemonic secret file) and a durable
+# spend ledger on a persistent disk, so it is a separate image from the public gateway and is never publicly routable.
+# Testnet only. See docs/channels/hosted-mcp.md.
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+# tsx is a dev dependency and runs the TypeScript sources directly, so install everything before NODE_ENV=production.
+RUN npm ci
+ENV NODE_ENV=production
+COPY tsconfig.json ./
+COPY src ./src
+COPY clients/payer ./clients/payer
+# The persistent disk is mounted at /var/data and is root-owned on Render, so this service runs as root inside its container.
+EXPOSE 8788
+CMD ["node_modules/.bin/tsx", "clients/payer/hosted.ts"]

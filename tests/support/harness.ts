@@ -35,7 +35,7 @@ export const TEST_ENV = {
   SIMULATED_CARD_CAPACITY_USD_MINOR: '20000',
 } as NodeJS.ProcessEnv;
 
-export async function startHarness(opts: { schema?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[]; settlementPolicy?: SettlementPolicy; serviceFeeBps?: number } = {}): Promise<Harness> {
+export async function startHarness(opts: { schema?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[]; settlementPolicy?: SettlementPolicy; serviceFeeBps?: number; port?: number; extraRouters?: (core: Gateway['core']) => NonNullable<Parameters<typeof buildGateway>[0]['extraRouters']> } = {}): Promise<Harness> {
   const clock = opts.clock ?? new ManualClock();
   const db = opts.db ?? await createTestDb(opts.schema);
   const retail = new FixtureExecutor('shopify', 'retail', clock);
@@ -46,6 +46,7 @@ export async function startHarness(opts: { schema?: string; db?: Db; clock?: Man
     { executors: [retail, hotel, flight], fundingAdapters: [funding], bankAdapters: opts.bankAdapters ?? [], buildRouters: core => [
       { path: '/v1/evidence', router: createEvidenceRouter({ db: core.deps.db, clock, bankAdapters: opts.bankAdapters ?? [] }), auth: true },
       { path: '/proof', router: createProofPageRouter(), auth: false },
+      ...(opts.extraRouters?.(core) ?? []),
     ] },
     { env: TEST_ENV, clock, db },
   );
@@ -56,7 +57,7 @@ export async function startHarness(opts: { schema?: string; db?: Db; clock?: Man
   const alice = await createClient(db, { displayName: 'Alice', channel: 'test', label: `alice-${existing.n}` }, now);
   const bob = await createClient(db, { displayName: 'Bob', channel: 'test', label: `bob-${existing.n}` }, now);
   const server = await new Promise<Server>((r) => {
-    const s = gw.app.listen(0, '127.0.0.1', () => r(s));
+    const s = gw.app.listen(opts.port ?? 0, '127.0.0.1', () => r(s));
   });
   const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
   const call: Harness['call'] = async (method, path, o = {}) => {

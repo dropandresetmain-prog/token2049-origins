@@ -1,6 +1,10 @@
 import { createTestDb } from '../support/database.js';
 import {describe,it,expect} from 'vitest';
 import {createHmac} from 'node:crypto';
+import {mkdtempSync,rmSync,writeFileSync} from 'node:fs';
+import {tmpdir} from 'node:os';
+import {join} from 'node:path';
+import {createServer as createNetServer} from 'node:net';
 import type {AddressInfo} from 'node:net';
 import {realParts} from '../../src/wiring.js';
 import {buildGateway} from '../../src/composition.js';
@@ -18,6 +22,8 @@ describe('production composition boundaries (offline)',()=>{
       expect(parts.fundingAdapters.map(f=>f.rail)).toEqual(['cardano','solana','masumi']);
       for(const c of [...parts.executors,...parts.fundingAdapters,...parts.bankAdapters]) expect((await c.readiness()).status).toBe('MISSING_CONFIG');
       expect((await fetch(url+'/inspect')).status).toBe(200);
+      // Hosted MCP is opt-in: without MCP_HOSTED_ENABLED neither /mcp nor any OAuth endpoint exists.
+      for(const path of ['/mcp','/authorize','/token','/register','/.well-known/oauth-authorization-server','/.well-known/oauth-protected-resource']) expect((await fetch(url+path,{method:path==='/mcp'?'POST':'GET',redirect:'manual'})).status,path).toBe(404);
       expect((await fetch(url+'/v1/evidence/purchases')).status).toBe(401);
       const webhook=await fetch(url+'/v1/webhooks/shopify',{method:'POST'});
       expect(webhook.status).toBe(503);expect((await webhook.json() as any).error).toMatchObject({code:'route_unavailable',requestId:expect.any(String)});
@@ -47,5 +53,22 @@ describe('production composition boundaries (offline)',()=>{
       expect((await h.gw.db.get<{state:string}>('SELECT state FROM purchases WHERE id = $1',id))!.state).toBe('succeeded');expect((await send()).status).toBe(202);expect(reads).toBe(1);
       const stored=JSON.stringify((await h.gw.db.all('SELECT data_json FROM purchase_events')));expect(stored).not.toContain('private@example.com');
     } finally {await new Promise<void>(r=>server.close(()=>r()));await h.close();await h.gw.db.close();}
+  });
+
+  it('mounts the hosted MCP and OAuth server on the single gateway app only when explicitly enabled',async()=>{
+    const root=mkdtempSync(join(tmpdir(),'wiring-hosted-')),pass=join(root,'pass');writeFileSync(pass,'owner-passcode-0123456789');
+    const db=await createTestDb(),port=await new Promise<number>(r=>{const n=createNetServer();n.listen(0,'127.0.0.1',()=>{const p=(n.address() as AddressInfo).port;n.close(()=>r(p));});});
+    const base='http://127.0.0.1:'+port;
+    const env={MCP_HOSTED_ENABLED:'true',MCP_PUBLIC_URL:base,PUBLIC_BASE_URL:base,PORT:String(port),MCP_OAUTH_OWNER_PASSCODE_FILE:pass} as NodeJS.ProcessEnv;
+    const gw=await buildGateway(realParts(env,()=>undefined),{env:{...TEST_ENV,PUBLIC_BASE_URL:base},db});
+    const server=gw.app.listen(port,'127.0.0.1');await new Promise<void>(r=>server.once('listening',r));
+    try {
+      const res=await fetch(base+'/mcp',{method:'POST',headers:{'content-type':'application/json'},body:'{}'});
+      expect(res.status).toBe(401);expect(res.headers.get('www-authenticate')).toContain('resource_metadata="'+base+'/.well-known/oauth-protected-resource/mcp"');
+      expect(((await (await fetch(base+'/.well-known/oauth-authorization-server')).json()) as any).code_challenge_methods_supported).toEqual(['S256']);
+      expect((await fetch(base+'/health')).status).toBe(200);
+      expect((await fetch(base+'/inspect')).status).toBe(200); // existing public routes are untouched
+      expect((await fetch(base+'/v1/offers/search',{method:'POST'})).status).toBe(401); // the gateway API is unchanged
+    } finally {await new Promise<void>(r=>server.close(()=>r()));await db.close();rmSync(root,{recursive:true,force:true});}
   });
 });

@@ -4,7 +4,7 @@ import { StreamableHTTPServerTransport } from '@modelcontextprotocol/sdk/server/
 import type { McpConfig } from './config.js';
 import { createMcpServer } from './server.js';
 
-const MAX_BODY_BYTES = 1_000_000;
+export const MAX_BODY_BYTES = 1_000_000;
 
 /** Loopback-only authority check (DNS-rebinding defence): Host must be 127.0.0.1 / localhost / [::1]. */
 function isLoopbackHost(hostHeader: string | undefined): boolean {
@@ -21,11 +21,11 @@ function isLoopbackOrigin(origin: string | undefined): boolean {
   }
 }
 
-function sendJson(res: ServerResponse, status: number, body: unknown): void {
+export function sendJson(res: ServerResponse, status: number, body: unknown): void {
   res.writeHead(status, { 'content-type': 'application/json', 'cache-control': 'no-store' }).end(JSON.stringify(body));
 }
 
-async function readBody(req: IncomingMessage): Promise<unknown> {
+export async function readBody(req: IncomingMessage): Promise<unknown> {
   const chunks: Buffer[] = [];
   let size = 0;
   for await (const c of req) {
@@ -35,6 +35,27 @@ async function readBody(req: IncomingMessage): Promise<unknown> {
   }
   const text = Buffer.concat(chunks).toString('utf8');
   return text ? JSON.parse(text) : undefined;
+}
+
+/**
+ * Serve one stateless Streamable HTTP POST: bounded body, fresh server + transport per request (no session to hijack),
+ * safe errors. Callers have already authenticated the request and validated Host/Origin.
+ */
+export async function serveMcpPost(config: McpConfig, req: IncomingMessage, res: ServerResponse, opts: { hosted?: { resourceMetadataUrl: string } } = {}): Promise<void> {
+  let body: unknown;
+  try {
+    body = await readBody(req);
+  } catch {
+    return sendJson(res, 400, { jsonrpc: '2.0', error: { code: -32700, message: 'invalid request body' }, id: null });
+  }
+  const mcp = createMcpServer(config, opts);
+  const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
+  res.on('close', () => {
+    void transport.close();
+    void mcp.close();
+  });
+  await mcp.connect(transport);
+  await transport.handleRequest(req, res, body);
 }
 
 /**
@@ -54,20 +75,7 @@ export async function startMcpHttpServer(config: McpConfig, port: number): Promi
         res.setHeader('allow', 'POST');
         return sendJson(res, 405, { jsonrpc: '2.0', error: { code: -32000, message: 'method not allowed' }, id: null });
       }
-      let body: unknown;
-      try {
-        body = await readBody(req);
-      } catch {
-        return sendJson(res, 400, { jsonrpc: '2.0', error: { code: -32700, message: 'invalid request body' }, id: null });
-      }
-      const mcp = createMcpServer(config);
-      const transport = new StreamableHTTPServerTransport({ sessionIdGenerator: undefined });
-      res.on('close', () => {
-        void transport.close();
-        void mcp.close();
-      });
-      await mcp.connect(transport);
-      await transport.handleRequest(req, res, body);
+      await serveMcpPost(config, req, res);
     })().catch(() => {
       if (!res.headersSent) sendJson(res, 500, { jsonrpc: '2.0', error: { code: -32603, message: 'internal error' }, id: null });
     });

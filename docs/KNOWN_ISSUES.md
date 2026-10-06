@@ -41,6 +41,12 @@ Historical issue ledgers remain in docs/evidence/. This file contains only curre
 - HA/distributed workers and lease renewal.
 - generic browser commerce and arbitrary merchant-account linking.
 
+## Hosted MCP (candidate `build/hosted-mcp-chatgpt`)
+
+- **Blocker (operator):** the hosted payer needs a paid Render private service + disk (Starter + 1 GB, about $7.25/mo) and the workspace has no payment info; secret files (`mcp-owner-passcode`, bridge token, payer mnemonic/gateway token) can only be created in the dashboard.
+- **Unverified externally:** actual ChatGPT connector OAuth/DCR handshake and Render private-network reachability/disk permissions (payer runs as root to write the disk mount) have not been exercised; only local, offline and fixture tests have.
+- **Accepted:** single-owner passcode consent with global (not per-IP) lockout; stateless `/mcp` with no SSE; a failed first payment attempt is not resent by the same `buy` (request a fresh quote).
+
 ## Ignore / Accept Risk for hackathon
 
 - Shopify throttling/keyless Catalog quotas: use bounded retries, quiet windows and no probe spam.

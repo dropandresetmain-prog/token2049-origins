@@ -20,6 +20,7 @@ Read these first for new work:
 | docs/RUNBOOK.md | Operational procedures |
 | docs/TEST_CHECKLIST.md | Current gates |
 | docs/contracts/CHANNEL_CONTRACT.md | Executable channel/core contract summary |
+| docs/channels/hosted-mcp.md | Hosted `/mcp` endpoint, OAuth, hosted Cardano payer, ChatGPT setup |
 | docs/work/ACTIVE_TASK.md | Working-memory checkpoint |
 
 Runtime/code remains authoritative when docs disagree.
