@@ -142,11 +142,9 @@ export async function loadProvisioned(client: CdpClient, settings: CdpSettings):
 }
 
 export async function readNativeEthBalance(client: CdpClient, identity: CdpPublicIdentity): Promise<string> {
-  const account = await client.evm.getAccount({ address: identity.treasuryAddress });
-  const scoped = await account.useNetwork(CDP_NETWORK);
   let pageToken: string | undefined;
   do {
-    const result = await scoped.listTokenBalances({ pageSize: 100, ...(pageToken ? { pageToken } : {}) });
+    const result = await client.evm.listTokenBalances({ address: identity.treasuryAddress, network: CDP_NETWORK, pageSize: 100, ...(pageToken ? { pageToken } : {}) });
     const native = result.balances.find((item) => item.token.network === CDP_NETWORK && item.token.contractAddress.toLowerCase() === NATIVE_ETH_ADDRESS);
     if (native) return native.amount.amount.toString();
     pageToken = result.nextPageToken;

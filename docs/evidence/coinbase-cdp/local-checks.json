@@ -13,7 +13,7 @@
       "name": "focused Coinbase CDP contract tests",
       "command": "node_modules/.bin/vitest.cmd run tests/unit/coinbase-cdp.test.ts",
       "result": "PASS",
-      "testsPassed": 9
+      "testsPassed": 10
     },
     {
       "name": "TypeScript typecheck",
