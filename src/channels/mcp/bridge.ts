@@ -47,7 +47,7 @@ export class BridgeClient {
         redirect: 'error', signal: AbortSignal.timeout(this.cfg.statusTimeoutMs ?? Math.min(this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5000)),
       });
       if (!response.ok) return null;
-      const body = z.object({ ok: z.literal(true), source: FundingSource.nullable() }).strict().safeParse(await response.json());
+      const body = z.object({ ok: z.literal(true), source: FundingSource.nullable(), ledger: z.record(z.string(), z.unknown()).optional() }).strict().safeParse(await response.json());
       // A bridge configured for one rail must never be accepted as another rail's payer.
       return body.success && body.data.source?.rail === this.rail ? body.data.source : null;
     } catch { return null; }

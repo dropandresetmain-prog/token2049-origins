@@ -47,6 +47,8 @@ export interface BridgeDeps {
   payer: BridgePayer;
   access?: BridgeAccess;
   source?: () => Promise<FundingSource>;
+  /** Optional operator summary (caps, committed spend, imported history) merged into /status. Must never contain secrets. */
+  summary?: () => Promise<Record<string, unknown>>;
   /** Bearer token callers must present. */
   token: string;
   log?: (e: Record<string, unknown>) => void;
@@ -134,7 +136,7 @@ export function createBridge(deps: BridgeDeps): Server {
           if (req.method !== 'GET') return fail(res, 'invalid_request', 'use GET');
           if (!deps.source) return send(res, 200, { ok: true, source: null });
           // Strict allowlist rejects accidental secret/config fields rather than echoing the signer object.
-          return send(res, 200, { ok: true, source: FundingSource.parse(await deps.source()) });
+          return send(res, 200, { ok: true, source: FundingSource.parse(await deps.source()), ...(deps.summary ? { ledger: await deps.summary() } : {}) });
         }
         if (req.method !== 'POST') return fail(res, 'invalid_request', 'use POST');
 

@@ -12,6 +12,7 @@
  */
 import type { Db } from '../../src/infrastructure/db.js';
 import type { LedgerEntry } from './ledger.js';
+import { importMarker } from './ledger-import.js';
 
 const LOCK_WAIT_MS = 30_000;
 
@@ -91,6 +92,30 @@ export class PgPayerLedger {
        WHERE hosted_payer_ledger.payer_address = EXCLUDED.payer_address`,
       entry.purchaseId, this.address, entry.network, entry.asset, entry.amountBaseUnits, entry.payTo, entry.status, entry.header, entry.transferReference, entry.createdAt, entry.updatedAt,
     );
+  }
+
+  /**
+   * Operator-facing summary of durable history and what is still spendable. Never includes headers or other secrets.
+   * Headroom is the largest single payment the caps would still allow right now.
+   */
+  async summary(policy: { network: string; asset: string; maxPerPayment: bigint; maxCumulative: bigint; maxDaily: bigint }, now = new Date()) {
+    const counts = await this.db.all<{ status: string; n: number }>('SELECT status, COUNT(*)::int AS n FROM hosted_payer_ledger WHERE payer_address = $1 GROUP BY status', this.address);
+    const committed = await this.committed(policy.network, policy.asset);
+    const daily = await this.daily(policy.network, policy.asset, now);
+    const clamp = (v: bigint) => (v < 0n ? 0n : v);
+    const headroom = [policy.maxPerPayment, clamp(policy.maxCumulative - committed), clamp(policy.maxDaily - daily)].reduce((a, b) => (a < b ? a : b));
+    const marker = await importMarker(this.db);
+    return {
+      address: this.address,
+      network: policy.network,
+      asset: policy.asset,
+      entries: { total: counts.reduce((a, c) => a + c.n, 0), signing: counts.find((c) => c.status === 'signing')?.n ?? 0, signed: counts.find((c) => c.status === 'signed')?.n ?? 0, accepted: counts.find((c) => c.status === 'accepted')?.n ?? 0 },
+      committedBaseUnits: committed.toString(),
+      dailyBaseUnits: daily.toString(),
+      caps: { perPayment: policy.maxPerPayment.toString(), cumulative: policy.maxCumulative.toString(), daily: policy.maxDaily.toString() },
+      headroomBaseUnits: headroom.toString(),
+      imported: marker ? { entries: marker.entryCount, committedBaseUnits: marker.committedBaseUnits, sourceSha256: marker.sourceSha256, importedAt: marker.importedAt } : null,
+    };
   }
 
   /** Remove an unsent reservation after an in-process signing failure. The table refuses to delete anything that holds a signed payment. */

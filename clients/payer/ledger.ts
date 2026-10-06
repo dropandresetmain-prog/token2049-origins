@@ -26,6 +26,49 @@ const Entry = z.object({
 export type LedgerEntry = z.infer<typeof Entry>;
 const File = z.object({ version: z.literal(1), entries: z.array(Entry) });
 
+/** Sibling marker that permanently disables a file ledger once its history has been migrated to PostgreSQL. */
+export const retiredMarkerPath = (ledgerPath: string) => `${ledgerPath}.retired`;
+
+export interface RetiredMarker { retiredAt: string; reason: string; sourceSha256: string; entryCount: number; payerAddress: string }
+
+/**
+ * Parse a file ledger WITHOUT any signing-readiness checks (used to migrate history, never to pay). Strict: an unreadable,
+ * malformed or duplicate-bearing file throws instead of yielding partial history.
+ */
+export function readLedgerSnapshot(path: string): LedgerEntry[] {
+  payerLedgerPath(path);
+  if (!existsSync(path)) throw new Error('payer ledger is missing');
+  let json: unknown;
+  try {
+    json = JSON.parse(readFileSync(path, 'utf8'));
+  } catch {
+    throw new Error('payer ledger is unreadable');
+  }
+  const parsed = File.safeParse(json);
+  if (!parsed.success) throw new Error('payer ledger has an unexpected shape');
+  if (new Set(parsed.data.entries.map(e => e.purchaseId)).size !== parsed.data.entries.length) throw new Error('payer ledger has duplicate purchases');
+  return parsed.data.entries;
+}
+
+/**
+ * Retire a file ledger: after this, every PayerLedger on that path refuses to sign (CLI, bridge, e2e harness). Exclusive-create, so an
+ * existing marker is never overwritten; an existing marker for a different history is an error. Idempotent for the same history.
+ */
+export function retireFileLedger(path: string, info: Omit<RetiredMarker, 'retiredAt'>, nowIso = new Date().toISOString()): RetiredMarker {
+  const marker = retiredMarkerPath(path);
+  const wanted: RetiredMarker = { retiredAt: nowIso, ...info };
+  try {
+    const fd = openSync(marker, 'wx', 0o600);
+    try { writeFileSync(fd, JSON.stringify(wanted, null, 2)); fsyncSync(fd); } finally { closeSync(fd); }
+    return wanted;
+  } catch (e) {
+    if ((e as NodeJS.ErrnoException).code !== 'EEXIST') throw e;
+  }
+  const existing = JSON.parse(readFileSync(marker, 'utf8')) as RetiredMarker;
+  if (existing.sourceSha256 !== info.sourceSha256 || existing.payerAddress !== info.payerAddress) throw new Error('payer ledger is already retired for a different history');
+  return existing;
+}
+
 export class PayerLedger {
   constructor(private readonly path: string) { payerLedgerPath(path); }
 
@@ -41,6 +84,7 @@ export class PayerLedger {
   assertReady(): void { this.read(); }
 
   private read(): LedgerEntry[] {
+    if (existsSync(retiredMarkerPath(this.path))) throw new Error('payer ledger was migrated to PostgreSQL and retired; this local signer is disabled');
     if (!existsSync(this.path)) throw new Error('payer ledger is missing; operator reconciliation required before signing');
     let json: unknown;
     try {

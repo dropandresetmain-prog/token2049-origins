@@ -17,6 +17,9 @@ import { createBridge, listenHosted } from './bridge.js';
 import { loadPayerConfig, readSecretFile, type PayerConfig } from './config.js';
 import { createBoundSigner } from './signer.js';
 import { PgPayerLedger } from './pg-ledger.js';
+import { readLedgerSnapshot } from './ledger.js';
+import { importLegacyLedger, importMarker } from './ledger-import.js';
+import { blockfrostEntryVerifier } from './onchain-verify.js';
 import { Payer } from './payer.js';
 
 const log = (e: Record<string, unknown>) => process.stdout.write(`${JSON.stringify({ t: new Date().toISOString(), ...e })}\n`);
@@ -42,7 +45,7 @@ export interface HostedPayerHandle {
   close(): Promise<void>;
 }
 
-export async function startHostedPayer(env: NodeJS.ProcessEnv, opts: { db?: Db; port?: number } = {}): Promise<HostedPayerHandle> {
+export async function startHostedPayer(env: NodeJS.ProcessEnv, opts: { db?: Db; port?: number; fetchImpl?: typeof fetch } = {}): Promise<HostedPayerHandle> {
   const config = loadPayerConfig(env, { ledger: 'external' });
   if (!config.walletAddress) throw new Error('invalid payer configuration: PAYER_WALLET_ADDRESS');
   if (!config.gatewayUrl.startsWith('https://')) throw new Error('invalid payer configuration: PAYER_GATEWAY_URL (https required when hosted)');
@@ -58,10 +61,21 @@ export async function startHostedPayer(env: NodeJS.ProcessEnv, opts: { db?: Db; 
 
   const db = opts.db ?? new Db(String(env.DATABASE_URL ?? ''));
   if (!opts.db) await db.initialize(); // append-only migrations; idempotent and safe alongside the gateway's own start-up
+  // The canonical payer's history moves into PostgreSQL once. A first import is proven on-chain to belong to this wallet; a rerun only
+  // verifies that the stored history still matches the pinned snapshot. Any disagreement stops start-up.
+  if (env.PAYER_LEGACY_LEDGER_FILE) {
+    const pinned = String(env.PAYER_LEGACY_LEDGER_SHA256 ?? '').trim().toLowerCase();
+    if (!/^[0-9a-f]{64}$/.test(pinned)) throw new Error('invalid payer configuration: PAYER_LEGACY_LEDGER_SHA256');
+    const entries = readLedgerSnapshot(env.PAYER_LEGACY_LEDGER_FILE);
+    const first = !(await importMarker(db));
+    const verifyEntry = first ? blockfrostEntryVerifier({ baseUrl: config.blockfrostBaseUrl, projectId: config.blockfrostProjectId, address, ...(opts.fetchImpl ? { fetchImpl: opts.fetchImpl } : {}) }) : undefined;
+    const result = await importLegacyLedger(db, { entries, network: config.network, address, expectedSha256: pinned, ...(verifyEntry ? { verifyEntry } : {}) });
+    log({ type: 'payer.ledger.import', status: result.status, entries: result.entryCount, committedBaseUnits: result.committedBaseUnits });
+  }
   const ledger = await PgPayerLedger.open(db, { network: config.network, address });
 
   const payer = new Payer({ config, ledger, log });
-  const server = createBridge({ payer, token, access: { mode: 'hosted', allowedHosts }, source: () => payer.source(), log });
+  const server = createBridge({ payer, token, access: { mode: 'hosted', allowedHosts }, source: () => payer.source(), summary: () => ledger.summary({ network: config.network, asset: config.allowedAsset, maxPerPayment: config.maxPerPayment, maxCumulative: config.maxCumulative, maxDaily: config.maxDaily }), log });
   await listenHosted(server, port);
   log({ type: 'payer.hosted.ready', network: config.network });
   return {
