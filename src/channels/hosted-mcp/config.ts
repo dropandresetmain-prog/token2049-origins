@@ -24,6 +24,7 @@ export interface HostedMcpConfig {
   /** Test seams for slow payers (production values are set in the router). */
   bridgeTimeoutMs?: number;
   bridgeStatusTimeoutMs?: number;
+  gatewayTimeoutMs?: number;
   /** Loopback URL of this same process, used by the MCP tools to call the gateway contract. */
   gatewayUrl: string;
 }
