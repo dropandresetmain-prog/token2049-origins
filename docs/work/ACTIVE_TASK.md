@@ -1,7 +1,7 @@
 # Partner track orchestration
 
 Common base: `0234d20a11e80285318c88511195c5f2d51c0df8`, fetched from origin/main before all four branches were created on 2026-10-07 (Singapore).
-Latest independently promoted origin/main observed: `c0f937570249b2be3ebbf0922514c9ae9216e044`. Main now includes a free public HTTPS Cardano payer, PostgreSQL history, verified canonical ledger import and file-signer retirement. All four lanes retain the original common base. No lane was rebased, merged, or deployed over canonical main.
+Latest independently promoted origin/main observed: `3e8d396c58481e07647786ac446d8644b8bbc774`. Main now includes a free public HTTPS Cardano payer, PostgreSQL history, verified canonical ledger import and file-signer retirement, live retail discovery, payer headroom checks, and improved deploy waiting. All four lanes retain the original common base. No lane was rebased, merged, or deployed over canonical main.
 
 This ledger lives only on `codex/partner-track-orchestration` in `C:/Dev/token2049-origins-orchestration`. Canonical checkout `C:/Dev/token2049-origins` remains on its existing branch; its preexisting untracked artifacts were preserved.
 
@@ -24,7 +24,7 @@ Act Now issues are fixed before PASS. Remaining findings use Investigate Now, Pa
 
 Tracked lane overlap: CDP and Hosted Solana both edit package.json; no other feature-lane pair overlaps. No feature lane edits ACTIVE_TASK, README, HANDOFF, ROADMAP, DECISIONS_LOG or generic Treasury/Connections UI. The Solana Render blueprint is separate from root render.yaml.
 
-Newer main materially overlaps Hosted Solana on hosted MCP config/router/tests and package.json. It also removes private bridge helpers (`isPrivatePeer`, `listenPrivate`, private BridgeAccess) that the Solana lane imports. Restore isolated private Solana helpers or refactor the Solana bridge during later integration; preserve main's public Cardano payer and canonical history import/retirement. Solana integration risk is HIGH. CDP's main overlap is package.json. CRE and Sokosumi have no tracked overlap with the newer main delta at this checkpoint.
+Newer main materially overlaps Hosted Solana on hosted MCP config/router/tests and package.json. It also removes private bridge helpers (`isPrivatePeer`, `listenPrivate`, private BridgeAccess) that the Solana lane imports. Restore isolated private Solana helpers or refactor the Solana bridge during later integration; preserve main's public Cardano payer, canonical history import/retirement and pre-purchase headroom guard. Report Solana remaining caps through the newer bridge status contract during integration. Solana integration risk is HIGH. CDP's main overlap is package.json. CRE and Sokosumi have no tracked overlap with the newer main delta at this checkpoint.
 
 Recommended later order: CRE first if simulation qualifies; Hosted Solana second only after private hosting proof and main reconciliation; Sokosumi third after an actual marketplace task; CDP last after genuine Wallet testnet proof and confirmed track fit. If submission time is short, drop CDP first and Sokosumi second, and use retained core Solana commerce proof instead of an unprovisioned hosted extension.
 
