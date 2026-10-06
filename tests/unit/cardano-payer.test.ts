@@ -114,6 +114,45 @@ describe('incidental ADA budget and provider destination', () => {
   });
 });
 describe('localhost payer bridge', () => {
+  it('returns only authenticated public identity and never signs or calls a provider', async () => {
+    const s = setup();
+    const build = vi.fn();
+    const getAddress = vi.fn(() => 'addr_test1publicidentity000000');
+    const fetchImpl = vi.fn();
+    const payer = new Payer({ ...s.deps, fetchImpl, createSigner: () => ({ getAddress, buildAndSignPaymentTransaction: build }) });
+    const source = await payer.source();
+    expect(source).toMatchObject({ rail: 'cardano', network: 'cardano:preprod', publicAddress: 'addr_test1publicidentity000000', readiness: 'configured' });
+    expect(source.sourceId).toBe((await payer.source()).sourceId);
+    expect(fetchImpl).not.toHaveBeenCalled(); expect(build).not.toHaveBeenCalled();
+    const token = 'test-only-identity-token-0123456789';
+    const server = createBridge({ payer, token, source: () => payer.source() });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address(); if (!address || typeof address === 'string') throw new Error('no address');
+    const url = `http://127.0.0.1:${address.port}/status`;
+    try {
+      expect((await fetch(url)).status).toBe(401);
+      const response = await fetch(url, { headers: { authorization: `Bearer ${token}` } });
+      expect(response.status).toBe(200);
+      const raw = await response.text();
+      expect(JSON.parse(raw).source).toEqual(source);
+      expect(raw).not.toMatch(/mnemonic|private|secret|token|projectId|ledgerFile/);
+      expect(raw).not.toContain(token);
+    } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
+  it('rejects extra signer fields instead of exposing secret material through status', async () => {
+    const token = 'test-only-identity-token-0123456789';
+    const source = { sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano' as const, network: 'cardano:preprod', publicAddress: 'addr_test1publicidentity000000', displayAddress: 'addr_test1…000000', assetId: 'fixture', readiness: 'configured' as const, mnemonic: 'must-never-return' };
+    const pay = vi.fn();
+    const server = createBridge({ payer: { pay }, token, source: async () => source });
+    await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));
+    const address = server.address(); if (!address || typeof address === 'string') throw new Error('no address');
+    try {
+      const response = await fetch(`http://127.0.0.1:${address.port}/status`, { headers: { authorization: `Bearer ${token}` } });
+      expect(response.status).toBe(500);
+      expect(await response.text()).not.toContain('must-never-return');
+      expect(pay).not.toHaveBeenCalled();
+    } finally { await new Promise<void>(resolve => server.close(() => resolve())); }
+  });
   it('requires bearer auth and rejects browser/host/extra URL input before payer access', async () => {
     const pay = vi.fn(async () => ({ purchase: { state: 'funded_queued' }, transferReference: 'a'.repeat(64), resumed: false }));
     const token = 'test-only-bridge-token-0123456789'; const server = createBridge({ payer: { pay }, token });

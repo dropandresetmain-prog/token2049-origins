@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import { PurchaseIntent, Fulfillment } from './intent.js';
+import { PurchaseIntentDraft, FulfillmentDraft } from './input.js';
 import { OfferView, QuoteView, PurchaseView, PurchaseEventView, Approval } from './commerce.js';
 import { CONTRACT_VERSION, FundingRail, OfferId, QuoteId, Readiness } from './common.js';
 
@@ -11,10 +12,12 @@ export const SearchOffersResponse = z.object({ offers: z.array(OfferView) }).str
 
 export const CreateQuoteRequest = z.object({ offerId: OfferId, fulfillment: Fulfillment }).strict();
 export const CreateQuoteResponse = z.object({ quote: QuoteView }).strict();
+export const SearchOffersDraftRequest = z.object({ intent: PurchaseIntentDraft }).strict();
+export const CreateQuoteDraftRequest = z.object({ offerId: OfferId, fulfillment: FulfillmentDraft }).strict();
 
 /** Requires `Idempotency-Key` header. Creates the purchase and returns funding instructions; no merchant spend. */
 export const CreatePurchaseRequest = z
-  .object({ quoteId: QuoteId, approval: Approval, fundingRail: FundingRail.default('cardano') })
+  .object({ quoteId: QuoteId, approval: Approval })
   .strict();
 export const PurchaseResponse = z.object({ purchase: PurchaseView }).strict();
 

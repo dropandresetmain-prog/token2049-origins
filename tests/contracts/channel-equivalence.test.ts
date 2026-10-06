@@ -28,7 +28,7 @@ describe('channel equivalence and Masumi seam', () => {
     const retry = await h.call('POST', '/v1/purchases', {
       token: soko.token,
       headers: { 'idempotency-key': 'sokosumi:task-0001' },
-      body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest }, fundingRail: 'cardano' },
+      body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest, selectedFundingOptionId: quote.fundingOptions[0]!.fundingOptionId! } },
     });
     expect(retry.body.purchase.purchaseId).toBe(viaSoko.purchase.purchaseId);
     const events = (await h.call('GET', `/v1/purchases/${viaSoko.purchase.purchaseId}/events`, { token: soko.token })).body.events;

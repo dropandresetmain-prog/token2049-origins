@@ -4,7 +4,7 @@ import { ZodError } from 'zod';
 import type { CommerceCore } from '../../core/service.js';
 import { CoreError } from '../../core/errors.js';
 import { authenticate } from '../../infrastructure/auth.js';
-import { CreatePurchaseRequest, CreateQuoteRequest, SearchOffersRequest } from '../../contracts/api.js';
+import { CreatePurchaseRequest, CreateQuoteDraftRequest, SearchOffersDraftRequest } from '../../contracts/api.js';
 import type { ErrorBody } from '../../contracts/common.js';
 import { redact } from '../../infrastructure/redact.js';
 import type { ActorContext } from '../../core/actor.js';
@@ -79,7 +79,7 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
     '/v1/offers/search',
     auth,
     asyncH(async (req, res) => {
-      const body = SearchOffersRequest.parse(req.body);
+      const body = SearchOffersDraftRequest.parse(req.body);
       res.json({ offers: await core.searchOffers(req.actor!, body.intent) });
     }),
   );
@@ -88,7 +88,7 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
     '/v1/quotes',
     auth,
     asyncH(async (req, res) => {
-      const body = CreateQuoteRequest.parse(req.body);
+      const body = CreateQuoteDraftRequest.parse(req.body);
       res.status(201).json({ quote: await core.createQuote(req.actor!, body.offerId, body.fulfillment) });
     }),
   );
@@ -110,6 +110,10 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
       res.status(r.status).json({ purchase: r.purchase });
     }),
   );
+
+  app.get('/v1/quotes/:id/purchase', auth, asyncH(async (req, res) => {
+    res.json(await core.quotePurchase(req.actor!, String(req.params.id)));
+  }));
 
   app.post(
     '/v1/purchases/:id/fund',
@@ -168,7 +172,7 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
           code: 'invalid_request',
           message: 'request validation failed',
           requestId,
-          details: { issues: err.issues.map((i) => ({ path: i.path.join('.'), message: i.message })) },
+          details: { issues: err.issues.map((i) => ({ path: i.path.join('.'), message: i.code === 'unrecognized_keys' ? 'unknown fields rejected' : i.message })) },
         },
       };
     } else if (err && typeof err === 'object' && 'type' in err && (err as { type: string }).type === 'entity.parse.failed') {

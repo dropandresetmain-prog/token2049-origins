@@ -133,7 +133,7 @@ describe('commerce spine (local fixtures)', () => {
     const s = await h.call('POST', '/v1/offers/search', { token: h.alice.token, body: { intent: retailIntent() } });
     const q = await h.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId: s.body.offers[0].offerId, fulfillment: retailFulfillment } });
     const quote = q.body.quote;
-    const body = { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest }, fundingRail: 'cardano' };
+    const body = { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest, selectedFundingOptionId: quote.fundingOptions[0]!.fundingOptionId! } };
     const results = await Promise.all(
       Array.from({ length: 5 }, () => h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'same-key-123' }, body })),
     );
@@ -248,7 +248,7 @@ describe('commerce spine (local fixtures)', () => {
     const s = await h.call('POST', '/v1/offers/search', { token: h.alice.token, body: { intent: retailIntent('30000') } });
     const q = await h.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId: s.body.offers[0].offerId, fulfillment: retailFulfillment } });
     const quote = q.body.quote;
-    const p = await h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'cap-key-0001' }, body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest } } });
+    const p = await h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'cap-key-0001' }, body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest, selectedFundingOptionId: quote.fundingOptions[0]!.fundingOptionId! } } });
     expect(p.status).toBe(422);
     expect(p.body.error.code).toBe('insufficient_capacity');
   });
@@ -262,9 +262,9 @@ describe('commerce spine (local fixtures)', () => {
     const s2 = await h.call('POST', '/v1/offers/search', { token: h.alice.token, body: { intent: retailIntent() } });
     const q2 = await h.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId: s2.body.offers[0].offerId, fulfillment: retailFulfillment } });
     const quote = q2.body.quote;
-    const low = await h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'approval-low-1' }, body: { quoteId: quote.quoteId, approval: { maxTotal: { currency: 'USD', amountMinor: '100', scale: 2 }, quoteDigest: quote.digest } } });
+    const low = await h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'approval-low-1' }, body: { quoteId: quote.quoteId, approval: { maxTotal: { currency: 'USD', amountMinor: '100', scale: 2 }, quoteDigest: quote.digest, selectedFundingOptionId: quote.fundingOptions[0]!.fundingOptionId! } } });
     expect(low.body.error.code).toBe('spend_limit_exceeded');
-    const wrongDigest = await h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'approval-dig-1' }, body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: 'sha256:' + '0'.repeat(64) } } });
+    const wrongDigest = await h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'approval-dig-1' }, body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: 'sha256:' + '0'.repeat(64), selectedFundingOptionId: quote.fundingOptions[0].fundingOptionId } } });
     expect(wrongDigest.body.error.code).toBe('quote_changed');
   });
 
@@ -276,7 +276,7 @@ describe('commerce spine (local fixtures)', () => {
     expect(ev.status).toBe(404);
     const fund = await h.call('POST', `/v1/purchases/${a.purchase.purchaseId}/fund`, { token: h.bob.token, headers: { 'payment-signature': `fixture:tb:${a.required}` } });
     expect(fund.status).toBe(404);
-    const buy = await h.call('POST', '/v1/purchases', { token: h.bob.token, headers: { 'idempotency-key': 'bob-steals-1' }, body: { quoteId: a.quote.quoteId, approval: { maxTotal: a.quote.payablePrincipal, quoteDigest: a.quote.digest } } });
+    const buy = await h.call('POST', '/v1/purchases', { token: h.bob.token, headers: { 'idempotency-key': 'bob-steals-1' }, body: { quoteId: a.quote.quoteId, approval: { maxTotal: a.quote.payablePrincipal, quoteDigest: a.quote.digest, selectedFundingOptionId: a.quote.fundingOptions[0]!.fundingOptionId! } } });
     expect(buy.status).toBe(404);
     const quoteRead = await h.call('GET', `/v1/quotes/${a.quote.quoteId}`, { token: h.bob.token });
     expect(quoteRead.status).toBe(404);
@@ -292,7 +292,7 @@ describe('commerce spine (local fixtures)', () => {
     const invalid = await h.call('POST', '/v1/offers/search', { token: h.alice.token, body: { intent: { category: 'retail', quantity: 0 } } });
     expect(invalid.status).toBe(400);
     expect(invalid.body.error.code).toBe('invalid_request');
-    const noIdem = await h.call('POST', '/v1/purchases', { token: h.alice.token, body: { quoteId: 'quo_ABCDEFGHIJKLMNOP', approval: { maxTotal: { currency: 'USD', amountMinor: '1', scale: 2 }, quoteDigest: 'x' } } });
+    const noIdem = await h.call('POST', '/v1/purchases', { token: h.alice.token, body: { quoteId: 'quo_ABCDEFGHIJKLMNOP', approval: { maxTotal: { currency: 'USD', amountMinor: '1', scale: 2 }, quoteDigest: 'x', selectedFundingOptionId: 'fop_ABCDEFGHIJKLMNOP' } } });
     expect(noIdem.status).toBe(400);
     const unknownRoute = await h.call('GET', '/v1/nope', { token: h.alice.token });
     expect(unknownRoute.status).toBe(404);

@@ -5,3 +5,4 @@ export * from './intent.js';
 export * from './commerce.js';
 export * from './api.js';
 export type * from './ports.js';
+export * from './input.js';

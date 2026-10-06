@@ -3,6 +3,8 @@ import type { Clock } from '../infrastructure/clock.js';
 import { iso } from '../infrastructure/clock.js';
 import { digestOf, newId } from '../infrastructure/ids.js';
 import { CoreError } from './errors.js';
+import { assessPurchaseIntent, assessFulfillment, providerRequirements } from '../contracts/input.js';
+import { CreatePurchaseRequest as PurchaseRequestSchema } from '../contracts/api.js';
 import type { ActorContext } from './actor.js';
 import type { Scope, ProviderRoute, Category, FundingRail, Readiness } from '../contracts/common.js';
 import type { PurchaseIntent, Fulfillment } from '../contracts/intent.js';
@@ -91,15 +93,33 @@ export class CommerceCore {
     return r;
   }
 
+  private fundingReady(status: Readiness['status']): boolean {
+    return status === 'CONFIGURED_UNVERIFIED' || status === 'EXTERNAL_CHECK_PASSED' ||
+      (status === 'LOCAL_TESTS_ONLY' && this.d.config.appEnv === 'test');
+  }
+
+  private async assessProvider(ex: CommerceExecutor, intent: PurchaseIntent, fulfillment?: Fulfillment): Promise<void> {
+    const request = await ex.inputRequirements?.({ intent, fulfillment });
+    if (!request?.paths.length) return;
+    if (!fulfillment && request.phase !== 'search') throw new CoreError('provider_error', 'provider requirement belongs in fulfillment; operator attention is required');
+    let needs;
+    try { needs = providerRequirements(intent.category, request.phase, request.paths); }
+    catch { throw new CoreError('provider_error', 'provider requires an unmodelled canonical field; operator attention is required'); }
+    throw new CoreError('needs_input', 'additional customer information required', needs);
+  }
+
   /* ---------------- offers ---------------- */
 
   async searchOffers(actor: ActorContext, rawIntent: unknown): Promise<OfferView[]> {
     this.requireScope(actor, 'offers:read');
-    const intent = PurchaseIntentSchema.parse(rawIntent);
+    const assessment = assessPurchaseIntent(rawIntent);
+    if (assessment.status === 'needs_input') throw new CoreError('needs_input', 'search information required', assessment);
+    const intent = PurchaseIntentSchema.parse(assessment.value);
     const route = intent.route ?? DEFAULT_ROUTE[intent.category];
     const ex = this.executorFor(route);
     if (ex.category !== intent.category) throw new CoreError('invalid_request', `route ${route} does not serve ${intent.category}`);
     await this.assertRouteReady(ex);
+    await this.assessProvider(ex, intent);
     const found = await ex.search(intent);
     const now = this.d.clock.now();
     const views: OfferView[] = [];
@@ -145,7 +165,9 @@ export class CommerceCore {
 
   async createQuote(actor: ActorContext, offerId: string, rawFulfillment: unknown, supersedes?: QuoteRow): Promise<QuoteView> {
     this.requireScope(actor, 'quotes:write');
-    const fulfillment = FulfillmentSchema.parse(rawFulfillment);
+    const assessment = assessFulfillment(rawFulfillment);
+    if (assessment.status === 'needs_input') throw new CoreError('needs_input', 'fulfillment information required', assessment);
+    const fulfillment = FulfillmentSchema.parse(assessment.value);
     const offer = await this.d.db.get<{
       id: string;
       customer_id: string;
@@ -162,6 +184,7 @@ export class CommerceCore {
     const ex = this.executorFor(offer.route);
     await this.assertRouteReady(ex);
 
+    await this.assessProvider(ex, intent, fulfillment);
     const pq = await ex.quote({ executionRef: JSON.parse(offer.execution_ref_json), intent }, fulfillment);
 
     // Spend ceiling from intent applies to the exact payable principal.
@@ -179,7 +202,7 @@ export class CommerceCore {
     const now = this.d.clock.now();
     const ttl = new Date(now.getTime() + this.d.config.quoteTtlSeconds * 1000);
     const expiresAt = new Date(Math.min(ttl.getTime(), Date.parse(pq.expiresAt), Date.parse(offer.expires_at) + this.d.config.quoteTtlSeconds * 1000)).toISOString();
-    const fundingOptions = this.fundingOptionsFor(pq.merchantTotal, fee, payable);
+    const fundingOptions = await this.fundingOptionsFor(pq.merchantTotal, fee, payable);
     const quoteId = newId('quo');
     const version = supersedes ? supersedes.version + 1 : 1;
     const digest = digestOf({
@@ -244,10 +267,11 @@ export class CommerceCore {
   }
 
   /** USD commercial obligations and valueless testnet notional are distinct quantities. */
-  private fundingOptionsFor(principal: Money, fee: Money, payable: Money): FundingOption[] {
+  private async fundingOptionsFor(principal: Money, fee: Money, payable: Money): Promise<FundingOption[]> {
     const out: FundingOption[] = [];
     const policy = SettlementPolicy.parse(this.d.config.settlementPolicy ?? demoData.settlementPolicy);
     for (const [rail, adapter] of this.d.fundingAdapters) {
+      if (!this.fundingReady((await adapter.readiness()).status)) continue;
       const asset = adapter.acceptedAsset();
       if (!asset || !asset.supportsUsdNotional || payable.currency !== 'USD') continue;
       let settlement;
@@ -261,7 +285,7 @@ export class CommerceCore {
       } catch {
         throw new CoreError('route_unavailable', 'commercial obligation cannot be settled exactly under the supported notional policy');
       }
-      out.push({ rail, payTo: asset.payTo, settlement,
+      out.push({ fundingOptionId: newId('fop'), rail, payTo: asset.payTo, settlement,
         amount: { network: adapter.network, assetId: asset.assetId, decimals: asset.decimals,
           ...(asset.symbol ? { symbol: asset.symbol } : {}), amountBaseUnits: settlement.totalBaseUnits },
       });
@@ -276,10 +300,19 @@ export class CommerceCore {
     return JSON.parse(q.public_json) as QuoteView;
   }
 
+  async quotePurchase(actor: ActorContext, quoteId: string) {
+    this.requireScope(actor, 'purchases:read');
+    const quote = await getQuoteRow(this.d.db, quoteId);
+    if (!quote || quote.customer_id !== actor.customerId) throw new CoreError('not_found', 'quote not found');
+    const p = await this.d.db.get<PurchaseRow>('SELECT * FROM purchases WHERE quote_id = $1 AND customer_id = $2', quoteId, actor.customerId);
+    return p ? { purchase: await this.viewOf(p), approval: JSON.parse(p.approval_json) } : { purchase: null, approval: null };
+  }
+
   /* ---------------- purchases ---------------- */
 
   async createPurchase(actor: ActorContext, req: CreatePurchaseRequest, idempotencyKey: string | undefined): Promise<{ status: number; purchase: PurchaseView }> {
     this.requireScope(actor, 'purchases:write');
+    req = PurchaseRequestSchema.parse(req);
     if (!idempotencyKey || !/^[A-Za-z0-9._:-]{8,128}$/.test(idempotencyKey)) {
       throw new CoreError('invalid_request', 'Idempotency-Key header (8-128 chars) is required');
     }
@@ -298,14 +331,16 @@ export class CommerceCore {
     const quote = await getQuoteRow(this.d.db, req.quoteId);
     if (!quote || quote.customer_id !== actor.customerId) throw new CoreError('not_found', 'quote not found');
     const qv = JSON.parse(quote.public_json) as QuoteView;
+    const option = qv.fundingOptions.find(o => o.fundingOptionId === req.approval.selectedFundingOptionId);
+    if (!option) throw new CoreError('invalid_request', 'selected funding option does not belong to this quote; select an option from a fresh quote');
     const ex = this.executorFor(qv.route);
     ex.assertPaymentAvailable?.();
     await this.assertRouteReady(ex);
-    const adapter = this.d.fundingAdapters.get(req.fundingRail);
-    if (!adapter) throw new CoreError('route_unavailable', `funding rail ${req.fundingRail} is not available`);
+    const adapter = this.d.fundingAdapters.get(option.rail);
+    if (!adapter) throw new CoreError('route_unavailable', `funding rail ${option.rail} is not available`);
     const railReady = await adapter.readiness();
-    if (!READY_FOR_USE.has(railReady.status)) {
-      throw new CoreError('route_unavailable', `funding rail ${req.fundingRail} is not ready (${railReady.status})`, { missing: railReady.missing });
+    if (!this.fundingReady(railReady.status)) {
+      throw new CoreError('route_unavailable', `funding rail ${option.rail} is not ready (${railReady.status})`, { missing: railReady.missing });
     }
 
     const nowIso = this.now();
@@ -334,8 +369,6 @@ export class CommerceCore {
       if (limit === undefined || minor(payable) > limit) {
         throw new CoreError('spend_limit_exceeded', 'quote exceeds the deployment per-purchase demo limit', { currency: payable.currency });
       }
-      const option = qv.fundingOptions.find((o) => o.rail === req.fundingRail);
-      if (!option) throw new CoreError('route_unavailable', `quote has no ${req.fundingRail} funding option`);
       const existing = await this.d.db.get<{ id: string }>('SELECT id FROM purchases WHERE quote_id = $1', quote.id);
       if (existing) throw new CoreError('conflict', 'a purchase already exists for this quote', { purchaseId: existing.id });
 
@@ -350,6 +383,7 @@ export class CommerceCore {
 
       const purchaseId = newId('pur');
       const requirement: FundingRequirementRecord = {
+        fundingOptionId: option.fundingOptionId,
         resourceUrl: `${this.d.config.publicBaseUrl}/v1/purchases/${purchaseId}/fund`,
         rail: option.rail,
         network: option.amount.network,
@@ -370,7 +404,7 @@ export class CommerceCore {
         actor.customerId,
         quote.id,
         actor.channel,
-        req.fundingRail,
+        option.rail,
         JSON.stringify(requirement),
         JSON.stringify(req.approval),
         nowIso,
@@ -388,7 +422,8 @@ export class CommerceCore {
         nowIso,
         nowIso,
       );
-      await appendEvent(this.d.db, purchaseId, 'purchase.created', { quoteId: quote.id, channel: actor.channel, rail: req.fundingRail }, nowIso);
+      await appendEvent(this.d.db, purchaseId, 'purchase.created', { quoteId: quote.id, channel: actor.channel, rail: option.rail }, nowIso);
+      await appendEvent(this.d.db, purchaseId, 'approval.recorded', { ...req.approval, channel: actor.channel }, nowIso);
       await appendEvent(this.d.db, purchaseId, 'capacity.reserved', { amount: qv.merchantTotal, ledgerMode: 'simulated' }, nowIso);
       await this.d.db.run(
         `INSERT INTO idempotency_keys(customer_id, operation, idem_key, request_digest, status_code, response_json, created_at)

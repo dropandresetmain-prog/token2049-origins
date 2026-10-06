@@ -59,7 +59,7 @@ async function smoke(): Promise<void> {
           await new Promise(resolve => setTimeout(resolve, 100));
         }
         if (!ready) throw new Error('compiled gateway health timed out');
-        for (const path of ['/v1/capabilities', '/inspect']) {
+        for (const path of ['/v1/capabilities', '/inspect', '/proof', '/proof/app.js']) {
           if ((await fetch(base + path)).status !== 200) throw new Error('public gateway smoke failed');
         }
         if ((await fetch(`${base}/v1/evidence/purchases`)).status !== 401) throw new Error('anonymous auth guard failed');

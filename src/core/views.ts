@@ -4,6 +4,7 @@ import { getQuoteRow, getReservation, type PurchaseRow, type FundingEvidenceRow,
 
 export function fundingRequirementView(req: FundingRequirementRecord): import('../contracts/commerce.js').FundingOption {
   return { rail: req.rail as import('../contracts/common.js').FundingRail,
+    ...(req.fundingOptionId ? { fundingOptionId: req.fundingOptionId } : {}),
     amount: { network: req.network, assetId: req.assetId, decimals: req.decimals, amountBaseUnits: req.amountBaseUnits,
       ...(req.symbol ? { symbol: req.symbol } : {}) }, payTo: req.payTo,
     ...(req.settlement ? { settlement: req.settlement } : {}),

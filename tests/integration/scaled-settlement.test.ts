@@ -21,7 +21,7 @@ async function quote(cents = demoData.retail.scalingExampleMinor) {
 }
 async function purchase(q: any, key = 'scaled-purchase-1') {
   return h!.call('POST', '/v1/purchases', { token: h!.alice.token, headers: { 'idempotency-key': key },
-    body: { quoteId: q.quoteId, approval: { maxTotal: q.payablePrincipal, quoteDigest: q.digest }, fundingRail: 'cardano' } });
+    body: { quoteId: q.quoteId, approval: { maxTotal: q.payablePrincipal, quoteDigest: q.digest, selectedFundingOptionId: q.fundingOptions[0]!.fundingOptionId! } } });
 }
 
 describe('scaled settlement through persisted commerce', () => {

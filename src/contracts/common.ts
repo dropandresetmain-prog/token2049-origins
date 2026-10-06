@@ -91,6 +91,7 @@ export const ErrorCode = z.enum([
   'forbidden',
   'not_found',
   'invalid_request',
+  'needs_input',
   'idempotency_conflict',
   'conflict',
   'quote_expired',

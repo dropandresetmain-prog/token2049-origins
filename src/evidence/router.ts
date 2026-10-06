@@ -27,6 +27,7 @@ import type { BankObservationAdapter } from '../contracts/ports.js';
 import { maskReference } from '../banking/ocbc/mask.js';
 import { OCBC_APIS } from '../banking/ocbc/client.js';
 import { latestBankObservations, listPurchases, loadOwnedPurchase, purchaseDetail, treasuryView } from './read-model.js';
+import { purchaseProof } from './proof.js';
 
 export interface EvidenceRouterDeps {
   db: Db;
@@ -90,6 +91,16 @@ export function createEvidenceRouter(deps: EvidenceRouterDeps): Router {
     // Foreign and nonexistent purchases are the same 404: no existence oracle.
     if (!p) throw new CoreError('not_found', 'purchase not found');
     send(res, (await purchaseDetail(db, p)));
+  });
+
+  router.get('/purchases/:id/proof', async (req, res) => {
+    const actor = requireScope(req, 'evidence:read');
+    const proof = await db.tx(async () => {
+      const p = await loadOwnedPurchase(db, actor.customerId, String(req.params.id));
+      if (!p) throw new CoreError('not_found', 'purchase not found');
+      return purchaseProof(db, p);
+    });
+    send(res, { proof });
   });
 
   router.get('/treasury', async (req, res) => {

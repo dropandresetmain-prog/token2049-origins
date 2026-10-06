@@ -57,6 +57,7 @@ async function startFakeBridge(h: Harness): Promise<FakeBridge> {
     req.on('end', async () => {
       void (await (async () => {
         const send = (status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
+        if (req.url === '/status' && req.method === 'GET') return send(200, { ok: true, source: { sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano', network: 'cardano:preprod', publicAddress: 'addr_test1fixturepayer', displayAddress: 'addr_test1…epayer', assetId: h.funding.acceptedAsset().assetId, readiness: 'configured' } });
         if (req.url !== '/pay' || req.method !== 'POST') return send(404, { ok: false, error: { code: 'not_found', message: 'no route' } });
         if (req.headers.authorization !== `Bearer ${BRIDGE_TOKEN}`) return send(401, { ok: false, error: { code: 'unauthenticated', message: 'bad bridge token' } });
         const { purchaseId } = JSON.parse(raw) as { purchaseId: string };
@@ -114,6 +115,7 @@ describe('MCP channel', () => {
     quoteId: quote.quoteId,
     maxTotal: quote.payablePrincipal,
     quoteDigest: quote.digest,
+    selectedFundingOptionId: quote.fundingOptions[0].fundingOptionId,
     ...extra,
   });
 
@@ -196,7 +198,7 @@ describe('MCP channel', () => {
     await h.gw.worker.tick();
     const got = await m.call('get_purchase', { purchaseId: r.structuredContent.purchase.purchaseId });
     expect(got.structuredContent.purchase.state).toBe('succeeded');
-    expect(got.content[0]!.text).toContain('Purchase succeeded');
+    expect(got.content[0]!.text).toContain('Purchase complete');
     expect(h.retail.executeCalls).toBe(1);
 
     // Re-buying a finished purchase is an idempotent replay: no second payment, no second order.
@@ -227,6 +229,118 @@ describe('MCP channel', () => {
     expect(e.isError).toBe(true);
     expect(e.structuredContent.error.code).toBe('idempotency_conflict');
     await m.close();
+  });
+
+  it('collects search, fulfillment, funding selection and approval as non-error needs_input', async () => {
+    const m = await connect(cfg);
+    try {
+      const incomplete = await m.call('find_offers', { intent: { category: 'flight', from: 'SIN', adults: 1, spendCeiling: { currency: 'USD', amountMinor: '20000', scale: 2 } } });
+      expect(incomplete.isError).toBeFalsy();
+      expect(incomplete.structuredContent).toMatchObject({ status: 'needs_input', phase: 'search' });
+      expect(incomplete.structuredContent.fields.map((f: any) => f.path)).toEqual(['to', 'departDate']);
+      expect(incomplete.content[0]!.text).toContain('Do not invent answers');
+      const invalid = await m.call('find_offers', { intent: { category: 'flight', from: 'SIN', to: 'SIN', departDate: '2026-10-20', adults: 1, spendCeiling: { currency: 'USD', amountMinor: '20000', scale: 2 } } });
+      expect(invalid.structuredContent.error.code).toBe('invalid_request');
+      const found = await m.call('find_offers', { intent: retailIntent() });
+      const missingFulfillment = await m.call('create_quote', { offerId: found.structuredContent.offers[0].offerId, fulfillment: { category: 'retail' } });
+      expect(missingFulfillment.isError).toBeFalsy();
+      expect(missingFulfillment.structuredContent.phase).toBe('fulfillment');
+      const quote = await quoteViaMcp(m);
+      const { selectedFundingOptionId: _choice, ...args } = buyArgs(quote);
+      const missingChoice = await m.call('buy', args);
+      expect(missingChoice.isError).toBeFalsy();
+      expect(missingChoice.structuredContent).toMatchObject({ status: 'needs_input', phase: 'funding_selection' });
+      const missingApproval = await m.call('buy', { quoteId: quote.quoteId, selectedFundingOptionId: quote.fundingOptions[0].fundingOptionId });
+      expect(missingApproval.structuredContent.phase).toBe('approval');
+      expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM purchases'))!.n).toBe(0);
+    } finally { await m.close(); }
+  });
+
+  it('shows connected public source and refuses a mismatched source before creating purchase', async () => {
+    const bridge = await startFakeBridge(h);
+    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    try {
+      const quote = await quoteViaMcp(m);
+      const quoted = await m.call('create_quote', { offerId: quote.offerId, fulfillment: retailFulfillment });
+      expect(quoted.structuredContent.fundingSource.displayAddress).toBe('addr_test1…epayer');
+      expect(quoted.content[0]!.text).toContain('Connected wallet');
+      expect(quoted.content[0]!.text).toContain('explicit approval');
+      const stored = await h.gw.db.get<{ public_json: string }>('SELECT public_json FROM quotes WHERE id=$1', quote.quoteId);
+      const changed = JSON.parse(stored!.public_json); changed.fundingOptions[0].amount.network = 'fixture:mismatch';
+      await h.gw.db.run('UPDATE quotes SET public_json=$1 WHERE id=$2', JSON.stringify(changed), quote.quoteId);
+      const result = await m.call('buy', buyArgs(quote));
+      expect(result.structuredContent.status).toBe('action_required');
+      expect(result.structuredContent.purchase).toBeUndefined();
+      expect(bridge.calls).toHaveLength(0);
+      expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM purchases'))!.n).toBe(0);
+    } finally { await m.close(); await bridge.close(); }
+  });
+
+  it.each(['submitted', 'unknown', 'confirmed'] as const)('follows repeated buy without another payment when payment is %s', async paymentState => {
+    const bridge = await startFakeBridge(h); bridge.mode = 'reject';
+    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    try {
+      const quote = await quoteViaMcp(m);
+      const first = await m.call('buy', buyArgs(quote));
+      const id = first.structuredContent.purchase.purchaseId;
+      await h.gw.db.run('UPDATE purchases SET payment_state=$1 WHERE id=$2', paymentState, id);
+      const repeated = await m.call('buy', buyArgs(quote, { idempotencyKey: 'another-approved-key' }));
+      expect(repeated.structuredContent.purchase.purchaseId).toBe(id);
+      expect(bridge.calls).toHaveLength(1);
+      const conflict = await m.call('buy', buyArgs(quote, { maxTotal: { ...quote.payablePrincipal, amountMinor: '999999' } }));
+      expect(conflict.isError).toBe(true);
+      expect(conflict.structuredContent.error.code).toBe('conflict');
+    } finally { await m.close(); await bridge.close(); }
+  });
+
+  it('refuses switching to another available option after the purchase exists', async () => {
+    const m = await connect(cfg);
+    try {
+      const quote = await quoteViaMcp(m);
+      const stored = await h.gw.db.get<{ public_json: string }>('SELECT public_json FROM quotes WHERE id=$1', quote.quoteId);
+      const extended = JSON.parse(stored!.public_json);
+      extended.fundingOptions.push({ ...extended.fundingOptions[0], fundingOptionId: 'fop_OTHERAVAILABLEOPTION' });
+      await h.gw.db.run('UPDATE quotes SET public_json=$1 WHERE id=$2', JSON.stringify(extended), quote.quoteId);
+      const first = await m.call('buy', buyArgs(quote));
+      const switched = await m.call('buy', buyArgs(quote, { selectedFundingOptionId: 'fop_OTHERAVAILABLEOPTION' }));
+      expect(switched.structuredContent.error.code).toBe('conflict');
+      expect(switched.structuredContent.purchase.purchaseId).toBe(first.structuredContent.purchase.purchaseId);
+    } finally { await m.close(); }
+  });
+
+  it('does not trigger another funding attempt after an unfunded payer refusal', async () => {
+    const bridge = await startFakeBridge(h); bridge.mode = 'reject';
+    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    try {
+      const quote = await quoteViaMcp(m);
+      const first = await m.call('buy', buyArgs(quote));
+      const repeated = await m.call('buy', buyArgs(quote));
+      expect(repeated.structuredContent.purchase.purchaseId).toBe(first.structuredContent.purchase.purchaseId);
+      expect(bridge.calls).toHaveLength(1);
+    } finally { await m.close(); await bridge.close(); }
+  });
+
+  it('concurrent repeated buy uses one purchase and one payer action', async () => {
+    const bridge = await startFakeBridge(h);
+    const m = await connect({ ...cfg, bridge: { url: bridge.url, token: BRIDGE_TOKEN } });
+    try {
+      const quote = await quoteViaMcp(m);
+      const results = await Promise.all([m.call('buy', buyArgs(quote)), m.call('buy', buyArgs(quote))]);
+      expect(results.every(r => !r.isError)).toBe(true);
+      expect(results[0]!.structuredContent.purchase.purchaseId).toBe(results[1]!.structuredContent.purchase.purchaseId);
+      expect(bridge.calls).toHaveLength(1);
+    } finally { await m.close(); await bridge.close(); }
+  });
+
+  it('a zero-option quote clearly reports that payment is unavailable', async () => {
+    h.funding.readinessStatus = 'MISSING_CONFIG';
+    const m = await connect(cfg);
+    try {
+      const found = await m.call('find_offers', { intent: retailIntent() });
+      const result = await m.call('create_quote', { offerId: found.structuredContent.offers[0].offerId, fulfillment: retailFulfillment });
+      expect(result.structuredContent.quote.fundingOptions).toEqual([]);
+      expect(result.content[0]!.text).toContain('No payment source is currently available');
+    } finally { await m.close(); }
   });
 
   it('a bridge that fails leaves an honest, unfunded result', async () => {
@@ -270,7 +384,8 @@ describe('MCP channel', () => {
     const p = got.structuredContent.purchase;
     expect(p.state).toBe('unresolved');
     expect(got.content[0]!.text).not.toMatch(/Purchase succeeded/);
-    expect(got.content[0]!.text).toMatch(/UNRESOLVED/);
+    expect(got.content[0]!.text).toMatch(/verifying whether the merchant completed/);
+    expect(got.content[0]!.text).not.toMatch(/do not buy again|state=|retry budget|job dead/i);
     await m.close();
     await bridge.close();
   });

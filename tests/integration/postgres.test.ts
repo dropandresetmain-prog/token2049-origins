@@ -17,7 +17,7 @@ async function quote(h: Harness) {
   const response = await h.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId: offers.body.offers[0].offerId, fulfillment: retailFulfillment } });
   expect(response.status).toBe(201);
   const q = response.body.quote;
-  return { quoteId: q.quoteId, approval: { maxTotal: q.payablePrincipal, quoteDigest: q.digest }, fundingRail: 'cardano' };
+  return { quoteId: q.quoteId, approval: { maxTotal: q.payablePrincipal, quoteDigest: q.digest, selectedFundingOptionId: q.fundingOptions[0]!.fundingOptionId! } };
 }
 
 describe('PostgreSQL persistence and competing connections', () => {

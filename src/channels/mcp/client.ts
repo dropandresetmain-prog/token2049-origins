@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { Approval, PurchaseView } from '../../contracts/commerce.js';
 import { ErrorBody } from '../../contracts/common.js';
 import { SearchOffersResponse, CreateQuoteResponse, PurchaseResponse, PurchaseEventsResponse } from '../../contracts/api.js';
 import type { McpConfig } from './config.js';
@@ -87,6 +88,15 @@ export class GatewayClient {
 
   async createPurchase(body: unknown, idempotencyKey: string) {
     return GatewayClient.parse(PurchaseResponse, await this.call('POST', '/v1/purchases', { body, headers: { 'idempotency-key': idempotencyKey } }));
+  }
+
+  async getQuote(quoteId: string) {
+    return GatewayClient.parse(CreateQuoteResponse, await this.call('GET', `/v1/quotes/${encodeURIComponent(quoteId)}`));
+  }
+
+  async quotePurchase(quoteId: string) {
+    return GatewayClient.parse(z.object({ purchase: PurchaseView.nullable(), approval: Approval.nullable() }).strict(),
+      await this.call('GET', `/v1/quotes/${encodeURIComponent(quoteId)}/purchase`));
   }
 
   async getPurchase(purchaseId: string) {

@@ -106,6 +106,8 @@ export interface CommerceExecutor {
   readiness(): Promise<Readiness>;
   /** Local payment gate; must run before creating a funding obligation. */
   assertPaymentAvailable?(): void;
+  /** Read-only discovery; paths must refer to reviewed canonical customer fields. Never request arbitrary JSON. */
+  inputRequirements?(input: { intent: PurchaseIntent; fulfillment?: Fulfillment }): Promise<{ phase: 'search' | 'fulfillment'; paths: string[] } | null>;
   search(intent: PurchaseIntent): Promise<ProviderOffer[]>;
   quote(offer: { executionRef: Record<string, unknown>; intent: PurchaseIntent }, fulfillment: Fulfillment): Promise<ProviderQuote>;
   /** Must never be called twice for one attempt by the core; must still be safe to resume from checkpoints. */

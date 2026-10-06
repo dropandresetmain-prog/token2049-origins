@@ -292,13 +292,15 @@ export class Worker {
     // Pre-execution gate: funding, authority, quote validity, capacity, route readiness.
     let gateFailure = await (async (): Promise<{ state: 'requires_reauthorization' | 'failed'; reason: string } | null> => {
       const funding = await this.appliedFunding(p0.id);
-      const req = JSON.parse(p0.funding_requirement_json) as { amountBaseUnits: string; network: string; assetId: string };
+      const req = JSON.parse(p0.funding_requirement_json) as { amountBaseUnits: string; network: string; assetId: string; fundingOptionId?: string };
       const covered = funding
         .filter((f) => f.network === req.network && f.asset_id === req.assetId)
         .reduce((s, f) => s + BigInt(f.amount_base_units), 0n);
       if (covered < BigInt(req.amountBaseUnits)) return { state: 'failed', reason: 'confirmed funding does not cover the quote' };
-      const approval = JSON.parse(p0.approval_json) as { quoteDigest: string };
+      const approval = JSON.parse(p0.approval_json) as { quoteDigest: string; selectedFundingOptionId?: string };
       if (approval.quoteDigest !== q.digest) return { state: 'requires_reauthorization', reason: 'approval does not bind quote' };
+      // New approvals authorize the frozen payment choice too; legacy obligations retain their stored terms.
+      if (req.fundingOptionId && approval.selectedFundingOptionId !== req.fundingOptionId) return { state: 'requires_reauthorization', reason: 'approval does not bind selected funding option' };
       if (Date.parse(q.expires_at) <= Date.parse(nowIso)) return { state: 'requires_reauthorization', reason: 'quote expired before execution; renewed authority required' };
       const res = await getReservation(this.db, p0.id);
       if (!res || res.status !== 'active' || BigInt(res.amount_minor) < minor(qv.merchantTotal)) return { state: 'failed', reason: 'no active capacity reservation' };

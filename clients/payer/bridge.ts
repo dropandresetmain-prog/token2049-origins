@@ -15,6 +15,7 @@ import { pathToFileURL } from 'node:url';
 import { loadBridgeConfig, loadPayerConfig, readSecretFile } from './config.js';
 import { redact } from '../../src/infrastructure/redact.js';
 import { Payer, PayerError, type PayerErrorCode } from './payer.js';
+import { FundingSource } from '../../src/contracts/presentation.js';
 
 const STATUS: Record<PayerErrorCode, number> = {
   invalid_request: 400,
@@ -29,6 +30,7 @@ const STATUS: Record<PayerErrorCode, number> = {
 
 export interface BridgeDeps {
   payer: Pick<Payer, 'pay'>;
+  source?: () => Promise<FundingSource>;
   /** Bearer token callers must present. */
   token: string;
   log?: (e: Record<string, unknown>) => void;
@@ -83,11 +85,17 @@ export function createBridge(deps: BridgeDeps): Server {
         }
         const path = req.url ?? '';
         if (req.method === 'GET' && path === '/health') return send(res, 200, { ok: true });
-        if (path !== '/pay') return fail(res, 'not_found', 'no such route');
-        if (req.method !== 'POST') return fail(res, 'invalid_request', 'use POST');
+        if (path !== '/pay' && path !== '/status') return fail(res, 'not_found', 'no such route');
 
         const m = /^Bearer\s+(.+)$/i.exec(req.headers.authorization ?? '');
         if (!m || !sameToken(m[1]!.trim(), deps.token)) return fail(res, 'unauthenticated', 'missing or invalid bridge token');
+        if (path === '/status') {
+          if (req.method !== 'GET') return fail(res, 'invalid_request', 'use GET');
+          if (!deps.source) return send(res, 200, { ok: true, source: null });
+          // Strict allowlist rejects accidental secret/config fields rather than echoing the signer object.
+          return send(res, 200, { ok: true, source: FundingSource.parse(await deps.source()) });
+        }
+        if (req.method !== 'POST') return fail(res, 'invalid_request', 'use POST');
 
         let purchaseId: unknown;
         try {
@@ -126,7 +134,7 @@ export async function startBridge(env: NodeJS.ProcessEnv): Promise<Server> {
   const token = readSecretFile(b.tokenFile, 'PAYER_BRIDGE_TOKEN_FILE');
   if (token.length < 24) throw new Error('PAYER_BRIDGE_TOKEN_FILE must hold a token of at least 24 characters');
   const payer = new Payer({ config: loadPayerConfig(env), log: (e) => process.stdout.write(`${JSON.stringify(e)}\n`) });
-  const server = createBridge({ payer, token, log: (e) => process.stdout.write(`${JSON.stringify(e)}\n`) });
+  const server = createBridge({ payer, token, source: () => payer.source(), log: (e) => process.stdout.write(`${JSON.stringify(e)}\n`) });
   await new Promise<void>((resolve, reject) => {
     server.once('error', reject);
     // 127.0.0.1 only: this endpoint can cause spending and must not be reachable off-host.

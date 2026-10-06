@@ -1,7 +1,9 @@
 import { z } from 'zod';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
-import { Fulfillment, PurchaseIntent } from '../../contracts/intent.js';
+import { PurchaseIntentDraft, FulfillmentDraft, assessPurchaseIntent, assessFulfillment, NeedsInput } from '../../contracts/input.js';
+import { projectProgress, type FundingSource } from '../../contracts/presentation.js';
+import { createHash } from 'node:crypto';
 import { Money, formatMinor } from '../../contracts/money.js';
 import { OfferId, PurchaseId, QuoteId } from '../../contracts/common.js';
 import type { PurchaseView, QuoteView, OfferView } from '../../contracts/commerce.js';
@@ -55,7 +57,14 @@ function failure(deps: ToolDeps, text: string, structured: Record<string, unknow
 
 /** Gateway failure (ErrorBody or transport problem) -> MCP tool error with code, message and requestId. */
 function gatewayFailure(deps: ToolDeps, e: unknown): CallToolResult {
+  if (e instanceof z.ZodError) return failure(deps, 'The supplied request contains invalid values. Correct those fields and retry.', {
+    error: { code: 'invalid_request', message: 'request validation failed', issues: e.issues.map(i => ({ path: i.path.join('.'), message: i.code === 'unrecognized_keys' ? 'unknown fields rejected' : i.message })) },
+  });
   if (e instanceof GatewayError) {
+    if (e.code === 'needs_input') {
+      const result = NeedsInput.safeParse(e.details);
+      if (result.success) return inputNeeded(deps, result.data);
+    }
     const error = { code: e.code, message: e.message, requestId: e.requestId, ...(e.details ? { details: e.details } : {}) };
     const rid = e.requestId ? ` (requestId: ${e.requestId})` : '';
     return failure(deps, `Error [${e.code}]: ${e.message}${rid}`, { error });
@@ -64,52 +73,13 @@ function gatewayFailure(deps: ToolDeps, e: unknown): CallToolResult {
   return failure(deps, 'Error [internal]: unexpected failure in the MCP channel', { error: { code: 'internal', message: 'unexpected failure in the MCP channel', requestId: null } });
 }
 
-/* ---------------- plain-language status ---------------- */
+function inputNeeded(deps: ToolDeps, result: NeedsInput): CallToolResult {
+  const retry = result.collectionPhase === 'search' ? 'Merge answers into the search intent and call find_offers again.' : result.collectionPhase === 'fulfillment' ? 'Merge answers into fulfillment and call create_quote again.' : 'Merge answers into the current request, then call this tool again.';
+  return success(deps, 'Ask the user for the missing information. ' + retry + ' Do not invent answers.\n' + result.fields.map(f => f.humanLabel + ': ' + f.reason).join('\n'), result);
+}
 
-/** Provider order statuses that must never be described as a completed purchase. */
-const NOT_COMPLETE_COMMERCE = new Set(['held', 'order_created_unpaid', 'payment_pending', 'ticketing', 'not_started', 'unknown']);
-
-/**
- * Honest one-paragraph status. The word "succeeded" appears only when state === 'succeeded';
- * held/unpaid orders and unresolved outcomes are called out explicitly.
- */
 export function describePurchase(p: PurchaseView): string {
-  const dims = `state=${p.state}; paymentState=${p.paymentState}; commerceStatus=${p.commerceStatus}; merchantPaymentStatus=${p.merchantPaymentStatus}`;
-  const reason = p.statusReason ? ` Reason: ${p.statusReason}` : '';
-  let head: string;
-  switch (p.state) {
-    case 'awaiting_funding':
-      head = `NOT purchased. The purchase (${formatMinor(p.payablePrincipal)}) is awaiting funding; nothing has been bought and no merchant spend has occurred.`;
-      break;
-    case 'funded_queued':
-      head = 'Funding was received but the order has NOT been placed yet: execution is queued. Do not treat this as purchased; call get_purchase to check progress.';
-      break;
-    case 'executing':
-      head = 'The order is being executed with the provider right now. The outcome is not final; call get_purchase to check progress.';
-      break;
-    case 'succeeded':
-      head = `Purchase succeeded${p.providerReference ? ` (provider reference ${p.providerReference})` : ''}.`;
-      if (NOT_COMPLETE_COMMERCE.has(p.commerceStatus)) {
-        head += ` Caution: the provider commerce status is "${p.commerceStatus}", which is not a completed order by itself; read the receipt limitations.`;
-      }
-      break;
-    case 'failed':
-      head = 'The purchase FAILED; no completed order was produced.';
-      break;
-    case 'unresolved':
-      head = 'The provider outcome is UNRESOLVED: it is not yet known whether the order exists, and the gateway is reconciling it. Do not assume success or failure and do not buy again; call get_purchase later.';
-      break;
-    case 'requires_reauthorization':
-      head = 'NOT purchased: terms changed and fresh approval is required. Create a new quote and ask the user to approve it.';
-      break;
-    case 'expired':
-      head = 'The purchase expired before it was funded; nothing was bought.';
-      break;
-  }
-  const unpaid = p.state !== 'succeeded' && (p.commerceStatus === 'held' || p.commerceStatus === 'order_created_unpaid')
-    ? ' A held or unpaid provider order is not a completed purchase.'
-    : '';
-  return `${head}${unpaid}${reason}\n${dims}`;
+  return projectProgress(p).message;
 }
 
 function describeOffers(offers: OfferView[]): string {
@@ -118,32 +88,46 @@ function describeOffers(offers: OfferView[]): string {
   return `${offers.length} offer(s). Offers are indicative and NOT executable; call create_quote for exact terms.\n${lines.join('\n')}`;
 }
 
-function describeQuote(q: QuoteView): string {
-  const fund = q.fundingOptions.map((f) => `${f.amount.amountBaseUnits} base units of ${f.amount.assetId} on ${f.amount.network}`).join('; ');
+export function describeQuote(q: QuoteView, source: FundingSource | null): string {
+  const fund = q.fundingOptions.map(f => {
+    const digits = f.amount.amountBaseUnits.padStart(f.amount.decimals + 1, '0');
+    const amount = f.amount.decimals ? digits.slice(0, -f.amount.decimals) + '.' + digits.slice(-f.amount.decimals) : digits;
+    const connected = source?.readiness === 'configured' && source.rail === f.rail && source.network === f.amount.network && source.assetId === f.amount.assetId;
+    const scale = f.settlement?.policy;
+    return '- ' + f.rail + ' / ' + f.amount.network + ': ' + amount + ' ' + (f.amount.symbol ?? f.amount.assetId) +
+      (scale ? ' · testnet notional ' + scale.numerator + ':' + scale.denominator : '') +
+      ' · ' + (connected ? 'Connected wallet ' + source.displayAddress + ' (configured; balance not verified)' : 'External payment action required') +
+      ' · selection ' + f.fundingOptionId;
+  });
   return [
-    `Quote ${q.quoteId} for "${q.title}" via ${q.route} (${q.providerEnvironment}).`,
-    `Merchant total ${formatMinor(q.merchantTotal)} + service fee ${formatMinor(q.serviceFee)} = payable ${formatMinor(q.payablePrincipal)}.`,
-    `Funding required: ${fund || 'none listed'}.`,
-    `Expires ${q.expiresAt}. Digest ${q.digest}.`,
-    'Nothing has been bought. To buy, the user must approve these exact terms; then call buy with quoteId, maxTotal (>= payable) and this digest.',
+    'Exact quote for "' + q.title + '" via ' + q.route + ' (' + q.providerEnvironment + ').',
+    'Merchant total ' + formatMinor(q.merchantTotal) + ' + service fee ' + formatMinor(q.serviceFee) + ' = payable ' + formatMinor(q.payablePrincipal) + '.',
+    'Fulfillment: ' + q.fulfillmentSummary,
+    ...q.terms.map(t => 'Terms: ' + t),
+    'Expires ' + q.expiresAt + '.',
+    ...(fund.length ? ['Available funding options:', ...fund] : ['No payment source is currently available. Purchase creation is unavailable.']),
+    'Nothing has been purchased yet. Show these exact terms to the user, ask them to select one available funding option, then ask for explicit approval of the terms and that payment choice. Only then call buy with selectedFundingOptionId, quoteId, maxTotal and quoteDigest from this quote. Never infer a choice or fabricate customer information.',
   ].join('\n');
 }
 
 /* ---------------- tool registration ---------------- */
 
 export function registerTools(server: McpServer, deps: ToolDeps): void {
+  const paymentAttempts = new Set<string>();
   server.registerTool(
     'find_offers',
     {
       title: 'Find offers',
       description:
         'Search supported retail, hotel and flight offers from a structured purchase intent. Results are indicative and NOT executable: call create_quote on an offerId for exact terms. Nothing is bought or reserved.',
-      inputSchema: { intent: PurchaseIntent },
+      inputSchema: { intent: PurchaseIntentDraft },
       annotations: { readOnlyHint: true, openWorldHint: true },
     },
     async ({ intent }) => {
       try {
-        const { offers } = await deps.gateway.searchOffers(PurchaseIntent.parse(intent));
+        const assessment = assessPurchaseIntent(intent);
+        if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
+        const { offers } = await deps.gateway.searchOffers(assessment.value);
         return success(deps, describeOffers(offers), { offers });
       } catch (e) {
         return gatewayFailure(deps, e);
@@ -156,14 +140,17 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       title: 'Create exact quote',
       description:
-        'Turn an offerId into an immutable quote with the exact price breakdown, funding requirement, expiry and digest. Takes buyer/shipping/traveller details in `fulfillment`. In sandbox, ALWAYS use synthetic traveller and shipping data (fake names, example.com emails, fake addresses and document numbers); never use a real person\'s personal data. Nothing is bought.',
-      inputSchema: { offerId: OfferId, fulfillment: Fulfillment },
+        'Turn an offerId into an immutable quote with the exact price breakdown, funding requirement, expiry and digest. Takes buyer/shipping/traveller details in `fulfillment`. In sandbox, ask the user to supply synthetic traveller and shipping data. Never invent required customer information or silently fill demo defaults. Nothing is bought.',
+      inputSchema: { offerId: OfferId, fulfillment: FulfillmentDraft },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
     },
     async ({ offerId, fulfillment }) => {
       try {
-        const { quote } = await deps.gateway.createQuote(OfferId.parse(offerId), Fulfillment.parse(fulfillment));
-        return success(deps, describeQuote(quote), { quote });
+        const assessment = assessFulfillment(fulfillment);
+        if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
+        const { quote } = await deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
+        const source = deps.bridge ? await deps.bridge.source() : null;
+        return success(deps, describeQuote(quote, source), { quote, fundingSource: source });
       } catch (e) {
         return gatewayFailure(deps, e);
       }
@@ -175,44 +162,72 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       title: 'Buy a quote',
       description:
-        'Create the purchase for an approved quote and, if a bounded payer is configured, fund it. Call ONLY after the user explicitly approved the exact quote; maxTotal and quoteDigest must come from that quote. Retries with the same quote are idempotent. Never claim the item was purchased unless the result status is "succeeded": "action_required" means payment is still needed, "execution_pending" means funded but not yet ordered (use get_purchase).',
+        'Create the purchase for an approved quote and, if a bounded payer is configured, fund it. Call ONLY after the user explicitly approved the exact quote; maxTotal and quoteDigest must come from that quote, and selectedFundingOptionId must be the option the user explicitly selected. Missing choices return needs_input; never infer Cardano. Retries with the same quote are idempotent. Never claim the item was purchased unless the result status is "succeeded": "action_required" means payment is still needed, "execution_pending" means funded but not yet ordered (use get_purchase).',
       inputSchema: {
         quoteId: QuoteId,
-        maxTotal: Money,
-        quoteDigest: z.string().min(1),
+        maxTotal: Money.optional(),
+        quoteDigest: z.string().min(1).optional(),
+        selectedFundingOptionId: z.string().regex(/^fop_[0-9A-Za-z]{10,40}$/).optional(),
         idempotencyKey: IdempotencyKey.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: false, idempotentHint: true, openWorldHint: true },
     },
-    async ({ quoteId, maxTotal, quoteDigest, idempotencyKey }) => {
+    async ({ quoteId, maxTotal, quoteDigest, selectedFundingOptionId, idempotencyKey }) => {
       try {
-        const key = idempotencyKey ?? `mcp:${quoteId}`;
-        const created = await deps.gateway.createPurchase(
-          { quoteId, approval: { maxTotal, quoteDigest }, fundingRail: 'cardano' },
-          key,
-        );
-        let purchase = created.purchase;
+        const { quote } = await deps.gateway.getQuote(quoteId);
+        if (!selectedFundingOptionId) return inputNeeded(deps, {
+          status: 'needs_input', phase: 'funding_selection', fields: [{ path: 'selectedFundingOptionId', humanLabel: 'Funding option', expectedType: 'string', reason: quote.fundingOptions.length ? 'Ask the user to select an available option from the exact quote' : 'No payment source is currently available; request a fresh quote once configured', issue: 'missing', allowedValues: quote.fundingOptions.flatMap(o => o.fundingOptionId ? [o.fundingOptionId] : []) }],
+        });
+        const option = quote.fundingOptions.find(o => o.fundingOptionId === selectedFundingOptionId);
+        if (!option) return failure(deps, 'Selected funding option is absent from this quote. Request a fresh quote and explicit approval.', { error: { code: 'invalid_request' } });
+        const fields: NeedsInput['fields'] = [];
+        if (!maxTotal) fields.push({ path: 'maxTotal', humanLabel: 'Approved maximum', expectedType: 'object', reason: 'Show the commercial amount and collect explicit approval', issue: 'missing' });
+        if (!quoteDigest) fields.push({ path: 'quoteDigest', humanLabel: 'Exact quote approval', expectedType: 'string', reason: 'Collect approval of this exact quote and selected payment choice', issue: 'missing' });
+        if (fields.length) return inputNeeded(deps, { status: 'needs_input', phase: 'approval', fields });
+        const approval = { maxTotal: maxTotal!, quoteDigest: quoteDigest!, selectedFundingOptionId };
+        const sameApproval = (a: typeof approval | null) => a && a.quoteDigest === approval.quoteDigest && a.selectedFundingOptionId === selectedFundingOptionId && a.maxTotal.currency === maxTotal!.currency && a.maxTotal.scale === maxTotal!.scale && a.maxTotal.amountMinor === maxTotal!.amountMinor;
+        const existing = await deps.gateway.quotePurchase(quoteId);
+        let purchase = existing.purchase;
+        if (purchase && !sameApproval(existing.approval)) return failure(deps, 'A purchase already exists with different approved terms or funding choice. Request a fresh quote and authorization.', { error: { code: 'conflict' }, purchase, progress: projectProgress(purchase) });
+        let newlyCreated = false;
+        if (!purchase) {
+          if (deps.bridge) {
+            const source = await deps.bridge.source();
+            if (!source || source.readiness !== 'configured' || source.rail !== option.rail || source.network !== option.amount.network || source.assetId !== option.amount.assetId) {
+              return success(deps, 'The connected payer cannot use the selected funding option. Connect a matching source or use a channel for external payment. Nothing has been purchased.', { status: 'action_required', quote, selectedFundingOptionId });
+            }
+          }
+          const key = idempotencyKey ?? 'mcp:' + createHash('sha256').update(quoteId + ':' + selectedFundingOptionId).digest('hex');
+          try {
+            purchase = (await deps.gateway.createPurchase({ quoteId, approval }, key)).purchase;
+            newlyCreated = true;
+          } catch (e) {
+            if (!(e instanceof GatewayError) || e.code !== 'conflict') throw e;
+            const raced = await deps.gateway.quotePurchase(quoteId);
+            if (!raced.purchase || !sameApproval(raced.approval)) throw e;
+            purchase = raced.purchase;
+          }
+        }
         let payment: Record<string, unknown> | undefined;
         let paymentFailed = false;
-
-        // Only an unfunded purchase is ever sent to the payer; replays of already-funded purchases are not re-paid.
-        if (purchase.state === 'awaiting_funding' && deps.bridge) {
+        // A repeated interaction follows durable truth. Submitted/unknown payments are never sent again.
+        if (newlyCreated && purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && deps.bridge && !paymentAttempts.has(purchase.purchaseId)) {
+          paymentAttempts.add(purchase.purchaseId);
           const paid = await deps.bridge.pay(purchase.purchaseId);
-          // Always re-read: the gateway is the source of truth, and a bridge timeout may hide a successful payment.
           purchase = (await deps.gateway.getPurchase(purchase.purchaseId)).purchase;
           if (paid.ok) payment = { attempted: true, ok: true, transferReference: paid.transferReference };
           else {
             payment = { attempted: true, ok: false, code: paid.code, message: paid.message };
-            paymentFailed = purchase.state === 'awaiting_funding';
+            paymentFailed = purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received';
           }
         }
 
         const status =
-          purchase.state === 'awaiting_funding' ? (paymentFailed ? 'payment_failed' : 'action_required') : purchase.state === 'funded_queued' || purchase.state === 'executing' ? 'execution_pending' : purchase.state;
-        const structured: Record<string, unknown> = { status, purchase, ...(payment ? { payment } : {}) };
+          purchase.state === 'awaiting_funding' ? (purchase.paymentState !== 'not_received' ? 'confirmation_pending' : paymentFailed ? 'payment_failed' : 'action_required') : purchase.state === 'funded_queued' || purchase.state === 'executing' ? 'execution_pending' : purchase.state;
+        const structured: Record<string, unknown> = { status, purchase, progress: projectProgress(purchase), ...(payment ? { payment } : {}) };
         let text = describePurchase(purchase);
 
-        if (purchase.state === 'awaiting_funding') {
+        if (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received') {
           structured.fundingInstructions = purchase.fundingInstructions;
           structured.message =
             paymentFailed && payment
@@ -222,7 +237,6 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         } else if (purchase.state === 'funded_queued' || purchase.state === 'executing') {
           text = `Execution is pending. Call get_purchase with purchaseId ${purchase.purchaseId} to check progress.\n${text}`;
         }
-        text = `Purchase ${purchase.purchaseId}. ${text}`;
         return paymentFailed ? failure(deps, text, structured) : success(deps, text, structured);
       } catch (e) {
         return gatewayFailure(deps, e);
@@ -242,8 +256,8 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     async ({ purchaseId, includeEvents }) => {
       try {
         const { purchase } = await deps.gateway.getPurchase(purchaseId);
-        const structured: Record<string, unknown> = { purchase };
-        let text = `Purchase ${purchase.purchaseId}. ${describePurchase(purchase)}`;
+        const structured: Record<string, unknown> = { purchase, progress: projectProgress(purchase) };
+        let text = describePurchase(purchase);
         if (includeEvents) {
           const { events } = await deps.gateway.getEvents(purchaseId);
           const recent = events.slice(-10);

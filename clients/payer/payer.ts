@@ -18,6 +18,8 @@ import { decodePaymentRequiredHeader, decodePaymentResponseHeader, decodePayment
 import type { PaymentRequired, PaymentRequirements } from '@x402/core/types';
 import { deepEqual } from '@x402/core/utils';
 import { readFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { FundingSource } from '../../src/contracts/presentation.js';
 import { z } from 'zod';
 import { readSecretFile, type PayerConfig } from './config.js';
 import { SettlementBreakdown, validateSettlement } from '../../src/contracts/settlement.js';
@@ -128,6 +130,21 @@ export class Payer {
     this.sleep = d.sleep ?? sleepReal;
     this.now = d.now ?? (() => new Date());
     this.log = d.log ?? (() => undefined);
+  }
+
+  /** Offline public identity only. Wallet derivation stays in the signer process; no provider requests. */
+  async source(): Promise<FundingSource> {
+    try {
+      this.ledger.assertReady();
+      const signer = this.d.createSigner ? this.d.createSigner() : this.defaultSigner('public-identity-only');
+      const publicAddress = await signer.getAddress();
+      return FundingSource.parse({
+        sourceId: `src_${createHash('sha256').update(`${this.d.config.network}:${publicAddress}`).digest('hex').slice(0, 32)}`,
+        rail: 'cardano', network: this.d.config.network, publicAddress,
+        displayAddress: `${publicAddress.slice(0, 14)}…${publicAddress.slice(-6)}`,
+        assetId: this.d.config.allowedAsset, readiness: 'configured',
+      });
+    } catch { throw new PayerError('internal', 'payer public identity is unavailable'); }
   }
 
   /* ---------------- gateway I/O ---------------- */

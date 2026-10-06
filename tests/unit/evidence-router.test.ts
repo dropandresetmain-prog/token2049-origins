@@ -100,8 +100,7 @@ describe('evidence API and inspect shell', () => {
     });
     const created = await h.gw.core.createPurchase(actor, {
       quoteId: quote.quoteId,
-      approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest },
-      fundingRail: 'cardano',
+      approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest, selectedFundingOptionId: quote.fundingOptions[0]!.fundingOptionId! },
     }, 'evidence-owner-test');
     const purchaseId = created.purchase.purchaseId;
     await appendEvent(h.db, purchaseId, 'provider.debug', { email: 'private-event@example.com', note: 'untrusted provider payload' }, h.clock.now().toISOString());
@@ -141,8 +140,7 @@ describe('evidence API and inspect shell', () => {
     });
     const created = await h.gw.core.createPurchase(actor, {
       quoteId: quote.quoteId,
-      approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest },
-      fundingRail: 'cardano',
+      approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest, selectedFundingOptionId: quote.fundingOptions[0]!.fundingOptionId! },
     }, 'evidence-provenance-test');
     const purchaseId = created.purchase.purchaseId;
     const quoteRow = (await h.db.get<{ public_json: string }>('SELECT public_json FROM quotes WHERE id = $1', quote.quoteId))!;

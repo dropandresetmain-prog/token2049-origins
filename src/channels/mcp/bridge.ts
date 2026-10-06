@@ -1,5 +1,6 @@
 import { z } from 'zod';
 import type { McpConfig } from './config.js';
+import { FundingSource } from '../../contracts/presentation.js';
 
 /** Outcome of asking the payer bridge to fund a purchase. Never throws; failures are values. */
 export type BridgeResult = { ok: true; transferReference: string | null } | { ok: false; code: string; message: string };
@@ -31,6 +32,18 @@ export class BridgeClient {
       ...(config.fetch ? { fetch: config.fetch } : {}),
       ...(config.bridgeTimeoutMs ? { timeoutMs: config.bridgeTimeoutMs } : {}),
     });
+  }
+
+  async source(): Promise<FundingSource | null> {
+    try {
+      const response = await this.f(`${this.cfg.url}/status`, {
+        headers: { accept: 'application/json', authorization: `Bearer ${this.cfg.token}` },
+        redirect: 'error', signal: AbortSignal.timeout(Math.min(this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5000)),
+      });
+      if (!response.ok) return null;
+      const body = z.object({ ok: z.literal(true), source: FundingSource.nullable() }).strict().safeParse(await response.json());
+      return body.success ? body.data.source : null;
+    } catch { return null; }
   }
 
   async pay(purchaseId: string): Promise<BridgeResult> {

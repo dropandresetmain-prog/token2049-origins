@@ -9,6 +9,8 @@ import { FixtureExecutor, FixtureFundingAdapter } from './fixtures.js';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import type { BankObservationAdapter } from '../../src/contracts/ports.js';
+import { createEvidenceRouter } from '../../src/evidence/router.js';
+import { createProofPageRouter } from '../../src/evidence/proof-page.js';
 
 export interface Harness {
   gw: Gateway;
@@ -41,7 +43,10 @@ export async function startHarness(opts: { schema?: string; db?: Db; clock?: Man
   const flight = new FixtureExecutor('atlas', 'flight', clock, 15000n);
   const funding = new FixtureFundingAdapter(clock);
   const gw = await buildGateway(
-    { executors: [retail, hotel, flight], fundingAdapters: [funding], bankAdapters: opts.bankAdapters ?? [] },
+    { executors: [retail, hotel, flight], fundingAdapters: [funding], bankAdapters: opts.bankAdapters ?? [], buildRouters: core => [
+      { path: '/v1/evidence', router: createEvidenceRouter({ db: core.deps.db, clock, bankAdapters: opts.bankAdapters ?? [] }), auth: true },
+      { path: '/proof', router: createProofPageRouter(), auth: false },
+    ] },
     { env: TEST_ENV, clock, db },
   );
   gw.core.deps.config.settlementPolicy = opts.settlementPolicy ?? { mode: 'full_notional', numerator: 1, denominator: 1 };
@@ -92,8 +97,8 @@ export const retailFulfillment = {
 };
 
 /** search -> quote -> purchase; returns ids and the funding requirement. */
-export async function createFundablePurchase(h: Harness, token = h.alice.token, idem = `idem-${Math.random().toString(36).slice(2, 12)}`) {
-  const s = await h.call('POST', '/v1/offers/search', { token, body: { intent: retailIntent() } });
+export async function createFundablePurchase(h: Harness, token = h.alice.token, idem = `idem-${Math.random().toString(36).slice(2, 12)}`, ceilingMinor = '10000') {
+  const s = await h.call('POST', '/v1/offers/search', { token, body: { intent: retailIntent(ceilingMinor) } });
   if (s.status !== 200) throw new Error(`search ${s.status} ${JSON.stringify(s.body)}`);
   const offerId = s.body.offers[0].offerId;
   const q = await h.call('POST', '/v1/quotes', { token, body: { offerId, fulfillment: retailFulfillment } });
@@ -102,7 +107,7 @@ export async function createFundablePurchase(h: Harness, token = h.alice.token, 
   const p = await h.call('POST', '/v1/purchases', {
     token,
     headers: { 'idempotency-key': idem },
-    body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest }, fundingRail: 'cardano' },
+    body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest, selectedFundingOptionId: quote.fundingOptions[0]!.fundingOptionId! } },
   });
   if (p.status !== 201) throw new Error(`purchase ${p.status} ${JSON.stringify(p.body)}`);
   return { quote, purchase: p.body.purchase, idem, required: quote.fundingOptions[0].amount.amountBaseUnits as string };

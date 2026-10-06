@@ -5,6 +5,7 @@ const STATUS: Record<ErrorCode, number> = {
   forbidden: 403,
   not_found: 404,
   invalid_request: 400,
+  needs_input: 422,
   idempotency_conflict: 409,
   conflict: 409,
   quote_expired: 409,

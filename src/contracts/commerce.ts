@@ -60,6 +60,8 @@ export const ValuationConvention = z
 
 export const FundingOption = z
   .object({
+    /** Absent only on legacy records. New quote options have an opaque quote-scoped identity. */
+    fundingOptionId: z.string().regex(/^fop_[0-9A-Za-z]{10,40}$/).optional(),
     rail: FundingRail,
     amount: CryptoAmount,
     payTo: z.string(),
@@ -166,6 +168,7 @@ export type MerchantPaymentStatus = z.infer<typeof MerchantPaymentStatus>;
 
 export const Approval = z
   .object({
+    selectedFundingOptionId: z.string().regex(/^fop_[0-9A-Za-z]{10,40}$/),
     /** Ceiling the customer authorizes; must be >= quote.payablePrincipal and in the same currency. */
     maxTotal: Money,
     /** Must equal the quote digest: approval binds exact merchant/offer/amount/fulfillment/expiry. */
