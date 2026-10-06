@@ -40,9 +40,11 @@
     "payer:solana:hosted": "tsx clients/solana/hosted.ts",
     "payer:solana:hosted:init-history": "tsx clients/solana/hosted.ts --init-history",
     "payer:solana:hosted:preflight": "node dist/scripts/solana/hosted-preflight.js",
-    "payer:solana:hosted:history": "tsx clients/solana/hosted.ts --history-fingerprint"
+    "payer:solana:hosted:history": "tsx clients/solana/hosted.ts --history-fingerprint",
+    "cdp:treasury": "tsx src/integrations/coinbase-cdp/cli.ts"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "1.57.0",
     "@evolution-sdk/evolution": "0.5.14",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@solana/kit": "5.1.0",
