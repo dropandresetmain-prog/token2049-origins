@@ -49,10 +49,15 @@ export function sourceMatches(source: FundingSource, option: FundingOptionView):
   return source.readiness === 'configured' && source.rail === option.rail && source.network === option.amount.network && source.assetId === option.amount.assetId;
 }
 
-/** Every reachable connected payer with its bridge. Read-only: /status never moves money. */
-async function connectedPayers(deps: ToolDeps): Promise<Array<{ bridge: BridgeClient; source: FundingSource }>> {
-  const all = await Promise.all((deps.bridges ?? []).map(async (bridge) => ({ bridge, source: await bridge.source() })));
-  return all.flatMap((p) => (p.source ? [{ bridge: p.bridge, source: p.source }] : []));
+/** Every reachable connected payer with its bridge (and the spend headroom it reports, if any). Read-only: /status never moves money. */
+async function connectedPayers(deps: ToolDeps): Promise<Array<{ bridge: BridgeClient; source: FundingSource; headroom?: bigint }>> {
+  const all = await Promise.all((deps.bridges ?? []).map(async (bridge) => ({ bridge, status: await bridge.status() })));
+  return all.flatMap((p) => (p.status ? [{ bridge: p.bridge, source: p.status.source, ...(p.status.headroomBaseUnits !== undefined ? { headroom: p.status.headroomBaseUnits } : {}) }] : []));
+}
+
+/** Whether a payer that reports its headroom can afford this option right now. Unknown headroom is treated as "no known limit". */
+function exceedsHeadroom(option: FundingOptionView, headroom: bigint | undefined): boolean {
+  return headroom !== undefined && BigInt(option.amount.amountBaseUnits) > headroom;
 }
 
 /* ---------------- output sanitising ---------------- */
@@ -161,7 +166,7 @@ function describeOffers(offers: OfferView[], totalFound: number): string {
   ].join('\n');
 }
 
-export function describeQuote(q: QuoteView, sources: FundingSource[]): string {
+export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms: Map<string, bigint> = new Map()): string {
   const fund = q.fundingOptions.map(f => {
     const digits = f.amount.amountBaseUnits.padStart(f.amount.decimals + 1, '0');
     const amount = f.amount.decimals ? digits.slice(0, -f.amount.decimals) + '.' + digits.slice(-f.amount.decimals) : digits;
@@ -169,7 +174,11 @@ export function describeQuote(q: QuoteView, sources: FundingSource[]): string {
     const scale = f.settlement?.policy;
     return '- ' + f.rail + ' / ' + f.amount.network + ': ' + amount + ' ' + (f.amount.symbol ?? f.amount.assetId) +
       (scale ? ' · testnet notional ' + scale.numerator + ':' + scale.denominator : '') +
-      ' · ' + (connected ? 'Connected wallet ' + connected.displayAddress + ' (configured; balance not verified)' : 'External payment action required') +
+      ' · ' + (connected
+        ? (exceedsHeadroom(f, headrooms.get(connected.sourceId))
+          ? 'Connected wallet ' + connected.displayAddress + ' BUT its remaining spend cap (' + String(headrooms.get(connected.sourceId)) + ' base units) is below this payment: it would be refused, nothing can be bought with it'
+          : 'Connected wallet ' + connected.displayAddress + ' (configured; balance not verified)')
+        : 'External payment action required') +
       ' · selection ' + f.fundingOptionId;
   });
   return [
@@ -257,7 +266,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       title: 'Find offers',
       description:
-        'Search supported retail, hotel and flight offers from a structured purchase intent. Results are indicative and NOT executable. Nothing is bought or reserved. Afterwards present the best 3 options to the user, mark one "Recommended" with a short reason, and let the user choose before calling create_quote.',
+        'Search supported retail, hotel and flight offers from a structured purchase intent (retail searches the live product catalog by default). Results are indicative and NOT executable. Nothing is bought or reserved. Afterwards present the best 3 options to the user, mark one "Recommended" with a short reason, and let the user choose before calling create_quote.',
       inputSchema: { intent: PurchaseIntentDraft },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       ...securityMeta(deps, 'find_offers'),
@@ -268,7 +277,12 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       try {
         const assessment = assessPurchaseIntent(intent);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
-        const { offers: found } = await deps.gateway.searchOffers(assessment.value);
+        // Open retail requests search the live Shopify catalog by default; the controlled test-store catalog is the fallback when live finds nothing.
+        const wanted = assessment.value;
+        let { offers: found } = wanted.category === 'retail' && wanted.discovery === undefined
+          ? await deps.gateway.searchOffers({ ...wanted, discovery: 'live' })
+          : await deps.gateway.searchOffers(wanted);
+        if (found.length === 0 && wanted.category === 'retail' && wanted.discovery === undefined) found = (await deps.gateway.searchOffers({ ...wanted, discovery: 'controlled_catalog' })).offers;
         // Gateway order is preserved; the host model recommends from these real fields and the user chooses.
         const offers = found.slice(0, SHORTLIST_SIZE);
         return success(deps, describeOffers(offers, found.length), { offers, shortlist: shortlistOf(offers), totalFound: found.length, interaction: offerSelectionGuide(offers.length) });
@@ -295,8 +309,10 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const assessment = assessFulfillment(fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
         const { quote } = await deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
-        const fundingSources = (await connectedPayers(deps)).map(p => p.source);
-        return success(deps, describeQuote(quote, fundingSources), { quote, fundingSources });
+        const payers = await connectedPayers(deps);
+        const fundingSources = payers.map(p => p.source);
+        const headrooms = new Map(payers.flatMap(p => (p.headroom !== undefined ? [[p.source.sourceId, p.headroom] as [string, bigint]] : [])));
+        return success(deps, describeQuote(quote, fundingSources, headrooms), { quote, fundingSources });
       } catch (e) {
         return gatewayFailure(deps, e);
       }
@@ -356,6 +372,10 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
             }
             if (!matching[0]) {
               return success(deps, 'The connected payer cannot use the selected funding option. Connect a matching source or use a channel for external payment. Nothing has been purchased.', { status: 'action_required', quote, selectedFundingOptionId });
+            }
+            if (exceedsHeadroom(option, matching[0].headroom)) {
+              return failure(deps, `The connected payer's remaining spend cap (${String(matching[0].headroom)} base units) is below this payment (${option.amount.amountBaseUnits}). It would be refused. Nothing has been purchased and no purchase was created. Choose a cheaper offer, or ask the operator to review the payer cap.`,
+                { error: { code: 'payer_cap_exceeded' }, selectedFundingOptionId, remainingCapBaseUnits: String(matching[0].headroom), requiredBaseUnits: option.amount.amountBaseUnits });
             }
             payer = matching[0].bridge;
           }

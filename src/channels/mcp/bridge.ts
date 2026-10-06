@@ -39,8 +39,12 @@ export class BridgeClient {
     });
   }
 
-  /** Sanitized identity of the payer behind this bridge; null if unreachable or if it is not a source of this client's rail. */
-  async source(): Promise<FundingSource | null> {
+  /**
+   * Sanitized identity of the payer behind this bridge, plus how much it may still spend when it reports that (hosted payers do:
+   * `ledger.headroomBaseUnits`, the largest single payment its caps still allow). Null if unreachable or if it is not a source of this
+   * client's rail.
+   */
+  async status(): Promise<{ source: FundingSource; headroomBaseUnits?: bigint } | null> {
     try {
       const response = await this.f(`${this.cfg.url}/status`, {
         headers: { accept: 'application/json', authorization: `Bearer ${this.cfg.token}` },
@@ -49,8 +53,14 @@ export class BridgeClient {
       if (!response.ok) return null;
       const body = z.object({ ok: z.literal(true), source: FundingSource.nullable(), ledger: z.record(z.string(), z.unknown()).optional() }).strict().safeParse(await response.json());
       // A bridge configured for one rail must never be accepted as another rail's payer.
-      return body.success && body.data.source?.rail === this.rail ? body.data.source : null;
+      if (!body.success || body.data.source?.rail !== this.rail) return null;
+      const raw = body.data.ledger?.headroomBaseUnits;
+      return { source: body.data.source, ...(typeof raw === 'string' && /^[0-9]+$/.test(raw) ? { headroomBaseUnits: BigInt(raw) } : {}) };
     } catch { return null; }
+  }
+
+  async source(): Promise<FundingSource | null> {
+    return (await this.status())?.source ?? null;
   }
 
   async pay(purchaseId: string): Promise<BridgeResult> {

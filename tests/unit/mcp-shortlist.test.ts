@@ -22,19 +22,27 @@ const withSource = (n: number): OfferView => offer(n, {
   },
 } as Partial<OfferView>);
 
-async function findOffers(offers: OfferView[]) {
+async function findOffers(offers: OfferView[], opts: { liveOffers?: OfferView[]; intent?: Record<string, unknown> } = {}) {
   const calls: string[] = [];
+  const intents: any[] = [];
   const server = createMcpServer({
     gatewayUrl: 'http://stub.invalid', gatewayToken: 't2o_stubtoken0123456789abcdef',
-    fetch: (async (url: string) => { calls.push(String(url)); return new Response(JSON.stringify({ offers }), { status: 200, headers: { 'content-type': 'application/json' } }); }) as unknown as typeof fetch,
+    fetch: (async (url: string, init?: RequestInit) => {
+      calls.push(String(url));
+      const sent = init?.body ? JSON.parse(String(init.body)) : {};
+      intents.push(sent.intent);
+      // `liveOffers` lets a test make the live catalog answer differently from the controlled catalog.
+      const body = opts.liveOffers && sent.intent?.discovery === 'live' ? opts.liveOffers : offers;
+      return new Response(JSON.stringify({ offers: body }), { status: 200, headers: { 'content-type': 'application/json' } });
+    }) as unknown as typeof fetch,
   });
   const [a, b] = InMemoryTransport.createLinkedPair();
   const client = new Client({ name: 'stub', version: '0' });
   await Promise.all([server.connect(a), client.connect(b)]);
-  const res = await client.callTool({ name: 'find_offers', arguments: { intent: retailIntent() } }) as any;
+  const res = await client.callTool({ name: 'find_offers', arguments: { intent: opts.intent ?? retailIntent() } }) as any;
   const tools = (await client.listTools()).tools;
   await client.close(); await server.close();
-  return { res, calls, tools };
+  return { res, calls, intents, tools };
 }
 
 describe('find_offers shortlist and explicit selection', () => {
@@ -104,5 +112,27 @@ describe('find_offers shortlist and explicit selection', () => {
     expect(shortlistOf([1, 2, 3, 4].map((n) => offer(n)))).toHaveLength(3);
     expect(offerSelectionGuide(0).createQuoteAllowedNow).toBe(false);
     expect(offerSelectionGuide(3).createQuoteAllowedNow).toBe(false);
+  });
+
+  describe('retail discovery', () => {
+    it('searches the live catalog by default for an open retail request', async () => {
+      const { intents, res } = await findOffers([offer(9)], { liveOffers: [offer(1), offer(2)] });
+      expect(intents).toHaveLength(1);
+      expect(intents[0]).toMatchObject({ category: 'retail', discovery: 'live' });
+      expect(res.structuredContent.shortlist.map((o: any) => o.offerId)).toEqual(['off_TESTOFFER0001', 'off_TESTOFFER0002']);
+    });
+
+    it('falls back to the controlled test catalog only when live discovery finds nothing', async () => {
+      const { intents, res } = await findOffers([offer(9)], { liveOffers: [] });
+      expect(intents.map((i) => i.discovery)).toEqual(['live', 'controlled_catalog']);
+      expect(res.structuredContent.shortlist.map((o: any) => o.offerId)).toEqual(['off_TESTOFFER0009']);
+    });
+
+    it('respects an explicit discovery mode and never rewrites non-retail searches', async () => {
+      const explicit = await findOffers([offer(9)], { intent: { ...retailIntent(), discovery: 'controlled_catalog' } });
+      expect(explicit.intents.map((i) => i.discovery)).toEqual(['controlled_catalog']);
+      const hotel = await findOffers([offer(9)], { intent: { category: 'hotel', destination: { cityName: 'Singapore', countryCode: 'SG' }, checkin: '2026-12-01', checkout: '2026-12-03', occupancies: [{ adults: 1 }], guestNationality: 'SG', spendCeiling: { currency: 'USD', amountMinor: '200000', scale: 2 } } });
+      for (const i of hotel.intents) expect(i).not.toHaveProperty('discovery');
+    });
   });
 });

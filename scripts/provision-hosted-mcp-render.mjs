@@ -563,31 +563,33 @@ async function applyPayer(opts, web, found, dryRun) {
 }
 
 async function triggerDeploy(label, serviceId) {
-  const { data } = await api('POST', `/services/${serviceId}/deploys`, { clearCache: 'do_not_clear' });
-  let id = data?.id;
-  if (!id) {
-    // 202 "queued" responses carry no body; fall back to the newest deploy.
-    const rows = (await api('GET', `/services/${serviceId}/deploys?limit=1`)).data;
-    id = Array.isArray(rows) ? rows[0]?.deploy?.id : undefined;
-  }
-  if (!id) fail(`${label}: could not determine the triggered deploy`);
-  log(`${label}: deploy ${id} triggered`);
-  return id;
+  // Remember when we asked: env-var changes and a new service's own first deploy also create deploys, so we follow the NEWEST
+  // deploy created since this point rather than guessing an id from a possibly racing list.
+  const since = Date.now() - 5000;
+  await api('POST', `/services/${serviceId}/deploys`, { clearCache: 'do_not_clear' });
+  log(`${label}: deploy triggered`);
+  return since;
 }
 
-async function waitForDeploy(label, serviceId, deployId) {
+async function waitForDeploy(label, serviceId, since) {
   const pollMs = Number(process.env.PROVISION_POLL_MS) || 10_000;
   const deadline = Date.now() + 25 * 60_000;
   let last = '';
   while (Date.now() < deadline) {
-    const { data } = await api('GET', `/services/${serviceId}/deploys/${deployId}`);
-    const status = data?.status ?? 'unknown';
+    const rows = (await api('GET', `/services/${serviceId}/deploys?limit=5`)).data;
+    const mine = (Array.isArray(rows) ? rows : [])
+      .map((r) => r?.deploy ?? r)
+      .filter((d) => d?.id && Date.parse(d.createdAt ?? '') >= since)
+      .sort((x, y) => Date.parse(y.createdAt) - Date.parse(x.createdAt));
+    const newest = mine[0];
+    const status = newest?.status ?? 'waiting';
     if (status !== last) {
       log(`${label}: deploy status ${status}`);
       last = status;
     }
-    if (status === 'live') return;
-    if (TERMINAL_BAD.has(status)) fail(`${label}: deploy ended with status ${status}`);
+    // A failed deploy that a newer one superseded is irrelevant; only the newest outcome decides.
+    if (newest && status === 'live') return;
+    if (newest && TERMINAL_BAD.has(status)) fail(`${label}: deploy ended with status ${status}`);
     await sleep(pollMs);
   }
   fail(`${label}: deploy did not go live within 25 minutes`);

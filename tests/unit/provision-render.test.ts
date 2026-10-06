@@ -195,6 +195,7 @@ async function startFake(tree: Tree, opts: { payerPlan?: string; existingPayer?:
   const requests: Recorded[] = [];
   const services = new Map<string, FakeService>();
   const deploys: string[] = [];
+  const deployLists = new Map<string, Array<{ id: string; status: string; createdAt: string; polls: number }>>();
   const deployPolls = new Map<string, number>();
   let counter = 0;
   let origin = '';
@@ -309,12 +310,17 @@ async function startFake(tree: Tree, opts: { payerPlan?: string; existingPayer?:
       }
       if (sub === 'deploys' && !key && method === 'POST') {
         deploys.push(svc.id);
-        return send(res, 201, { id: `dep-${svc.id}`, status: 'created' });
+        const list = deployLists.get(svc.id) ?? [];
+        list.unshift({ id: `dep-${svc.id}-${list.length}`, status: 'build_in_progress', createdAt: new Date().toISOString(), polls: 0 });
+        deployLists.set(svc.id, list);
+        return send(res, 202, {});
       }
-      if (sub === 'deploys' && key && method === 'GET') {
-        const n = (deployPolls.get(key) ?? 0) + 1;
-        deployPolls.set(key, n);
-        return send(res, 200, { id: key, status: n < 2 ? 'build_in_progress' : 'live' });
+      if (sub === 'deploys' && !key && method === 'GET') {
+        // A new service's own first deploy (before env vars exist) failed long before ours: it must not decide the outcome.
+        const list = deployLists.get(svc.id) ?? [];
+        const rows = [...list, { id: `dep-${svc.id}-creation`, status: 'update_failed', createdAt: '2020-01-01T00:00:00.000Z', polls: 99 }];
+        if (list[0]) { list[0].polls++; list[0].status = list[0].polls < 2 ? 'build_in_progress' : 'live'; }
+        return send(res, 200, rows.map((d) => ({ deploy: { id: d.id, status: d.status, createdAt: d.createdAt }, cursor: d.id })));
       }
       return send(res, 404, { message: 'unsupported in fake' });
     })();

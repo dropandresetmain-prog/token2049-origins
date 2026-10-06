@@ -63,7 +63,7 @@ function retailReportsPaid(h: Harness): void {
 }
 
 /** Gateway + hosted MCP on one listener, with an optional fake Cardano payer on the "private network". */
-async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; statusDelayMs?: number; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
+async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; statusDelayMs?: number; headroomBaseUnits?: string; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const cleanup: Array<() => Promise<void>> = [];
@@ -81,7 +81,7 @@ async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; wi
         if (req.url === '/health') return send(200, { ok: true });
         if (req.headers.authorization !== `Bearer ${BRIDGE_TOKEN}`) return send(401, { ok: false, error: { code: 'unauthenticated', message: 'bad token' } });
         if (req.url === '/status') await new Promise((r) => setTimeout(r, opts.statusDelayMs ?? 0)); // a free payer waking from sleep
-        if (req.url === '/status') return send(200, { ok: true, source: FundingSource.parse({ sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano', network: 'cardano:preprod', publicAddress: PAYER_ADDRESS, displayAddress: PAYER_ADDRESS.slice(0, 14) + '…' + PAYER_ADDRESS.slice(-6), assetId: h.funding.acceptedAsset().assetId, readiness: 'configured' }) });
+        if (req.url === '/status') return send(200, { ok: true, source: FundingSource.parse({ sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano', network: 'cardano:preprod', publicAddress: PAYER_ADDRESS, displayAddress: PAYER_ADDRESS.slice(0, 14) + '…' + PAYER_ADDRESS.slice(-6), assetId: h.funding.acceptedAsset().assetId, readiness: 'configured' }), ...(opts.headroomBaseUnits ? { ledger: { headroomBaseUnits: opts.headroomBaseUnits, committedBaseUnits: '66830' } } : {}) });
         const { purchaseId } = JSON.parse(raw) as { purchaseId: string };
         bridge.calls.push(purchaseId);
         const got = await h.call('GET', `/v1/purchases/${purchaseId}`, { token: payerToken });
@@ -718,5 +718,44 @@ describe('hosted MCP: free payer cold starts', () => {
       const polled = await client.callTool({ name: 'get_purchase', arguments: { purchaseId: first.structuredContent.purchase.purchaseId } }) as any;
       expect(polled.structuredContent.purchase.paymentState).not.toBe('not_received');
     } finally { await client.close(); }
+  });
+});
+
+describe('hosted MCP: payer spend-cap headroom', () => {
+  async function quoted(f: Fixture) {
+    const client = await mcp(f, (await fullGrant(f)).tokens.access_token);
+    const found = await client.callTool({ name: 'find_offers', arguments: { intent: retailIntent() } }) as any;
+    const q = await client.callTool({ name: 'create_quote', arguments: { offerId: found.structuredContent.offers[0].offerId, fulfillment: retailFulfillment } }) as any;
+    return { client, q };
+  }
+
+  it('tells the user at quote time when the payer\'s remaining cap is below the payment, and refuses before creating any purchase', async () => {
+    const f = await start({ withBridge: true, headroomBaseUnits: '1' });
+    const { client, q } = await quoted(f);
+    try {
+      const quote = q.structuredContent.quote;
+      expect(q.content[0].text).toMatch(/remaining spend cap \(1 base units\) is below this payment: it would be refused/);
+      const res = await client.callTool({ name: 'buy', arguments: { quoteId: quote.quoteId, selectedFundingOptionId: quote.fundingOptions[0].fundingOptionId, maxTotal: quote.payablePrincipal, quoteDigest: quote.digest } }) as any;
+      expect(res.isError).toBe(true);
+      expect(res.structuredContent.error.code).toBe('payer_cap_exceeded');
+      expect(res.structuredContent).toMatchObject({ remainingCapBaseUnits: '1', requiredBaseUnits: quote.fundingOptions[0].amount.amountBaseUnits });
+      expect(res.content[0].text).toMatch(/Nothing has been purchased and no purchase was created/);
+      expect(f.bridge!.calls).toEqual([]);
+      expect((await f.h.gw.db.all('SELECT id FROM purchases')).length).toBe(0);
+    } finally { await client.close(); }
+  });
+
+  it('proceeds normally when the headroom covers the payment (and when a payer reports none)', async () => {
+    for (const headroomBaseUnits of ['999999999999', undefined]) {
+      const f = await start({ withBridge: true, ...(headroomBaseUnits ? { headroomBaseUnits } : {}) });
+      const { client, q } = await quoted(f);
+      try {
+        const quote = q.structuredContent.quote;
+        expect(q.content[0].text).not.toMatch(/would be refused/);
+        const res = await client.callTool({ name: 'buy', arguments: { quoteId: quote.quoteId, selectedFundingOptionId: quote.fundingOptions[0].fundingOptionId, maxTotal: quote.payablePrincipal, quoteDigest: quote.digest } }) as any;
+        expect(res.isError).toBeFalsy();
+        expect(f.bridge!.calls).toHaveLength(1);
+      } finally { await client.close(); await current?.h.close(); for (const c of current?.cleanup ?? []) await c(); current = undefined; }
+    }
   });
 });
