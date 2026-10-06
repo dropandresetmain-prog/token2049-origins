@@ -125,3 +125,16 @@ full PASS or a genuine terminal/ambiguous blocker; no per-fix review loop.
 
 Issue 31 is a mandatory ambiguity stop. No automatic retry, new order or replacement funding.
 Current overall verdict UNRESOLVED. Preserve original state and wait for read-only reconciliation.
+
+### Read-only investigation and diagnostic regressions
+
+- [x] Original cart/order reads; no new cart, worker tick, Pay, funding or payer.
+- [x] Bogus inputs match official guidance; no mismatch established.
+- [x] abandonedCheckouts HTTP 200 / ACCESS_DENIED for protected-data approval; no scope expansion.
+- [x] Passive post-Pay snapshot before browser closes; no raw text or field values.
+- [x] Four regressions: timeout, throwing diagnostics, post-Pay challenge, actual Pay failure;
+  original errors and single submission/checkpoint preserved.
+- [x] Focused 78/78, full 518/518 (26 files), typecheck/build/migrations PASS.
+- [ ] Original abandoned-checkout Timeline error/outcome obtained from human.
+- [ ] Issue 31 authoritatively reconciled; zero orders/fresh page are insufficient.
+- [ ] Paid Shopify/readback/receipt PASS. Overall UNRESOLVED; no Pay retry.

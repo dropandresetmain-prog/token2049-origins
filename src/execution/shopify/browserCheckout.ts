@@ -148,9 +148,9 @@ export function readCheckoutTotals(text: string, subtotal: Money, shipping: Mone
 /* ---------------- Playwright driver ---------------- */
 
 /**
- * Diagnostics seam for the unfunded rehearsal harness. Production passes no observer. Hooks are
+ * Passive diagnostics seam for acceptance harnesses. Production passes no observer. Hooks are
  * isolated (a throwing hook never affects the driver). `attach` may be async and is the ONE hook that
- * may touch the browser context, solely so a diagnostic permalink session's cookies can be seeded;
+ * may register read-only observers or seed a diagnostic permalink session's cookies;
  * it runs before any navigation and can never click. Implementations must
  * record hostnames, step names and booleans only, never URLs with queries, page text or field values.
  */
@@ -350,17 +350,21 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       // No `force`: live rehearsal showed the pay button passes Playwright's normal actionability checks.
       await payElement.click({ timeout: 5000, noWaitAfter: true });
     } catch {
+      await observe(() => this.opts.observer?.stepFailed?.('pay_click'));
       throw new CheckoutAbort('step_failed', 'step pay_click failed');
     }
 
-    log('await_confirmation');
-    const deadline = this.clock.now().getTime() + CONFIRM_TIMEOUT_MS;
-    for (;;) {
-      if (/thank[-_]?you|\/orders\/[a-f0-9]{8,}/i.test(page.url())) break;
-      await this.assertNoChallenge(page);
-      if (this.clock.now().getTime() > deadline) throw new CheckoutAbort('order_not_confirmed');
-      await page.waitForTimeout(1000);
-    }
+    // Capture passive diagnostics before closing the page on timeout/challenge. The durable
+    // Pay checkpoint and unknown-outcome semantics remain unchanged; this never retries Pay.
+    await this.step(log, 'await_confirmation', async () => {
+      const deadline = this.clock.now().getTime() + CONFIRM_TIMEOUT_MS;
+      for (;;) {
+        if (/thank[-_]?you|\/orders\/[a-f0-9]{8,}/i.test(page.url())) break;
+        await this.assertNoChallenge(page);
+        if (this.clock.now().getTime() > deadline) throw new CheckoutAbort('order_not_confirmed');
+        await page.waitForTimeout(1000);
+      }
+    });
     log('read_confirmation');
     await page.waitForLoadState('domcontentloaded').catch(() => undefined);
     const ids = extractOrderIdentifiers(await this.bodyText(page));

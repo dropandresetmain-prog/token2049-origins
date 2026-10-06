@@ -6,6 +6,7 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { randomUUID, createHash } from 'node:crypto';
 import { Pool } from 'pg';
+import type { Page } from 'playwright-core';
 import type { Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { buildGateway, type Gateway } from '../../src/composition.js';
@@ -67,6 +68,15 @@ const observedFetch:typeof fetch=async(url,init)=>{
 };
 let server:Server|undefined,db:Db|undefined,gw:Gateway|undefined,purchaseId:string|undefined,quote:QuoteView|undefined;
 let executionInvoked=false,payCheckpointSeen=false;
+let checkoutPage:Page|undefined;
+const blockedRequests:Record<string,number>={},browserResponses:Record<string,number>={};
+const captureFailure=async(step:string)=>{
+ if(!checkoutPage)return;
+ const body=await checkoutPage.locator('body').innerText({timeout:1500}).catch(()=>'');
+ const url=new URL(checkoutPage.url());
+ const indicators={invalidCard:/enter a valid card number/i.test(body),invalidExpiry:/enter a valid (?:expiration|expiry) date/i.test(body),invalidSecurityCode:/enter a valid security code/i.test(body),paymentFailure:/your payment (?:could not|couldn't)|card (?:was |is )?declined|unable to process (?:your |the )?payment/i.test(body),challenge:/verify (?:that )?you are (?:a )?human|one-time (?:code|passcode)/i.test(body)};
+ emit('checkout_failure_snapshot',{phase,step,host:url.hostname,routeClass:/thank[-_]?you/.test(url.pathname)?'thank_you':/\/orders\//.test(url.pathname)?'order':/^\/checkouts\//.test(url.pathname)?'checkout':'other',confirmationUrlPattern:/thank[-_]?you|\/orders\/[a-f0-9]{8,}/i.test(checkoutPage.url()),indicators,invalidFields:await checkoutPage.locator('[aria-invalid="true"]').count().catch(()=>-1),visibleAlertElements:await checkoutPage.getByRole('alert').count().catch(()=>-1),frameHosts:[...new Set(checkoutPage.frames().map(f=>{try{return new URL(f.url()).hostname||'about';}catch{return 'invalid';}}))],blockedRequests,browserResponses});
+};
 try{
  const adminPool=new Pool({connectionString:databaseUrl,max:1});
  try{await adminPool.query('CREATE SCHEMA "'+schema+'"');}finally{await adminPool.end();}
@@ -75,7 +85,7 @@ try{
  const shopify=new ShopifyExecutor(env,{fetchImpl:observedFetch,sink:line=>{
   const step=/step=([a-z0-9_.-]+)/.exec(line)?.[1];
   if(step){if(step==='pay_click')payCheckpointSeen=true;emit('browser_step',{phase,step});}
- },checkoutObserver:{stepFailed:async step=>{emit('browser_step_failed',{phase,step});},beforePay:async()=>{emit('irreversible_boundary',{action:'one_bogus_pay_submission',funding:'local_fixture'});}}});
+ },checkoutObserver:{attach:page=>{checkoutPage=page;page.on('response',r=>{const key=new URL(r.url()).hostname+'|'+r.status();browserResponses[key]=(browserResponses[key]??0)+1;});},blocked:e=>{const key=e.hostname+'|'+e.resourceType+'|'+e.frame;blockedRequests[key]=(blockedRequests[key]??0)+1;},stepFailed:async step=>{emit('browser_step_failed',{phase,step});await captureFailure(step);},beforePay:async()=>{emit('irreversible_boundary',{action:'one_bogus_pay_submission',funding:'local_fixture'});}}});
  gw=await buildGateway({executors:[shopify],fundingAdapters:[funding],bankAdapters:[],buildRouters:core=>[
   {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:systemClock,bankAdapters:[]}),auth:true},
   {path:'/proof',router:createProofPageRouter(),auth:false},

@@ -136,3 +136,29 @@ Pause for user direction on READ-ONLY reconciliation of the original checkout. M
 review of captured evidence/diff in a fresh review chat; do not launch it or any new project lane.
 Keep the same integration chat for reconciliation. Do not fund real Cardano until this original
 Shopify outcome and the later deployment/source approval checkpoints are resolved.
+
+## Current read-only investigation checkpoint — supersedes prior request for direction
+
+User "Investigate" authorized original-attempt read-only reconciliation and bounded diagnostic fixes.
+Admin still returns zero orders; original cart available, quantity/nonce match and estimated USD 17.95.
+Original Pay outcome/root cause remain unknown. Fresh browser/static strings cannot reconstruct it.
+
+Issue 32 Investigate Now/open: abandonedCheckouts HTTP 200 / ACCESS_DENIED; missing protected-data
+approval for AbandonedCheckout, read_orders already granted. No permissions expanded. Human question
+pending: original Admin Orders -> Abandoned checkouts -> Timeline around 21:35 Singapore, 6 October;
+share only error/code, no buyer details/recovery URL. Original quote expired; no resubmission.
+
+Issue 33 Act Now/resolved: passive snapshots before confirmation timeout/challenge and actual
+Pay-failure cleanup. Sanitized route/error booleans, frame/request hostnames, HTTP status counts.
+Four regressions preserve single Pay/checkpoint, original error and cleanup ordering. Focused 78/78,
+full 518/518 (26 files), typecheck/build/migration copy PASS. Commit/push only build/e2e-acceptance.
+
+Original purchase pur_01M48PSSTDQDR4VGPAQPC2VRYZ remains unresolved: one click/attempt/fixture funding,
+held reservation, no receipt. No worker tick, pending job, harness rerun, replacement cart/purchase or
+payment. Overall UNRESOLVED. Ledger 33 issues: 20 resolved, 4 open, 2 deferred, 6 accepted, 1 partial.
+Main 95a896c730cf893c3afd00919ebe16ad823a608b unchanged; no Render/Cardano/payer action.
+Original artifacts/e2e/20261006T133500Z-shopify-paid/ holds sanitized investigation results.
+
+Exact next action: obtain original abandoned-checkout Timeline evidence from pending human question,
+then continue read-only reconciliation in this same chat. Final independent Opus review recommended
+in a fresh review chat at terminal ambiguity; do not launch it automatically.

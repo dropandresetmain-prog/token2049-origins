@@ -307,3 +307,58 @@ receipt, refund, void, cancellation or no-order certainty is claimed. Recommend 
 Opus review of the complete captured diff/evidence at this terminal ambiguity; no review was launched.
 Exact next action: await the user's direction for read-only reconciliation of the original checkout.
 No payment/order retry or fresh canonical attempt until the original outcome is authoritatively resolved.
+
+## Read-only investigation of original Shopify attempt — 2026-10-06
+
+User "Investigate" authorized read-only reconciliation and bounded diagnostic fixes, not another Pay,
+cart, purchase, worker tick or funding attempt. Original state/schema are retained. The original
+quote expired at 13:45:12.174 UTC; it must not be paid again.
+
+| ID | Stage | Symptom / exact outcome | Root cause | Classification | Fix / verification | Status / demo risk |
+|---|---|---|---|---|---|---|
+| 32 | Read-only provider reconciliation | Admin abandonedCheckouts HTTP 200 / GraphQL ACCESS_DENIED. Structured classifier confirms app not approved for AbandonedCheckout and protected customer-data documentation reference. | Missing protected customer-data approval for this diagnostic object; read_orders already granted. Not proven to cause original checkout failure. | Investigate Now | Preserved sanitized denial; no scope/approval change. Requested human original Admin Orders -> Abandoned checkouts -> Timeline inspection around 21:35 Singapore, 6 October. | OPEN. Deferring leaves original payment/error evidence unavailable and blocks paid acceptance; zero orders cannot authorize retry. |
+| 33 | Post-Pay browser failure diagnostics | order_not_confirmed captured without a failure snapshot before browser closure. | Confirmation polling and actual Pay-click catch did not invoke existing passive stepFailed observer. | Act Now | Use existing bounded step wrapper for confirmation and invoke observer on actual click failure. Manual harness captures sanitized route/error booleans, frame hosts and blocked-request/HTTP counts before cleanup. Four regressions preserve one Pay, cleanup ordering and original errors if diagnostics throw. | RESOLVED locally. No timeout, retry, checkpoint, unknown-outcome or reservation semantics changed. Lost original session cannot be recovered retrospectively; issue 31 remains open. |
+
+### Independent evidence and limits
+
+- Read-only snapshots at 13:56:56 UTC and 14:02:06 UTC: zero Admin orders and zero nonce-bound orders.
+  Original cart available, quantity one, nonce matches, estimated API total USD 17.95. This is absence
+  in queried orders, not authoritative not-sent proof.
+- A fresh isolated browser read the original checkout. All non-GET/HEAD requests were blocked except
+  store-password authentication; payment/submission paths were also blocked. No buyer/card filling,
+  Pay, cart creation, purchase, worker tick, payer or chain action. New browser state is not the
+  original failed session; intentionally blocked POSTs cannot explain the prior Pay outcome.
+- Fresh page stayed on checkout, with no confirmation URL/order identifier, and exposed Bogus
+  instructions/expected PCI host. Published "declined" instructions and generic static HTML strings
+  PAYMENT_METHOD / PAYMENTS_UNACCEPTABLE_PAYMENT_AMOUNT are not established active errors.
+  No payment-host omission, validation rejection or transport root cause was proven; no allowlist change.
+- Existing Bogus card inputs match official Shopify guidance. Correct documented inputs do not prove
+  this payment succeeded. Shopify recommends abandoned-checkout Timeline inspection for checkout failures.
+  Sources: [development-store test orders](https://help.shopify.com/en/partners/dashboard/managing-stores/test-orders-in-dev-stores),
+  [checkout payment troubleshooting](https://help.shopify.com/en/manual/checkout-settings/troubleshooting-checkout-payments),
+  [AbandonedCheckout API](https://shopify.dev/docs/api/admin-graphql/latest/objects/AbandonedCheckout).
+- Original ignored run directory artifacts: 12-readonly-inspection.json,
+  13-abandoned-permission-diagnostic.json, 14-readonly-structured-inspection.json,
+  15-investigation-checks.json. Structured classifier in 14 supersedes the preliminary generic
+  classifier in 13. No raw page/provider bodies, credentials or buyer details were saved.
+- Focused Shopify/browser/webhook 78/78 PASS. Full suite 26 files, 518/518 PASS at 22:09:26 Singapore,
+  duration 16.84 seconds. Strict typecheck, production build and migration copy PASS. Tests used
+  fixtures/isolated local schemas, with no live checkout/payer call. Diff/secret checks recorded in 15.
+- Main remains 95a896c730cf893c3afd00919ebe16ad823a608b; no deployment. Validated diagnostics changes
+  will be committed/pushed only to build/e2e-acceptance; resulting SHA recorded in artifact 16.
+
+### Seed/data disposition after investigation
+
+Shopify item/variant, US buyer config, original cart quantity/nonce/amount match the scenario. No
+new product/order seed mismatch proven. Missing AbandonedCheckout protected-data approval is a
+provider preflight/config gap (32), distinct from unknown payment outcome (31). Singapore market
+issues (5,7) remain deferred. Original PostgreSQL fixture schema/checkpoints retained; hosted seeds
+unverified. Cardano asset/treasury/payer balances/ledger and other-provider seeds remain NOT_REACHED.
+
+Ledger now has 33 unique issues: 20 resolved; 4 open Investigate Now (4,18,31,32); 2 Park for Later;
+6 Ignore / Accept Risk; historical partial record 25. Earlier failures remain intact.
+Overall UNRESOLVED: issue 31 root cause/outcome still unknown. Do not run pending jobs or retry Pay.
+Exactly one next action: obtain original synthetic abandoned-checkout Timeline payment/validation
+error from Admin without buyer details/recovery URL. Same integration chat; one final independent
+Opus review of complete evidence/diff recommended in a fresh review chat at this terminal ambiguity.
+No review or new project lane started.

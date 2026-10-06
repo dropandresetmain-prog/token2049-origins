@@ -1,7 +1,7 @@
 import { demoData } from '../../src/demo/config.js';
 import { describe, it, expect, vi, beforeEach } from 'vitest';
 import type { Browser, Page, BrowserContext, Route } from 'playwright-core';
-import { PlaywrightCheckoutDriver, readCheckoutTotals } from '../../src/execution/shopify/browserCheckout.js';
+import { PlaywrightCheckoutDriver, readCheckoutTotals, type CheckoutObserver } from '../../src/execution/shopify/browserCheckout.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
 import { money } from '../../src/contracts/money.js';
 import type { CheckoutDriverInput, CheckoutQuoteInput } from '../../src/execution/shopify/checkout.js';
@@ -9,7 +9,7 @@ import type { CheckoutDriverInput, CheckoutQuoteInput } from '../../src/executio
 const mocks = vi.hoisted(() => ({ launch: vi.fn() }));
 vi.mock('playwright-core', () => ({ chromium: { launch: mocks.launch } }));
 
-function fixture() {
+function fixture(observer?: CheckoutObserver) {
   const clock = new ManualClock();
   const events: string[] = [];
   let url = 'https://test-shop.myshopify.com/checkouts/fixture';
@@ -29,7 +29,7 @@ function fixture() {
   } as unknown as Page;
   const browser = { newContext: vi.fn(async () => context), close: vi.fn(async () => undefined) } as unknown as Browser;
   mocks.launch.mockResolvedValue(browser);
-  const driver = new PlaywrightCheckoutDriver({storeDomain:'test-shop.myshopify.com',executablePath:'fixture-browser',clock});
+  const driver = new PlaywrightCheckoutDriver({storeDomain:'test-shop.myshopify.com',executablePath:'fixture-browser',clock,observer});
   const input: CheckoutDriverInput = {
     checkoutUrl:url,expectedTotal:money('USD',3200),shippingTitle:'Standard',storePassword:null,
     fulfillment:{category:'retail',...demoData.buyer},
@@ -50,6 +50,44 @@ describe('controlled Shopify browser payment boundary', () => {
     expect(s.events).toEqual(['pay_click','click','order']);
     expect(s.pay).toHaveBeenCalledTimes(1);
     expect(s.browser.newContext).toHaveBeenCalledWith({acceptDownloads:false,serviceWorkers:'block'});
+    expect(s.browser.close).toHaveBeenCalledOnce();
+  });
+  it('captures confirmation timeout before page cleanup without a second Pay click', async () => {
+    const failure = vi.fn(async (step: string) => { expect(step).toBe('await_confirmation'); expect(s.browser.close).not.toHaveBeenCalled(); });
+    const s = fixture({ stepFailed: failure });
+    s.pay.mockImplementationOnce(async () => { s.events.push('click'); s.setText('Enter a valid card number'); });
+    await expect(s.driver.complete(s.input)).rejects.toMatchObject({code:'order_not_confirmed'});
+    expect(failure).toHaveBeenCalledOnce();
+    expect(s.pay).toHaveBeenCalledOnce();
+    expect(s.events).toEqual(['pay_click','click']);
+    expect(s.browser.close).toHaveBeenCalledOnce();
+    expect(s.input.log).toHaveBeenCalledWith('await_confirmation');
+  });
+  it('keeps the original unknown-outcome timeout if diagnostics throw', async () => {
+    const s = fixture({stepFailed:async () => { throw new Error('diagnostics unavailable'); }});
+    s.pay.mockImplementationOnce(async () => { s.events.push('click'); });
+    await expect(s.driver.complete(s.input)).rejects.toMatchObject({code:'order_not_confirmed'});
+    expect(s.pay).toHaveBeenCalledOnce();
+    expect(s.events).toEqual(['pay_click','click']);
+    expect(s.browser.close).toHaveBeenCalledOnce();
+  });
+  it('captures a post-Pay challenge while preserving the single submission', async () => {
+    const failure = vi.fn(async () => undefined);
+    const s = fixture({stepFailed:failure});
+    s.pay.mockImplementationOnce(async () => { s.events.push('click'); s.setText('Verify you are human'); });
+    await expect(s.driver.complete(s.input)).rejects.toMatchObject({code:'captcha_challenge'});
+    expect(failure).toHaveBeenCalledWith('await_confirmation');
+    expect(s.events).toEqual(['pay_click','click']);
+    expect(s.pay).toHaveBeenCalledOnce();
+  });
+  it('captures a failed Pay action after its checkpoint without retrying it', async () => {
+    const failure = vi.fn(async () => undefined);
+    const s = fixture({stepFailed:failure});
+    s.pay.mockRejectedValueOnce(new Error('page detached'));
+    await expect(s.driver.complete(s.input)).rejects.toMatchObject({code:'step_failed'});
+    expect(failure).toHaveBeenCalledWith('pay_click');
+    expect(s.events).toEqual(['pay_click']);
+    expect(s.pay).toHaveBeenCalledOnce();
     expect(s.browser.close).toHaveBeenCalledOnce();
   });
   it('does not click on checkpoint failure', async () => {

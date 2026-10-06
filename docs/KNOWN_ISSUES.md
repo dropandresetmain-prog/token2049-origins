@@ -134,3 +134,20 @@ new/bound orders; this does not prove not-sent. Root cause unknown. Do not retry
 order. Reconcile the original quote/purchase read-only, preserving every checkpoint. Deferring this
 blocks Shopify paid acceptance; accepting zero-order readback as certainty risks a duplicate. See the
 E2E ledger and artifacts/e2e/20261006T133500Z-shopify-paid/. No Cardano transaction occurred.
+
+### Read-only Shopify investigation — issues 32 and 33
+
+Issue 31 remains Investigate Now/open: no definitive post-Pay outcome. Admin still shows zero orders;
+original cart remains available. Fresh browser state/static error strings are not original error proof.
+
+Issue 32 Investigate Now/open: abandonedCheckouts HTTP 200 / ACCESS_DENIED because the app lacks
+approval for the protected AbandonedCheckout object; read_orders is already granted. No scope or
+approval change. Recommended action: human Admin Orders -> Abandoned checkouts -> Timeline lookup
+around 21:35 Singapore, 6 October. Deferral blocks error reconciliation and paid acceptance; zero
+orders cannot authorize another Pay.
+
+Issue 33 Act Now/resolved: passive failure diagnostics before browser cleanup on confirmation
+timeout/challenge and actual Pay failure. Manual harness saves sanitized booleans/route classes/
+hostnames/status counts. Four regressions preserve one Pay, original errors and cleanup ordering.
+Full 518/518, focused 78/78, typecheck/build pass. This cannot recover the original lost session;
+payment/state/retry semantics unchanged. Full evidence/classifications in append-only E2E ledger.
