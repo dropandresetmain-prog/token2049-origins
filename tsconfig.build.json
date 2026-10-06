@@ -1,4 +1,4 @@
 {
   "extends": "./tsconfig.json",
-  "include": ["src", "scripts"]
+  "include": ["src", "scripts/create-client.ts", "scripts/migrate.ts", "scripts/readiness.ts", "scripts/db-smoke.ts"]
 }
