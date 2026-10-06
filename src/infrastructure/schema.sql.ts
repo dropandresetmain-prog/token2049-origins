@@ -152,6 +152,19 @@ CREATE TABLE IF NOT EXISTS jobs (
 );
 CREATE INDEX IF NOT EXISTS jobs_ready ON jobs(status, run_after);
 
+-- Candidate hashes are durable before settlement; signed payloads and keys are never stored here.
+CREATE TABLE IF NOT EXISTS funding_attempts (
+  id TEXT PRIMARY KEY,
+  purchase_id TEXT NOT NULL UNIQUE REFERENCES purchases(id),
+  rail TEXT NOT NULL,
+  network TEXT NOT NULL,
+  transfer_reference TEXT NOT NULL,
+  status TEXT NOT NULL CHECK (status IN ('pending','recorded')),
+  created_at TEXT NOT NULL,
+  updated_at TEXT NOT NULL,
+  UNIQUE (rail, network, transfer_reference)
+);
+
 CREATE TABLE IF NOT EXISTS execution_attempts (
   id TEXT PRIMARY KEY,
   purchase_id TEXT NOT NULL REFERENCES purchases(id),

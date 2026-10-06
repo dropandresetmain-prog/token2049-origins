@@ -57,6 +57,7 @@ export type BookFailure = 'definite' | 'duplicate' | 'unknown';
  * parse stay `unknown` so exposure is retained and reconciled through readback.
  */
 export function classifyBookFailure(o: Extract<HttpOutcome, { kind: 'provider_error' }>): BookFailure {
+  if (o.status === 408 || o.status >= 500) return 'unknown';
   if (o.code === 4005) return 'duplicate';
   if (o.code !== null && AMBIGUOUS.has(o.code)) return 'unknown';
   if (o.code !== null && DEFINITE_REJECTION.has(o.code)) return 'definite';

@@ -84,6 +84,8 @@ export interface AttemptRow {
 }
 
 export interface FundingRequirementRecord {
+  /** Frozen x402 resource identity; optional only for pre-recovery-schema records. */
+  resourceUrl?: string;
   rail: string;
   network: string;
   assetId: string;

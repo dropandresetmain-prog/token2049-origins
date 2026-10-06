@@ -60,7 +60,7 @@ describe('real SDK client <-> our adapter', () => {
     const decodeCalls: string[] = [];
     const decodeTransaction = (t: string): DecodedTxView => {
       decodeCalls.push(t);
-      return { txHash: TX, commitment: fundingCommitment(input.resourceUrl, (adapter.paymentRequirements(input) as unknown as PaymentRequired).accepts[0]!), outputs: [{ address: TREASURY, coin: 2_000_000n, assets: { [USDM_PREPROD_ASSET]: 2_500_000n } }] };
+      return { txHash: TX, validUntilMs: Date.parse(input.expiresAt), commitment: fundingCommitment(input.resourceUrl, (adapter.paymentRequirements(input) as unknown as PaymentRequired).accepts[0]!), outputs: [{ address: TREASURY, coin: 2_000_000n, assets: { [USDM_PREPROD_ASSET]: 2_500_000n } }] };
     };
     let seenPayload: unknown;
     const adapter = createCardanoFundingAdapter(env, {

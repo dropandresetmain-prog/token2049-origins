@@ -20,7 +20,7 @@ import type { QuoteView, ReceiptView, CommerceStatus, MerchantPaymentStatus } fr
 import type { FundingRail, ProviderRoute } from '../contracts/common.js';
 import { Accounts, cryptoAsset, entriesForPurchase, fiatAsset, postEntry, type JournalLine } from './journal.js';
 import { fundingSummaries } from './views.js';
-import { minor, rescaleMinor } from '../contracts/money.js';
+import { Money, minor, rescaleMinor } from '../contracts/money.js';
 
 interface JobRow {
   id: string;
@@ -88,7 +88,11 @@ export class Worker {
        AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.purchase_id = p.id AND j.status IN ('pending','claimed'))`,
     );
     for (const o of orphans) this.db.tx(() => this.core.enqueueJob('reconcile_purchase', o.id, `reconcile:${o.id}:${nowIso}`, nowIso));
-    return orphans.length;
+    const funding=this.db.all<{id:string;purchase_id:string}>(
+      "SELECT f.id,f.purchase_id FROM funding_attempts f WHERE f.status='pending' AND NOT EXISTS (SELECT 1 FROM jobs j WHERE j.purchase_id=f.purchase_id AND j.kind='recover_funding' AND j.status IN ('pending','claimed'))"
+    );
+    for(const f of funding) this.db.tx(()=>this.core.enqueueJob('recover_funding',f.purchase_id,'recover_funding:'+f.id+':'+newId('repair'),nowIso));
+    return orphans.length+funding.length;
   }
 
   /** Run all currently due work once. Returns number of jobs processed. */
@@ -151,6 +155,11 @@ export class Worker {
 
   private failJob(job: JobRow, e: unknown): void {
     const msg = String(redact((e as Error)?.message ?? e)).slice(0, 500);
+    if (job.attempts >= MAX_RECONCILE_ATTEMPTS && (job.kind === 'recover_funding' || job.kind === 'confirm_funding' || job.kind === 'refresh_outcome')) {
+      if(job.attempts === MAX_RECONCILE_ATTEMPTS) this.db.tx(()=>appendEvent(this.db,job.purchase_id,job.kind==='refresh_outcome'?'outcome.manual_required':'funding.manual_required',{reason:'readback repeatedly failed; recovery continues hourly'},this.now()));
+      this.reschedule(job,3_600_000,msg);
+      return;
+    }
     if (job.attempts >= MAX_RECONCILE_ATTEMPTS) {
       this.db.run("UPDATE jobs SET status = 'dead', last_error = ?, updated_at = ? WHERE id = ?", msg, this.now(), job.id);
       return;
@@ -166,6 +175,8 @@ export class Worker {
         return this.reconcilePurchase(job);
       case 'refresh_outcome':
         return this.refreshOutcome(job);
+      case 'recover_funding':
+        return this.recoverFunding(job);
       case 'confirm_funding':
         return this.confirmFunding(job);
       default:
@@ -179,7 +190,7 @@ export class Worker {
     const nowIso = this.now();
     const due = this.db.all<{ id: string }>(
       `SELECT p.id FROM purchases p JOIN reservations r ON r.purchase_id = p.id
-       WHERE p.state = 'awaiting_funding' AND p.payment_state = 'not_received' AND r.expires_at IS NOT NULL AND r.expires_at <= ?`,
+       WHERE p.state = 'awaiting_funding' AND r.expires_at IS NOT NULL AND r.expires_at <= ?`,
       nowIso,
     );
     for (const { id } of due) this.core.expirePurchase(id, 'quote expired before funding');
@@ -207,6 +218,11 @@ export class Worker {
       checkpoints: JSON.parse(current?.checkpoints_json ?? attempt.checkpoints_json),
       checkpoint: async (step, data) => {
         const nowIso = this.now();
+        // Every currently wired provider commits side effects through one of these pre-call markers.
+        // Post-call order/reference checkpoints remain writable after expiry for recovery.
+        if (['create_attempt','book_attempt','pay_attempt','pay_click'].includes(step) && Date.parse(q.expires_at)<=Date.parse(nowIso)) {
+          throw new ProviderError('not_sent','quote_expired','quote expired before provider commit');
+        }
         this.db.tx(() => {
           const cur = this.db.get<{ checkpoints_json: string }>('SELECT checkpoints_json FROM execution_attempts WHERE id = ?', attempt.id)!;
           const cps = JSON.parse(cur.checkpoints_json) as Record<string, unknown>;
@@ -253,10 +269,10 @@ export class Worker {
     }
     const { ex, q } = this.executor(p0);
     const qv = JSON.parse(q.public_json) as QuoteView;
-    const nowIso = this.now();
+    let nowIso = this.now();
 
     // Pre-execution gate: funding, authority, quote validity, capacity, route readiness.
-    const gateFailure = await (async (): Promise<{ state: 'requires_reauthorization' | 'failed'; reason: string } | null> => {
+    let gateFailure = await (async (): Promise<{ state: 'requires_reauthorization' | 'failed'; reason: string } | null> => {
       const funding = this.appliedFunding(p0.id);
       const req = JSON.parse(p0.funding_requirement_json) as { amountBaseUnits: string; network: string; assetId: string };
       const covered = funding
@@ -273,6 +289,9 @@ export class Worker {
       return null;
     })();
 
+    // Readiness may take long enough to outlive the approval; recheck after every awaited gate.
+    if (!gateFailure && Date.parse(q.expires_at) <= this.core.deps.clock.now().getTime()) gateFailure = { state: 'requires_reauthorization', reason: 'quote expired while checking readiness; renewed authority required' };
+    nowIso = this.now();
     if (gateFailure) {
       this.db.tx(() => {
         transitionPurchase(this.db, p0.id, ['funded_queued'], { state: gateFailure.state, status_reason: gateFailure.reason }, nowIso);
@@ -334,9 +353,30 @@ export class Worker {
         evidence: result.evidence,
       };
     }
+    let financialAnomaly: {expected: Money; actual: unknown} | null = null;
+    if (result.kind === 'succeeded') {
+      const qv=JSON.parse(getQuoteRow(this.db,getPurchaseRow(this.db,purchaseId)!.quote_id)!.public_json) as QuoteView;
+      const parsed=Money.safeParse(result.chargedAmount);
+      if(!parsed.success || parsed.data.currency!==qv.merchantTotal.currency || parsed.data.scale!==qv.merchantTotal.scale || parsed.data.amountMinor!==qv.merchantTotal.amountMinor) {
+        financialAnomaly={expected:qv.merchantTotal,actual:result.chargedAmount};
+        result={kind:'unknown',reason:'provider charge differs from the authorized quote; exposure held for operator review',providerReference:result.providerReference,
+          evidence:result.evidence.map(e=>({...e,details:{...e.details,quotedAmount:qv.merchantTotal,reportedCharge:financialAnomaly!.actual}}))};
+      }
+    }
+    // A later success, cancellation or terms change cannot erase an earlier observed charge.
+    if(result.kind!=='unknown' && this.db.get("SELECT id FROM purchase_events WHERE purchase_id = ? AND type='execution.financial_anomaly' LIMIT 1",purchaseId)) {
+      result={kind:'unknown',reason:'an earlier charge anomaly requires operator review; exposure remains held',providerReference:'providerReference' in result?result.providerReference:null,evidence:result.evidence};
+    }
     this.db.tx(() => {
       const p = getPurchaseRow(this.db, purchaseId)!;
       if (!['executing', 'unresolved'].includes(p.state)) return; // finalized already: never regress
+      if(financialAnomaly) {
+        const actual=Money.safeParse(financialAnomaly.actual);
+        // Retain at least the original reservation; greater same-unit charges increase held exposure.
+        if(actual.success && actual.data.currency===financialAnomaly.expected.currency && actual.data.scale===financialAnomaly.expected.scale && minor(actual.data)>BigInt(getReservation(this.db,p.id)!.amount_minor))
+          this.db.run('UPDATE reservations SET amount_minor = ?, updated_at = ? WHERE purchase_id = ?',actual.data.amountMinor,nowIso,p.id);
+        appendEvent(this.db,p.id,'execution.financial_anomaly',financialAnomaly,nowIso);
+      }
       const evidence = result.evidence.map((e) => redact(e));
       this.db.run(
         'UPDATE execution_attempts SET status = ?, provider_reference = COALESCE(?, provider_reference), result_json = ?, finished_at = ? WHERE id = ?',
@@ -546,6 +586,12 @@ export class Worker {
       return;
     }
     this.applyResult(p.id, attempt.id, result);
+    // A financial anomaly can turn a provider success into an unresolved core outcome.
+    if (getPurchaseRow(this.db,p.id)!.state === 'unresolved') {
+      if(job.attempts === MAX_RECONCILE_ATTEMPTS) this.db.tx(()=>appendEvent(this.db,p.id,'reconciliation.manual_required',{reason:'provider charge remains outside authorized terms; exposure retained'},this.now()));
+      this.reschedule(job,job.attempts >= MAX_RECONCILE_ATTEMPTS ? 3_600_000 : 30_000,'provider outcome requires operator review');
+      return;
+    }
     this.complete(job);
   }
 
@@ -559,21 +605,33 @@ export class Worker {
     }
     const { ex } = this.executor(p);
     const r = await ex.retrieve(this.context(p, attempt));
-    if (r.kind === 'succeeded' && r.commerceStatus !== p.commerce_status) {
-      const nowIso = this.now();
-      this.db.tx(() => {
-        this.db.run('UPDATE purchases SET commerce_status = ?, updated_at = ? WHERE id = ?', r.commerceStatus, nowIso, p.id);
-        const receipt = JSON.parse(p.receipt_json!) as ReceiptView;
-        receipt.commerceStatus = r.commerceStatus;
-        this.db.run('UPDATE purchases SET receipt_json = ? WHERE id = ?', JSON.stringify(receipt), p.id);
-        appendEvent(this.db, p.id, 'outcome.refreshed', { commerceStatus: r.commerceStatus }, nowIso);
+    const receipt=JSON.parse(p.receipt_json!) as ReceiptView;
+    const coherent = r.kind==='succeeded' && !NOT_COMPLETE.has(r.commerceStatus) && PAID.has(r.merchantPaymentStatus) &&
+      r.providerReference===p.provider_reference && r.merchantPaymentStatus===p.merchant_payment_status &&
+      r.chargedAmount.currency===receipt.principal.currency && r.chargedAmount.scale===receipt.principal.scale && r.chargedAmount.amountMinor===receipt.principal.amountMinor;
+    // Refresh can confirm ticket issuance; it cannot rewrite payment facts or regress the receipt.
+    if(coherent && p.commerce_status==='ticketing' && r.commerceStatus==='ticketed') {
+      const nowIso=this.now();
+      this.db.tx(()=>{
+        this.db.run('UPDATE purchases SET commerce_status = ?, updated_at = ? WHERE id = ?','ticketed',nowIso,p.id);
+        receipt.commerceStatus='ticketed';
+        this.db.run('UPDATE purchases SET receipt_json = ? WHERE id = ?',JSON.stringify(receipt),p.id);
+        appendEvent(this.db,p.id,'outcome.refreshed',{commerceStatus:'ticketed'},nowIso);
       });
+      this.complete(job);return;
     }
-    if (r.kind === 'succeeded' && r.commerceStatus === 'ticketing' && job.attempts < MAX_RECONCILE_ATTEMPTS) {
-      this.reschedule(job, 30_000);
+    if(p.commerce_status==='ticketing') {
+      if(job.attempts===MAX_RECONCILE_ATTEMPTS) this.db.tx(()=>appendEvent(this.db,p.id,'outcome.manual_required',{reason:'ticket issuance remains unverified; read-only refresh continues hourly'},this.now()));
+      this.reschedule(job,job.attempts>=MAX_RECONCILE_ATTEMPTS?3_600_000:30_000,'ticket issuance not independently confirmed');
       return;
     }
     this.complete(job);
+  }
+
+  private async recoverFunding(job: JobRow): Promise<void> {
+    if (await this.core.recoverPendingFunding(job.purchase_id)) { this.complete(job); return; }
+    if (job.attempts === MAX_RECONCILE_ATTEMPTS) this.db.tx(() => appendEvent(this.db,job.purchase_id,'funding.manual_required',{reason:'candidate transfer still unavailable; automatic read-only recovery continues hourly'},this.now()));
+    this.reschedule(job,job.attempts >= MAX_RECONCILE_ATTEMPTS ? 3_600_000 : RECONCILE_BACKOFF_MS[Math.min(job.attempts,RECONCILE_BACKOFF_MS.length-1)]!);
   }
 
   /** Re-check a submitted (not yet confirmed) transfer; apply it once confirmed. */
@@ -608,6 +666,8 @@ export class Worker {
     const c = await adapter.confirm(vf);
     const nowIso = this.now();
     if (c.paymentState === 'confirmed') {
+      const current=getPurchaseRow(this.db,p.id)!;
+      if(current.state==='awaiting_funding' && Date.parse(getQuoteRow(this.db,current.quote_id)!.expires_at)<=this.core.deps.clock.now().getTime()) this.core.expirePurchase(p.id,'quote expired while confirming funding');
       this.db.tx(() => {
         const cur = getPurchaseRow(this.db, p.id)!;
         const open = cur.state === 'awaiting_funding';
@@ -632,6 +692,7 @@ export class Worker {
     if (c.paymentState === 'invalid') {
       this.db.tx(() => {
         this.db.run("UPDATE funding_evidence SET payment_state = 'invalid', application = 'unapplied' WHERE id = ?", ev.id);
+        this.db.run('DELETE FROM funding_attempts WHERE purchase_id = ? AND transfer_reference = ?',p.id,ev.transfer_reference);
         transitionPurchase(this.db, p.id, ['awaiting_funding'], { payment_state: 'not_received' }, nowIso);
         appendEvent(this.db, p.id, 'funding.invalid', { transfer: ev.transfer_reference }, nowIso);
       });
@@ -639,7 +700,8 @@ export class Worker {
       return;
     }
     if (job.attempts >= MAX_RECONCILE_ATTEMPTS) {
-      this.db.run("UPDATE jobs SET status = 'dead', last_error = 'confirmation timeout', updated_at = ? WHERE id = ?", nowIso, job.id);
+      if (job.attempts === MAX_RECONCILE_ATTEMPTS) this.db.tx(() => appendEvent(this.db,p.id,'funding.manual_required',{reason:'confirmation delayed; automatic read-only confirmation continues hourly'},nowIso));
+      this.reschedule(job,3_600_000,'confirmation delayed; operator review required');
       return;
     }
     this.reschedule(job, RECONCILE_BACKOFF_MS[Math.min(job.attempts, RECONCILE_BACKOFF_MS.length - 1)]!);

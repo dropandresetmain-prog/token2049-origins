@@ -17,7 +17,11 @@
     "test:contracts": "vitest run tests/contracts",
     "test:integration": "vitest run tests/integration",
     "readiness": "tsx scripts/readiness.ts",
-    "client:create": "tsx scripts/create-client.ts"
+    "client:create": "tsx scripts/create-client.ts",
+    "mcp": "tsx src/channels/mcp/main.ts",
+    "payer": "tsx clients/payer/pay.ts",
+    "payer:bridge": "tsx clients/payer/bridge.ts",
+    "wallet": "tsx clients/payer/wallet-generate.ts"
   },
   "dependencies": {
     "@evolution-sdk/evolution": "0.5.14",

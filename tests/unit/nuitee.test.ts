@@ -773,3 +773,11 @@ describe('nuitee sandbox environment guard',()=>{
     expect(f.calls).toHaveLength(0);
   });
 });
+
+
+describe('Nuitee ambiguous transport outcomes',()=>{
+  it.each([408,500,503])('retains ambiguity for HTTP %s even when response carries a refusal code',async status=>{
+    const f=provider({book:()=>({status,json:{error:{code:4002,message:'synthetic rejection'}}})});
+    const r=await mk(f).execute(makeCtx().ctx);expect(r.kind).toBe('unknown');
+  });
+});

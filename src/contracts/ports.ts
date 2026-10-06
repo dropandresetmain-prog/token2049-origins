@@ -146,7 +146,17 @@ export interface VerifiedFunding {
 
 export type FundingVerification =
   | { ok: true; funding: VerifiedFunding }
-  | { ok: false; code: 'payment_invalid' | 'payment_replayed' | 'payment_required'; reason: string };
+  | {
+      ok: false;
+      code: 'payment_invalid' | 'payment_replayed' | 'payment_required';
+      reason: string;
+      /** False proves settlement was never invoked. Omission retains durable recovery. */
+      settlementAttempted?: boolean;
+    };
+
+export type FundingPreparation =
+  | { ok: true; transferReference: string }
+  | Extract<FundingVerification, { ok: false }>;
 
 export interface FundingAdapter {
   readonly rail: FundingRail;
@@ -158,6 +168,10 @@ export interface FundingAdapter {
   paymentRequirements(input: FundingRequirementInput): Record<string, unknown>;
   /** Header the client sends the payment payload in. */
   readonly paymentHeaderName: string;
+  /** Decode and bind a candidate without external side effects, so core can persist its recovery reference. */
+  prepare?(paymentHeaderValue: string, input: FundingRequirementInput): FundingPreparation;
+  /** Read an already-persisted candidate independently; never submit or settle another transfer. */
+  recover?(transferReference: string, input: FundingRequirementInput): Promise<FundingVerification>;
   /** Independently verify (and settle if the protocol requires) the payment for this exact requirement. */
   verify(paymentHeaderValue: string, input: FundingRequirementInput): Promise<FundingVerification>;
   /**

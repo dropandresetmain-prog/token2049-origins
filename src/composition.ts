@@ -13,7 +13,8 @@ export interface GatewayParts {
   executors: CommerceExecutor[];
   fundingAdapters: FundingAdapter[];
   bankAdapters: BankObservationAdapter[];
-  extraRouters?: Array<{ path: string; router: Router; auth: boolean }>;
+  extraRouters?: Array<{ path: string; router: Router; auth: boolean; beforeJson?: boolean }>;
+  buildRouters?: (core: CommerceCore) => NonNullable<GatewayParts['extraRouters']>;
 }
 
 export interface Gateway {
@@ -43,6 +44,7 @@ export function buildGateway(parts: GatewayParts, opts: { env?: NodeJS.ProcessEn
     bankAdapters: parts.bankAdapters,
   });
   const worker = new Worker(core);
-  const app = createHttpApp({ core, ...(parts.extraRouters ? { extraRouters: parts.extraRouters } : {}), ...(opts.log ? { log: opts.log } : {}) });
+  const extraRouters = [...(parts.extraRouters ?? []), ...(parts.buildRouters?.(core) ?? [])];
+  const app = createHttpApp({ core, extraRouters, ...(opts.log ? { log: opts.log } : {}) });
   return { env, db, core, worker, app };
 }

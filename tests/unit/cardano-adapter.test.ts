@@ -100,6 +100,7 @@ class TxBook {
   add(txString: string, hash: string, outputs: Array<{ address: string; asset: string; amount: bigint }>): string {
     this.m.set(txString, {
       txHash: hash,
+      validUntilMs: Date.parse(input().expiresAt),
       commitment: fundingCommitment(RESOURCE, (rig(baseEnv({ CARDANO_ASSET_UNIT: outputs[0]?.asset ?? USDM_PREPROD_ASSET })).adapter.paymentRequirements(input({}, outputs[0]?.asset)) as unknown as PaymentRequired).accepts[0]!),
       outputs: outputs.map((o) => ({
         address: o.address,
@@ -649,6 +650,12 @@ describe('cardano adapter: confirm()', () => {
     expect((await r.adapter.confirm!(funding())).paymentState).toBe('submitted');
   });
 
+  it('preserves submitted proof when configuration is absent and confirms the immutable payee after rotation',async()=>{
+    const stored=funding();expect((await createCardanoFundingAdapter({}).confirm!(stored)).paymentState).toBe('submitted');
+    const rotated=rig(baseEnv({CARDANO_TREASURY_ADDRESS:OTHER}));rotated.bf.pay();expect((await rotated.adapter.confirm!(stored)).paymentState).toBe('confirmed');
+    expect(expectOk(await rotated.adapter.recover(TX,input())).payee).toBe(TREASURY);
+  });
+
   it('reports invalid when the on-chain output does not match what was recorded', async () => {
     const r = rig();
     r.bf.pay(TX, OTHER);
@@ -736,5 +743,22 @@ describe('cardano adapter: readiness', () => {
     };
     r.bf.throwTransport = true;
     await expect(r.adapter.readiness()).resolves.toMatchObject({ component: 'cardano' });
+  });
+});
+
+
+describe('signed transaction expiry boundary',()=>{
+  it.each([null,NaN,Date.parse(input().expiresAt)+1000])('rejects invalid or excessive validity end %s before facilitator settlement',async end=>{
+    const r=okRig();r.book.decode('tx-ok').validUntilMs=end;
+    expect(await r.adapter.verify(header(r),input())).toMatchObject({ok:false,settlementAttempted:false});
+    expect(r.fac.calls).not.toContain('settle');
+  });
+  it('rechecks expiry after read-only facilitator verification before settling',async()=>{
+    const r=okRig(),inp=input(),signed=header(r,{},inp),original=clock.now().toISOString();
+    try {
+      r.fac.verifyImpl=async()=>{clock.set(inp.expiresAt);return {isValid:true,payer:PAYER};};
+      expect(await r.adapter.verify(signed,inp)).toMatchObject({ok:false,settlementAttempted:false});
+      expect(r.fac.calls).toContain('verify');expect(r.fac.calls).not.toContain('settle');
+    } finally {clock.set(original);}
   });
 });

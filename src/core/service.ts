@@ -350,6 +350,7 @@ export class CommerceCore {
 
       const purchaseId = newId('pur');
       const requirement: FundingRequirementRecord = {
+        resourceUrl: `${this.d.config.publicBaseUrl}/v1/purchases/${purchaseId}/fund`,
         rail: option.rail,
         network: option.amount.network,
         assetId: option.amount.assetId,
@@ -441,7 +442,7 @@ export class CommerceCore {
         ...(r.symbol ? { symbol: r.symbol } : {}),
       },
       payTo: r.payTo,
-      resourceUrl: `${this.d.config.publicBaseUrl}/v1/purchases/${p.id}/fund`,
+      resourceUrl: r.resourceUrl ?? `${this.d.config.publicBaseUrl}/v1/purchases/${p.id}/fund`,
       description: `Purchase funding for ${p.id} (quote ${p.quote_id})`,
       expiresAt: r.expiresAt,
     };
@@ -461,7 +462,7 @@ export class CommerceCore {
     if (p.state !== 'awaiting_funding') {
       throw new CoreError('conflict', `purchase is ${p.state}; it does not accept funding`, { state: p.state, paymentState: p.payment_state });
     }
-    if (p.payment_state === 'submitted') {
+    if (p.payment_state === 'submitted' || p.payment_state === 'unknown') {
       throw new CoreError('conflict', 'a funding transfer is already awaiting confirmation for this purchase', { paymentState: p.payment_state });
     }
     const input = this.requirementInput(p);
@@ -481,6 +482,12 @@ export class CommerceCore {
     }
     this.fundingInFlight.add(purchaseId);
     try {
+      if (adapter.prepare) {
+        const candidate = adapter.prepare(paymentHeader, input);
+        if (!candidate.ok) throw new CoreError(candidate.code, candidate.reason);
+        if (!adapter.recover) throw new CoreError('route_unavailable', 'funding adapter has no durable recovery');
+        this.persistFundingCandidate(purchaseId, adapter.rail, input.amount.network, candidate.transferReference);
+      }
       return await this.verifyAndRecord(purchaseId, adapter, paymentHeader, input);
     } finally {
       this.fundingInFlight.delete(purchaseId);
@@ -492,10 +499,31 @@ export class CommerceCore {
     const verification = await adapter.verify(paymentHeader, input);
     if (!verification.ok) {
       const nowIso = this.now();
-      this.d.db.tx(() => appendEvent(this.d.db, p.id, 'funding.rejected', { code: verification.code, reason: verification.reason }, nowIso));
+      this.d.db.tx(() => {
+        appendEvent(this.d.db,p.id,'funding.rejected',{code:verification.code,reason:verification.reason},nowIso);
+        if(verification.settlementAttempted===false) {
+          const removed=this.d.db.run("DELETE FROM funding_attempts WHERE purchase_id = ? AND status = 'pending'",p.id).changes;
+          if(removed) this.d.db.run("UPDATE purchases SET payment_state = 'not_received', updated_at = ? WHERE id = ? AND state = 'awaiting_funding' AND payment_state = 'unknown'",nowIso,p.id);
+        }
+      });
       throw new CoreError(verification.code, verification.reason);
     }
-    const f = verification.funding;
+    return this.recordVerifiedFunding(purchaseId, verification.funding, input);
+  }
+
+  private recordVerifiedFunding(purchaseId: string, f: VerifiedFunding, input: FundingRequirementInput): FundResult {
+    let p = getPurchaseRow(this.d.db, purchaseId)!;
+    if (f.rail !== p.funding_rail) throw new CoreError('payment_invalid', 'funding rail does not match purchase');
+    if (p.state === 'awaiting_funding' && Date.parse(input.expiresAt) <= this.d.clock.now().getTime()) {
+      this.expirePurchase(p.id,'quote expired before funding was independently confirmed');
+      p=getPurchaseRow(this.d.db,purchaseId)!;
+    }
+    // Recovery can race the original response after a confirmed chain read; never post twice.
+    const existing = this.d.db.get<{purchase_id:string}>('SELECT purchase_id FROM funding_evidence WHERE rail = ? AND network = ? AND transfer_reference = ?', f.rail, f.network, f.transferReference);
+    if (existing) {
+      if (existing.purchase_id !== purchaseId) throw new CoreError('payment_replayed', 'this transfer has already been used');
+      return {kind:'funded', purchase:this.viewOf(p)};
+    }
     // Defense in depth: core re-checks the adapter's claims against the stored requirement.
     this.assertFundingMatches(f, input);
 
@@ -506,22 +534,22 @@ export class CommerceCore {
       const required = BigInt(input.amount.amountBaseUnits);
       const received = BigInt(f.amountBaseUnits);
       const confirmed = f.paymentState === 'confirmed';
-      const application: FundingEvidenceRow['application'] = !stillOpen ? 'unapplied' : confirmed ? 'applied' : 'pending_confirmation';
+      const application: FundingEvidenceRow['application'] = !confirmed ? 'pending_confirmation' : stillOpen ? 'applied' : 'unapplied';
       try {
         this.insertEvidence(p.id, f, application, nowIso);
       } catch (e) {
         if (String((e as Error).message).includes('UNIQUE')) throw new CoreError('payment_replayed', 'this transfer has already been used');
         throw e;
       }
-      if (!stillOpen) {
-        if (confirmed) this.postReceipt(p.id, f, 0n, received, nowIso);
-        appendEvent(this.d.db, p.id, 'funding.unapplied', { reason: 'purchase no longer accepts funding', transfer: f.transferReference }, nowIso);
-        return;
-      }
+      this.d.db.run("UPDATE funding_attempts SET status = 'recorded', updated_at = ? WHERE purchase_id = ? AND transfer_reference = ?", nowIso, p.id, f.transferReference);
       if (!confirmed) {
-        transitionPurchase(this.d.db, p.id, ['awaiting_funding'], { payment_state: 'submitted' }, nowIso);
+        this.d.db.run("UPDATE purchases SET payment_state = 'submitted', updated_at = ? WHERE id = ?", nowIso, p.id);
         appendEvent(this.d.db, p.id, 'funding.submitted', { transfer: f.transferReference, network: f.network }, nowIso);
         this.enqueueJob('confirm_funding', p.id, `confirm:${p.id}:${f.transferReference}`, nowIso);
+        return;
+      }
+      if (!stillOpen) {
+        this.recordConfirmedUnappliedFunding(p.id, f, nowIso);
         return;
       }
       this.applyConfirmedFunding(p, f, required, received, nowIso);
@@ -535,6 +563,38 @@ export class CommerceCore {
       purchase: this.viewOf(after),
       ...(f.settlementResponseHeader ? { settlementHeader: f.settlementResponseHeader } : {}),
     };
+  }
+
+  private persistFundingCandidate(purchaseId: string, rail: FundingRail, network: string, reference: string): void {
+    if (!reference || reference.length > 256) throw new CoreError('payment_invalid', 'invalid funding recovery reference');
+    const nowIso = this.now();
+    this.d.db.tx(() => {
+      const prior = this.d.db.get<{purchase_id:string;transfer_reference:string}>('SELECT purchase_id, transfer_reference FROM funding_attempts WHERE rail = ? AND network = ? AND transfer_reference = ?',rail,network,reference);
+      if (prior && prior.purchase_id !== purchaseId) throw new CoreError('payment_replayed','this transfer is already bound to another purchase');
+      const current = this.d.db.get<{transfer_reference:string}>('SELECT transfer_reference FROM funding_attempts WHERE purchase_id = ?',purchaseId);
+      if (current && current.transfer_reference !== reference) throw new CoreError('conflict','a different payment is already pending recovery');
+      this.d.db.run("INSERT INTO funding_attempts(id,purchase_id,rail,network,transfer_reference,status,created_at,updated_at) VALUES(?,?,?,?,?,'pending',?,?) ON CONFLICT(purchase_id) DO NOTHING",newId('fat'),purchaseId,rail,network,reference,nowIso,nowIso);
+      this.d.db.run("UPDATE purchases SET payment_state = 'unknown', updated_at = ? WHERE id = ? AND state = 'awaiting_funding'",nowIso,purchaseId);
+      const candidate=this.d.db.get<{id:string}>('SELECT id FROM funding_attempts WHERE purchase_id = ?',purchaseId)!;
+      this.enqueueJob('recover_funding',purchaseId,'recover_funding:'+candidate.id,new Date(Date.parse(nowIso)+15_000).toISOString());
+      appendEvent(this.d.db,purchaseId,'funding.attempt_prepared',{transfer:reference},nowIso);
+    });
+  }
+
+  /** Only durable candidate references can enter this read-only recovery path. */
+  async recoverPendingFunding(purchaseId: string): Promise<boolean> {
+    const candidate=this.d.db.get<{rail:FundingRail;transfer_reference:string}>("SELECT rail, transfer_reference FROM funding_attempts WHERE purchase_id = ? AND status = 'pending'",purchaseId);
+    if(!candidate) return true;
+    const p=getPurchaseRow(this.d.db,purchaseId)!;
+    const adapter=this.d.fundingAdapters.get(candidate.rail);
+    if(!adapter?.recover) throw new Error('funding adapter recovery unavailable');
+    const input=this.requirementInput(p);
+    if(p.state==='awaiting_funding' && Date.parse(input.expiresAt)<=this.d.clock.now().getTime()) this.expirePurchase(p.id,'quote expired during funding recovery');
+    const verification=await adapter.recover(candidate.transfer_reference,input);
+    if(!verification.ok) return false;
+    if(verification.funding.transferReference!==candidate.transfer_reference) throw new Error('funding recovery reference mismatch');
+    this.recordVerifiedFunding(purchaseId,verification.funding,input);
+    return true;
   }
 
   private assertFundingMatches(f: VerifiedFunding, input: FundingRequirementInput): void {
@@ -601,6 +661,7 @@ export class CommerceCore {
   /** A late confirmed transfer remains an observed refundable obligation, even after closure. */
   recordConfirmedUnappliedFunding(purchaseId: string, funding: VerifiedFunding, nowIso: string): void {
     this.postReceipt(purchaseId, funding, 0n, BigInt(funding.amountBaseUnits), nowIso);
+    this.d.db.run("UPDATE purchases SET payment_state = 'confirmed', updated_at = ? WHERE id = ?",nowIso,purchaseId);
     appendEvent(this.d.db, purchaseId, 'funding.unapplied', { reason: 'confirmed after purchase closed', transfer: funding.transferReference }, nowIso);
   }
 

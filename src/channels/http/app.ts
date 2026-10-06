@@ -20,7 +20,7 @@ declare module 'express-serve-static-core' {
 export interface HttpAppOptions {
   core: CommerceCore;
   /** Extra routers mounted after auth (e.g. evidence). */
-  extraRouters?: Array<{ path: string; router: Router; auth: boolean }>;
+  extraRouters?: Array<{ path: string; router: Router; auth: boolean; beforeJson?: boolean }>;
   log?: (line: Record<string, unknown>) => void;
 }
 
@@ -36,7 +36,6 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
   const app = express();
   app.disable('x-powered-by');
   app.set('trust proxy', false);
-  app.use(express.json({ limit: '64kb' }));
 
   app.use((req, res, next) => {
     req.requestId = randomUUID();
@@ -66,6 +65,15 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
       next(e);
     }
   };
+
+  // Signature-verified webhook handlers must see exact request bytes before JSON parsing.
+  for (const r of opts.extraRouters ?? []) {
+    if (r.beforeJson) {
+      if (r.auth) app.use(r.path, auth, r.router);
+      else app.use(r.path, r.router);
+    }
+  }
+  app.use(express.json({ limit: '64kb' }));
 
   app.post(
     '/v1/offers/search',
@@ -138,6 +146,7 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
   );
 
   for (const r of opts.extraRouters ?? []) {
+    if (r.beforeJson) continue;
     if (r.auth) app.use(r.path, auth, r.router);
     else app.use(r.path, r.router);
   }
@@ -168,6 +177,9 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
     } else if (err && typeof err === 'object' && 'type' in err && (err as { type: string }).type === 'entity.too.large') {
       status = 413;
       body = { error: { code: 'invalid_request', message: 'request too large', requestId } };
+    } else if (err && typeof err === 'object' && 'type' in err && ['encoding.unsupported','charset.unsupported'].includes(String(err.type))) {
+      status = 415;
+      body = {error:{code:'invalid_request',message:'unsupported request encoding',requestId}};
     } else {
       status = 500;
       body = { error: { code: 'internal', message: 'internal error', requestId } };

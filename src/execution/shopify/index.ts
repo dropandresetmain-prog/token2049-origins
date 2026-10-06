@@ -190,7 +190,7 @@ export class ShopifyExecutor implements CommerceExecutor {
     }
   }
   private reference(ctx: ExecutionContext): string | null {
-    const r = ctx.checkpoints.order?.providerReference;
+    const r = ctx.checkpoints.order?.providerReference ?? ctx.checkpoints.webhook_order?.providerReference;
     return typeof r === 'string' && /^(#[0-9]{3,}|[A-Z0-9]{6,12}|gid:\/\/shopify\/Order\/\d+)$/.test(r) ? r : null;
   }
   async retrieve(ctx: ExecutionContext): Promise<ExecutionResult> {

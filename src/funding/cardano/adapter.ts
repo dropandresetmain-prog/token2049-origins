@@ -24,6 +24,7 @@ import {
   LOVELACE_ASSET,
   POSITIVE_CANONICAL_AMOUNT_REGEX,
   decodeCardanoTransaction,
+  slotToPosixMs,
 } from '@x402/cardano';
 import { HTTPFacilitatorClient, decodePaymentSignatureHeader, encodePaymentResponseHeader } from '@x402/core/http';
 import type { FacilitatorClient } from '@x402/core/http';
@@ -47,6 +48,7 @@ export type CardanoFacilitatorPort = Pick<FacilitatorClient, 'verify' | 'settle'
 export interface DecodedTxView {
   txHash: string;
   commitment: string | null;
+  validUntilMs: number | null;
   outputs: Array<{ address: string; coin: bigint; assets: Record<string, bigint> }>;
 }
 
@@ -109,7 +111,7 @@ function safeCode(c: unknown, fallback: string): string {
 
 function defaultDecode(tx: string): DecodedTxView {
   const d = decodeCardanoTransaction(tx);
-  return { txHash: d.txHash.toLowerCase(), commitment: readFundingCommitment(tx), outputs: d.outputs.map((o) => ({ address: o.address, coin: o.coin, assets: o.assets })) };
+  return { txHash: d.txHash.toLowerCase(), commitment: readFundingCommitment(tx), validUntilMs: d.ttlSlot === undefined ? null : slotToPosixMs(CARDANO_NETWORK,d.ttlSlot), outputs: d.outputs.map((o) => ({ address: o.address, coin: o.coin, assets: o.assets })) };
 }
 
 /** Exact bigint sum a decoded transaction pays to `address` in `assetId`. */
@@ -296,6 +298,7 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
     } catch {
       return invalid('transaction could not be decoded');
     }
+    if (decoded.validUntilMs === null || !Number.isFinite(decoded.validUntilMs) || decoded.validUntilMs <= this.clock.now().getTime() || decoded.validUntilMs > Date.parse(input.expiresAt)) return invalid('signed transaction validity exceeds quote expiry or is expired');
     if (decoded.commitment !== fundingCommitment(input.resourceUrl, expected)) return invalid('signed transaction does not bind this purchase and quote');
     const localTx = decoded.txHash.toLowerCase();
     if (!TX_HASH.test(localTx)) return invalid('transaction id is not canonical');
@@ -314,7 +317,8 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
 
   /** Never settles. The caller must prove this reference was durably prepared for this exact requirement. */
   async recover(transferReference: string, input: FundingRequirementInput): Promise<FundingVerification> {
-    if (!this.requirementMatchesConfig(input, true) || !TX_HASH.test(transferReference)) return invalid('invalid persisted funding recovery requirement');
+    // Recovery follows the immutable stored payee/asset, even after configuration changes.
+    if (!this.cfg || input.amount.network !== CARDANO_NETWORK || !CANONICAL_CARDANO_ASSET_REGEX.test(input.amount.assetId) || !POSITIVE_CANONICAL_AMOUNT_REGEX.test(input.amount.amountBaseUnits) || !CARDANO_ADDRESS_REGEX.test(input.payTo) || !Number.isFinite(Date.parse(input.expiresAt)) || !TX_HASH.test(transferReference)) return invalid('invalid persisted funding recovery requirement');
     const recovered = await this.recoverFromChain(transferReference, input, null, null);
     return recovered ?? invalid('recovery_pending: transfer is not independently observable');
   }
@@ -323,7 +327,7 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
     const c = this.cfg;
     if (!c || !this.facilitator) return invalid('cardano funding rail is not configured');
     const prepared = this.inspectPayment(paymentHeaderValue, input);
-    if (!prepared.ok) return prepared;
+    if (!prepared.ok) return { ...prepared, settlementAttempted: false };
     const { payload, requirement, nonce, localTx, localReceived } = prepared;
 
     // 4. Facilitator verify (read-only). Settle is never reached when this fails.
@@ -335,13 +339,15 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
         verifyRes = { isValid: false, ...(e.invalidReason ? { invalidReason: e.invalidReason } : {}), ...(e.payer ? { payer: e.payer } : {}) };
       } else {
         this.event('facilitator.verify_unavailable', { host: c.facilitatorHost });
-        return invalid('facilitator_unavailable: retry with the identical payment header');
+        return { ...invalid('facilitator_unavailable: retry with the identical payment header'), settlementAttempted: false };
       }
     }
     let payer: string | null = typeof verifyRes.payer === 'string' && CARDANO_ADDRESS_REGEX.test(verifyRes.payer) ? verifyRes.payer : null;
     if (!verifyRes.isValid) {
-      return invalid(`facilitator rejected payment: ${safeCode(verifyRes.invalidReason, 'verification_failed')}`);
+      return { ...invalid(`facilitator rejected payment: ${safeCode(verifyRes.invalidReason, 'verification_failed')}`), settlementAttempted: false };
     }
+
+    if (Date.parse(input.expiresAt) <= this.clock.now().getTime()) return { ...invalid('quote expired during facilitator verification'), settlementAttempted: false };
 
     // 5. Settle. The facilitator broadcasts and waits for l1Confirmations (may return settlement_pending).
     let receipt: SettleResponse | null = null;
@@ -543,11 +549,9 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
   async confirm(funding: VerifiedFunding): Promise<{ paymentState: PaymentState; confirmations: number | null; observedAt: string }> {
     const observedAt = this.clock.now().toISOString();
     const pending = { paymentState: 'submitted' as const, confirmations: null, observedAt };
-    const c = this.cfg;
-    if (!c || funding.rail !== 'cardano' || funding.network !== CARDANO_NETWORK || funding.assetId !== c.assetUnit ||
-      funding.decimals !== c.decimals || funding.payee !== c.treasuryAddress || !POSITIVE_CANONICAL_AMOUNT_REGEX.test(funding.amountBaseUnits)) {
-      return { paymentState: 'invalid', confirmations: null, observedAt };
-    }
+    // An outage or changed configuration is not evidence that an old transfer was invalid.
+    // The persisted payee, asset and commitment govern this read-only confirmation.
+    if (funding.rail !== 'cardano' || funding.network !== CARDANO_NETWORK || !CANONICAL_CARDANO_ASSET_REGEX.test(funding.assetId) || !CARDANO_ADDRESS_REGEX.test(funding.payee) || !POSITIVE_CANONICAL_AMOUNT_REGEX.test(funding.amountBaseUnits)) return pending;
     if (!this.blockfrost) return pending;
     let tx: OnChainTx | null;
     try {
