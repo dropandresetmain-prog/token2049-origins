@@ -134,3 +134,7 @@ new/bound orders; this does not prove not-sent. Root cause unknown. Do not retry
 order. Reconcile the original quote/purchase read-only, preserving every checkpoint. Deferring this
 blocks Shopify paid acceptance; accepting zero-order readback as certainty risks a duplicate. See the
 E2E ledger and artifacts/e2e/20261006T133500Z-shopify-paid/. No Cardano transaction occurred.
+
+## Shopify Global Catalog sandbox lane — 2026-10-06
+
+Scope: isolated `build/shopify-global-sandbox`. [Evidence](evidence/shopify-global-sandbox-e2e.md) records each classified issue, action and deferral risk. Investigate Now: preceding unresolved post-Pay outcome blocks new paid tests; new shadow exact checkout summary remains unproved; confirm reduced transaction-offer retention against official Catalog no-caching guidance before deployment. Act Now fixes completed locally: native unique-ID metafield input, publication UserError selection, strict free-shipping row, retained-shadow discovery/provenance bypass. Park for Later: FX, cleanup scheduling, delegated budgets. Accept Risk: untracked development inventory and undocumented numeric keyless quota, bounded by test-store/item/quantity guards. Overall PARTIAL; no real new quote/order/receipt acceptance claim.

@@ -87,3 +87,7 @@ Canonical secret-free scenario data: [demo/demo-data.json](demo/demo-data.json),
 [src/demo/config.ts](src/demo/config.ts). Runtime endpoints, secrets, exact asset identities,
 protocol constants and independent signer/security caps remain runtime configuration or code.
 See [current settlement decision](docs/decisions/scaled-testnet-settlement.md).
+
+## Shopify live discovery sandbox lane
+
+Retail intent may opt into `discovery: live` for official Shopify Global Catalog discovery. Selection creates one retained shadow in Capsule's owned development store and reuses the existing exact quote/checkout machinery. The source merchant receives no order or payment. Omitted discovery preserves ordinary controlled-store behavior. USD only, quantity one, source item maximumUSD100; no source image copying or FX. Configure `SHOPIFY_SANDBOX_PUBLICATION_ID`. See [decision](docs/decisions/shopify-real-discovery-sandbox-execution.md) and [external evidence](docs/evidence/shopify-global-sandbox-e2e.md): discovery/shadow PASS, execution NOT_RUN, lane PARTIAL.

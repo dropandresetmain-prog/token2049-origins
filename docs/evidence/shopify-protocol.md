@@ -57,3 +57,18 @@ npm run build
 ```
 
 Focused coverage: exact shipping/tax arithmetic, estimated/discount/duty rejection, changed quote/fulfillment, spend/config/test identity gates, concurrent execution, durable checkpoint failure, uncertain payment/restart/readback, unpaid/manual/authorized/pending/mismatched evidence, order nonce binding, URL/redirect controls, real raw-body HTTP HMAC, duplicates/out-of-order callbacks, retryable enqueue, and mocked browser checkpoint-before-click/challenge/gateway/navigation behavior.
+
+## Additional Global Catalog discovery mode
+
+Use `discovery: live` with typed retail query, USD scale2, quantity1. Search is read-only; `create_quote` selects the Capsule offer and prepares its own immutable retained shadow. `SHOPIFY_SANDBOX_PUBLICATION_ID` supplies the explicit sales-channel publication; readiness requires independent Storefront visibility. Ordinary controlled discovery excludes retained shadows. Existing omitted-mode flow remains supported.
+
+Exact source item price and sandbox shipping/tax/total are distinct; no source merchant order/payment. No image copy, real chain funding, new checkout state machine or public mark-funded switch. Shadow Admin runtime needs read_products/write_products/write_publications; existing order readback needs read_orders. Broader already-installed credentials were not expanded.
+
+Test-only harness (PowerShell, approved sandbox env, loopback PostgreSQL):
+
+```powershell
+$env:SHOPIFY_SANDBOX_PUBLICATION_ID = 'gid://shopify/Publication/230951092281'
+node --env-file=C:/Dev/t2o-e2e-acceptance/.env --import tsx tests/manual/shopify-global-sandbox.ts artifacts/e2e/<fresh-run> --stop-before-pay
+```
+
+Never use that example to restart the original unresolved paid attempt. `--resume-before-pay` only reconciles this lane's retained preparation and obeys canonical expiry. Paid mode `--allow-one-bogus-order` is test-only and refuses while retained Shopify purchases are executing/unresolved. Current original ambiguity blocks it; no paid run occurred here. [Current lane evidence](shopify-global-sandbox-e2e.md).
