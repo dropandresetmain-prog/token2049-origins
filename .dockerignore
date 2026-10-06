@@ -1,0 +1,14 @@
+node_modules
+dist
+data
+wallets
+keys
+secrets
+.env
+.env.*
+!.env.example
+artifacts
+logs
+traces
+docs/evidence/raw
+.git

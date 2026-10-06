@@ -73,7 +73,14 @@ Masumi/Sokosumi and console lanes.
 C1 — contract + runnable skeleton committed (v1 schemas, HTTP, auth/scopes, error shape, money, journal,
 reservations, jobs, worker, restart recovery; 35 local tests). Channel contract: `docs/contracts/CHANNEL_CONTRACT.md`.
 
+C1 SHA `0955263`; worker base `3bf1b61`; core head after funding lock `00fab34` (+ Dockerfile commit).
+Lane branches (worktrees `C:\Dev	2o-wt-<x>`, branched from `3bf1b61`, disjoint ownership):
+`build/core-cardano` (src/funding/cardano, clients/payer), `build/core-shopify`, `build/core-atlas`,
+`build/core-nuitee`, `build/core-evidence` (src/banking/ocbc, src/evidence), `build/core-mcp` (src/channels/mcp).
+
 ## Next action
 
-Dispatch parallel adapter workers (Cardano, Shopify, Atlas, Nuitée, OCBC) on per-worker branches from C1; then
-MCP + payer client + evidence API; integrate, review, recheck readiness.
+Review each lane report + diff; merge lanes into `build/commerce-core`; register factories in `src/wiring.ts`
+(mount evidence + inspect routers, Shopify webhook router); add npm scripts (mcp, payer); run full suite;
+independent review workers (auth/funding, journal/idempotency, provider/evidence); RUNBOOK/TEST_CHECKLIST/
+KNOWN_ISSUES/HANDOFF; recheck readiness when credentials arrive.
