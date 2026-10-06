@@ -1,0 +1,9 @@
+{
+  "name": "capsule-commerce-verification",
+  "version": "1.0.0",
+  "private": true,
+  "type": "module",
+  "scripts": { "typecheck": "tsc --noEmit", "test": "bun test", "snapshot-fixture": "bun run fixture-server.ts" },
+  "dependencies": { "@chainlink/cre-sdk": "1.23.0" },
+  "devDependencies": { "@types/bun": "1.3.8", "typescript": "5.9.3" }
+}
