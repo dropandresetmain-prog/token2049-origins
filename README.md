@@ -7,11 +7,11 @@ Capsule is a buyer-side commerce gateway for AI agents. The user's existing agen
 ## Current authoritative baseline
 
 - Repository: dropandresetmain-prog/token2049-origins
-- Main baseline: 8a76225364bf3b56fe2bf192297ee17b86d8f540
-- Status: PRE-MASUMI integrated implementation baseline.
-- Local integration gate: 697/697 tests across 33 files, clean npm install, typecheck/build, PostgreSQL migrations/rerun, compiled gateway/MCP smoke, UI asset sanity and bounded secret scan PASS.
+- Latest integration base: 84c0aef7a7acd1851c590c54ccd8881b9dc365d5; current source tip is `git rev-parse HEAD`.
+- Status: native Masumi service-fee/task runtime integrated; Sokosumi marketplace delivery remains partial.
+- Previous pre-Masumi gate: 697/697 tests across 33 files plus install/build/migration/smoke checks PASS. Current Masumi integration checks: [MASUMI_INTEGRATION.md](docs/work/MASUMI_INTEGRATION.md).
 - Deployment: NOT RUN.
-- Masumi/Sokosumi: NOT INTEGRATED; separate lane still pending.
+- Masumi: native registry, escrow, result, exact seller payout and restart/replay PASS with external merchant/principal fixtures. Public Sokosumi listing/authenticated platform delivery remains unverified.
 - Final external E2E: NOT RUN on this integrated main.
 
 Main includes the latest E2E fixes, Cardano + Solana funding lanes, OCBC history fix, Nuitée and Atlas provider lanes, Shopify deterministic + Global Catalog/shadow work, thin MCP, PostgreSQL, evidence/proof, and approved Capsule UI V3 design references.
@@ -28,6 +28,7 @@ Main includes the latest E2E fixes, Cardano + Solana funding lanes, OCBC history
 | Shopify deterministic | Paid attempt UNRESOLVED | One Pay attempt; held unresolved reservation; no confirmed order/receipt |
 | Shopify Global | Discovery/shadow/publication/readback PASS | Exact sandbox quote PARTIAL/UNRESOLVED; paid order NOT RUN |
 | MCP | Protocol/local journeys PASS | ChatGPT host connection NOT VERIFIED |
+| Masumi / Sokosumi | Native fee/task/payout PASS | Merchant/principal fixtures; actual Sokosumi marketplace delivery PARTIAL |
 | UI | V3 design approved | Static reference only; not wired into runtime |
 
 These rows are deliberately separate. A local green suite does not upgrade an external row.
@@ -46,7 +47,7 @@ Canonical flow:
 8. reconcile unknown outcomes by readback, never blind retry;
 9. return a concise proof/receipt backed by durable evidence.
 
-Funding rails currently implemented in core: Cardano Preprod and Solana Devnet. Masumi remains a separate pending lane.
+Purchase-principal funding rails: Cardano Preprod and Solana Devnet. Masumi is integrated separately as task remuneration; its escrow never funds merchant principal. Its core principal seam deliberately reports unavailable.
 
 Commerce providers currently implemented: Shopify, Atlas and Nuitée. Shopify has two retail discovery modes:
 - deterministic Capsule-owned store flow;

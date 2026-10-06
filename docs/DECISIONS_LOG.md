@@ -93,3 +93,8 @@ Completed E2E/crypto/providers/Shopify Global/UI references were integrated and 
 Status: planned.
 
 Once all chosen final lanes are integrated, use Astra for one final review+fix of the exact candidate, then run the actual final E2E on that exact SHA. Avoid micro-review loops unless a high-risk ambiguity requires one.
+
+### Native Masumi integrates as task remuneration, separate from purchase principal
+Status: implemented and locally verified.
+
+The completed native lane is integrated onto current main based on 84c0aef. Exact fee lock/result/payout and restart proof is retained; the combined local gate passed 735/735 tests across 35 files. Reauthorization and unresolved outcomes retain truthful core state, and late tasks never initiate a new native submission. Public Sokosumi marketplace delivery remains partial. See docs/work/MASUMI_INTEGRATION.md; the earlier pre-Masumi decision remains historical.

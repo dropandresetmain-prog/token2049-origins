@@ -1,16 +1,16 @@
 # Capsule remaining hackathon roadmap
 
-Baseline: main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540
+Integration base: main @ 84c0aef7a7acd1851c590c54ccd8881b9dc365d5; native Masumi source is integrated and its gate is docs/work/MASUMI_INTEGRATION.md.
 
 Goal: smallest reliable, judge-clear system that proves agent-native funding -> ordinary commerce -> verifiable result.
 
 ## P0 — finish before final submission
 
-### 1. Decide Masumi/Sokosumi integration
-- Wait for the separate lane's final verified report.
-- Integrate only if it has a visible product role and a stable bounded merge.
-- Do not let Masumi delay the canonical demo or corrupt known-good main.
-- If marketplace delivery remains unverified, state that honestly.
+### 1. Bound the remaining Sokosumi marketplace milestone
+- Native Masumi fee/task/payout is integrated and independently verified; escrow is never merchant principal.
+- Public host/listing, platform authentication and actual marketplace delivery remain unverified.
+- Prepare that separate milestone only if it improves the chosen demo; do not block the canonical flow on it.
+- Preserve native database, wallet and recovery history; do not repeat a paid task just to refresh evidence.
 
 ### 2. Seed/preflight audit
 Implement the policy in docs/demo/SEED_DATA.md across:
@@ -20,7 +20,7 @@ Implement the policy in docs/demo/SEED_DATA.md across:
 - Cardano;
 - Solana;
 - PostgreSQL demo identities/state;
-- Masumi if integrated;
+- native Masumi fee/task runtime;
 - UI/proof scenario references.
 
 Outcome: one pre-demo command/checklist that verifies actual external state rather than trusting JSON.

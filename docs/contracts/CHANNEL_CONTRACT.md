@@ -1,7 +1,7 @@
 # Channel contract v1 — for channel lanes (MCP, ChatGPT, Sokosumi/Masumi, console)
 
 Canonical schemas: [`src/contracts/`](../../src/contracts/) (zod, executable). This document summarizes them; on
-conflict the code wins. After pre-Masumi promotion, `main` is the implementation baseline; future lanes propose changes against it. Implemented channels are HTTP and MCP; ChatGPT host connectivity is unverified and Masumi is pending.
+conflict the code wins. After pre-Masumi promotion, `main` is the implementation baseline; future lanes propose changes against it. Implemented channels are HTTP, MCP and the authenticated native Masumi MIP-003 task runtime; ChatGPT host connectivity and actual Sokosumi marketplace delivery remain unverified.
 
 ## Rules every channel follows
 
@@ -142,9 +142,11 @@ evidence. Success ⇒ `202` + `PAYMENT-RESPONSE`. Replay ⇒ `409 payment_replay
 
 The selected fundingOptionId controls the adapter; no rail is inferred. Solana Devnet uses the same canonical purchase/approval/funding/evidence model and disclosed 1:1000 policy. Its supplied payer requires authenticated /prepare co-signing and durable candidate recovery. Gateway contains no payer keys. See [Solana report](../work/SOLANA_FIX.md). Stock-client interoperability is not claimed.
 
-## Masumi/Sokosumi seam (pending, not integrated)
+## Masumi/Sokosumi task runtime (native integrated; marketplace partial)
 
-- Map `externalTaskId → purchaseId` in the Masumi lane's own storage; call core with idempotency key `sokosumi:<id>`.
+- Persist owner/external-task/core correlation in the Masumi runtime store; create core purchases with an owner-scoped durable idempotency key.
+- Native fee payment, result hash, tagged seller payout and restart/replay are independently verified. Task completion can deliver a truthful stopped/failed core outcome; it never turns that outcome into successful commerce.
+- Only awaiting_funding asks for direct principal. Queued/executing report progress, unresolved reports merchant reconciliation, and a missed native submission deadline requires reconciliation without a new payment. requires_reauthorization delivers the truthful stopped outcome.
 - Masumi funding evidence, if proven, becomes a **separate funding adapter** (`rail: "masumi"`), not a channel shortcut.
   Until the lane proves dynamic principal + pre-execution escrow semantics, use the direct funding gate and present the
   required funding honestly.

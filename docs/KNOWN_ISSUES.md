@@ -1,6 +1,6 @@
 # Current Capsule issues
 
-Baseline: main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540
+Integration base: main @ 84c0aef7a7acd1851c590c54ccd8881b9dc365d5; native Masumi integration checks are in docs/work/MASUMI_INTEGRATION.md.
 
 Historical issue ledgers remain in docs/evidence/. This file contains only current actionable triage.
 
@@ -22,7 +22,8 @@ Historical issue ledgers remain in docs/evidence/. This file contains only curre
 | Atlas ambiguous-create recovery is NOT VERIFIED. | Verify read-only lookup/recovery only if Atlas becomes canonical/final-demo critical. | Unknown create could remain unresolved; blind repeat is unsafe. |
 | ChatGPT host MCP connection is NOT VERIFIED. | Test actual host only if it materially improves judging/submission. | Protocol pass may not translate to host connectivity. |
 | Deployment is NOT VERIFIED. | Deploy exact candidate; verify final origin, DB, browser, provider tokens, market and rail readiness. | Local success may not survive hosted runtime. |
-| Masumi/Sokosumi is not integrated. | Assess the separate lane when its final verified checkpoint returns; integrate only if stable and useful. | Cardano marketplace/sponsor story may be weaker; integration may also consume critical time. |
+| Actual Sokosumi marketplace delivery remains unverified after native Masumi integration. | Prepare approved public host/listing metadata, prove platform-to-agent authentication and run a bounded real platform task if needed for the demo. Keep fee and principal separate. | Native protocol success can be mistaken for marketplace acceptance. |
+| Native ordinary Masumi withdrawal summaries are unreported; some recipient/refund/dispute variants are unsupported. | Use exact independent tagged chain payout proof; fail closed for unsupported variants and reject conflicting nonempty API amounts. | Empty summaries can be mistaken for zero earnings; unsupported variants need reconciliation. |
 | Solana stock-client interoperability is limited by authenticated /prepare. | Use the provided payer for demo; redesign durable stock-client preparation only if required. | Do not claim universal stock x402 client compatibility. |
 | Render free DB was recorded to expire 5 Nov 2026 14:55 Singapore with no managed backups. | Recheck before use; export before expiry. | Hosted data loss later. |
 

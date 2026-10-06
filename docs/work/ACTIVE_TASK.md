@@ -2,16 +2,18 @@
 
 ## Goal
 
-Plan and execute the minimum remaining work from the verified pre-Masumi main baseline to a judge-ready TOKEN2049 Origins submission.
+Plan and execute the minimum remaining work from the integrated main baseline, including native Masumi task remuneration, to a judge-ready TOKEN2049 Origins submission.
 
 ## Baseline
 
 Repository: dropandresetmain-prog/token2049-origins
 
-Authoritative main:
-8a76225364bf3b56fe2bf192297ee17b86d8f540
+Latest integration base:
+84c0aef7a7acd1851c590c54ccd8881b9dc365d5
 
-Pre-Masumi integration local gate:
+Current tip: `git rev-parse HEAD`; current Masumi integration gate is docs/work/MASUMI_INTEGRATION.md.
+
+Historical pre-Masumi integration local gate:
 - 697/697 tests, 33 files PASS
 - clean install/typecheck/build PASS
 - PostgreSQL migrations/rerun PASS
@@ -29,6 +31,7 @@ No deployment or new provider/payment/chain action occurred during integration.
 - 1:1000 testnet settlement
 - Cardano Preprod rail
 - Solana Devnet rail
+- native Masumi service-fee/task runtime; independently verified fee payout
 - Shopify deterministic path
 - Shopify Global discovery/shadows
 - Atlas
@@ -40,7 +43,7 @@ No deployment or new provider/payment/chain action occurred during integration.
 
 ## Pending / not proven
 
-- Masumi/Sokosumi integration
+- actual Sokosumi public listing/platform authentication/task delivery
 - runtime V3 UI
 - deployment
 - final combined E2E
@@ -57,7 +60,7 @@ Do not retry old unresolved Shopify purchase pur_01M48PSSTDQDR4VGPAQPC2VRYZ.
 
 ## Required outcomes before submission
 
-- [ ] Decide/integrate or explicitly exclude final Masumi lane.
+- [x] Integrate the verified native Masumi fee/task/payout lane without treating escrow as principal.
 - [ ] Run demo seed/preflight audit for chosen final flow.
 - [ ] Wire judge-facing V3 runtime enough for the canonical demo.
 - [ ] Deploy exact candidate and verify runtime/browser/database/secrets.

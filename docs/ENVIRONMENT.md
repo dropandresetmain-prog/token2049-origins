@@ -151,7 +151,15 @@ Stdio is the preferred local host mode. HTTP mode is loopback-only and unauthent
 
 ## Masumi/Sokosumi
 
-Not integrated into main at this baseline. Keep its service/config separate until the lane is explicitly accepted and integrated.
+The native service-fee/task runtime is integrated as a separate loopback process. It does not provide merchant purchase-principal funding or establish an actual Sokosumi marketplace listing.
+
+Use `.env.masumi.example` for the required variables. Inject secrets privately; reuse the existing native registry, selling identity, database and recovery history. Public fee/identity/contract terms are frozen for each durable job store; configuration repricing fails startup while credential rotation is allowed. Keep MPS administration and signer material private.
+
+```powershell
+node --env-file=.env.masumi.local --import tsx src/channels/sokosumi/main.ts
+```
+
+With variables already in the process environment, `npm run channel:masumi` launches the same runtime. The gateway remains a separate process. Platform-to-agent authentication, a public TLS endpoint and approved listing metadata are still unverified; local account API authentication does not establish those boundaries.
 
 ## Render deployment
 

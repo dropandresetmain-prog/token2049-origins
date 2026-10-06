@@ -4,17 +4,20 @@
 
 Repository: dropandresetmain-prog/token2049-origins
 
-Authoritative main baseline:
-8a76225364bf3b56fe2bf192297ee17b86d8f540
+Latest integration base:
+84c0aef7a7acd1851c590c54ccd8881b9dc365d5
+
+Current source tip: `git rev-parse HEAD`. Exact integration checks: docs/work/MASUMI_INTEGRATION.md.
 
 Status:
-PRE-MASUMI integrated main baseline established.
+Native Masumi service-fee/task runtime integrated with the existing main lanes; actual Sokosumi marketplace delivery remains partial.
 
 Main contains:
 - PostgreSQL persistence and migrations;
 - progressive needs_input and explicit funding-option approval;
 - Cardano Preprod funding;
 - Solana Devnet funding;
+- authenticated native Masumi fee/task runtime with independently verified seller payout;
 - Shopify deterministic execution path;
 - Shopify Global Catalog discovery + durable sandbox shadows;
 - Atlas flights;
@@ -24,8 +27,8 @@ Main contains:
 - customer/judge proof projection;
 - approved Capsule UI V3 design assets/reference.
 
-Not integrated:
-- Masumi/Sokosumi lane.
+Not proved:
+- public Sokosumi listing, platform-to-agent authentication and marketplace task delivery.
 
 Not yet done on this baseline:
 - deployment;
@@ -37,7 +40,7 @@ Not yet done on this baseline:
 
 ## Verification at main promotion
 
-Pre-Masumi integration gate:
+Historical pre-Masumi integration gate:
 - clean npm install: PASS
 - PostgreSQL fresh migrations + rerun/checksums: PASS
 - typecheck/build: PASS
@@ -65,7 +68,7 @@ No deployment or new provider/payment/chain action occurred during integration.
 | Shopify Global | Real discovery/shadow/publication/readback PASS; exact sandbox quote partial; paid order not run |
 | MCP | Local/protocol PASS; ChatGPT host not verified |
 | UI | V3 approved reference; runtime not implemented |
-| Masumi | Not integrated; separate lane pending |
+| Masumi / Sokosumi | Native fee/task/payout/restart PASS; external merchant/principal fixtures; marketplace delivery PARTIAL |
 
 Original unresolved Shopify purchase:
 pur_01M48PSSTDQDR4VGPAQPC2VRYZ
@@ -88,7 +91,7 @@ Do not retry, mutate or fabricate resolution. It is retained evidence of conserv
 
 ## Highest-priority remaining work
 
-1. Receive and assess the final Masumi/Sokosumi lane; integrate only if its verified value exceeds integration risk.
+1. Prepare the actual Sokosumi host/listing/authentication milestone only if required for the demo; native Masumi is integrated. Keep task fees separate from direct purchase principal.
 2. Run the cross-provider demo seed/preflight audit in docs/demo/SEED_DATA.md.
 3. Wire approved UI V3 into the runtime proof/transaction console.
 4. Verify deployment configuration and deploy the exact final candidate to Render.

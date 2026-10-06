@@ -129,11 +129,29 @@ export class SokosumiRuntime {
       }
       // Refresh authenticated core truth; fee payment cannot complete or fund a merchant purchase.
       const purchase = await this.corePurchase(job, identity);
-      if (!['succeeded', 'failed', 'expired', 'cancelled'].includes(purchase.state)) return { status: 'running', result: JSON.stringify( { type: 'direct_principal_funding', purchaseId: purchase.purchaseId, state: purchase.state, fundingInstructions: purchase.fundingInstructions }) };
+      if (!['succeeded', 'failed', 'expired', 'cancelled', 'requires_reauthorization'].includes(purchase.state)) {
+        const deadlineExpired = this.now() > Number(job.submit_by);
+        const type = deadlineExpired ? 'native_task_deadline_reconciliation_required'
+          : purchase.state === 'awaiting_funding' ? 'direct_principal_funding'
+          : purchase.state === 'unresolved' ? 'merchant_outcome_reconciliation_required' : 'purchase_in_progress';
+        // An unresolved merchant outcome is never a request to fund again or a definite purchase failure.
+        return { status: deadlineExpired ? 'failed' : 'running', result: JSON.stringify({
+          type, purchaseId: purchase.purchaseId, state: purchase.state, statusReason: purchase.statusReason,
+          submitBy: new Date(Number(job.submit_by)).toISOString(),
+          ...(purchase.state === 'awaiting_funding' && !deadlineExpired ? { fundingInstructions: purchase.fundingInstructions } : {}),
+          ...(deadlineExpired ? { action: 'Reconcile the existing native payment and purchase; no new payment is authorized' } : {}),
+        }) };
+      }
       // Evidence modes travel with the actual core receipt, so fixture merchants cannot masquerade as live.
       const result = job.result_json ?? JSON.stringify({ serviceFee: this.serviceFee(), purchaseId: purchase.purchaseId, state: purchase.state, receipt: purchase.receipt, statusReason: purchase.statusReason, serviceFeePurpose: 'service_fee' });
       const resultHash = mipOutputHash(job.external_id, result);
       if (job.phase !== 'submit_attempt' && job.phase !== 'submit_rejected') {
+        // Keep a truthful terminal outcome, but never begin a native write after its immutable deadline.
+        if (observed.status === 'escrow_locked' && this.now() > Number(job.submit_by)) {
+          if (!job.result_json) await this.opts.db.run('UPDATE sokosumi_jobs SET result_json=$1 WHERE id=$2', result, id);
+          job.result_json = result;
+          return this.recovery(job, resultHash);
+        }
         await this.opts.db.run('UPDATE sokosumi_jobs SET phase=$1,result_json=$2 WHERE id=$3', 'submit_attempt', result, id); job.result_json = result;
         if (observed.status === 'escrow_locked') {
           try { await this.opts.masumi.submitResult(p.blockchainIdentifier, resultHash); } catch (error) {

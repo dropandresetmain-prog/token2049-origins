@@ -1,6 +1,8 @@
-# Runbook — Capsule pre-Masumi baseline
+# Runbook — Capsule integrated baseline
 
-Current authority: the pre-Masumi integrated main baseline after exact-head promotion. See [ACTIVE_TASK](work/ACTIVE_TASK.md), [verification](evidence/pre-masumi-integration.md) and [issue triage](KNOWN_ISSUES.md). Retained Cardano/Solana, Nuitée, Atlas and OCBC evidence passed within their stated limits. Shopify paid/Global exact quote and ChatGPT host remain unresolved or unverified. No provider/chain/payment/deployment action is authorized by local checks.
+Current authority: the integrated main baseline, including native Masumi. See [ACTIVE_TASK](work/ACTIVE_TASK.md), [current integration verification](work/MASUMI_INTEGRATION.md), [historical pre-Masumi verification](evidence/pre-masumi-integration.md) and [issue triage](KNOWN_ISSUES.md). Retained Cardano/Solana, Nuitée, Atlas and OCBC evidence passed within their stated limits. Shopify paid/Global exact quote and ChatGPT host remain unresolved or unverified. No provider/chain/payment/deployment action is authorized by local checks.
+
+The native Masumi task service runs separately on loopback; startup/configuration is in [ENVIRONMENT](ENVIRONMENT.md#masumisokosumi). Its fee is separate from direct purchase principal. Public Sokosumi marketplace hosting/authentication/delivery remains unverified.
 
 ## Local runtime
 

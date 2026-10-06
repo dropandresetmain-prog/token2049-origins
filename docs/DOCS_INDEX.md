@@ -53,6 +53,8 @@ Important retained evidence:
 - cardano-protocol.md — Cardano funding design/evidence.
 - CARDANO_FIX.md / SOLANA_FIX.md / SOLANA_LIVE.json — rail-specific evidence.
 - COMPLETED_LANES.md — crypto/provider consolidation source report.
+- MASUMI_INTEGRATION.md — native Masumi merge onto latest main and combined validation.
+- MASUMI_SOKOSUMI_FIX.md / masumi-live.json / sokosumi-runtime-live.json — native fee/task/payout evidence and explicit marketplace limits.
 
 ## Rule for future agents
 

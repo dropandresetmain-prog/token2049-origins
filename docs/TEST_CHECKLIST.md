@@ -1,6 +1,6 @@
 # Capsule test checklist — final-candidate gates
 
-Baseline: main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540
+Integration base: main @ 84c0aef7a7acd1851c590c54ccd8881b9dc365d5; current native Masumi integration gate: docs/work/MASUMI_INTEGRATION.md.
 
 This is the current gate for remaining work. Historical lane checklists/evidence remain retained separately.
 
@@ -14,6 +14,7 @@ This is the current gate for remaining work. Historical lane checklists/evidence
 - npm run build
 - full unit/contract/integration suite
 - Cardano and Solana funding/recovery regressions
+- native Masumi service-fee proof, task auth/replay and deadline-aware core outcome regressions
 - Shopify deterministic regressions
 - Shopify Global/shadow/idempotency regressions
 - Atlas and Nuitée regressions
@@ -98,7 +99,7 @@ If any irreversible result becomes unknown:
 | Shopify Global | Discovery/shadow PASS; exact quote partial; paid not run |
 | MCP | Protocol/local PASS; ChatGPT host unverified |
 | UI | Design V3 approved; runtime not wired |
-| Masumi | Not integrated |
+| Masumi / Sokosumi | Native fee/task/payout/restart PASS; merchant/principal fixtures; marketplace PARTIAL |
 
 ## F. Final review and submission gate
 

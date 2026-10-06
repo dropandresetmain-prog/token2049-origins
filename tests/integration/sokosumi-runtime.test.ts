@@ -59,4 +59,38 @@ describe('authenticated durable Sokosumi standard task runtime',()=>{
   it('does not infer unpaid solely from an expired deadline when native state remains pending',async()=>{
     const s=await setup();const j:any=await s.runtime.start(s.start,s.identity);s.native.p.onChainState=null;s.h.clock.advance(16*60000);const status=await s.runtime.status(j.id,s.identity);expect(status.status).toBe('running');expect(JSON.parse(String(status.result)).type).toBe('native_payment_reconciliation_required');
   });
+  it('submits a truthful reauthorization result without claiming completed commerce',async()=>{
+    const s=await setup();s.h.hotel.behavior='terms_changed';const j:any=await s.runtime.start(s.start,s.identity);await finishPrincipal(s,j);
+    expect((await s.runtime.status(j.id,s.identity)).status).toBe('running');
+    const done=await s.runtime.status(j.id,s.identity);expect(done.status).toBe('completed');
+    expect(JSON.parse(String(done.result))).toMatchObject({state:'requires_reauthorization',statusReason:'fixture price changed'});
+    expect(JSON.parse(String(done.result)).receipt).toBeNull();expect(s.h.hotel.orders.size).toBe(0);
+    expect(s.native.calls.filter(c=>c.url.endsWith('submit-result'))).toHaveLength(1);
+    const restarted=new SokosumiRuntime(s.runtime.opts);await restarted.initialize();expect(await restarted.status(j.id,s.identity)).toEqual(done);
+  });
+  it('keeps an unresolved merchant outcome distinct from funding and surfaces the native deadline',async()=>{
+    const s=await setup();s.h.hotel.behavior='unknown';const j:any=await s.runtime.start(s.start,s.identity);await finishPrincipal(s,j);
+    const pending=await s.runtime.status(j.id,s.identity);expect(pending.status).toBe('running');
+    expect(JSON.parse(String(pending.result))).toMatchObject({type:'merchant_outcome_reconciliation_required',state:'unresolved'});
+    expect(JSON.parse(String(pending.result)).fundingInstructions).toBeUndefined();
+    s.h.clock.advance(31*60000);const expired=await s.runtime.status(j.id,s.identity);expect(expired.status).toBe('failed');
+    expect(JSON.parse(String(expired.result))).toMatchObject({type:'native_task_deadline_reconciliation_required',state:'unresolved'});
+    expect(JSON.parse(String(expired.result)).fundingInstructions).toBeUndefined();
+    expect(s.h.hotel.executeCalls).toBe(1);expect(s.native.calls.filter(c=>c.url.endsWith('submit-result'))).toHaveLength(0);
+  });
+  it('reports a funded queued purchase as progress without another funding request',async()=>{
+    const s=await setup();const j:any=await s.runtime.start(s.start,s.identity);
+    const guidance=JSON.parse(String((await s.runtime.status(j.id,s.identity)).result));
+    const funded=await s.h.call('POST','/v1/purchases/'+guidance.purchaseId+'/fund',{token:s.h.alice.token,headers:{'payment-signature':'fixture:queued-'+j.id+':'+s.q.fundingOptions[0].amount.amountBaseUnits},body:{}});expect(funded.status).toBe(202);
+    const pending=await s.runtime.status(j.id,s.identity);expect(pending.status).toBe('running');
+    expect(JSON.parse(String(pending.result))).toMatchObject({type:'purchase_in_progress',state:'funded_queued'});
+    expect(JSON.parse(String(pending.result)).fundingInstructions).toBeUndefined();expect(s.h.hotel.executeCalls).toBe(0);
+  });
+  it('preserves a late terminal receipt without starting an expired native submission',async()=>{
+    const s=await setup();const j:any=await s.runtime.start(s.start,s.identity);await finishPrincipal(s,j);s.h.clock.advance(31*60000);
+    const expired=await s.runtime.status(j.id,s.identity);expect(expired.status).toBe('failed');
+    expect(JSON.parse(String(expired.result))).toMatchObject({type:'native_result_reconciliation_required',coreResult:{state:'succeeded',receipt:expect.any(Object)}});
+    await s.runtime.status(j.id,s.identity);expect(s.native.calls.filter(c=>c.url.endsWith('submit-result'))).toHaveLength(0);expect(s.h.hotel.executeCalls).toBe(1);
+  });
+
 });
