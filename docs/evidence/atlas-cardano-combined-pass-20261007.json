@@ -1,0 +1,512 @@
+{
+  "verdict": "PASS",
+  "at": "2026-10-06T19:39:18.378Z",
+  "codeSha": "48ec323630110d3d7522876bdc9c7adccc12b113",
+  "quoteId": "quo_01M49B82CA1G6CAJPFTYZ8ANKE",
+  "purchaseId": "pur_01M49B9QJCBD8SS77FMAXNTJK8",
+  "commercialTotal": {
+    "currency": "USD",
+    "amountMinor": "2287",
+    "scale": 2
+  },
+  "breakdown": [
+    {
+      "kind": "item",
+      "label": "Fare, 1 adult(s)",
+      "amount": {
+        "currency": "USD",
+        "amountMinor": "487",
+        "scale": 2
+      }
+    },
+    {
+      "kind": "tax",
+      "label": "Taxes and airport charges",
+      "amount": {
+        "currency": "USD",
+        "amountMinor": "1800",
+        "scale": 2
+      }
+    }
+  ],
+  "selectedFundingOptionId": "fop_01M49B82C9S6TBN07KD0QAAF3Z",
+  "cardano": {
+    "txHash": "000a96cbf2c6155492e7f701f7e57500509125855d043d0057237e85bcf56da0",
+    "amountBaseUnits": "22870",
+    "confirmations": 11,
+    "blockHeight": 5261680,
+    "commitmentMatches": true
+  },
+  "atlas": {
+    "orderReference": "TESTA20261007033457267",
+    "orderStatus": "2",
+    "ticketStatus": "1",
+    "paid": true,
+    "payTime": "2026-10-07 03:34:58",
+    "pnrCode": "DQLFN7",
+    "total": 22.87,
+    "currency": "USD",
+    "fee": 0,
+    "passengerCount": 1,
+    "ticketReferences": [
+      {
+        "ticketNos": [
+          "S19397"
+        ],
+        "airlinePNRs": [
+          "S19397"
+        ],
+        "ticketStatus": null
+      }
+    ],
+    "passengerRecordFieldNames": [
+      [
+        "name",
+        "passengerType",
+        "birthday",
+        "gender",
+        "cardNum",
+        "cardType",
+        "cardIssuePlace",
+        "cardExpired",
+        "nationality",
+        "ticketNos",
+        "airlinePNRs",
+        "contactEmails",
+        "contactPhones",
+        "ticketStatus",
+        "ancillaries"
+      ]
+    ],
+    "independentReadback": true
+  },
+  "state": "succeeded",
+  "commerceStatus": "ticketed",
+  "paymentState": "confirmed",
+  "merchantPaymentStatus": "test_balance_paid",
+  "receiptId": "rcp_01M49BCHX6239KYXQ3604GWDYM",
+  "counts": {
+    "funding": 1,
+    "funding_attempts": 1,
+    "execute_jobs": 1,
+    "receipts": 1
+  },
+  "fundRequests": 2,
+  "attemptStatus": "succeeded",
+  "checkpoints": [
+    "create_attempt",
+    "order",
+    "pay_attempt"
+  ],
+  "reservation": {
+    "status": "consumed",
+    "amount_minor": "2287"
+  },
+  "journal": [
+    {
+      "id": "jen_01M49BCH1SXB83EE4XS63AYQYA",
+      "event_key": "funding:cardano:cardano:preprod:000a96cbf2c6155492e7f701f7e57500509125855d043d0057237e85bcf56da0",
+      "kind": "funding_received",
+      "ledger_mode": "observed",
+      "created_at": "2026-10-06T19:34:57.325Z",
+      "lines": [
+        {
+          "account": "assets:crypto_treasury",
+          "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+          "side": "debit",
+          "amount": "22870"
+        },
+        {
+          "account": "liabilities:customer_prepayment",
+          "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+          "side": "credit",
+          "amount": "22870"
+        }
+      ]
+    },
+    {
+      "id": "jen_01M49BCHWCENM8YCXX36W85BF7",
+      "event_key": "merchant_payment:pur_01M49B9QJCBD8SS77FMAXNTJK8",
+      "kind": "merchant_payment_provider_test_balance",
+      "ledger_mode": "simulated",
+      "created_at": "2026-10-06T19:34:58.153Z",
+      "lines": [
+        {
+          "account": "simulated:merchant_purchases",
+          "asset": "fiat:USD/2",
+          "side": "debit",
+          "amount": "2287"
+        },
+        {
+          "account": "simulated:provider_test_balance_used",
+          "asset": "fiat:USD/2",
+          "side": "credit",
+          "amount": "2287"
+        }
+      ]
+    },
+    {
+      "id": "jen_01M49BCHWN6VV60Y51CJ2KWRSS",
+      "event_key": "prepayment_applied:pur_01M49B9QJCBD8SS77FMAXNTJK8",
+      "kind": "prepayment_applied",
+      "ledger_mode": "observed",
+      "created_at": "2026-10-06T19:34:58.153Z",
+      "lines": [
+        {
+          "account": "liabilities:customer_prepayment",
+          "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+          "side": "debit",
+          "amount": "22870"
+        },
+        {
+          "account": "income:purchase_principal_applied",
+          "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+          "side": "credit",
+          "amount": "22870"
+        }
+      ]
+    }
+  ],
+  "trialBalances": [
+    {
+      "asset": "cardano:preprod/16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+      "net": "0"
+    },
+    {
+      "asset": "fiat:USD/2",
+      "net": "0"
+    },
+    {
+      "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "net": "0"
+    }
+  ],
+  "events": [
+    {
+      "type": "purchase.created",
+      "created_at": "2026-10-06T19:33:25.695Z"
+    },
+    {
+      "type": "approval.recorded",
+      "created_at": "2026-10-06T19:33:25.695Z"
+    },
+    {
+      "type": "capacity.reserved",
+      "created_at": "2026-10-06T19:33:25.695Z"
+    },
+    {
+      "type": "funding.attempt_prepared",
+      "created_at": "2026-10-06T19:34:21.518Z"
+    },
+    {
+      "type": "funding.submitted",
+      "created_at": "2026-10-06T19:34:56.007Z"
+    },
+    {
+      "type": "funding.confirmed",
+      "created_at": "2026-10-06T19:34:57.325Z"
+    },
+    {
+      "type": "execution.queued",
+      "created_at": "2026-10-06T19:34:57.325Z"
+    },
+    {
+      "type": "execution.started",
+      "created_at": "2026-10-06T19:34:57.378Z"
+    },
+    {
+      "type": "execution.checkpoint",
+      "created_at": "2026-10-06T19:34:57.397Z"
+    },
+    {
+      "type": "execution.checkpoint",
+      "created_at": "2026-10-06T19:34:57.640Z"
+    },
+    {
+      "type": "execution.checkpoint",
+      "created_at": "2026-10-06T19:34:57.816Z"
+    },
+    {
+      "type": "execution.succeeded",
+      "created_at": "2026-10-06T19:34:58.153Z"
+    },
+    {
+      "type": "capacity.consumed",
+      "created_at": "2026-10-06T19:34:58.153Z"
+    },
+    {
+      "type": "receipt.issued",
+      "created_at": "2026-10-06T19:34:58.153Z"
+    },
+    {
+      "type": "outcome.refreshed",
+      "created_at": "2026-10-06T19:39:00.575Z"
+    }
+  ],
+  "funding": [
+    {
+      "payment_state": "confirmed",
+      "confirmations": 1,
+      "application": "applied",
+      "evidence_mode": "fresh_external"
+    }
+  ],
+  "proof": {
+    "funding": {
+      "requirement": {
+        "fundingOptionId": "fop_01M49B82C9S6TBN07KD0QAAF3Z",
+        "rail": "cardano",
+        "amount": {
+          "network": "cardano:preprod",
+          "assetId": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+          "symbol": "tUSDM",
+          "decimals": 6,
+          "amountBaseUnits": "22870"
+        },
+        "payTo": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py",
+        "settlement": {
+          "policy": {
+            "mode": "scaled_testnet",
+            "numerator": 1,
+            "denominator": 1000
+          },
+          "commercialPrincipal": {
+            "currency": "USD",
+            "amountMinor": "2287",
+            "scale": 2
+          },
+          "commercialServiceFee": {
+            "currency": "USD",
+            "amountMinor": "0",
+            "scale": 2
+          },
+          "commercialTotal": {
+            "currency": "USD",
+            "amountMinor": "2287",
+            "scale": 2
+          },
+          "principalBaseUnits": "22870",
+          "feeBaseUnits": "0",
+          "totalBaseUnits": "22870"
+        }
+      },
+      "confirmationStatus": "confirmed",
+      "applied": true,
+      "sources": [
+        {
+          "displayAddress": "addr_test1qrwg…tthyxm",
+          "evidenceRef": "fev_01M49BCFR94WPN12FWHDVRNW0Q"
+        }
+      ],
+      "transfers": [
+        {
+          "reference": "000a96cbf2c6155492e7f701f7e57500509125855d043d0057237e85bcf56da0",
+          "confirmationStatus": "confirmed",
+          "application": "applied",
+          "evidenceMode": "fresh_external",
+          "verifiedAt": "2026-10-06T19:34:56.007Z"
+        }
+      ]
+    },
+    "merchant": {
+      "provider": "atlas",
+      "environment": "sandbox",
+      "result": "ticketed",
+      "paymentStatus": "test_balance_paid",
+      "providerReference": "TESTA20261007033457267",
+      "evidenceMode": "fresh_external"
+    },
+    "receipt": {
+      "receiptId": "rcp_01M49BCHX6239KYXQ3604GWDYM",
+      "finalResult": "Complete",
+      "issuedAt": "2026-10-06T19:34:58.153Z",
+      "limitations": [
+        "Testnet funding uses valueless test assets; no crypto-to-fiat conversion occurred.",
+        "Scaled testnet notional — 1:1000. Commercial capacity and chain settlement have no equivalent economic value.",
+        "Merchant payment is provider sandbox/test evidence; it is not bank settlement or an OCBC transaction.",
+        "Provider test-balance usage consumes synthetic capacity; it is not card spend or supplier credit approval.",
+        "Atlas sandbox payment uses the provider test balance mechanism; see status for hold/payment/ticket state."
+      ],
+      "evidenceRefs": [
+        "journal:jen_01M49BCH1SXB83EE4XS63AYQYA",
+        "journal:jen_01M49BCHWCENM8YCXX36W85BF7",
+        "journal:jen_01M49BCHWN6VV60Y51CJ2KWRSS",
+        "atlas:sandbox:TESTA20261007033457267"
+      ]
+    },
+    "progress": {
+      "stage": "complete",
+      "label": "Complete",
+      "message": "Purchase complete. Provider reference TESTA20261007033457267. Read the receipt for the environment and proof limitations.",
+      "paymentConfirmed": true,
+      "merchantAction": "reported",
+      "outcomeFinal": true,
+      "nextAction": null
+    }
+  },
+  "headroom": {
+    "committed": "66830",
+    "cumulative": "35170",
+    "daily": "35170",
+    "lock": false
+  },
+  "customerId": "cus_01M496A1AMX19SC5AEDRX21BAE",
+  "schema": "combined_0377612108794d379e15259bee7b166a",
+  "consoleObservations": [
+    {
+      "at": "2026-10-06T19:34:05.098Z",
+      "purchase": "#/purchases/pur_01M49B9QJCBD8SS77FMAXNTJK8",
+      "title": "Z2Z2777 MNL to CEB",
+      "status": "Awaiting payment",
+      "action": "Waiting for payment",
+      "steps": [
+        {
+          "label": "Approved",
+          "state": "step done",
+          "detail": "Connected app approved this exact price and payment method."
+        },
+        {
+          "label": "Payment received",
+          "state": "step current",
+          "detail": "Waiting for payment."
+        },
+        {
+          "label": "Booking the flight",
+          "state": "step pending",
+          "detail": "Starts once the payment is received."
+        },
+        {
+          "label": "Merchant confirmation",
+          "state": "step pending",
+          "detail": "Not confirmed yet."
+        }
+      ]
+    },
+    {
+      "at": "2026-10-06T19:34:22.261Z",
+      "purchase": "#/purchases/pur_01M49B9QJCBD8SS77FMAXNTJK8",
+      "title": "Z2Z2777 MNL to CEB",
+      "status": "Confirming payment",
+      "action": "Confirming payment",
+      "steps": [
+        {
+          "label": "Approved",
+          "state": "step done",
+          "detail": "Connected app approved this exact price and payment method."
+        },
+        {
+          "label": "Payment received",
+          "state": "step current",
+          "detail": "Checking the payment."
+        },
+        {
+          "label": "Booking the flight",
+          "state": "step pending",
+          "detail": "Starts once the payment is received."
+        },
+        {
+          "label": "Merchant confirmation",
+          "state": "step pending",
+          "detail": "Not confirmed yet."
+        }
+      ]
+    },
+    {
+      "at": "2026-10-06T19:34:57.233Z",
+      "purchase": "#/purchases/pur_01M49B9QJCBD8SS77FMAXNTJK8",
+      "title": "Z2Z2777 MNL to CEB",
+      "status": "Confirming payment",
+      "action": "Confirming payment",
+      "steps": [
+        {
+          "label": "Approved",
+          "state": "step done",
+          "detail": "Connected app approved this exact price and payment method."
+        },
+        {
+          "label": "Payment received",
+          "state": "step current",
+          "detail": "Payment sent, waiting for confirmation."
+        },
+        {
+          "label": "Booking the flight",
+          "state": "step pending",
+          "detail": "Starts once the payment is received."
+        },
+        {
+          "label": "Merchant confirmation",
+          "state": "step pending",
+          "detail": "Not confirmed yet."
+        }
+      ]
+    },
+    {
+      "at": "2026-10-06T19:35:02.255Z",
+      "purchase": "#/purchases/pur_01M49B9QJCBD8SS77FMAXNTJK8",
+      "title": "Z2Z2777 MNL to CEB",
+      "status": "Checking with merchant",
+      "action": "Checking with the merchant",
+      "steps": [
+        {
+          "label": "Approved",
+          "state": "step done",
+          "detail": "Connected app approved this exact price and payment method."
+        },
+        {
+          "label": "Payment received",
+          "state": "step done",
+          "detail": "Paid with Cardano on the test network."
+        },
+        {
+          "label": "Booking the flight",
+          "state": "step done",
+          "detail": "Sent to Atlas."
+        },
+        {
+          "label": "Merchant confirmation",
+          "state": "step current",
+          "detail": "Waiting for Atlas to confirm. No action needed."
+        }
+      ]
+    },
+    {
+      "at": "2026-10-06T19:39:02.260Z",
+      "purchase": "#/purchases/pur_01M49B9QJCBD8SS77FMAXNTJK8",
+      "title": "Z2Z2777 MNL to CEB",
+      "status": "Completed",
+      "action": "Done",
+      "steps": [
+        {
+          "label": "Approved",
+          "state": "step done",
+          "detail": "Connected app approved this exact price and payment method."
+        },
+        {
+          "label": "Payment received",
+          "state": "step done",
+          "detail": "Paid with Cardano on the test network."
+        },
+        {
+          "label": "Booking the flight",
+          "state": "step done",
+          "detail": "Sent to Atlas."
+        },
+        {
+          "label": "Merchant confirmation",
+          "state": "step done",
+          "detail": "Atlas confirmed. Ticket issued."
+        }
+      ]
+    }
+  ],
+  "signedFundingSubmissions": 1,
+  "unsignedFundingChallenges": 1,
+  "singleExecutionAttempt": true,
+  "executionAttempts": 1,
+  "runtimeIssue": {
+    "priorGatewayStopped": true,
+    "processId": 36684,
+    "nextRefreshSucceeded": true,
+    "cause": "Competing gateway configuration is a suspected contributor; per-attempt claimant history was not retained."
+  }
+}
