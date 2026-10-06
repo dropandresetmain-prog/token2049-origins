@@ -1,0 +1,48 @@
+{
+  "status": "verified",
+  "workflow": "capsule-commerce-verification",
+  "simulation": {
+    "result": "success",
+    "cli": "Chainlink CRE CLI v1.37.0",
+    "sdk": "@chainlink/cre-sdk 1.23.0",
+    "runtime": "Bun 1.4.0",
+    "typescript": "5.9.3",
+    "javy": "8.1.0",
+    "target": "snapshot-settings",
+    "mode": "local CRE workflow simulation",
+    "builtWasmSha256": "989d1208acf6bffca25da09292ac8470478860aefcb200f438b0d362fddd90ce",
+    "configSha256": "2d794b4631fbc54e5a490211fac8b597d44d3dd96487ee108845b06cbc0d96da"
+  },
+  "evidenceSource": "retained_capsule_snapshot",
+  "capsulePurchase": {
+    "purchaseId": "pur_01M49B9QJCBD8SS77FMAXNTJK8",
+    "quoteId": "quo_01M49B82CA1G6CAJPFTYZ8ANKE",
+    "rail": "cardano",
+    "network": "cardano:preprod",
+    "amountBaseUnits": "22870",
+    "merchantProvider": "atlas",
+    "merchantEnvironment": "sandbox",
+    "merchantResult": "ticketed",
+    "paymentStatus": "test_balance_paid",
+    "receiptFinalResult": "Complete"
+  },
+  "independentPublicChainRead": {
+    "provider": "Koios Preprod read-only API",
+    "transactionHash": "000a96cbf2c6155492e7f701f7e57500509125855d043d0057237e85bcf56da0",
+    "blockHeight": 5261680,
+    "matched": "expected recipient, asset ID, and exact quantity"
+  },
+  "checks": [
+    "selected_funding_matches_pinned_quote",
+    "capsule_records_fresh_confirmed_funding",
+    "public_chain_confirms_recipient_asset_amount",
+    "merchant_result_is_fresh_and_successful",
+    "final_receipt_and_purchase_state_are_consistent"
+  ],
+  "limits": [
+    "Capsule merchant and receipt facts came from a retained, trusted historical Capsule proof artifact served by an ephemeral local read-only fixture; this was not a live Capsule gateway fetch.",
+    "Koios was queried afresh during CRE simulation; it independently confirmed the pinned Cardano transaction output.",
+    "The workflow was simulated, not deployed to a CRE DON. The workflow does not independently call Atlas; merchant success is checked against the retained Capsule proof.",
+    "No purchase, transaction, or other state-changing operation was performed."
+  ]
+}

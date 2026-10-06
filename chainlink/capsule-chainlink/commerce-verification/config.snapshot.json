@@ -1,0 +1,16 @@
+{
+  "gatewayOrigin": "http://127.0.0.1:4319",
+  "evidenceSourceMode": "retained_snapshot",
+  "expected": {
+    "purchaseId": "pur_01M49B9QJCBD8SS77FMAXNTJK8",
+    "quoteId": "quo_01M49B82CA1G6CAJPFTYZ8ANKE",
+    "network": "cardano:preprod",
+    "rail": "cardano",
+    "assetId": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+    "amountBaseUnits": "22870",
+    "payTo": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py",
+    "txHash": "000a96cbf2c6155492e7f701f7e57500509125855d043d0057237e85bcf56da0",
+    "merchantProvider": "atlas",
+    "merchantEnvironment": "sandbox"
+  }
+}
