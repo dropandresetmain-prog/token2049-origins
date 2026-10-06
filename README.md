@@ -12,12 +12,18 @@ Channels (canonical HTTP, thin MCP, ChatGPT, Sokosumi Coworker) all call the sam
 core. No channel owns commerce logic, funding truth or journal writes. Payer keys never live in the
 gateway process.
 
+The human flow is progressive: collect missing information, find offers, show an exact quote,
+explicitly select an available funding option, approve those terms and payment choice, then follow
+one durable purchase. No Cardano choice is inferred. [Channel contract](docs/contracts/CHANNEL_CONTRACT.md)
+documents `needs_input`, approval and duplicate behavior. `/proof` shows the customer timeline,
+payment and receipt; `/inspect` retains detailed engineering evidence.
+
 ## Current state
 
 - Planning release `launch-2026-10-06-v1` imported from
   `dropandresetmain-prog/wip-personal@af648eece01321fec50bcddeee9ba92fd3e10d3a`
   (`token2049-hackathon/`).
-- Commerce Core local implementation is complete on `build/commerce-core`: all six lanes integrated; reviewed PostgreSQL is fast-forwarded into Commerce Core. External acceptance hardening is a separate review branch.
+- Commerce Core local implementation is complete on `build/commerce-core`. `build/human-orchestration` builds on the isolated external-acceptance-hardening branch; the combined diff requires independent review against the reviewed PostgreSQL baseline before external acceptance.
 - Runtime and acceptance instructions: [RUNBOOK](docs/RUNBOOK.md), [TEST_CHECKLIST](docs/TEST_CHECKLIST.md), [KNOWN_ISSUES](docs/KNOWN_ISSUES.md), [HANDOFF](docs/HANDOFF.md).
 - No external acceptance has passed yet. Sandbox/testnet evidence is tracked separately from local
   tests in [`docs/work/ACTIVE_TASK.md`](docs/work/ACTIVE_TASK.md).

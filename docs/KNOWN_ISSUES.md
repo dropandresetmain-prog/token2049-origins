@@ -82,4 +82,22 @@ P-1 through P-12, PG-1 and other PG findings remain outside this lane. No unrela
 provider-routing redesign was performed. The owner-supplied accepted Opus verdict/findings and PostgreSQL review reconciliation pasted in
 Hackathon Build Recommendation were used. Original full core report was absent in inspected worktrees;
 its accepted findings are carried through that reconciliation. Independent review
-must check this financial-policy branch before acceptance.
+must check the combined financial-policy and human-orchestration branch before acceptance.
+
+## Human orchestration findings and limits
+
+| Finding | Class | Evidence / affected files | Action and deferral risk | Blocks first external acceptance? |
+|---|---|---|---|---|
+| Missing user fields could not reach MCP handlers; HTTP exposed generic validation errors | Act Now | `contracts/input.ts`, HTTP/core/MCP and input/HTTP tests | Resolved locally with strict drafts and controlled 422 `needs_input`. Deferring would encourage fabricated customer fields. | Resolved locally; review required |
+| Default Cardano choice and approval did not name a stored funding option | Act Now | `contracts/api.ts`, `commerce.ts`, core/service/worker, MCP and funding-selection tests | Resolved locally: opaque quote-scoped IDs, no independent rail/default, persisted approval and execution guard. Deferring could spend using an unselected source. | Resolved locally; review required |
+| Repeated buy could ask payer again while funding was submitted/uncertain or after a refusal | Act Now | MCP tools/client, quote-purchase lookup and MCP regressions | Resolved locally: owner-scoped follow-existing approval plus payment-state/attempt guard. Durable payer ledger remains the process/restart safeguard. Deferring could create duplicate funding interactions. | Resolved locally; review required |
+| Missing payer identity and opaque state/JSON-first proof obscured what actually happened | Act Now | Payer status allowlist, shared progress, proof projection/page and tests/browser fixture checks | Resolved locally without exposing signing material or raw provider/fulfillment data. Deferring would undermine truthful approval/demo evidence. | Resolved locally; review required |
+| Proof read shares the existing core advisory transaction lock | Ignore / Accept Risk | Evidence router/proof and PostgreSQL DB transaction helper | Keep bounded read-only queries for a coherent projection. At greater volume, move to a reviewed repeatable-read snapshot. Current bounded demo can tolerate brief read/write contention. | No |
+| Bridge status is configuration/public identity, not balance or spend-cap acceptance | Ignore / Accept Risk | `Payer.source`, strict FundingSource, MCP preflight and UI text | Clearly label configured/unverified balance; payer still enforces caps before signing. Quote may be valid but payment can refuse for funds/caps. Never switch source automatically. | No, operator must provision the bounded demo source |
+| Stronger human/wallet-session attestation | Park for Later | Approval event records channel-submitted exact terms; source metadata is channel/payer display only | Separate milestone if physical-human or unchanged-wallet attestation is needed. Current approval must not claim that proof. | No for bounded hackathon scope |
+| Legacy quotes lack selectable option IDs | Ignore / Accept Risk | Optional persisted FundingOption ID and strict new purchase approval | Requote for new buys; retain old frozen amounts/receipts/recovery. Avoid inventing IDs or changing old digests. Old legacy quote cannot start a new purchase through this API. | No |
+
+No new unresolved acceptance blocker was found in this lane. Shopify IN-1 (hosted-field allowlist /
+forced click), Atlas IN-2 (ambiguous payment result), and Atlas IN-3 (fee readback/runbook claim) stay
+**Investigate Now** blockers. Their affected provider files were not changed. Resolve through the
+already-defined acceptance work only after independent review; this lane ran no external calls.

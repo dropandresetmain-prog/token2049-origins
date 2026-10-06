@@ -1,3 +1,124 @@
+# Human orchestration — local verification, 2026-10-06
+
+Implementation branch: `build/human-orchestration`. Base: `build/external-acceptance-hardening`
+`3d7f1df7cea845cd04bd98af9f0d6fc94a79c16e`. Reviewed PostgreSQL baseline:
+`45db8d6a2fd486947b9e6b5045493a849309f326`. Worktree:
+`C:/Dev/token2049-origins/human-orchestration`. `git fetch origin` verified both requested remote refs,
+ancestry and clean registered worktrees before editing. Main remains `95a896c`; base branches and
+active hardening source were not modified. Exact final SHA: `git rev-parse HEAD`; the final report
+records it, and the pushed origin head must match. No merge or independent review was performed.
+
+Environment: Windows ARM64, Node 24.15.0, real local loopback PostgreSQL 18.6. Existing pinned
+packages reused locally; no dependency/lockfile or migration changes. No provider credentials or
+real wallet files were loaded. Browser/compiled MCP verification used an explicitly disposable
+fixture gateway and its owned random PostgreSQL schema; cleanup removed the fixture schema,
+local token file, preview process and temporary scripts. This is local evidence, not external PASS.
+
+| Check / exact command | Result | Evidence / limits |
+|---|---|---|
+| `node node_modules/vitest/vitest.mjs run tests/contracts/input-assessment.test.ts tests/unit/mcp.test.ts tests/unit/evidence-router.test.ts tests/unit/cardano-payer.test.ts tests/integration/human-orchestration.test.ts tests/integration/scaled-settlement.test.ts tests/unit/settlement.test.ts tests/unit/cardano-adapter.test.ts tests/unit/cardano-binding.test.ts tests/integration/postgres.test.ts tests/integration/funding-recovery.test.ts` | PASS | **199/199 tests in 11 files**. Input/HTTP, MCP, proof, payer, exact notional, Cardano, PostgreSQL concurrency/idempotency and durable recovery. |
+| `node node_modules/vitest/vitest.mjs run` | PASS | **481/481 tests in 26 files**, no failures/skips. Final run began 17:11:38 SGT, duration 20.30s. Includes Atlas closed gate, journal, SDK roundtrip, payer history safety and provider/recovery regressions. |
+| `node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit` | PASS | Strict source, scripts, clients and tests. |
+| `node node_modules/typescript/bin/tsc -p tsconfig.build.json`; `node scripts/copy-migrations.mjs` | PASS | Production compile; demo JSON and unchanged SQL packaged. |
+| Set local loopback `DATABASE_URL`; `node dist/scripts/db-smoke.js` | PASS | PostgreSQL auth, owned isolated schema, write/read/pool restart/migration rerun, two compiled gateway process starts and auth/persistence. Public health/capabilities/inspect/**proof and proof script** checked. |
+| Compiled `dist/src/channels/mcp/main.js` through SDK `StdioClientTransport` | PASS | Four tools, local progressive `needs_input`, fixture search/exact quote, missing funding choice, explicitly selected unfunded durable buy, same-purchase repeat and human get_purchase. Token echo check. No bridge or funding in this smoke. First invocation used wrong command environment names; corrected to documented `GATEWAY_URL`/`GATEWAY_TOKEN_FILE` and final reruns passed. |
+| `/proof` in Codex browser, explicit local fixtures | PASS | Pending / complete / verifying views; USD 183.40, 0.183400 tUSDM, 1:1000 disclosure, fixture/preprod labels, masked recorded payer, true transfer/ref/receipt boundaries. Existing technical evidence loads only on expansion. Clearing session removes private content; updated list labels distinguish results. No real store/browser rehearsal. |
+| Set local loopback `DATABASE_URL`; `node dist/scripts/readiness.js` | PASS | Informational exit 0, all five real adapters `MISSING_CONFIG`. Atlas payment gate disabled. No provider requests. |
+| `node dist/scripts/readiness.js --strict` | EXPECTED FAIL | Exit 1 with absent configuration. Fail-closed readiness, not external acceptance. |
+| `git diff --check` | PASS | Exact-file staging; no secret/env/signer/preview artifacts in delivery. |
+
+## Specific guarantees established locally
+
+- Canonical intent/fulfillment schemas unchanged. Strict draft schemas accept incomplete known fields
+  but validate supplied values and reject unknown bags; assessment produces controlled paths without
+  echoing PII. HTTP 422 wraps `needs_input` in error.details; MCP emits non-error structured needs_input.
+- Provider requests use reviewed leaf paths and canonical array bounds. Unknown/out-of-phase requests
+  fail safely. Agents are instructed to ask/merge/retry, never invent customer data or defaults.
+- Every new funding option has an opaque quote-scoped ID included in the quote digest. Purchase approval
+  requires the selected ID. The stored option supplies rail/network/asset/payee/amount/settlement;
+  client `fundingRail` is rejected. Worker checks the selected approval before merchant execution.
+- Missing/blocked rails never appear; configured/passed rails can appear; fixture rails only in tests.
+  Two ready fixture rails have independent IDs and no selected default. Readiness loss after quote
+  prevents a new funding obligation; zero options cannot buy.
+- Protected payer status strictly allowlists public identity. Offline address derivation, no signing,
+  no provider call and rejection of accidental secret fields are tested. `configured` is not a balance
+  or cap guarantee. MCP source mismatch refuses before purchase creation.
+- Stable MCP idempotency uses quote+selected option. Matching repeats follow persisted purchase/approval
+  including alternate keys. Concurrent repeats produce one purchase and one payer action. Different
+  approved terms/choice refuse; submitted/unknown/confirmed states and an earlier refusal do not repay.
+- Progress covers every current purchase state; receipt/completed commerce/paid merchant dimensions
+  constrain completion. Unresolved means verifying result with no user action. Internal reasons and
+  distributed-systems jargon remain out of primary copy.
+- Proof uses owner-scoped durable quote, events, purchase, funding evidence and receipt only. Pending
+  and unresolved timelines visibly stop at actual boundaries. No fake transaction/provider reference,
+  raw fulfillment, raw payload, checkpoint, secrets or operator bank/treasury effects in the projection.
+- USD 183.40 commercial → 183400 six-decimal base units → **0.183400 tUSDM**, disclosed **1:1000**.
+  Existing frozen obligations, fee allocation, metadata binding, balanced journal and recovery remain
+  correct; current demo configuration does not recalculate stored quotes/purchases.
+
+## Findings / exclusions / next action
+
+Act Now orchestration gaps are resolved locally; details, affected files and deferral risks are in
+`docs/KNOWN_ISSUES.md`. No newly unresolved acceptance blocker. Accepted limits: bounded proof read
+shares existing core lock, status is public identity/configuration rather than balance acceptance,
+legacy quotes require requoting. Stronger human/wallet-session attestation is Park for Later.
+
+**External acceptance: NOT_RUN.** Shopify IN-1 hosted frame allowlist/forced click, Atlas IN-2 ambiguous
+pay.do interpretation and Atlas IN-3 final fee readback/runbook claim remain Investigate Now blockers.
+Atlas stays disabled. No transaction, checkout, real store browser rehearsal, Atlas/Nuitée/OCBC request,
+deployment, registration, main merge, base-branch merge or independent review was performed.
+
+Exactly one next action: **Independent Opus review in a fresh chat of the complete branch against the
+reviewed PostgreSQL baseline, covering financial hardening and human orchestration, before any
+Shopify rehearsal, deployment or real testnet transaction.** Do not start it automatically.
+
+## Changed-file manifest
+
+- README.md
+- clients/payer/bridge.ts
+- clients/payer/payer.ts
+- docs/KNOWN_ISSUES.md
+- docs/RUNBOOK.md
+- docs/TEST_CHECKLIST.md
+- docs/contracts/CHANNEL_CONTRACT.md
+- docs/evidence/local-verification.md
+- docs/work/ACTIVE_TASK.md
+- scripts/db-smoke.ts
+- src/channels/http/app.ts
+- src/channels/mcp/bridge.ts
+- src/channels/mcp/client.ts
+- src/channels/mcp/tools.ts
+- src/contracts/api.ts
+- src/contracts/commerce.ts
+- src/contracts/common.ts
+- src/contracts/index.ts
+- src/contracts/input.ts
+- src/contracts/ports.ts
+- src/contracts/presentation.ts
+- src/core/errors.ts
+- src/core/service.ts
+- src/core/store.ts
+- src/core/views.ts
+- src/core/worker.ts
+- src/evidence/proof-page.ts
+- src/evidence/proof.ts
+- src/evidence/router.ts
+- src/wiring.ts
+- tests/contracts/channel-equivalence.test.ts
+- tests/contracts/input-assessment.test.ts
+- tests/integration/human-orchestration.test.ts
+- tests/integration/postgres.test.ts
+- tests/integration/scaled-settlement.test.ts
+- tests/integration/spine.test.ts
+- tests/support/harness.ts
+- tests/unit/cardano-payer.test.ts
+- tests/unit/evidence-router.test.ts
+- tests/unit/mcp.test.ts
+
+---
+
+## Earlier hardening verification (retained history)
+
 # External acceptance hardening — local verification, 2026-10-06
 
 Branch: build/external-acceptance-hardening. Base: 45db8d6a2fd486947b9e6b5045493a849309f326.

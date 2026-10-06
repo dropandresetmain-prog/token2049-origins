@@ -2,6 +2,26 @@
 
 Local tests and external acceptance are separate. Fixtures are test-only, carry `local_fixture`, and never satisfy an external acceptance row. See [local verification](evidence/local-verification.md) for commands and [ACTIVE_TASK](work/ACTIVE_TASK.md) for blockers.
 
+## Human orchestration checks
+
+- [x] Missing flight destination/date, hotel dates and retail query/reference produce controlled `needs_input`.
+- [x] Nested contact/passenger/address/document fields collect progressively; malformed/unknown fields refuse.
+- [x] Complete canonical schemas remain strict; no conversational drafts or fabricated demo answers.
+- [x] Provider requirement allowlist and array bounds; unmodelled/out-of-phase requirements fail safely.
+- [x] Selected option required, quote-scoped and persisted with approval; no Cardano default or independent client rail.
+- [x] Selected option is frozen; worker refuses changed payment-choice approval before merchant execution.
+- [x] Missing/blocked rails excluded; configured/passed allowed, fixtures selectable only in tests; multiple ready fixture rails have no default.
+- [x] Authenticated payer status exposes only public identity, does not sign/call providers and refuses secret fields.
+- [x] MCP shows matching public source and blocks mismatched source before purchase creation.
+- [x] Repeated matching buy follows one purchase, including alternate keys and submitted/unknown/confirmed payments; no second funding on refusal.
+- [x] Human projection covers every purchase state and finality/payment/merchant combinations without recovery jargon.
+- [x] Owner-scoped proof stops at actual pending/unresolved boundary; no invented references; receipt excludes private/treasury data.
+- [x] Browser fixture check: pending, complete and verifying views; exact commercial/testnet amounts, 1:1000 disclosure, masked source, expandable evidence and session clearing.
+- [x] Existing settlement/Cardano/journal/Atlas/payer/PostgreSQL concurrency/recovery regressions stay green.
+- [x] Strict typecheck, production compile, compiled gateway and MCP stdio smoke, local readiness and diff checks.
+- [ ] Independent Opus review of the complete orchestration branch against reviewed PostgreSQL baseline.
+- [ ] External acceptance: NOT_RUN. Review precedes any Shopify rehearsal, deployment or payment.
+
 ## PostgreSQL migration checks
 
 - [x] Official postgres:18 local Compose service starts healthy on loopback; fresh volume/empty schema migration.
@@ -53,7 +73,7 @@ Shopify rehearsal. Shopify IN-1 and Atlas IN-2/IN-3 are unchanged blockers; do n
 
 1. Provision receive-only Preprod treasury configuration, an official Preprod Blockfrost project, facilitator, disposable payer wallet with tADA and exact tUSDM, separate tokens for the SAME customer, reviewed caps and protected shared payer ledger. Verify supported network/scheme and independent chain access without printing secrets.
 2. Provision own Shopify dev store/Bogus gateway and permissions. Independently resolve Atlas's founder payment-path decision; keep the flag false until approval. Provision verified LiteAPI sandbox key and OCBC API subscriptions/session access.
-3. Verify the disclosed scaled-testnet policy and protected existing payer ledger. Run a fresh customer-authenticated search, exact quote and digest/max-total approval. Capture the funding challenge, identifiers and expiry, with secrets/PII removed.
+3. Verify the disclosed scaled-testnet policy and protected existing payer ledger. Run a fresh customer-authenticated search, exact quote, explicit option selection and digest/max-total/selected-option approval. Capture the funding challenge, identifiers and expiry, with secrets/PII removed.
 4. Fund through the bounded payer. Confirm on independent Blockfrost: Preprod network, canonical transaction hash, exact treasury output/asset/amount, signed quote commitment and required depth. Confirm persisted core journal and reservation before merchant execution.
 5. For EACH route, execute a new funded sandbox purchase once, independently retrieve it and capture the safe receipt. Shopify: test PAID + Bogus SALE/CAPTURE; Atlas: approved test balance + explicit zero fee + paid/ticket status; Nuitée: exact booking/client/hotel identities + sandbox simulated payment.
 6. Capture a restart/timeout and duplicate webhook/funding retry against the sandbox without a second merchant write. Compare journal balance, exposure and public evidence labels. Preserve unresolved states; do not manufacture success to finish the checklist.

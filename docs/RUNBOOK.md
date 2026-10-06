@@ -31,7 +31,31 @@ node --env-file=.env --import tsx src/main.ts
 node --env-file=.env dist/src/main.js
 ```
 
-`APP_ENV=production` is refused. `/health` proves process health. `/v1/capabilities` reports configuration/readiness without secrets. `/inspect` is a public static shell: enter an appropriately scoped token there to load same-origin evidence. No private data or token is embedded or persisted in browser storage.
+`APP_ENV=production` is refused. `/health` proves process health. `/v1/capabilities` reports configuration/readiness without secrets. `/proof` is the customer/judge view; `/inspect` retains engineering evidence. Both are public static shells: enter a customer `evidence:read` token to load owner-scoped same-origin evidence. No private data or token is embedded or persisted in browser storage; clear the session when finished.
+
+## Human demo flow
+
+1. Submit the known intent fields. On 422 `needs_input`, ask only for the listed canonical fields,
+   merge the answer in the host agent and retry. Unknown or malformed values are ordinary validation
+   failures. Ask the user for synthetic fulfillment in sandbox; never fabricate demo values.
+2. Search, collect required fulfillment and create the exact quote. Present commercial total,
+   terms/expiry, available funding options and the separate 1:1000 testnet obligation.
+3. Ask the human to select one quote-scoped `fundingOptionId`, then explicitly approve exact terms
+   and that payment choice. Submit `{quoteId,approval:{maxTotal,quoteDigest,selectedFundingOptionId}}`.
+   No default Cardano choice exists. Missing/blocked rails are omitted. A zero-option quote cannot buy.
+4. For automatic MCP payment, the separate protected payer bridge must implement authenticated
+   `GET /status` and report a matching configured public source. Its identity display is not a balance
+   check. An old/unreachable/mismatched bridge blocks creation safely; do not fall back to another rail.
+   Without a bridge, show external payment instructions. Payer secrets stay only in the signer process.
+5. Follow the same purchase with `get_purchase`. Repeated buy follows matching approval and never
+   sends another payment. An operator resolves an actual payer refusal on that same purchase through
+   the bounded payer/recovery workflow; repeating buy is not a retry-spending instruction.
+6. Open `/proof`, authenticate with evidence scope and select the purchase. Refresh progress as needed.
+   Verify that pending steps remain pending, the merchant environment is labelled and receipt
+   limitations are visible. Expand technical evidence only when needed.
+
+This branch remains review-gated. No Shopify rehearsal, provider/payment call, testnet transaction or
+deployment is authorized by local verification. Atlas stays disabled; IN-1/IN-2/IN-3 remain blockers.
 
 ## Clients and funding authority
 

@@ -1,66 +1,68 @@
-# Active task — external acceptance hardening
+# Active task — human orchestration and judge proof
 
-Prepare Commerce Core for first external acceptance. Local checks only: no provider/payment calls,
-Cardano transaction, browser rehearsal, Atlas enablement, main merge or Render deployment.
+## Verified branch state
 
-## Verified integration baseline
+- Reviewed PostgreSQL baseline: `build/commerce-core`, `45db8d6a2fd486947b9e6b5045493a849309f326`.
+- Implementation base: `build/external-acceptance-hardening`, `3d7f1df7cea845cd04bd98af9f0d6fc94a79c16e`.
+- Fetched origin; both exact remote SHAs match; hardening descends from reviewed core.
+- All registered worktrees were clean before creation (per-command safe-directory checks where needed).
+- Branch/worktree: `build/human-orchestration`, `C:/Dev/token2049-origins/human-orchestration`.
+- Main stays at `95a896c730cf893c3afd00919ebe16ad823a608b`; no merge into any base branch.
+- Final head and publication guard: `git rev-parse HEAD` must equal `origin/build/human-orchestration`.
 
-- Original Commerce Core: 2b6260b41149d36fafcb98b387dec9cf43faa31f.
-- Reviewed PostgreSQL: 45db8d6a2fd486947b9e6b5045493a849309f326; PASS TO INTEGRATE, 406 tests.
-- Fetched and verified both remote SHAs; original core is an ancestor; all registered worktrees clean.
-- Fast-forwarded build/commerce-core and pushed; remote verified at 45db8d6a2fd486947b9e6b5045493a849309f326.
-- Main remains 95a896c730cf893c3afd00919ebe16ad823a608b.
-- Branch: build/external-acceptance-hardening.
-- Base: 45db8d6a2fd486947b9e6b5045493a849309f326.
-- Worktree: C:/Dev/token2049-origins/external-acceptance-hardening.
-- Remote publication: build/external-acceptance-hardening; delivery requires origin SHA == git rev-parse HEAD.
-  The final completion report records the verified SHA (avoids a self-referential commit hash).
+## Scope and decisions
 
-## Scope, risks and verification
+Progressive controlled input assessment and drafts; explicit quote-scoped payment choice and persisted
+approval; only ready rails selectable; safe independent payer identity; duplicate-safe MCP follow;
+human progress and customer/judge proof. Core strict canonical intent/fulfillment, financial math,
+recovery, journal and evidence remain intact. No migrations or package dependencies were added.
 
-Canonical secret-free demo JSON and strict loader; exact 1:1000 policy frozen in quote/purchase JSON;
-separate commercial principal/fee/total and testnet principal/fee/total. Existing records retain their
-stored requirements. No PostgreSQL DDL required.
+No Cardano default remains in new purchase creation. Old frozen obligations retain amounts/digests
+and recovery; old quotes without option IDs must be requoted for new buys. Approval events prove
+channel submission of exact terms/payment choice, not cryptographic human attestation. Source status
+means identity/configuration available, not confirmed wallet balance or spend-cap acceptance.
 
-Targeted fixes: AN-1 Atlas closed gate, IN-4 absolute initialized payer ledger, PG-2 worker logging,
-PG-5 fee scaling. Shopify IN-1 and Atlas IN-2/IN-3 stay blockers. Other findings remain out of scope.
-Accepted baseline: owner-supplied original review findings plus the PostgreSQL review/reconciliation
-pasted in the planning chat, Hackathon Build Recommendation (6ac3a6cd-5400-83ec-8547-957895148604,
-message a1ba86e2-463f-4ae5-b514-6900bc3f2565). The original full core report was not present in the
-reviewed worktrees; its reconciled findings remain authoritative. No new review was started.
+The host agent keeps/merges drafts and asks only for missing fields. It never invents customer data.
+Canonical demo fixtures were used only in explicit local verification scripts/tests. Provider discovery
+is a controlled schema-path seam, never a provider JSON bag; unmodelled/out-of-phase requests fail safely.
 
-Affected areas: contracts/core/funding binding, evidence, independent payer, Atlas, demo scripts,
-packaging/docs. Risks: financial semantics, recalculating old obligations, lost ledger history,
-supplier writes behind closed gate. Checks: typecheck/build; scaling/frozen contracts/fee journal;
-Cardano/payer/ledger/Atlas/evidence; integration/PostgreSQL concurrency/recovery; full Vitest;
-compiled gateway smoke; local readiness; diff check. External evidence remains NOT_RUN.
+## Completed work
 
-## Progress
+- [x] Verify Git baselines/ancestry/clean worktrees and create isolated branch.
+- [x] Canonical `needs_input` with phases, exact controlled paths, human descriptors and no PII echo.
+- [x] HTTP 422 and non-error MCP progressive collection; malformed/unknown input remains invalid.
+- [x] Quote-scoped funding IDs, required selected option in approval, frozen requirement, approval event.
+- [x] Ready-rail filtering/recheck and worker selected-approval guard.
+- [x] Protected payer `/status`; offline public identity only, strict response whitelist.
+- [x] MCP quote display, source-match preflight and stable quote/option idempotency.
+- [x] Owner-scoped quote-purchase lookup; matching repeated approval follows purchase without repayment.
+- [x] Human progress, authenticated customer proof and neutral `/proof` page with expandable audit.
+- [x] Local contract/MCP/HTTP/proof/payer/financial/concurrency/recovery tests, typecheck/build/smokes/readiness.
+- [x] Documentation updated; pinned planning snapshots untouched.
 
-- [x] Verify and integrate PostgreSQL baseline.
-- [x] Inspect authoritative docs and affected live code.
-- [x] Demo SSOT and schema.
-- [x] Frozen settlement, fee scaling and regressions.
-- [x] Payer ledger and Atlas gate.
-- [x] Safe worker error logging.
-- [x] Local verification and docs: 440/440 tests in 24 files, typecheck/build, compiled smoke, readiness and diff check.
-- [x] Exact-file checkpoint commits; hardening-only push and remote comparison are the delivery guard. No merge.
+Verification commands/results and exact changed-file manifest are in `docs/evidence/local-verification.md`.
+External acceptance remains **NOT_RUN**. No Cardano transaction, Shopify checkout/browser rehearsal,
+Atlas/Nuitée/OCBC call, deployment, registration, merge or independent review was run.
 
-Next action: independent review of build/external-acceptance-hardening before the unfunded Shopify
-rehearsal. Do not start that review automatically.
+## Findings and limits
 
-## Verified results and review handoff
+Act Now gaps (progressive input, silent funding selection, duplicate payer requests, opaque progress/proof)
+are resolved locally and require independent review. Accepted limits: proof reads share the bounded
+core transaction lock; payer identity is not balance verification; legacy quotes require new quotes.
+Stronger human/wallet-session attestation is Park for Later. See `docs/KNOWN_ISSUES.md` for evidence,
+affected files, actions and deferral risks. No new unresolved external-acceptance blocker was identified.
 
-No new migrations/dependencies. Financial behavior remains review-gated on this branch; do not merge
-it into Commerce Core yet. Commerce Core remote stays at 45db8d6; main stays at 95a896c. No Render
-resource was read or changed in this lane. AN-1, IN-4, PG-2 and PG-5 pass local regressions. Shopify
-IN-1 and Atlas IN-2/IN-3 remain Investigate Now blockers; PG-1 and other parked findings stay deferred.
+Unchanged Investigate Now blockers: Shopify IN-1 hosted-card-frame allowlist/forced click; Atlas IN-2
+ambiguous pay.do interpretation; Atlas IN-3 final fee readback/runbook claim. Atlas remains disabled.
+Unrelated parked findings, provider integrations, production wallets, Solana, Masumi/Sokosumi,
+card funding, treasury rebalancing and branding work remain outside this lane.
 
-Build-stage Docker packaging includes compiled demo JSON. Full runtime image/live Chromium is NOT_RUN.
-Readiness with provider credentials absent is MISSING_CONFIG for all adapters; informational exit 0,
-strict exit 1 as expected. No secrets or local environment files were read into the verification process.
+## Exact next action — fresh chat
 
-Use a fresh review chat: base 45db8d6, this branch head from git rev-parse HEAD, exact manifest and
-commands in docs/evidence/local-verification.md, current decision in docs/decisions/scaled-testnet-settlement.md.
-Review scope is frozen commercial/chain semantics, fee journal, payer ledger/binding, closed Atlas gate
-and sanitized worker logging. Exclude frontend/Solana/Masumi/deployment/external calls and parked backlog.
+Independent Opus review of the complete `build/human-orchestration` head against reviewed PostgreSQL
+baseline `45db8d6a2fd486947b9e6b5045493a849309f326`, covering both inherited financial hardening and this
+human-orchestration diff, before any Shopify rehearsal, deployment or real testnet transaction.
+Do not start review automatically. Recommend a fresh chat because this implementation context is long;
+review model: Claude Opus at high reasoning for independent financial/security and orchestration review.
+Authoritative current files: this task, `docs/contracts/CHANNEL_CONTRACT.md`, `docs/KNOWN_ISSUES.md`,
+`docs/evidence/local-verification.md`, and `docs/decisions/scaled-testnet-settlement.md`.
