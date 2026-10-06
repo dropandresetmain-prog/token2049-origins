@@ -1,0 +1,104 @@
+import { buildGateway, type Gateway } from '../../src/composition.js';
+import { Db } from '../../src/infrastructure/db.js';
+import { ManualClock } from '../../src/infrastructure/clock.js';
+import { createClient } from '../../src/infrastructure/auth.js';
+import { FixtureExecutor, FixtureFundingAdapter } from './fixtures.js';
+import type { Server } from 'node:http';
+import type { AddressInfo } from 'node:net';
+import type { BankObservationAdapter } from '../../src/contracts/ports.js';
+
+export interface Harness {
+  gw: Gateway;
+  clock: ManualClock;
+  retail: FixtureExecutor;
+  hotel: FixtureExecutor;
+  flight: FixtureExecutor;
+  funding: FixtureFundingAdapter;
+  alice: { token: string; customerId: string };
+  bob: { token: string; customerId: string };
+  url: string;
+  server: Server;
+  call(method: string, path: string, opts?: { token?: string; body?: unknown; headers?: Record<string, string> }): Promise<{ status: number; body: any; headers: Headers }>;
+  close(): Promise<void>;
+}
+
+export const TEST_ENV = {
+  APP_ENV: 'test',
+  PUBLIC_BASE_URL: 'http://127.0.0.1:0',
+  DEMO_PER_PURCHASE_LIMIT_USD_MINOR: '50000',
+  SIMULATED_CARD_CAPACITY_USD_MINOR: '20000',
+} as NodeJS.ProcessEnv;
+
+export async function startHarness(opts: { dbPath?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[] } = {}): Promise<Harness> {
+  const clock = opts.clock ?? new ManualClock();
+  const db = opts.db ?? new Db(opts.dbPath ?? ':memory:');
+  const retail = new FixtureExecutor('shopify', 'retail', clock);
+  const hotel = new FixtureExecutor('nuitee', 'hotel', clock, 12000n);
+  const flight = new FixtureExecutor('atlas', 'flight', clock, 15000n);
+  const funding = new FixtureFundingAdapter(clock);
+  const gw = buildGateway(
+    { executors: [retail, hotel, flight], fundingAdapters: [funding], bankAdapters: opts.bankAdapters ?? [] },
+    { env: TEST_ENV, clock, db },
+  );
+  const now = clock.now().toISOString();
+  const existing = db.get<{ n: number }>('SELECT COUNT(*) AS n FROM api_clients')!;
+  const alice = createClient(db, { displayName: 'Alice', channel: 'test', label: `alice-${existing.n}` }, now);
+  const bob = createClient(db, { displayName: 'Bob', channel: 'test', label: `bob-${existing.n}` }, now);
+  const server = await new Promise<Server>((r) => {
+    const s = gw.app.listen(0, '127.0.0.1', () => r(s));
+  });
+  const url = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
+  const call: Harness['call'] = async (method, path, o = {}) => {
+    const headers: Record<string, string> = { ...(o.headers ?? {}) };
+    if (o.token) headers.authorization = `Bearer ${o.token}`;
+    if (o.body !== undefined) headers['content-type'] = 'application/json';
+    const res = await fetch(url + path, { method, headers, ...(o.body !== undefined ? { body: JSON.stringify(o.body) } : {}) });
+    const text = await res.text();
+    return { status: res.status, body: text ? JSON.parse(text) : null, headers: res.headers };
+  };
+  return {
+    gw,
+    clock,
+    retail,
+    hotel,
+    flight,
+    funding,
+    alice,
+    bob,
+    url,
+    server,
+    call,
+    close: () => new Promise<void>((r) => server.close(() => r())),
+  };
+}
+
+export const retailIntent = (ceilingMinor = '10000') => ({
+  category: 'retail',
+  query: 'test tee',
+  quantity: 1,
+  shipToCountry: 'SG',
+  spendCeiling: { currency: 'USD', amountMinor: ceilingMinor, scale: 2 },
+});
+
+export const retailFulfillment = {
+  category: 'retail',
+  email: 'buyer@example.com',
+  shippingAddress: { firstName: 'Test', lastName: 'Buyer', address1: '1 Test Street', city: 'Singapore', zip: '018989', countryCode: 'SG' },
+};
+
+/** search -> quote -> purchase; returns ids and the funding requirement. */
+export async function createFundablePurchase(h: Harness, token = h.alice.token, idem = `idem-${Math.random().toString(36).slice(2, 12)}`) {
+  const s = await h.call('POST', '/v1/offers/search', { token, body: { intent: retailIntent() } });
+  if (s.status !== 200) throw new Error(`search ${s.status} ${JSON.stringify(s.body)}`);
+  const offerId = s.body.offers[0].offerId;
+  const q = await h.call('POST', '/v1/quotes', { token, body: { offerId, fulfillment: retailFulfillment } });
+  if (q.status !== 201) throw new Error(`quote ${q.status} ${JSON.stringify(q.body)}`);
+  const quote = q.body.quote;
+  const p = await h.call('POST', '/v1/purchases', {
+    token,
+    headers: { 'idempotency-key': idem },
+    body: { quoteId: quote.quoteId, approval: { maxTotal: quote.payablePrincipal, quoteDigest: quote.digest }, fundingRail: 'cardano' },
+  });
+  if (p.status !== 201) throw new Error(`purchase ${p.status} ${JSON.stringify(p.body)}`);
+  return { quote, purchase: p.body.purchase, idem, required: quote.fundingOptions[0].amount.amountBaseUnits as string };
+}

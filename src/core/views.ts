@@ -1,0 +1,59 @@
+import type { Db } from '../infrastructure/db.js';
+import type { PurchaseView, QuoteView, FundingSummary, ReceiptView } from '../contracts/commerce.js';
+import { getQuoteRow, getReservation, type PurchaseRow, type FundingEvidenceRow, type FundingRequirementRecord } from './store.js';
+
+export function fundingSummaries(db: Db, purchaseId: string): FundingSummary[] {
+  return db
+    .all<FundingEvidenceRow>('SELECT * FROM funding_evidence WHERE purchase_id = ? ORDER BY verified_at, id', purchaseId)
+    .map((f) => ({
+      rail: f.rail as FundingSummary['rail'],
+      network: f.network,
+      asset: f.asset_id,
+      amountBaseUnits: f.amount_base_units,
+      decimals: f.decimals,
+      transferReference: f.transfer_reference,
+      paymentState: f.payment_state as FundingSummary['paymentState'],
+      purpose: f.purpose as FundingSummary['purpose'],
+      verifiedAt: f.verified_at,
+      evidenceMode: f.evidence_mode as FundingSummary['evidenceMode'],
+    }));
+}
+
+export function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: string): PurchaseView {
+  const q = getQuoteRow(db, p.quote_id)!;
+  const qv = JSON.parse(q.public_json) as QuoteView;
+  const req = JSON.parse(p.funding_requirement_json) as FundingRequirementRecord;
+  const res = getReservation(db, p.id);
+  const awaiting = p.state === 'awaiting_funding' && p.payment_state === 'not_received';
+  return {
+    purchaseId: p.id,
+    customerId: p.customer_id,
+    quoteId: p.quote_id,
+    quoteVersion: q.version,
+    category: qv.category,
+    route: qv.route,
+    state: p.state as PurchaseView['state'],
+    paymentState: p.payment_state as PurchaseView['paymentState'],
+    commerceStatus: p.commerce_status as PurchaseView['commerceStatus'],
+    merchantPaymentStatus: p.merchant_payment_status as PurchaseView['merchantPaymentStatus'],
+    payablePrincipal: qv.payablePrincipal,
+    fundingInstructions: awaiting
+      ? {
+          fundUrl: `${publicBaseUrl}/v1/purchases/${p.id}/fund`,
+          protocol: 'x402',
+          options: qv.fundingOptions.filter((o) => o.rail === req.rail),
+          expiresAt: req.expiresAt,
+          note: 'POST the fund URL without a payment header to receive the x402 challenge; pay with a bounded payer client. No merchant spend occurs until funding is independently verified and confirmed.',
+        }
+      : null,
+    funding: fundingSummaries(db, p.id),
+    reservation: res
+      ? { status: res.status, amount: { currency: res.currency, scale: res.scale, amountMinor: res.amount_minor } }
+      : null,
+    providerReference: p.provider_reference,
+    receipt: p.receipt_json ? (JSON.parse(p.receipt_json) as ReceiptView) : null,
+    statusReason: p.status_reason,
+    createdAt: p.created_at,
+    updatedAt: p.updated_at,
+  };
+}
