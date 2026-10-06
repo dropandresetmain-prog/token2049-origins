@@ -48,6 +48,7 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
         {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:core.deps.clock,bankAdapters}),auth:true},
         {path:'/inspect',router:createInspectRouter(),auth:false},
         {path:'/proof',router:createProofPageRouter(),auth:false},
+        {path:'/console',router:createConsoleRouter(),auth:false},
       ];
       const report=loadShopifyConfig(env), cfg=report.config;
       const webhook=cfg.storeDomain && cfg.clientSecret && report.invalid.length===0
@@ -59,3 +60,4 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
   };
 }
 import { createProofPageRouter } from './evidence/proof-page.js';
+import { createConsoleRouter } from './console/router.js';

@@ -3,6 +3,8 @@
 .env.*
 !.env.example
 !.env.*.example
+# The console build mode file holds no secrets (only VITE_CONSOLE_SOURCE).
+!web/.env.gateway
 *.pem
 *.key
 

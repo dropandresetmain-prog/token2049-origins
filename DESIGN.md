@@ -4,12 +4,14 @@ Status: V3 approved on 2026-10-06. V3 supersedes the V2 checkpoint (`607c21a`); 
 
 ## Canonical reference
 
-- Prototype: `docs/design/ui-v3/index.html` (keep its sibling CSS, JavaScript and assets).
+- Implementation: the Capsule console in `web/` (React, served at `/console`). Its contract with the gateway is `docs/contracts/CONSOLE_CONTRACT.md`.
+- Prototype: `docs/design/ui-v3/index.html` (keep its sibling CSS, JavaScript and assets). Visual reference for the console.
+- Language: `docs/design/VOCABULARY.md`. All on-screen strings live in `web/src/copy/en.ts`.
 - V3 change log and verification: `docs/design/ui-v3/CHANGES.md`.
 - V2 to V3 side-by-side comparison: `docs/design/compare.html`.
 - Superseded V2 checkpoint, kept for history: `docs/design/ui-v2/` (research and rationale in `REVIEW_NOTES.md`, original review evidence in `VERIFICATION.json`, provenance in `CHECKPOINT.md`). The Mobbin research in `REVIEW_NOTES.md` still applies to V3.
 - Existing approved logo assets: `assets/brand/capsule-wordmark-mono.webp`, `capsule-wordmark-accent.webp`, `capsule-mark.webp`.
-- UI branch: `build/ui`.
+- Branches: design reference on `build/ui`; console implementation on `build/console`.
 - Backend authority: current executable schemas and `docs/contracts/CHANNEL_CONTRACT.md`. Prototype fixture helpers are not financial truth or new API contracts.
 
 The earlier three-direction HTML was rejected. Do not reintroduce its oversized diagram columns, decorative dark panels or marketing copy in the application.
@@ -46,7 +48,7 @@ The exact CSS (`docs/design/ui-v3/styles.css`) is the implementation reference. 
 Oxblood is the single brand accent. Coral appears only on the moving route indicator. Status colour carries meaning, not decoration:
 
 - In progress: neutral ink with a small spinner (static under reduced motion).
-- Needs review: amber. This is the only warm status, reserved for states that need a person to act.
+- Needs attention (Price changed, Couldn't complete): amber. This is the only warm status, reserved for states that need a person to act.
 - Completed: green.
 - Awaiting payment: outlined neutral.
 - No decorative status dots.
@@ -73,15 +75,17 @@ Use thin warm borders, restrained shadows and four corner radii: `--r-sm` 6px fo
 
 The prototype contains in-progress purchase, completed purchase, evidence inspector with audit tab, changed-price comparison, and purchases history with search/filter/empty states. Hotel and retail share the layout; additional examples in history are illustrative only.
 
-Show the funding method before payment. The preview offers Cardano and Solana and visibly disables Stripe. Method selection is not signing, approval or proof of integration readiness. Confirmed funding is read-only. Changed financial terms require renewed authority even below a ceiling. The changed-quote explanation and its primary action ("Review new quote") sit in a banner above the route, visible without scrolling. The preview only copies an approval request, never executes it.
+The console is read-only. Approvals and payments happen through the customer's assistant; the console never approves, pays, funds or changes a payment method. Show the payment method the assistant chose, and the amount due in test tokens, before payment arrives; once payment is received the method is locked.
+
+Changed financial terms require renewed approval even below the spending limit. The gateway pauses the purchase and does not produce a new quote, so the console does not show a side-by-side comparison. A banner above the route, visible without scrolling, says "The price changed, so nothing was bought," explains that the assistant must get a new quote, and offers one action: "Copy request for a new quote." Expired and failed purchases use the same banner position with their own copy and action.
 
 Evidence and sample receipt availability must follow the displayed state. Keep raw redacted state behind inspection. Do not show a completed receipt while provider confirmation is pending. Sokosumi task fees/escrow do not become purchase principal by changing a visual status.
 
-Presentation mode simplifies this same workspace rather than introducing another theme. On narrow screens the route stacks; summary moves below progress; history scrolls in its table container. Below 560px a segmented Live / Purchases / Needs review row replaces the sidebar. Preserve visible keyboard focus, dialog focus handling, Escape close, semantic controls and reduced-motion behavior.
+Presentation mode simplifies this same workspace rather than introducing another theme. On narrow screens the route stacks; summary moves below progress; history scrolls in its table container. Below 560px a segmented Current / Purchases / Needs attention row replaces the sidebar. Preserve visible keyboard focus, dialog focus handling, Escape close, semantic controls and reduced-motion behavior.
 
 ## Prototype versus integration
 
-All IDs, totals, times, orders, asset valuations and outcomes here are local samples. Keep the explicit no-payments disclosure: one persistent environment strip ("Sample data. No real payments, bookings or provider calls.") plus the evidence-panel disclaimer. In a real sandbox environment the same strip pattern identifies test mode. The Run sample timer is a design control, not a network timing promise. Do not copy local state switches, `paid()` heuristics or fixture exports into live funding/approval logic.
+All IDs, totals, times, orders, asset valuations and outcomes here are local samples. Keep the explicit disclosure: one persistent environment strip plus the proof-panel note. On sample data it reads "Sample data. Nothing here is a real purchase." Against a test gateway it reads "Test mode. Payments use test funds with no cash value, and orders go to test merchants." A live gateway shows no strip. Do not copy local state switches, `paid()` heuristics or fixture exports into live funding/approval logic.
 
 Integration must read authenticated channel identity, executable quote context and independent payment/provider evidence from the existing core. Do not infer paid status from overall purchase state. Keep operator treasury permissions separate from customer evidence. Preserve simulated purchasing capacity labels; receiving test crypto is not bank cash or a crypto-to-fiat conversion.
 
@@ -93,7 +97,6 @@ Open decisions for the production frontend:
 
 - Self-hosted fonts (a sans plus a monospace).
 - Replacing the prototype's hand-drawn SVG icons with one maintained library (Phosphor Light suggested).
-- Loading skeletons for asynchronous data.
 - Eventual vector-master preparation.
 
 Backend integration, real funding/provider runs, Treasury/Connections expansion and the landing page are not part of this design. No deployment, merge, production build or backend test run is authorized by this design reference. Use a fresh implementation chat when a bounded integration milestone is approved.
