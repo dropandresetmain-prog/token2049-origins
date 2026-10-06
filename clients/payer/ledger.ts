@@ -1,10 +1,11 @@
 /**
- * Durable payer ledger (data/payer-ledger.json). Every signed payment is recorded BEFORE it can be sent,
+ * Durable payer ledger at an explicitly configured absolute path. Every signed payment is recorded BEFORE it can be sent,
  * so the cumulative cap survives restarts and a restarted payer can resend the identical signed header
  * instead of building a second transaction. Holds signed (unbroadcast) payment headers: keep it 0600 and
  * gitignored (data/ is). It never holds a mnemonic or a gateway token.
  */
 import { chmodSync, closeSync, existsSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { payerLedgerPath } from './config.js';
 import { dirname } from 'node:path';
 import { z } from 'zod';
 
@@ -26,10 +27,21 @@ export type LedgerEntry = z.infer<typeof Entry>;
 const File = z.object({ version: z.literal(1), entries: z.array(Entry) });
 
 export class PayerLedger {
-  constructor(private readonly path: string) {}
+  constructor(private readonly path: string) { payerLedgerPath(path); }
+
+  /** Only first-time wallet setup may establish empty history. Never call this while paying. */
+  static initialize(path: string): void {
+    payerLedgerPath(path);
+    mkdirSync(dirname(path), { recursive: true });
+    const fd = openSync(path, 'wx', 0o600);
+    try { writeFileSync(fd, JSON.stringify({ version: 1, entries: [] })); fsyncSync(fd); }
+    finally { closeSync(fd); }
+  }
+
+  assertReady(): void { this.read(); }
 
   private read(): LedgerEntry[] {
-    if (!existsSync(this.path)) return [];
+    if (!existsSync(this.path)) throw new Error('payer ledger is missing; operator reconciliation required before signing');
     let json: unknown;
     try {
       json = JSON.parse(readFileSync(this.path, 'utf8'));
@@ -61,7 +73,7 @@ export class PayerLedger {
 
   /** Lock the entire signing/send flow across CLI and bridge processes. A crash leaves a lock for manual reconciliation. */
   async exclusive<T>(fn: () => Promise<T>): Promise<T> {
-    mkdirSync(dirname(this.path), { recursive: true });
+    this.assertReady();
     let fd: number;
     try { fd = openSync(`${this.path}.lock`, 'wx', 0o600); }
     catch { throw new Error('payer ledger is locked; another payer is active or crash recovery is required'); }

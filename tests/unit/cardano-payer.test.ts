@@ -6,6 +6,9 @@ import { request } from 'node:http';
 import { encodePaymentRequiredHeader } from '@x402/core/http';
 import { USDM_PREPROD_ASSET } from '@x402/cardano';
 import type { PaymentRequired } from '@x402/core/types';
+import { money } from '../../src/contracts/money.js';
+import { payerLedgerPath } from '../../clients/payer/config.js';
+import { generateWallet } from '../../clients/payer/wallet-generate.js';
 import { assertAdaBudget } from '../../clients/payer/signer.js';
 import { isTrustedBlockfrostUrl } from '../../src/funding/cardano/blockfrost.js';
 import { Payer } from '../../clients/payer/payer.js';
@@ -20,16 +23,19 @@ const NOW = new Date('2026-10-06T00:00:00Z');
 const EXPIRY = '2026-10-06T00:10:00Z';
 function setup(amount = '1500000') {
   const root = mkdtempSync(join(tmpdir(), 'cardano-payer-')); roots.push(root);
-  const config = loadPayerConfig({ PAYER_GATEWAY_URL: 'https://gateway.example.test', PAYER_GATEWAY_TOKEN_FILE: 'unused',
+  const payerEnv = { PAYER_GATEWAY_URL: 'https://gateway.example.test', PAYER_GATEWAY_TOKEN_FILE: 'unused',
     PAYER_CARDANO_NETWORK: 'cardano:preprod', PAYER_CARDANO_MNEMONIC_FILE: 'unused', BLOCKFROST_PROJECT_ID: 'test-only',
     PAYER_MAX_PER_PAYMENT_BASE_UNITS: '2000000', PAYER_MAX_CUMULATIVE_BASE_UNITS: '5000000', PAYER_MAX_DAILY_BASE_UNITS: '3000000', PAYER_MAX_FEE_LOVELACE: '500000', PAYER_MAX_ADA_OUTPUT_LOVELACE: '3000000',
-    PAYER_ALLOWED_ASSET_UNIT: USDM_PREPROD_ASSET, PAYER_EXPECTED_PAY_TO: TO, PAYER_LEDGER_FILE: join(root, 'ledger.json') });
+    PAYER_ALLOWED_ASSET_UNIT: USDM_PREPROD_ASSET, PAYER_EXPECTED_PAY_TO: TO, PAYER_LEDGER_FILE: join(root, 'ledger.json') };
+  const config = loadPayerConfig(payerEnv);
+  const settlement = { policy: { mode: 'scaled_testnet' as const, numerator: 1 as const, denominator: 1000 as const }, commercialPrincipal: money('USD', BigInt(amount) / 10n), commercialServiceFee: money('USD', 0n), commercialTotal: money('USD', BigInt(amount) / 10n), principalBaseUnits: amount, feeBaseUnits: '0', totalBaseUnits: amount };
+  PayerLedger.initialize(config.ledgerFile);
   const entry = { scheme: 'exact', network: config.network, asset: config.allowedAsset, amount, payTo: TO, maxTimeoutSeconds: 600,
-    extra: { assetTransferMethod: 'default', areFeesSponsored: false, confirmationPolicy: { l1Confirmations: 1 }, purchaseId: ID,
+    extra: { settlement, chainDecimals: 6, assetTransferMethod: 'default', areFeesSponsored: false, confirmationPolicy: { l1Confirmations: 1 }, purchaseId: ID,
       quoteId: 'quo_ABCDEFGHIJKLMNOP', quoteDigest: 'd'.repeat(64), expiresAt: EXPIRY } };
   const challenge: PaymentRequired = { x402Version: 2, resource: { url: `${config.gatewayUrl}/v1/purchases/${ID}/fund` }, accepts: [entry] };
   const purchase = { purchaseId: ID, quoteId: 'quo_ABCDEFGHIJKLMNOP', state: 'awaiting_funding', paymentState: 'not_received',
-    fundingInstructions: { expiresAt: EXPIRY, options: [{ rail: 'cardano', amount: { network: config.network, assetId: config.allowedAsset, amountBaseUnits: amount }, payTo: TO }] }, funding: [] };
+    fundingInstructions: { expiresAt: EXPIRY, options: [{ rail: 'cardano', amount: { network: config.network, assetId: config.allowedAsset, amountBaseUnits: amount, decimals: 6 }, payTo: TO, settlement }] }, funding: [] };
   const sent: string[] = [];
   const signer = vi.fn(() => ({ getAddress: () => 'addr_test1qzpayer', buildAndSignPaymentTransaction: async () => ({ transaction: 'test-only', nonce: `${'b'.repeat(64)}#0` }) }));
   const fetchImpl: typeof fetch = async (url, init) => {
@@ -42,7 +48,7 @@ function setup(amount = '1500000') {
   };
   const ledger = new PayerLedger(config.ledgerFile);
   const deps = { config, ledger, fetchImpl, createSigner: signer, readGatewayToken: () => 'test-token', now: () => NOW, sleep: async () => {} };
-  return { root, config, entry, challenge, purchase, sent, signer, ledger, deps };
+  return { root, payerEnv, config, entry, challenge, purchase, sent, signer, ledger, deps };
 }
 describe('bounded payer', () => {
   it('signs one vetted purchase, persists it before send, and reuses the identical header on restart', async () => {
@@ -50,8 +56,13 @@ describe('bounded payer', () => {
     expect(s.signer).toHaveBeenCalledTimes(1); expect(s.sent).toHaveLength(2); expect(s.sent[0]).toBe(s.sent[1]);
     expect(readFileSync(s.config.ledgerFile, 'utf8')).not.toContain('test-token');
   });
-  it.each(['amount', 'daily', 'cumulative', 'payee', 'resource', 'expiry', 'identity', 'method', 'version', 'shape'])('refuses %s violations before touching a key', async kind => {
+  it.each(['amount', 'daily', 'cumulative', 'payee', 'resource', 'expiry', 'identity', 'method', 'version', 'shape', 'scale', 'fee_scale', 'settlement_mode', 'network', 'asset'])('refuses %s violations before touching a key', async kind => {
     const s = setup();
+    if (kind === 'scale') s.entry.extra.settlement.policy.denominator = 999 as 1000;
+    if (kind === 'fee_scale') s.entry.extra.settlement.feeBaseUnits = '1000000';
+    if (kind === 'settlement_mode') (s.entry.extra.settlement.policy as { mode: string }).mode = 'full_notional';
+    if (kind === 'network') s.entry.network = 'cardano:mainnet' as 'cardano:preprod';
+    if (kind === 'asset') s.entry.asset = 'lovelace';
     if (kind === 'amount') s.config.maxPerPayment = 1n;
     if (kind === 'daily') s.config.maxDaily = 1n;
     if (kind === 'cumulative') s.config.maxCumulative = 1n;
@@ -123,5 +134,38 @@ describe('localhost payer bridge', () => {
       const response = await fetch(url, { method: 'POST', headers: auth, body: JSON.stringify({ purchaseId: ID }) });
       expect(response.status).toBe(200); expect(await response.text()).not.toContain(token); expect(pay).toHaveBeenCalledOnce();
     } finally { await new Promise<void>((resolve, reject) => server.close(e => e ? reject(e) : resolve())); }
+  });
+});
+
+
+describe('payer initialized ledger boundary', () => {
+  it.each([undefined, '', './data/payer-ledger.json', 'relative.json', 'C:relative.json', '\u0000invalid'])('rejects missing, relative or malformed path %s', path => {
+    const s = setup();
+    expect(() => payerLedgerPath(path)).toThrow('PAYER_LEDGER_FILE');
+    expect(() => loadPayerConfig({ ...s.payerEnv, PAYER_LEDGER_FILE: path })).toThrow('PAYER_LEDGER_FILE');
+  });
+  it('accepts a configured absolute existing ledger and refuses a vanished ledger before gateway or signing', async () => {
+    const s = setup();
+    expect(payerLedgerPath(s.config.ledgerFile)).toBe(s.config.ledgerFile);
+    expect(() => s.ledger.assertReady()).not.toThrow();
+    rmSync(s.config.ledgerFile);
+    const fetchImpl = vi.fn(s.deps.fetchImpl);
+    await expect(new Payer({ ...s.deps, fetchImpl }).pay(ID)).rejects.toThrow('reconciliation');
+    expect(s.signer).not.toHaveBeenCalled(); expect(fetchImpl).not.toHaveBeenCalled();
+    expect(() => new Payer({ ...s.deps, ledger: undefined })).toThrow('missing');
+  });
+  it('initializes empty history only with a new wallet and never resets an existing wallet history', () => {
+    const root = mkdtempSync(join(tmpdir(), 'payer-setup-')); roots.push(root);
+    const env = { PAYER_CARDANO_MNEMONIC_FILE: join(root, 'wallet.mnemonic'), PAYER_LEDGER_FILE: join(root, 'history.json') };
+    const out = { write: vi.fn() };
+    expect(() => generateWallet({ ...env, PAYER_LEDGER_FILE: './relative' }, out)).toThrow('absolute');
+    generateWallet(env, out);
+    const ledger = new PayerLedger(env.PAYER_LEDGER_FILE);
+    expect(ledger.committed('cardano:preprod', USDM_PREPROD_ASSET)).toBe(0n);
+    expect(() => generateWallet(env, out)).toThrow('overwrite');
+    rmSync(env.PAYER_LEDGER_FILE);
+    expect(() => generateWallet(env, out)).toThrow('reconciliation');
+    expect(() => ledger.assertReady()).toThrow('missing');
+    expect(JSON.stringify(out.write.mock)).not.toContain(readFileSync(env.PAYER_CARDANO_MNEMONIC_FILE, 'utf8').trim());
   });
 });

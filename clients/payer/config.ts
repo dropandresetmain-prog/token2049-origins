@@ -3,6 +3,7 @@
  * gateway never imports anything from clients/. Error messages name variables, never values, and the
  * token/mnemonic files are only read at the moment they are needed.
  */
+import { isAbsolute, parse } from 'node:path';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { isTrustedBlockfrostUrl } from '../../src/funding/cardano/blockfrost.js';
@@ -23,6 +24,16 @@ const SafeUrl = z.string().refine((s) => {
   }
 }, 'https URL (or http on loopback)');
 
+export function payerLedgerPath(value: unknown): string {
+  if (typeof value !== 'string' || !value.trim() || /[\x00-\x1f]/.test(value) || value !== value.trim() ||
+      !isAbsolute(value) || !parse(value).base || /[\\/]$/.test(value) ||
+      (process.platform === 'win32' && /[<>:"|?*]/.test(value.slice(parse(value).root.length))) ||
+      (process.platform === 'win32' && !/^(?:[A-Za-z]:[\\/]|\\\\[^\\]+\\[^\\]+)/.test(value))) {
+    throw new Error('invalid payer configuration: PAYER_LEDGER_FILE (absolute file path required)');
+  }
+  return value;
+}
+
 const PayerEnv = z.object({
   PAYER_GATEWAY_URL: SafeUrl,
   PAYER_GATEWAY_TOKEN_FILE: z.string().min(1),
@@ -37,7 +48,7 @@ const PayerEnv = z.object({
   PAYER_MAX_ADA_OUTPUT_LOVELACE: IntegerString,
   PAYER_ALLOWED_ASSET_UNIT: z.string().transform((s) => s.trim().toLowerCase()).refine((s) => CANON_ASSET.test(s), 'lovelace or policyId.assetNameHex'),
   PAYER_EXPECTED_PAY_TO: z.string().regex(/^addr_test1[0-9a-z]+$/),
-  PAYER_LEDGER_FILE: z.string().min(1).default('./data/payer-ledger.json'),
+  PAYER_LEDGER_FILE: z.string().min(1).refine(s => { try { payerLedgerPath(s); return true; } catch { return false; } }, 'absolute file path required'),
 });
 
 export interface PayerConfig {

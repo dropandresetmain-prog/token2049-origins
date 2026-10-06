@@ -8,11 +8,14 @@
  * - stdout gets the bech32 address and faucet links, nothing else. The mnemonic is never printed, never logged.
  * - Back the file up out of band if the wallet will ever hold more than test tokens (it should not).
  */
-import { closeSync, mkdirSync, openSync, unlinkSync, writeSync } from 'node:fs';
+import { existsSync, closeSync, mkdirSync, openSync, unlinkSync, writeSync } from 'node:fs';
 import { dirname } from 'node:path';
 import { pathToFileURL } from 'node:url';
 import { PrivateKey } from '@evolution-sdk/evolution';
 import { toClientCardanoSigner } from '@x402/cardano';
+
+import { payerLedgerPath } from './config.js';
+import { PayerLedger } from './ledger.js';
 
 export const FAUCET_LINKS = {
   tADA: 'https://docs.cardano.org/cardano-testnets/tools/faucet',
@@ -36,6 +39,12 @@ export function generateWallet(env: NodeJS.ProcessEnv, out: Out): { address: str
     throw new Error('PAYER_CARDANO_NETWORK must be cardano:preprod');
   }
 
+  const ledgerFile = payerLedgerPath(env.PAYER_LEDGER_FILE);
+  if (existsSync(file)) {
+    if (!existsSync(ledgerFile)) throw new Error('payer wallet exists but ledger is missing; operator reconciliation required');
+    throw new WalletExistsError();
+  }
+  if (existsSync(ledgerFile)) throw new Error('payer ledger already exists; refusing to reset history');
   const mnemonic = PrivateKey.generateMnemonic(256);
   // The address is derived locally by the same SDK path the signer uses; no network call, so the
   // provider values are placeholders and are never used.
@@ -66,6 +75,9 @@ export function generateWallet(env: NodeJS.ProcessEnv, out: Out): { address: str
     throw new Error('cannot write mnemonic file');
   }
   closeSync(fd);
+
+  // If ledger creation fails, the new wallet remains and payment refuses until reconciled.
+  PayerLedger.initialize(ledgerFile);
 
   out.write(`Payer address (cardano:preprod):\n${address}\n\n`);
   out.write(`Fund it with test tokens only:\n  tADA  ${FAUCET_LINKS.tADA}\n  tUSDM ${FAUCET_LINKS.tUSDM}\n`);

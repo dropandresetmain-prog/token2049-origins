@@ -1,9 +1,10 @@
 import { z } from 'zod';
+import { demoData, demoDate } from '../../demo/config.js';
 import type { CommerceExecutor, ExecutionContext, ExecutionResult, ProviderEvidence, ProviderOffer, ProviderQuote } from '../../contracts/ports.js';
 import type { PurchaseIntent, Fulfillment, FlightFulfillment } from '../../contracts/intent.js';
 import type { Readiness, ReadinessStatus } from '../../contracts/common.js';
 import { formatMinor, money } from '../../contracts/money.js';
-import { ProviderError } from '../../core/errors.js';
+import { CoreError, ProviderError } from '../../core/errors.js';
 import { systemClock, type Clock } from '../../infrastructure/clock.js';
 import { AtlasClient, AtlasTransportError, DEFAULT_TIMEOUT_MS, type AtlasEndpoint } from './client.js';
 import { checkAtlasConfig, missingAtlasEnv, paymentGateEnabled, type AtlasConfig } from './config.js';
@@ -19,8 +20,8 @@ import { OrderBody, OrderDetailsBody, OrderListRow, PayBody, SearchBody, VerifyB
  *     execute() that finds that checkpoint never creates again; it reconciles instead.
  *  2. Payment is gated off by default. Supplier credit/prefunding is not an approved architecture;
  *     the only payment mechanism found (pay.do against the sandbox test balance) is reachable only
- *     when ATLAS_ALLOW_TEST_BALANCE_PAYMENT === 'true'. With the gate closed a hold is created and
- *     reported as a definite no-charge failure; it is never reported as a purchase.
+ *     when ATLAS_ALLOW_TEST_BALANCE_PAYMENT === 'true'. Closed gates refuse quotes and execution
+ *     before any provider write or passenger submission.
  *  3. The order number is checkpointed before pay.do, and a `pay_attempt` checkpoint precedes the
  *     request. After any pay outcome the order is read back; pay.do is never repeated.
  *  4. Provider free text (`msg`) and secrets never reach errors, evidence or logs.
@@ -142,7 +143,7 @@ class AtlasExecutor implements CommerceExecutor {
   private ready(status: ReadinessStatus, missing: string[], detail: string): Readiness {
     const gate = paymentGateEnabled(this.env)
       ? 'payment gate ENABLED (bounded sandbox test-balance exception)'
-      : 'payment gate disabled (holds are created but never paid)';
+      : 'payment gate disabled (search only; quotes and provider writes refused)';
     return { component: 'atlas', status, environment: 'sandbox', missing, detail: `${detail}; ${gate}`, checkedAt: this.now().toISOString() };
   }
 
@@ -157,12 +158,12 @@ class AtlasExecutor implements CommerceExecutor {
 
     // Cheap read-only probe: a search on a documented sandbox route ~30 days out. Passes when the
     // provider accepts our credentials and answers with its success envelope (zero offers is fine).
-    const date = new Date(t + 30 * 86_400_000).toISOString().slice(0, 10).replaceAll('-', '');
+    const date = demoDate(demoData.flight.departDaysFromNow, this.now()).replaceAll('-', '');
     let status: Readiness;
     let ttl = READINESS_OK_TTL_MS;
     try {
       const client = this.client(cfg.config);
-      const body = await this.call(client, '/search.do', { cid: client.cid, tripType: '1', adultNum: 1, childNum: 0, infantNum: 0, fromCity: 'MNL', toCity: 'CEB', fromDate: date }, SearchBody);
+      const body = await this.call(client, '/search.do', { cid: client.cid, tripType: '1', adultNum: demoData.flight.adults, childNum: 0, infantNum: 0, fromCity: demoData.flight.from, toCity: demoData.flight.to, fromDate: date }, SearchBody);
       status =
         body.status === 0
           ? this.ready('EXTERNAL_CHECK_PASSED', [], 'sandbox search probe accepted')
@@ -210,7 +211,12 @@ class AtlasExecutor implements CommerceExecutor {
     return mapSearch(body, intent, this.now());
   }
 
+  assertPaymentAvailable(): void {
+    if (!paymentGateEnabled(this.env)) throw new CoreError('route_unavailable', 'Atlas payment gate is closed; executable quotes and funding are unavailable');
+  }
+
   async quote(offer: { executionRef: Record<string, unknown>; intent: PurchaseIntent }, fulfillment: Fulfillment): Promise<ProviderQuote> {
+    this.assertPaymentAvailable();
     if (offer.intent.category !== 'flight' || fulfillment.category !== 'flight') {
       throw new ProviderError('rejected', 'atlas_unsupported_category', 'Atlas serves flights only');
     }
@@ -229,6 +235,7 @@ class AtlasExecutor implements CommerceExecutor {
   /* ---------------- execute ---------------- */
 
   async execute(ctx: ExecutionContext): Promise<ExecutionResult> {
+    if (!paymentGateEnabled(this.env)) return { kind: 'failed_definite', reason: 'atlas_payment_mechanism_not_approved', providerReference: null, evidence: [] };
     let ref: QuoteRef;
     let cfg: AtlasConfig;
     try {
@@ -255,15 +262,6 @@ class AtlasExecutor implements CommerceExecutor {
       return this.retrieve(ctx);
     }
 
-    // Payment gate. Supplier prefunding is not an approved architecture: closed by default.
-    if (!cfg.allowTestBalancePayment) {
-      return {
-        kind: 'failed_definite',
-        reason: 'atlas_payment_mechanism_not_approved',
-        providerReference: orderNo,
-        evidence: this.evidence(orderNo, { stage: 'hold_created', paymentGate: 'closed', note: 'nothing charged; hold lapses at the ticketing deadline' }),
-      };
-    }
     return this.payHold(ctx, ref, client, orderNo);
   }
 
@@ -445,6 +443,7 @@ class AtlasExecutor implements CommerceExecutor {
   /* ---------------- retrieve ---------------- */
 
   async retrieve(ctx: ExecutionContext): Promise<ExecutionResult> {
+    // Readback remains available for earlier attempts even after the payment gate closes.
     let ref: QuoteRef;
     let client: AtlasClient;
     try {

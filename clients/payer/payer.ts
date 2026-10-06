@@ -20,6 +20,7 @@ import { deepEqual } from '@x402/core/utils';
 import { readFileSync } from 'node:fs';
 import { z } from 'zod';
 import { readSecretFile, type PayerConfig } from './config.js';
+import { SettlementBreakdown, validateSettlement } from '../../src/contracts/settlement.js';
 import { fundingCommitment } from '../../src/funding/cardano/binding.js';
 import { createBoundSigner } from './signer.js';
 import { PayerLedger } from './ledger.js';
@@ -90,8 +91,9 @@ const PurchaseLite = z
           z
             .object({
               rail: z.string(),
-              amount: z.object({ network: z.string(), assetId: z.string(), amountBaseUnits: z.string() }).loose(),
+              amount: z.object({ network: z.string(), assetId: z.string(), amountBaseUnits: z.string(), decimals: z.number().int() }).loose(),
               payTo: z.string(),
+              settlement: SettlementBreakdown,
             })
             .loose(),
         ),
@@ -122,6 +124,7 @@ export class Payer {
   constructor(private readonly d: PayerDeps) {
     this.f = d.fetchImpl ?? fetch;
     this.ledger = d.ledger ?? new PayerLedger(d.config.ledgerFile);
+    if (!d.ledger) this.ledger.assertReady();
     this.sleep = d.sleep ?? sleepReal;
     this.now = d.now ?? (() => new Date());
     this.log = d.log ?? (() => undefined);
@@ -206,6 +209,11 @@ export class Payer {
       if (opt.amount.assetId !== entry.asset) p.push('asset_vs_purchase');
       if (opt.amount.network !== entry.network) p.push('network_vs_purchase');
       if (opt.payTo !== entry.payTo) p.push('payTo_vs_purchase');
+      try {
+        const settlement = validateSettlement(opt.settlement, opt.amount.decimals);
+        if (settlement.policy.mode !== 'scaled_testnet' || settlement.totalBaseUnits !== entry.amount ||
+            entry.extra?.chainDecimals !== opt.amount.decimals || !deepEqual(settlement, entry.extra?.settlement)) p.push('settlement_policy');
+      } catch { p.push('settlement_policy'); }
     }
     if (p.includes('amount_format')) return p;
     const amount = BigInt(entry.amount);

@@ -237,7 +237,7 @@ describe('atlas quote', () => {
   const offer = { executionRef: { routingIdentifier: 'RID-1', currency: 'USD' }, intent };
 
   it('maps verify to an exact quote with a conservative TTL', async () => {
-    const { fake, ex } = setup();
+    const { fake, ex } = setup(ENV_ON);
     fake.on('/verify.do', () => verifyBody());
     const q = await ex.quote(offer, fulfillment);
     // (159.15 + 0.15) * 2 = 318.60
@@ -253,7 +253,7 @@ describe('atlas quote', () => {
   });
 
   it('uses the verified price when verify reports a price change, and states it', async () => {
-    const { fake, ex } = setup();
+    const { fake, ex } = setup(ENV_ON);
     fake.on('/verify.do', () =>
       verifyBody({ priceChange: { isPriceChange: true, newAdultPrice: 170.5, newAdultTax: 0.2 }, routing: routing({ adultPrice: 170.5, adultTax: 0.2 }) }),
     );
@@ -264,7 +264,7 @@ describe('atlas quote', () => {
   });
 
   it('includes a per-passenger transaction fee known before order creation', async () => {
-    const { fake, ex } = setup();
+    const { fake, ex } = setup(ENV_ON);
     fake.on('/verify.do', () => verifyBody({ routing: routing({ transactionFee: 1.5, transactionFeePerPax: 1.5 }) }));
     const q = await ex.quote(offer, fulfillment);
     expect(q.merchantTotal.amountMinor).toBe('32160'); // 318.60 + 1.50 * 2 passengers
@@ -272,7 +272,7 @@ describe('atlas quote', () => {
   });
 
   it('rejects with field NAMES only when required traveller data is missing', async () => {
-    const { fake, ex } = setup();
+    const { fake, ex } = setup(ENV_ON);
     fake.on('/verify.do', () => verifyBody({ bookingRequirement: requirement({ cardNum: { required: true }, cardType: { required: true } }) }));
     const err = (await ex.quote(offer, fulfillment).catch((e) => e)) as ProviderError;
     expect(err).toBeInstanceOf(ProviderError);
@@ -284,7 +284,7 @@ describe('atlas quote', () => {
   });
 
   it('accepts required document fields when every passenger supplies a document', async () => {
-    const { fake, ex } = setup();
+    const { fake, ex } = setup(ENV_ON);
     fake.on('/verify.do', () => verifyBody({ bookingRequirement: requirement({ cardNum: { required: true } }) }));
     const withDoc: FlightFulfillment = {
       ...fulfillment,
@@ -294,7 +294,7 @@ describe('atlas quote', () => {
   });
 
   it('rejects names that cannot be sent on the wire and a traveller count mismatch', async () => {
-    const { fake, ex } = setup();
+    const { fake, ex } = setup(ENV_ON);
     fake.on('/verify.do', () => verifyBody());
     const hyphen: FlightFulfillment = { ...fulfillment, passengers: [{ ...fulfillment.passengers[0]!, familyName: "O'Brien" }, fulfillment.passengers[1]!] };
     const e1 = (await ex.quote(offer, hyphen).catch((e) => e)) as ProviderError;
@@ -306,7 +306,7 @@ describe('atlas quote', () => {
   });
 
   it('rejects a failed or incomplete verification without surfacing provider text', async () => {
-    const { fake, ex } = setup();
+    const { fake, ex } = setup(ENV_ON);
     fake.on('/verify.do', () => ({ status: 805, msg: LEAK }));
     const e1 = (await ex.quote(offer, fulfillment).catch((e) => e)) as ProviderError;
     expect(e1.outcome).toBe('rejected');
@@ -320,7 +320,8 @@ describe('atlas quote', () => {
 
 describe('atlas execute: order creation', () => {
   it('checkpoints create_attempt BEFORE order.do, and the order BEFORE any pay step', async () => {
-    const { fake, ex } = setup(ENV_OFF);
+    const { fake, ex } = setup(ENV_ON);
+    fake.on('/queryOrderDetails.do', () => details({ totalTransactionFee: 1 }));
     fake.on('/order.do', () => orderBody());
     const h = new CtxHarness(fake);
     const r = await ex.execute(h.ctx());
@@ -328,7 +329,7 @@ describe('atlas execute: order creation', () => {
     expect(fake.log.indexOf('checkpoint:create_attempt')).toBeLessThan(fake.log.indexOf('call:/order.do'));
     expect(fake.log.indexOf('call:/order.do')).toBeLessThan(fake.log.indexOf('checkpoint:order'));
     expect(h.persisted.order).toMatchObject({ providerReference: ORDER_NO, pnrCode: 'ABC123', tktLimitTime: '2026-10-06 21:30:00' });
-    expect(r.kind).toBe('failed_definite'); // gate closed, see below
+    expect(r.kind).toBe('terms_changed'); // non-zero fee refuses payment after hold
     const body = fake.calls.find((c) => c.endpoint === '/order.do')!.body;
     expect(body.sessionId).toBe('sess-1');
     expect(body.passengers[0]).toEqual({ name: 'DOE/JANE', passengerType: 0, gender: 'F', birthday: '19900517', nationality: 'PH' });
@@ -398,7 +399,7 @@ describe('atlas execute: order creation', () => {
   });
 
   it('falls back to queryOrderDetails for the total when order.do omits it', async () => {
-    const { fake, ex } = setup(ENV_OFF);
+    const { fake, ex } = setup(ENV_ON);
     fake.on('/order.do', () => orderBody({ totalPrice: null, currency: null }));
     fake.on('/queryOrderDetails.do', () => details({ totalPrice: 400 }));
     expect((await ex.execute(new CtxHarness(fake).ctx())).kind).toBe('terms_changed');
@@ -421,16 +422,27 @@ describe('atlas execute: order creation', () => {
 /* ---------------- execute: payment gate ---------------- */
 
 describe('atlas execute: payment gate', () => {
-  it('gate off: hold created, definite no-charge failure with the order number, pay.do never called', async () => {
+  it('gate off: no hold, passenger submission, order or payment write', async () => {
     for (const env of [ENV_OFF, { ...ENV_OFF, ATLAS_ALLOW_TEST_BALANCE_PAYMENT: 'TRUE' }, { ...ENV_OFF, ATLAS_ALLOW_TEST_BALANCE_PAYMENT: '1' }] as NodeJS.ProcessEnv[]) {
       const { fake, ex } = setup(env);
       fake.on('/order.do', () => orderBody());
       const r = await ex.execute(new CtxHarness(fake).ctx());
-      expect(r).toMatchObject({ kind: 'failed_definite', reason: 'atlas_payment_mechanism_not_approved', providerReference: ORDER_NO });
+      expect(r).toMatchObject({ kind: 'failed_definite', reason: 'atlas_payment_mechanism_not_approved', providerReference: null });
       expect(fake.count('/pay.do')).toBe(0);
       expect(fake.count('/queryOrderDetails.do')).toBe(0);
-      expect(r.kind === 'failed_definite' && r.evidence[0]?.details).toMatchObject({ paymentGate: 'closed' });
+      expect(fake.calls).toEqual([]);
+      expect(r.evidence).toEqual([]);
+      await expect(ex.quote({ executionRef: {}, intent }, fulfillment)).rejects.toMatchObject({ code: 'route_unavailable' });
+      expect(fake.calls).toEqual([]);
     }
+  });
+
+  it('closed gate retains independent readback for an earlier paid attempt', async () => {
+    const { fake, ex } = setup(ENV_OFF);
+    fake.on('/queryOrderDetails.do', () => details({ orderStatus: '1', payTime: '2026-10-06 20:01:00' }));
+    const h = new CtxHarness(fake, { order: { providerReference: ORDER_NO }, pay_attempt: { at: '2026-10-06T12:00:00Z' } });
+    expect((await ex.retrieve(h.ctx())).kind).toBe('succeeded');
+    expect(fake.count('/order.do')).toBe(0); expect(fake.count('/pay.do')).toBe(0);
   });
 
   function gateOnScript(opts: { pay?: Handler; after?: () => unknown } = {}) {
