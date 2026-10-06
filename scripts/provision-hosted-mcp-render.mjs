@@ -850,6 +850,8 @@ async function main() {
       ['CARDANO_PAYER_BRIDGE_URL', payerUrl],
       ['CARDANO_PAYER_BRIDGE_TOKEN_FILE', '/etc/secrets/cardano-payer-bridge-token'],
       ['MCP_PAYER_GATEWAY_TOKEN_SHA256', gatewayTokenSha],
+      // The gateway runs on a 512 MB free instance: Shopify's headless checkout (quotes and orders) must use the lean browser mode.
+      ['SHOPIFY_BROWSER_LOW_MEMORY', 'true'],
     ]);
   const webFiles = new Map([
     ['mcp-owner-passcode', passcode],

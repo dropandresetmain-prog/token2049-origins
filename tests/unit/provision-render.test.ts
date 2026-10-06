@@ -511,6 +511,7 @@ describe('provision-hosted-mcp-render (existing canonical payer)', () => {
       CARDANO_PAYER_BRIDGE_URL: `${fake.origin}/payer`,
       CARDANO_PAYER_BRIDGE_TOKEN_FILE: '/etc/secrets/cardano-payer-bridge-token',
       MCP_PAYER_GATEWAY_TOKEN_SHA256: createHash('sha256').update(GATEWAY_TOKEN).digest('hex'),
+      SHOPIFY_BROWSER_LOW_MEMORY: 'true',
       CARDANO_ASSET_UNIT: ASSET_CONCAT, // not rewritten
       CARDANO_TREASURY_ADDRESS: TREASURY,
     });
@@ -525,7 +526,7 @@ describe('provision-hosted-mcp-render (existing canonical payer)', () => {
     }
     const webKeys = envWrites.filter((w) => w.path.startsWith('/v1/services/srv-web/')).map((w) => w.path.split('/').pop());
     expect(webKeys.sort()).toEqual(
-      ['CARDANO_PAYER_BRIDGE_TOKEN_FILE', 'CARDANO_PAYER_BRIDGE_URL', 'MCP_HOSTED_ENABLED', 'MCP_OAUTH_OWNER_PASSCODE_FILE', 'MCP_PAYER_GATEWAY_TOKEN_SHA256', 'MCP_PUBLIC_URL', 'PUBLIC_BASE_URL'].sort(),
+      ['CARDANO_PAYER_BRIDGE_TOKEN_FILE', 'CARDANO_PAYER_BRIDGE_URL', 'MCP_HOSTED_ENABLED', 'MCP_OAUTH_OWNER_PASSCODE_FILE', 'MCP_PAYER_GATEWAY_TOKEN_SHA256', 'MCP_PUBLIC_URL', 'PUBLIC_BASE_URL', 'SHOPIFY_BROWSER_LOW_MEMORY'].sort(),
     );
 
     // deploys: web then payer

@@ -79,7 +79,7 @@ export class ShopifyExecutor implements CommerceExecutor {
     const { config } = this.report;
     this.sf = opts.storefront ?? (this.report.buyerReady ? new StorefrontClient(config, opts.fetchImpl ?? fetch) : null);
     this.admin = opts.admin ?? (this.report.adminReady ? new AdminClient(config, opts.fetchImpl ?? fetch, this.clock) : null);
-    this.driver = opts.driver ?? createPlaywrightDriver({ storeDomain: config.storeDomain, executablePath: config.browserExecutable, headless: config.headless, clock: this.clock, observer: opts.checkoutObserver });
+    this.driver = opts.driver ?? createPlaywrightDriver({ storeDomain: config.storeDomain, executablePath: config.browserExecutable, headless: config.headless, lowMemory: config.browserLowMemory, clock: this.clock, observer: opts.checkoutObserver });
     this.log = createStepLogger(opts.sink ?? (() => undefined));
     this.fixture = Boolean(opts.storefront || opts.admin || opts.driver);
   }

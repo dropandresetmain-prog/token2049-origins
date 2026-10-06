@@ -170,12 +170,26 @@ export interface PlaywrightCheckoutOptions {
   storeDomain: string;
   headless?: boolean;
   executablePath?: string | null;
+  /**
+   * Fit a small instance: low-memory Chromium flags, image/media/font requests aborted (page text and totals are unaffected), and at most one
+   * browser at a time per process so overlapping quotes can never double the footprint. Off by default.
+   */
+  lowMemory?: boolean;
   /** DIAGNOSTIC ONLY (rehearsal harness): extra exact hostnames allowed for sub-resources. Never set in production. */
   diagnosticAllowedHosts?: string[];
   clock?: Clock;
   /** Sink for step-name log lines. Default: stderr. */
   sink?: (line: string) => void;
 }
+
+/** Chromium flags for a ~512 MB container: no GPU/shared-memory use, one renderer, trimmed V8 heap, no background services. */
+const LOW_MEMORY_ARGS = [
+  '--disable-dev-shm-usage', '--disable-gpu', '--disable-extensions', '--disable-background-networking', '--disable-component-update', '--disable-default-apps',
+  '--disable-sync', '--disable-translate', '--mute-audio', '--no-first-run', '--renderer-process-limit=1', '--js-flags=--max-old-space-size=160',
+];
+const LOW_MEMORY_BLOCKED_TYPES = new Set(['image', 'media', 'font']);
+/** Serializes low-memory browser sessions within the process. */
+let browserQueue: Promise<unknown> = Promise.resolve();
 
 const NAV_TIMEOUT_MS = 45_000;
 const STEP_TIMEOUT_MS = 20_000;
@@ -201,6 +215,13 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
   }
 
   private async withPage<T>(checkoutUrl: string, run: (page: Page) => Promise<T>): Promise<T> {
+    if (!this.opts.lowMemory) return this.withPageUnqueued(checkoutUrl, run);
+    const turn = browserQueue.then(() => undefined, () => undefined).then(() => this.withPageUnqueued(checkoutUrl, run));
+    browserQueue = turn.catch(() => undefined);
+    return turn;
+  }
+
+  private async withPageUnqueued<T>(checkoutUrl: string, run: (page: Page) => Promise<T>): Promise<T> {
     if (!isTrustedCheckoutUrl(checkoutUrl, this.opts.storeDomain)) throw new CheckoutAbort('untrusted_checkout_url');
     let browser: Browser;
     try {
@@ -208,6 +229,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       // Default resolution uses the local Playwright cache; SHOPIFY_BROWSER_EXECUTABLE overrides.
       browser = await chromium.launch({
         headless: this.opts.headless ?? true,
+        ...(this.opts.lowMemory ? { args: LOW_MEMORY_ARGS } : {}),
         ...(this.opts.executablePath ? { executablePath: this.opts.executablePath } : {}),
       });
     } catch {
@@ -219,6 +241,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       context.setDefaultTimeout(STEP_TIMEOUT_MS);
       await context.route('**/*', async route => {
         const request = route.request();
+        if (this.opts.lowMemory && LOW_MEMORY_BLOCKED_TYPES.has(request.resourceType())) return route.abort().catch(() => undefined);
         try {
           const u = new URL(request.url());
           const store = u.hostname === this.opts.storeDomain;

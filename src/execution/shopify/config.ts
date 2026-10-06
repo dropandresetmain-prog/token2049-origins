@@ -24,6 +24,7 @@ export interface ShopifyConfig {
   storePassword: string | null;
   browserExecutable: string | null;
   headless: boolean;
+  browserLowMemory?: boolean;
   devStoreConfirmed: boolean;
   bogusGatewayEnabled: boolean;
 }
@@ -76,6 +77,8 @@ export function loadShopifyConfig(env: NodeJS.ProcessEnv): ShopifyConfigReport {
     storePassword: get('SHOPIFY_STORE_PASSWORD'),
     browserExecutable: get('SHOPIFY_BROWSER_EXECUTABLE'),
     headless: (get('SHOPIFY_HEADLESS') ?? 'true').toLowerCase() !== 'false',
+    /** Small instances (e.g. a 512 MB free web service): leaner Chromium, no images/media/fonts, one browser at a time. */
+    browserLowMemory: get('SHOPIFY_BROWSER_LOW_MEMORY') === 'true',
     devStoreConfirmed: get('SHOPIFY_DEV_STORE_CONFIRMED') === 'true',
     bogusGatewayEnabled: get('SHOPIFY_BOGUS_GATEWAY_ENABLED') === 'true',
   };
