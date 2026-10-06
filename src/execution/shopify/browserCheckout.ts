@@ -23,7 +23,8 @@ import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver, type 
 /** Published Shopify test-gateway values. These are not real card data. */
 export const BOGUS_CARD = { number: '1', name: 'Bogus Gateway', cvv: '123' } as const;
 
-const TEST_GATEWAY_TEXT = /bogus gateway|test payment gateway/i;
+// Live Bogus checkout does not print its name; it shows its own test instructions ("1 to simulate an approved transaction").
+const TEST_GATEWAY_TEXT = /bogus gateway|test payment gateway|1 to simulate an approved transaction/i;
 const CAPTCHA_TEXT = /verify (that )?you are (a )?human|i['’]m not a robot|complete the (captcha|security challenge)/i;
 const OTP_TEXT = /one-time (code|passcode|password)|we (sent|texted|emailed) (you )?a (verification )?code|enter the (verification )?code (we|sent)/i;
 
@@ -46,7 +47,7 @@ const AMOUNT = String.raw`(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)`;
  */
 export function parseDisplayedTotals(pageText: string, scale: number): bigint[] {
   const out: bigint[] = [];
-  const re = new RegExp(String.raw`(?<![A-Za-z])Total\b[^\d\n]{0,40}${AMOUNT}`, 'g');
+  const re = new RegExp(String.raw`(?<![A-Za-z])Total\b[^\d]{0,40}${AMOUNT}`, 'g');
   for (const m of pageText.matchAll(re)) {
     try {
       out.push(parseDecimalToMinor(m[1]!.replace(/,/g, ''), scale));
@@ -59,7 +60,8 @@ export function parseDisplayedTotals(pageText: string, scale: number): bigint[] 
 
 /** The final order total on the page is the LAST "Total" amount (the summary, after shipping/tax). */
 export function displayedTotalMatches(pageText: string, expected: Money): boolean {
-  const re = new RegExp(String.raw`(?<![A-Za-z])Total\b([^\d\n]{0,40})${AMOUNT}([^\n]{0,12})`, 'g');
+  // Real checkout text puts the label, currency code and amount on separate lines ("Total\nUSD\n$17.95").
+  const re = new RegExp(String.raw`(?<![A-Za-z])Total\b([^\d]{0,40})${AMOUNT}([^\n]{0,12})`, 'g');
   const matches = [...pageText.matchAll(re)];
   const last = matches.at(-1);
   if (!last || !new RegExp(`\\b${expected.currency}\\b`).test(`${last[1]} ${last[3]}`)) return false;
@@ -108,10 +110,29 @@ export function isTrustedCheckoutUrl(url: string, storeDomain: string): boolean 
 
 /* ---------------- Playwright driver ---------------- */
 
+/**
+ * Diagnostics seam for the unfunded rehearsal harness. Production passes no observer. Hooks are
+ * isolated (a throwing hook never affects the driver). `attach` may be async and is the ONE hook that
+ * may touch the browser context, solely so a diagnostic permalink session's cookies can be seeded;
+ * it runs before any navigation and can never click. Implementations must
+ * record hostnames, step names and booleans only, never URLs with queries, page text or field values.
+ */
+export interface CheckoutObserver {
+  attach?(page: Page): void | Promise<void>;
+  blocked?(e: { hostname: string; resourceType: string; frame: 'main' | 'sub' }): void;
+  stepFailed?(step: string): Promise<void>;
+  /** Called immediately before the durable pay_click checkpoint (and therefore before any click). */
+  beforePay?(): Promise<void>;
+}
+const observe = async (f: (() => unknown) | undefined): Promise<void> => { try { await f?.(); } catch { /* observers never affect the driver */ } };
+
 export interface PlaywrightCheckoutOptions {
+  observer?: CheckoutObserver;
   storeDomain: string;
   headless?: boolean;
   executablePath?: string | null;
+  /** DIAGNOSTIC ONLY (rehearsal harness): extra exact hostnames allowed for sub-resources. Never set in production. */
+  diagnosticAllowedHosts?: string[];
   clock?: Clock;
   /** Sink for step-name log lines. Default: stderr. */
   sink?: (line: string) => void;
@@ -151,13 +172,17 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
         try {
           const u = new URL(request.url());
           const store = u.hostname === this.opts.storeDomain;
-          const staticShopify = ['cdn.shopify.com', 'checkout.shopify.com'].includes(u.hostname) || u.hostname.endsWith('.shopifycdn.com');
+          const staticShopify = ['cdn.shopify.com', 'checkout.shopify.com', 'checkout.pci.shopifyinc.com', ...(this.opts.diagnosticAllowedHosts ?? [])].includes(u.hostname) || u.hostname.endsWith('.shopifycdn.com');
           const mainNavigation = request.isNavigationRequest() && request.frame().parentFrame() === null;
-          if (u.protocol !== 'https:' || u.username || u.password || u.port || (mainNavigation ? !store : !(store || staticShopify))) return await route.abort();
+          if (u.protocol !== 'https:' || u.username || u.password || u.port || (mainNavigation ? !store : !(store || staticShopify))) {
+            await observe(() => this.opts.observer?.blocked?.({ hostname: u.hostname, resourceType: request.resourceType(), frame: request.frame().parentFrame() === null ? 'main' : 'sub' }));
+            return await route.abort();
+          }
           await route.continue();
         } catch { await route.abort(); }
       });
       const page = await context.newPage();
+      await observe(() => this.opts.observer?.attach?.(page));
       return await this.run(page, input, log);
     } finally {
       await browser.close().catch(() => undefined);
@@ -170,6 +195,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     try {
       return await fn();
     } catch (e) {
+      await observe(() => this.opts.observer?.stepFailed?.(name));
       if (e instanceof CheckoutAbort) throw e;
       // Playwright messages can embed locators/page text: keep only the step name and error class.
       throw new CheckoutAbort('step_failed', `step ${name} failed`);
@@ -261,18 +287,20 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     // Durable BEFORE the click. If this throws, nothing was clicked.
     const payButton = page.getByRole('button', { name: /pay now|complete order|place order/i }).first();
     // Trial resolves actionability before the durable boundary.
-    await payButton.click({ trial: true });
+    try { await payButton.click({ trial: true }); } catch (e) { await observe(() => this.opts.observer?.stepFailed?.('pay_trial_click')); throw e; }
     await this.chooseQuotedShipping(page, input.shippingTitle);
     await this.waitForTotal(page, expectedTotal);
     if (!hasTestGateway(await this.bodyText(page))) throw new CheckoutAbort('test_gateway_not_active');
     if (new URL(page.url()).hostname !== this.opts.storeDomain) throw new CheckoutAbort('untrusted_checkout_url');
     const payElement = await payButton.elementHandle();
     if (!payElement) throw new CheckoutAbort('step_failed');
+    await observe(() => this.opts.observer?.beforePay?.());
     await input.checkpoint('pay_click', { at: this.clock.now().toISOString() });
     log('pay_click');
     // Everything below is post-click: the executor treats any failure as an unknown outcome.
     try {
-      await payElement.click({ force: true, timeout: 5000, noWaitAfter: true });
+      // No `force`: live rehearsal showed the pay button passes Playwright's normal actionability checks.
+      await payElement.click({ timeout: 5000, noWaitAfter: true });
     } catch {
       throw new CheckoutAbort('step_failed', 'step pay_click failed');
     }
@@ -300,12 +328,18 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
   }
 
   private async chooseQuotedShipping(page: Page, title: string): Promise<void> {
-    const radios = page.getByRole('radio', { name: title, exact: false });
-    if (await radios.count() === 1) await radios.check();
-    else {
+    // Shopify renders delivery methods a few seconds after the address is complete: wait, bounded.
+    const end = this.clock.now().getTime() + STEP_TIMEOUT_MS;
+    for (;;) {
+      const radios = page.getByRole('radio', { name: title, exact: false });
+      if (await radios.count() === 1) {
+        await radios.check();
+        return;
+      }
       // A single automatic method still has to expose the quoted title on the checkout page.
-      const label = page.getByText(title, { exact: true });
-      if (await label.count() !== 1) throw new CheckoutAbort('total_mismatch');
+      if (await page.getByText(title, { exact: true }).count() === 1) return;
+      if (this.clock.now().getTime() > end) throw new CheckoutAbort('total_mismatch');
+      await page.waitForTimeout(500);
     }
   }
   /** Totals settle asynchronously after shipping/tax: poll until equal, else abort before paying. */

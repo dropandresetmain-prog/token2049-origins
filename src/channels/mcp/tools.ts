@@ -188,7 +188,14 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const sameApproval = (a: typeof approval | null) => a && a.quoteDigest === approval.quoteDigest && a.selectedFundingOptionId === selectedFundingOptionId && a.maxTotal.currency === maxTotal!.currency && a.maxTotal.scale === maxTotal!.scale && a.maxTotal.amountMinor === maxTotal!.amountMinor;
         const existing = await deps.gateway.quotePurchase(quoteId);
         let purchase = existing.purchase;
-        if (purchase && !sameApproval(existing.approval)) return failure(deps, 'A purchase already exists with different approved terms or funding choice. Request a fresh quote and authorization.', { error: { code: 'conflict' }, purchase, progress: projectProgress(purchase) });
+        if (purchase && !sameApproval(existing.approval)) {
+          // Only a purchase with no payment and no merchant activity may be re-authorized from a fresh quote.
+          const untouched = purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received';
+          const message = untouched
+            ? 'A purchase already exists with different approved terms or funding choice. Request a fresh quote and authorization.'
+            : `Purchase ${purchase.purchaseId} already has payment or merchant activity. Follow it with get_purchase. Do not create another purchase.`;
+          return failure(deps, message, { error: { code: 'conflict' }, purchase, progress: projectProgress(purchase) });
+        }
         let newlyCreated = false;
         if (!purchase) {
           if (deps.bridge) {

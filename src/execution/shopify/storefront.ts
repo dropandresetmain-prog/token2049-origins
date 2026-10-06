@@ -3,7 +3,7 @@ import type { Money } from '../../contracts/money.js';
 import type { RetailFulfillment } from '../../contracts/intent.js';
 import { ProviderError } from '../../core/errors.js';
 import type { ShopifyConfig } from './config.js';
-import { postGraphQL, type GraphQLEndpoint } from './http.js';
+import { postGraphQL, ShopifyHttpError, type GraphQLEndpoint } from './http.js';
 import { MoneyV2, toMoney } from './money.js';
 
 /**
@@ -143,12 +143,32 @@ export class StorefrontClient {
   constructor(
     cfg: ShopifyConfig,
     private readonly fetchImpl: typeof fetch,
+    private readonly sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
   ) {
-    if (!cfg.storefrontToken) throw new ProviderError('not_sent', 'shopify_not_configured', 'Storefront token missing');
-    this.ep = {
-      url: `https://${cfg.storeDomain}/api/${cfg.apiVersion}/graphql.json`,
-      headers: { 'X-Shopify-Storefront-Access-Token': cfg.storefrontToken },
-    };
+    if (!cfg.storefrontToken && !cfg.storefrontPrivateToken) throw new ProviderError('not_sent', 'shopify_not_configured', 'Storefront token missing');
+    // Server-side calls prefer the private (delegate) token; Shopify attributes traffic via the buyer IP when configured.
+    const headers: Record<string, string> = cfg.storefrontPrivateToken
+      ? { 'Shopify-Storefront-Private-Token': cfg.storefrontPrivateToken }
+      : { 'X-Shopify-Storefront-Access-Token': cfg.storefrontToken! };
+    if (cfg.storefrontBuyerIp) headers['Shopify-Storefront-Buyer-IP'] = cfg.storefrontBuyerIp;
+    this.ep = { url: `https://${cfg.storeDomain}/api/${cfg.apiVersion}/graphql.json`, headers };
+  }
+
+  /**
+   * Shopify limits cart/checkout creation per minute and answers with a 200 THROTTLED error. Carts are
+   * harmless to repeat (no order or payment), so retry with bounded exponential backoff. Other errors,
+   * and exhaustion, propagate unchanged.
+   */
+  private async retryThrottled<T>(fn: () => Promise<T>): Promise<T> {
+    const delays = [500, 1500, 4000, 10_000];
+    for (let attempt = 0; ; attempt++) {
+      try {
+        return await fn();
+      } catch (e) {
+        if (!(e instanceof ShopifyHttpError && e.throttled) || attempt >= delays.length) throw e;
+        await this.sleep(delays[attempt]!);
+      }
+    }
   }
 
   async shopName(): Promise<string> {
@@ -231,18 +251,18 @@ export class StorefrontClient {
       buyerIdentity: { email: args.fulfillment.email, countryCode: a.countryCode },
       delivery: { addresses: [{ selected: true, oneTimeUse: true, address: { deliveryAddress } }] },
     };
-    const d = await postGraphQL(this.fetchImpl, this.ep, CART_CREATE, { input, country: a.countryCode }, z.object({ cartCreate: z.unknown() }));
+    const d = await this.retryThrottled(() => postGraphQL(this.fetchImpl, this.ep, CART_CREATE, { input, country: a.countryCode }, z.object({ cartCreate: z.unknown() })));
     return this.cartResult(d.cartCreate);
   }
 
   async selectDelivery(cartId: string, selections: Array<{ deliveryGroupId: string; deliveryOptionHandle: string }>, country: string): Promise<StorefrontCart> {
-    const d = await postGraphQL(
+    const d = await this.retryThrottled(() => postGraphQL(
       this.fetchImpl,
       this.ep,
       CART_SELECT_DELIVERY,
       { cartId, options: selections, country },
       z.object({ cartSelectedDeliveryOptionsUpdate: z.unknown() }),
-    );
+    ));
     return this.cartResult(d.cartSelectedDeliveryOptionsUpdate);
   }
 

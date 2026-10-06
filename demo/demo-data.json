@@ -4,10 +4,10 @@
   "settlementLabel": "Scaled testnet notional — 1:1000",
   "buyer": {
     "email": "buyer@example.com",
-    "shippingAddress": { "firstName": "Test", "lastName": "Buyer", "address1": "1 Test Street", "city": "Singapore", "zip": "018989", "countryCode": "SG" }
+    "shippingAddress": { "firstName": "Test", "lastName": "Buyer", "address1": "1 Test Street", "city": "New York", "province": "NY", "zip": "10001", "countryCode": "US" }
   },
   "traveller": { "firstName": "Test", "lastName": "Traveller", "email": "test.traveller@example.com", "phone": "+6500000000" },
-  "retail": { "id": "shopify-retail", "label": "Shopify development-store test order", "query": "test tee", "productHandle": null, "quantity": 1, "shipToCountry": "SG", "maxCommercialMinor": "50000", "scalingExampleMinor": "18340" },
+  "retail": { "id": "shopify-retail", "label": "Shopify development-store test order", "query": "agent commerce test tee", "productHandle": "agent-commerce-test-tee", "productRef": "gid://shopify/ProductVariant/50670884094009", "quantity": 1, "shipToCountry": "US", "maxCommercialMinor": "50000", "scalingExampleMinor": "18340" },
   "hotel": { "id": "nuitee-hotel", "label": "Nuitée sandbox hotel", "cityName": "Singapore", "countryCode": "SG", "checkInDaysFromNow": 60, "checkOutDaysFromNow": 62, "adults": 1, "guestNationality": "SG", "maxCommercialMinor": "200000" },
   "flight": { "id": "atlas-flight", "label": "Atlas sandbox flight search", "from": "MNL", "to": "CEB", "departDaysFromNow": 30, "adults": 1, "maxCommercialMinor": "100000" }
 }

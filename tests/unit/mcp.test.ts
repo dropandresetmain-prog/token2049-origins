@@ -290,7 +290,27 @@ describe('MCP channel', () => {
       const conflict = await m.call('buy', buyArgs(quote, { maxTotal: { ...quote.payablePrincipal, amountMinor: '999999' } }));
       expect(conflict.isError).toBe(true);
       expect(conflict.structuredContent.error.code).toBe('conflict');
+      // F-1: payment activity means follow the existing purchase, never request a fresh quote.
+      const text = String(conflict.content[0]?.text);
+      expect(text).toContain(`Purchase ${id} already has payment or merchant activity`);
+      expect(text).toContain('get_purchase');
+      expect(text).not.toMatch(/fresh quote/i);
     } finally { await m.close(); await bridge.close(); }
+  });
+
+  it.each(['funded_queued', 'executing', 'succeeded'] as const)('points to get_purchase when the purchase state is %s even with no payment recorded', async state => {
+    const m = await connect(cfg);
+    try {
+      const quote = await quoteViaMcp(m);
+      const first = await m.call('buy', buyArgs(quote));
+      const id = first.structuredContent.purchase.purchaseId;
+      await h.gw.db.run('UPDATE purchases SET state=$1 WHERE id=$2', state, id);
+      const conflict = await m.call('buy', buyArgs(quote, { maxTotal: { ...quote.payablePrincipal, amountMinor: '999999' } }));
+      expect(conflict.structuredContent.error.code).toBe('conflict');
+      expect(conflict.content[0]?.text).toContain('get_purchase');
+      expect(conflict.content[0]?.text).not.toMatch(/fresh quote/i);
+      expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM purchases'))!.n).toBe(1);
+    } finally { await m.close(); }
   });
 
   it('refuses switching to another available option after the purchase exists', async () => {
@@ -305,6 +325,8 @@ describe('MCP channel', () => {
       const switched = await m.call('buy', buyArgs(quote, { selectedFundingOptionId: 'fop_OTHERAVAILABLEOPTION' }));
       expect(switched.structuredContent.error.code).toBe('conflict');
       expect(switched.structuredContent.purchase.purchaseId).toBe(first.structuredContent.purchase.purchaseId);
+      // Genuinely untouched purchase (awaiting_funding / not_received): fresh authorization is still appropriate.
+      expect(switched.content[0]?.text).toMatch(/fresh quote and authorization/i);
     } finally { await m.close(); }
   });
 

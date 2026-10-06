@@ -15,6 +15,10 @@ export interface ShopifyConfig {
   storeDomain: string;
   apiVersion: string;
   storefrontToken: string | null;
+  /** Optional server-side delegate token (Shopify-Storefront-Private-Token); preferred over the public token when set. */
+  storefrontPrivateToken: string | null;
+  /** Optional egress IP forwarded as Shopify-Storefront-Buyer-IP so Shopify can attribute traffic instead of pooling it. */
+  storefrontBuyerIp: string | null;
   clientId: string | null;
   clientSecret: string | null;
   storePassword: string | null;
@@ -55,10 +59,18 @@ export function loadShopifyConfig(env: NodeJS.ProcessEnv): ShopifyConfigReport {
     invalid.push('SHOPIFY_API_VERSION');
     apiVersion = DEFAULT_API_VERSION;
   }
+  let buyerIp = get('SHOPIFY_STOREFRONT_BUYER_IP');
+  // Forwarded verbatim as a header: accept only a plain IPv4/IPv6 literal.
+  if (buyerIp && !/^(?:\d{1,3}\.){3}\d{1,3}$|^[0-9a-fA-F:]{2,45}$/.test(buyerIp)) {
+    invalid.push('SHOPIFY_STOREFRONT_BUYER_IP');
+    buyerIp = null;
+  }
   const config: ShopifyConfig = {
     storeDomain,
     apiVersion,
     storefrontToken: get('SHOPIFY_STOREFRONT_TOKEN'),
+    storefrontPrivateToken: get('SHOPIFY_STOREFRONT_PRIVATE_TOKEN'),
+    storefrontBuyerIp: buyerIp,
     clientId: get('SHOPIFY_CLIENT_ID'),
     clientSecret: get('SHOPIFY_CLIENT_SECRET'),
     storePassword: get('SHOPIFY_STORE_PASSWORD'),

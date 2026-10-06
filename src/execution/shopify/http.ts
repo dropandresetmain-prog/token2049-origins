@@ -11,6 +11,7 @@ export class ShopifyHttpError extends Error {
     message: string,
     readonly status?: number,
     readonly accessDenied = false,
+    readonly throttled = false,
   ) {
     super(message);
   }
@@ -64,7 +65,7 @@ export async function postGraphQL<S extends z.ZodType>(
   if (!env.success) throw new ShopifyHttpError('parse', 'unexpected response envelope');
   if (env.data.errors && env.data.errors.length > 0) {
     const codes = env.data.errors.map((x) => ['ACCESS_DENIED','THROTTLED'].includes(x.extensions?.code ?? '') ? x.extensions!.code! : 'UNKNOWN');
-    throw new ShopifyHttpError('graphql', `GraphQL errors: ${[...new Set(codes)].join(',')}`, undefined, codes.includes('ACCESS_DENIED'));
+    throw new ShopifyHttpError('graphql', `GraphQL errors: ${[...new Set(codes)].join(',')}`, undefined, codes.includes('ACCESS_DENIED'), codes.includes('THROTTLED'));
   }
   const parsed = schema.safeParse(env.data.data);
   if (!parsed.success) throw new ShopifyHttpError('parse', 'response shape did not match expectation');
@@ -81,5 +82,7 @@ export function toProviderError(e: unknown, code: string): ProviderError {
     const retryable = e.kind === 'network' || e.status === 429 || (e.status !== undefined && e.status >= 500);
     return new ProviderError(e.kind === 'http' && e.status !== undefined && e.status < 500 && e.status !== 429 ? 'rejected' : 'not_sent', code, e.message, retryable);
   }
-  return new ProviderError('not_sent', code, 'operation failed');
+  // Class name (and zod issue paths/codes, never values) only: enough to diagnose without leaking content.
+  const detail = e instanceof z.ZodError ? `zod ${e.issues.slice(0, 5).map((i) => `${i.path.join('.')}:${i.code}`).join(',')}` : e instanceof Error ? e.name : 'unknown';
+  return new ProviderError('not_sent', code, `operation failed (${detail})`);
 }
