@@ -514,6 +514,7 @@ class AtlasExecutor implements CommerceExecutor {
       return { kind: 'unknown', reason: 'atlas_readback_unavailable', providerReference: orderNo, evidence: [] };
     }
     if (d.status !== 0) return { kind: 'unknown', reason: `atlas_readback_status_${d.status}`, providerReference: orderNo, evidence: [] };
+    if (d.orderNo !== orderNo) return { kind: 'unknown', reason: 'atlas_readback_reference_mismatch', providerReference: orderNo, evidence: [] };
 
     const st = d.orderStatus == null ? null : String(d.orderStatus);
     const ts = d.ticketStatus == null ? null : String(d.ticketStatus);
@@ -554,8 +555,8 @@ class AtlasExecutor implements CommerceExecutor {
       case '2': {
         // Paid states only count as our purchase if we paid. Otherwise someone else did: do not claim it.
         if (!s.payAttempted) return unknown(s.adopted ? 'atlas_adopted_order_unexpectedly_paid' : 'atlas_order_paid_without_pay_attempt');
-        const charged = observed ?? BigInt(ref.expectedTotalMinor);
-        const chargedAmount = observed === null ? money(ref.currency, charged, ref.scale) : money(currency, charged, scale);
+        if (!d.currency || observed === null) return unknown('atlas_paid_amount_unverifiable');
+        const chargedAmount = money(currency, observed, scale);
         const ticketed = st === '2' && ts === '1';
         return {
           kind: 'succeeded',

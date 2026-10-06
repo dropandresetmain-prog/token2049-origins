@@ -598,6 +598,12 @@ export class CommerceCore {
     );
   }
 
+  /** A late confirmed transfer remains an observed refundable obligation, even after closure. */
+  recordConfirmedUnappliedFunding(purchaseId: string, funding: VerifiedFunding, nowIso: string): void {
+    this.postReceipt(purchaseId, funding, 0n, BigInt(funding.amountBaseUnits), nowIso);
+    appendEvent(this.d.db, purchaseId, 'funding.unapplied', { reason: 'confirmed after purchase closed', transfer: funding.transferReference }, nowIso);
+  }
+
   /** Called inside a tx with a confirmed, matching transfer for an open purchase. */
   applyConfirmedFunding(p: PurchaseRow, f: VerifiedFunding, required: bigint, received: bigint, nowIso: string): void {
     this.postReceipt(p.id, f, required, received, nowIso);

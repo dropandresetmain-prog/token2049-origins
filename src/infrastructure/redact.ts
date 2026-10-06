@@ -9,6 +9,7 @@ const VALUE_PATTERNS: Array<[RegExp, string]> = [
   [/\b(?:\d[ -]?){13,19}\b/g, '[REDACTED_NUMBER]'],
   [/[A-Za-z0-9._%+-]+@[A-Za-z0-9.-]+\.[A-Za-z]{2,}/g, '[REDACTED_EMAIL]'],
   [/\bBearer\s+[A-Za-z0-9._~+/=-]+/gi, 'Bearer [REDACTED]'],
+  [/\bt2o_[A-Za-z0-9_-]{16,}\b/g, '[REDACTED_TOKEN]'],
   [/\b(?:sk|pk|tok|shpat|shpss|sand|prod)_[A-Za-z0-9_-]{8,}\b/g, '[REDACTED_TOKEN]'],
   [/\b(ed25519_sk|xprv|addr_xsk)[0-9a-z]{20,}\b/gi, '[REDACTED_KEY]'],
 ];

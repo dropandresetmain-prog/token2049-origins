@@ -130,7 +130,8 @@ class NuiteeExecutor implements CommerceExecutor {
     if (hint === 'production') {
       return this.ready('ACCESS_BLOCKED', 'API key prefix indicates a production key; this sandbox lane refuses to book with it');
     }
-    const note = hint === 'unknown' ? ' Key prefix is not recognised as a sandbox key.' : '';
+    if (hint !== 'sandbox') return this.ready('ACCESS_BLOCKED', 'API key prefix is not recognised as a sandbox key; booking is refused');
+    const note = '';
     // Cheap authenticated read of reference data: proves the key is accepted, nothing more.
     const http = new NuiteeHttp({ apiKey: r.config.apiKey, fetchImpl: this.fetchImpl, timeoutMs: this.timeoutMs });
     const o = await http.request('GET', `${r.config.searchBaseUrl}/data/currencies`);
@@ -199,7 +200,8 @@ class NuiteeExecutor implements CommerceExecutor {
     } catch (e) {
       return refuse(`not attempted: ${(e as Error).message}`);
     }
-    if (keyEnvironmentHint(conn.cfg.apiKey) === 'production') return refuse('not attempted: production API key refused by the sandbox lane');
+    const keyHint = keyEnvironmentHint(conn.cfg.apiKey);
+    if (keyHint !== 'sandbox') return refuse(keyHint === 'production' ? 'not attempted: production API key refused by the sandbox lane' : 'not attempted: sandbox API key identity is unverified');
     const ref = PrebookRef.safeParse(ctx.quote.executionRef);
     if (!ref.success) return refuse('not attempted: quote reference is not a nuitee prebook');
     if (ctx.fulfillment.category !== 'hotel') return refuse('not attempted: hotel fulfillment required');

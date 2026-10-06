@@ -15,7 +15,8 @@ import { newId } from '../infrastructure/ids.js';
  *
  * Simulated ledger (explicitly synthetic fiat/card capacity; never OCBC cash):
  *   simulated:merchant_purchases      DR when a provider reports the merchant payment
- *   simulated:card_payable            CR same event — card liability, NOT a bank debit
+ *   simulated:card_payable            CR card-style sandbox payment, NOT a bank debit
+ *   simulated:provider_test_balance_used CR provider test-balance payment, never card spend
  */
 export const Accounts = {
   cryptoTreasury: 'assets:crypto_treasury',
@@ -25,9 +26,10 @@ export const Accounts = {
   serviceFee: 'income:service_fee',
   merchantPurchases: 'simulated:merchant_purchases',
   cardPayable: 'simulated:card_payable',
+  providerTestBalanceUsed: 'simulated:provider_test_balance_used',
 } as const;
 
-export const SIMULATED_ACCOUNTS = new Set<string>([Accounts.merchantPurchases, Accounts.cardPayable]);
+export const SIMULATED_ACCOUNTS = new Set<string>([Accounts.merchantPurchases, Accounts.cardPayable, Accounts.providerTestBalanceUsed]);
 
 export function cryptoAsset(network: string, assetId: string): string {
   return `${network}/${assetId}`;

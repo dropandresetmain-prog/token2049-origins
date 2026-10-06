@@ -35,7 +35,7 @@ export class AtlasTransportError extends Error {
 
   /** True when the provider certainly did not process the request. */
   get definitelyNotProcessed(): boolean {
-    return this.kind === 'http' && this.httpStatus !== null && this.httpStatus >= 400 && this.httpStatus < 500;
+    return this.kind === 'http' && this.httpStatus !== null && this.httpStatus >= 400 && this.httpStatus < 500 && this.httpStatus !== 408;
   }
 
   /** 401/403 mean our credentials are not accepted. */

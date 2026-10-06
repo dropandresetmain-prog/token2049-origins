@@ -22,7 +22,7 @@ const IdempotencyKey = z.string().regex(/^[A-Za-z0-9._:-]{8,128}$/, '8-128 chars
 
 /* ---------------- output sanitising ---------------- */
 
-/** Gateway API tokens are `t2o_<base64url>`; redact() has no pattern for them, so catch any that a peer echoes back. */
+/** Defence in depth for gateway tokens echoed by a peer. */
 const GATEWAY_TOKEN_SHAPE = /\bt2o_[A-Za-z0-9_-]{16,}/g;
 
 /** Deep-replace every known secret (and anything shaped like a gateway token) in all strings: defence in depth on top of redact(). */

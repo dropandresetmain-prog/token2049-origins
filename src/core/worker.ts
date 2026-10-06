@@ -210,7 +210,10 @@ export class Worker {
         this.db.tx(() => {
           const cur = this.db.get<{ checkpoints_json: string }>('SELECT checkpoints_json FROM execution_attempts WHERE id = ?', attempt.id)!;
           const cps = JSON.parse(cur.checkpoints_json) as Record<string, unknown>;
-          cps[step] = redact(data);
+          const safe = redact(data);
+          // Opaque provider handles are needed intact after restart; public events remain redacted.
+          if (typeof data.providerReference === 'string') safe.providerReference = data.providerReference;
+          cps[step] = safe;
           const ref = typeof data.providerReference === 'string' ? data.providerReference : null;
           this.db.run(
             'UPDATE execution_attempts SET checkpoints_json = ?, provider_reference = COALESCE(?, provider_reference) WHERE id = ?',
@@ -221,7 +224,7 @@ export class Worker {
           if (ref) this.db.run('UPDATE purchases SET provider_reference = ?, updated_at = ? WHERE id = ?', ref, nowIso, p.id);
           appendEvent(this.db, p.id, 'execution.checkpoint', { step, providerReference: ref }, nowIso);
         });
-        // Executors read back their own unredacted data; persisted copy is redacted.
+        // Keep the in-memory checkpoint aligned with the durable reconciliation data.
         ctx.checkpoints[step] = data;
       },
     };
@@ -399,19 +402,20 @@ export class Worker {
     const q = getQuoteRow(this.db, p.quote_id)!;
     const qv = JSON.parse(q.public_json) as QuoteView;
     const charged = r.chargedAmount;
-    // Simulated card spend: expense vs card payable. Not a bank debit, not OCBC cash.
+    const testBalance = r.merchantPaymentStatus === 'test_balance_paid';
+    // Provider test-balance usage must never be presented as card spend or a bank debit.
     postEntry(
       this.db,
       {
         eventKey: `merchant_payment:${p.id}`,
         purchaseId: p.id,
-        kind: 'merchant_payment_simulated_card',
+        kind: testBalance ? 'merchant_payment_provider_test_balance' : 'merchant_payment_simulated_card',
         ledgerMode: 'simulated',
-        description: `Provider-reported merchant payment via simulated card capacity (${qv.route})`,
+        description: testBalance ? `Provider sandbox test-balance payment (${qv.route}); synthetic capacity usage` : `Provider-reported merchant payment via simulated card capacity (${qv.route})`,
         externalReference: r.providerReference,
         lines: [
           { account: Accounts.merchantPurchases, asset: fiatAsset(charged.currency, charged.scale), side: 'debit', amount: minor(charged) },
-          { account: Accounts.cardPayable, asset: fiatAsset(charged.currency, charged.scale), side: 'credit', amount: minor(charged) },
+          { account: testBalance ? Accounts.providerTestBalanceUsed : Accounts.cardPayable, asset: fiatAsset(charged.currency, charged.scale), side: 'credit', amount: minor(charged) },
         ],
       },
       nowIso,
@@ -441,7 +445,7 @@ export class Worker {
       nowIso,
     );
     setReservationStatus(this.db, p.id, ['active', 'held_unresolved'], 'consumed', nowIso);
-    const overReservation = minor(charged) > minor(qv.merchantTotal) || charged.currency !== qv.merchantTotal.currency;
+    const overReservation = charged.currency !== qv.merchantTotal.currency || charged.scale !== qv.merchantTotal.scale || minor(charged) > minor(qv.merchantTotal);
 
     transitionPurchase(
       this.db,
@@ -474,7 +478,9 @@ export class Worker {
     const limitations = [
       'Testnet funding uses valueless test assets; no crypto-to-fiat conversion occurred.',
       'Merchant payment is provider sandbox/test evidence; it is not bank settlement or an OCBC transaction.',
-      'Card spend is internally simulated capacity (card payable), not an immediate bank debit.',
+      ...(r.merchantPaymentStatus === 'test_balance_paid'
+        ? ['Provider test-balance usage consumes synthetic capacity; it is not card spend or supplier credit approval.']
+        : ['Card spend is internally simulated capacity (card payable), not an immediate bank debit.']),
     ];
     if (qv.route === 'atlas') limitations.push('Atlas sandbox payment uses the provider test balance mechanism; see status for hold/payment/ticket state.');
     if (qv.route === 'nuitee') limitations.push('Nuitée sandbox booking payment is simulated by the provider (no charge).');
@@ -539,8 +545,8 @@ export class Worker {
       this.reschedule(job, RECONCILE_BACKOFF_MS[Math.min(job.attempts, RECONCILE_BACKOFF_MS.length - 1)]!, result.reason);
       return;
     }
-    this.complete(job);
     this.applyResult(p.id, attempt.id, result);
+    this.complete(job);
   }
 
   /** Post-success status refresh (e.g. ticketing -> ticketed). Never changes financial state. */
@@ -617,7 +623,7 @@ export class Worker {
         if (open) {
           this.core.applyConfirmedFunding(cur, confirmed, BigInt(req.amountBaseUnits), BigInt(ev.amount_base_units), nowIso);
         } else {
-          appendEvent(this.db, p.id, 'funding.unapplied', { reason: 'confirmed after purchase closed', transfer: ev.transfer_reference }, nowIso);
+          this.core.recordConfirmedUnappliedFunding(p.id, confirmed, nowIso);
         }
       });
       this.complete(job);

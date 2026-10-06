@@ -4,7 +4,7 @@ import { Accounts, accountBalance, fiatAsset } from './journal.js';
 /**
  * Explicitly simulated fiat/card purchasing capacity. NOT an OCBC balance.
  * available = limit - (active + held_unresolved reservations) - outstanding simulated card payable.
- * A consumed reservation moves into card payable, so the same money is never counted twice.
+ * A consumed reservation moves into card payable or provider test-balance usage, without double counting.
  */
 export interface CapacitySnapshot {
   currency: string;
@@ -12,6 +12,7 @@ export interface CapacitySnapshot {
   limitMinor: bigint;
   reservedMinor: bigint;
   cardPayableMinor: bigint;
+  providerTestBalanceUsedMinor: bigint;
   availableMinor: bigint;
   ledgerMode: 'simulated';
 }
@@ -43,6 +44,7 @@ export function capacitySnapshot(db: Db, currency: string): CapacitySnapshot | n
     .reduce((s, r) => s + BigInt(r.amount_minor), 0n);
   // card payable is a credit-balance liability: negate debit-positive balance
   const payable = -accountBalance(db, Accounts.cardPayable, fiatAsset(currency, pool.scale));
+  const testBalanceUsed = -accountBalance(db, Accounts.providerTestBalanceUsed, fiatAsset(currency, pool.scale));
   const limit = BigInt(pool.limit_minor);
   return {
     currency,
@@ -50,7 +52,8 @@ export function capacitySnapshot(db: Db, currency: string): CapacitySnapshot | n
     limitMinor: limit,
     reservedMinor: reserved,
     cardPayableMinor: payable,
-    availableMinor: limit - reserved - payable,
+    providerTestBalanceUsedMinor: testBalanceUsed,
+    availableMinor: limit - reserved - payable - testBalanceUsed,
     ledgerMode: 'simulated',
   };
 }

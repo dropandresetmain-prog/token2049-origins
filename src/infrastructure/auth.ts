@@ -24,7 +24,7 @@ export function createClient(
       opts.channel,
       opts.label,
       sha256Hex(token),
-      JSON.stringify(opts.scopes ?? ALL_CUSTOMER_SCOPES),
+      JSON.stringify(opts.scopes ?? (opts.channel === 'mcp' ? ALL_CUSTOMER_SCOPES.filter(s => s !== 'purchases:fund') : ALL_CUSTOMER_SCOPES)),
       nowIso,
     );
   });

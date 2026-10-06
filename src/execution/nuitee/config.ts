@@ -58,7 +58,7 @@ export function loadNuiteeConfig(env: NodeJS.ProcessEnv): ConfigResult {
  */
 export function keyEnvironmentHint(apiKey: string): 'sandbox' | 'production' | 'unknown' {
   const k = apiKey.toLowerCase();
-  if (k.startsWith('sand')) return 'sandbox';
+  if (k.startsWith('sand_')) return 'sandbox';
   if (k.startsWith('prod') || k.startsWith('live')) return 'production';
   return 'unknown';
 }

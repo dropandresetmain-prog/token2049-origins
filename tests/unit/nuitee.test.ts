@@ -742,3 +742,14 @@ describe('nuitee readiness', () => {
 
 // Keep the result type referenced so a signature change in ports.ts fails here at compile time.
 export type _ResultKinds = ExecutionResult['kind'];
+
+
+describe('nuitee sandbox environment guard',()=>{
+  it.each(['abcdef0123456789','sandcastle_example'])('rejects unverified key environment before any booking (%s)',async key=>{
+    const f=fakeFetch(()=>{throw new Error('must not call provider');});
+    const ex=mk(f,{NUITEE_API_KEY:key});
+    expect((await ex.readiness()).status).toBe('ACCESS_BLOCKED');
+    expect((await ex.execute(makeCtx().ctx)).kind).toBe('failed_definite');
+    expect(f.calls).toHaveLength(0);
+  });
+});

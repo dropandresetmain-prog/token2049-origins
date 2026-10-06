@@ -801,3 +801,19 @@ describe('atlas executor identity', () => {
     await expect(ex.search(retail)).rejects.toBeInstanceOf(ProviderError);
   });
 });
+
+
+describe('atlas independent evidence guards', () => {
+  it.each([{totalPrice:null},{currency:null},{orderNo:'OTHER-ORDER'}])('does not infer a paid amount or accept mismatched readback %j',async missing=>{
+    const {fake,ex}=setup(ENV_ON);
+    fake.on('/queryOrderDetails.do',()=>details({orderStatus:'2',ticketStatus:'1',payTime:'2026-10-06 20:01:00',...missing}));
+    const cp={order:{providerReference:ORDER_NO},pay_attempt:{providerReference:ORDER_NO}};
+    expect((await ex.retrieve(new CtxHarness(fake,cp).ctx())).kind).toBe('unknown');
+    expect(fake.count('/pay.do')).toBe(0);
+  });
+  it('retains exposure on HTTP 408 after order creation was sent',async()=>{
+    const {fake,ex}=setup(ENV_ON);
+    fake.on('/order.do',()=>new Response('request timeout',{status:408}));
+    expect((await ex.execute(new CtxHarness(fake).ctx())).kind).toBe('unknown');
+  });
+});
