@@ -1,0 +1,324 @@
+{
+  "timestamp": "2026-10-06T14:20:52.634Z",
+  "outcome": "PASS",
+  "real": [
+    "gateway HTTP",
+    "PostgreSQL/core/journal",
+    "official x402 Solana payer and sponsor",
+    "official Devnet RPC"
+  ],
+  "simulated": [
+    "hotel search/quote/booking/payment"
+  ],
+  "schema": "solana_e2e_51b540b5fb8c45608699094685d8429c",
+  "payer": {
+    "status": 202,
+    "signature": "4tY5vmXqeQKPBnwRPU97FEKQDpksxr1SHEHvEMg4WLM8dTyGjWBZw4kK585EbKvvusUwH1JjYVi3zqNv1rqm8X8c"
+  },
+  "purchase": {
+    "purchaseId": "pur_01M48SDE6VYYJDTBDSKZ3M6H4B",
+    "customerId": "cus_01M48SDE0KP51T8A0MBGQHBATN",
+    "quoteId": "quo_01M48SDE593J2C7Y5VSBMN2P4Z",
+    "quoteVersion": 1,
+    "category": "hotel",
+    "route": "nuitee",
+    "state": "succeeded",
+    "paymentState": "confirmed",
+    "commerceStatus": "confirmed",
+    "merchantPaymentStatus": "simulated_paid",
+    "payablePrincipal": {
+      "currency": "USD",
+      "amountMinor": "105",
+      "scale": 2
+    },
+    "fundingRequirement": {
+      "rail": "solana",
+      "fundingOptionId": "fop_01M48SDE59VPSXMZ5YDD3S0YME",
+      "amount": {
+        "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "assetId": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        "decimals": 6,
+        "amountBaseUnits": "1050",
+        "symbol": "Devnet test USDC"
+      },
+      "payTo": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+      "settlement": {
+        "policy": {
+          "mode": "scaled_testnet",
+          "numerator": 1,
+          "denominator": 1000
+        },
+        "commercialPrincipal": {
+          "currency": "USD",
+          "amountMinor": "100",
+          "scale": 2
+        },
+        "commercialServiceFee": {
+          "currency": "USD",
+          "amountMinor": "5",
+          "scale": 2
+        },
+        "commercialTotal": {
+          "currency": "USD",
+          "amountMinor": "105",
+          "scale": 2
+        },
+        "principalBaseUnits": "1000",
+        "feeBaseUnits": "50",
+        "totalBaseUnits": "1050"
+      }
+    },
+    "fundingInstructions": null,
+    "funding": [
+      {
+        "rail": "solana",
+        "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "asset": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        "amountBaseUnits": "1050",
+        "decimals": 6,
+        "transferReference": "4tY5vmXqeQKPBnwRPU97FEKQDpksxr1SHEHvEMg4WLM8dTyGjWBZw4kK585EbKvvusUwH1JjYVi3zqNv1rqm8X8c",
+        "paymentState": "confirmed",
+        "purpose": "principal_and_fee",
+        "verifiedAt": "2026-10-06T14:21:04.506Z",
+        "evidenceMode": "fresh_external"
+      }
+    ],
+    "reservation": {
+      "status": "consumed",
+      "amount": {
+        "currency": "USD",
+        "scale": 2,
+        "amountMinor": "100"
+      }
+    },
+    "providerReference": "FIX-pur_01M48SDE6VYYJDTBDSKZ3M6H4B:1",
+    "receipt": {
+      "receiptId": "rcp_01M48SDSQZ2GD6B4KKBWHZD5AS",
+      "purchaseId": "pur_01M48SDE6VYYJDTBDSKZ3M6H4B",
+      "quoteId": "quo_01M48SDE593J2C7Y5VSBMN2P4Z",
+      "quoteDigest": "sha256:f82e054e9d0049a705f88483dfbd114224ef44db0763cde8d01b9e86b64ad3f3",
+      "category": "hotel",
+      "route": "nuitee",
+      "providerEnvironment": "fixture",
+      "evidenceMode": "local_fixture",
+      "principal": {
+        "currency": "USD",
+        "amountMinor": "100",
+        "scale": 2
+      },
+      "fundingRequirement": {
+        "rail": "solana",
+        "fundingOptionId": "fop_01M48SDE59VPSXMZ5YDD3S0YME",
+        "amount": {
+          "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+          "assetId": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+          "decimals": 6,
+          "amountBaseUnits": "1050",
+          "symbol": "Devnet test USDC"
+        },
+        "payTo": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+        "settlement": {
+          "policy": {
+            "mode": "scaled_testnet",
+            "numerator": 1,
+            "denominator": 1000
+          },
+          "commercialPrincipal": {
+            "currency": "USD",
+            "amountMinor": "100",
+            "scale": 2
+          },
+          "commercialServiceFee": {
+            "currency": "USD",
+            "amountMinor": "5",
+            "scale": 2
+          },
+          "commercialTotal": {
+            "currency": "USD",
+            "amountMinor": "105",
+            "scale": 2
+          },
+          "principalBaseUnits": "1000",
+          "feeBaseUnits": "50",
+          "totalBaseUnits": "1050"
+        }
+      },
+      "serviceFee": {
+        "currency": "USD",
+        "amountMinor": "5",
+        "scale": 2
+      },
+      "funding": [
+        {
+          "rail": "solana",
+          "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+          "asset": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+          "amountBaseUnits": "1050",
+          "decimals": 6,
+          "transferReference": "4tY5vmXqeQKPBnwRPU97FEKQDpksxr1SHEHvEMg4WLM8dTyGjWBZw4kK585EbKvvusUwH1JjYVi3zqNv1rqm8X8c",
+          "paymentState": "confirmed",
+          "purpose": "principal_and_fee",
+          "verifiedAt": "2026-10-06T14:21:04.506Z",
+          "evidenceMode": "fresh_external"
+        }
+      ],
+      "providerReference": "FIX-pur_01M48SDE6VYYJDTBDSKZ3M6H4B:1",
+      "commerceStatus": "confirmed",
+      "merchantPaymentStatus": "simulated_paid",
+      "limitations": [
+        "LOCAL FIXTURE: not external evidence.",
+        "Testnet funding uses valueless test assets; no crypto-to-fiat conversion occurred.",
+        "Scaled testnet notional — 1:1000. Commercial capacity and chain settlement have no equivalent economic value.",
+        "Merchant payment is provider sandbox/test evidence; it is not bank settlement or an OCBC transaction.",
+        "Card spend is internally simulated capacity (card payable), not an immediate bank debit.",
+        "Nuitée sandbox booking payment is simulated by the provider (no charge)."
+      ],
+      "treasuryEffect": [
+        {
+          "ledgerMode": "observed",
+          "account": "assets:crypto_treasury",
+          "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+          "delta": "1050"
+        },
+        {
+          "ledgerMode": "observed",
+          "account": "liabilities:customer_prepayment",
+          "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+          "delta": "-1050"
+        },
+        {
+          "ledgerMode": "simulated",
+          "account": "simulated:merchant_purchases",
+          "asset": "fiat:USD/2",
+          "delta": "100"
+        },
+        {
+          "ledgerMode": "simulated",
+          "account": "simulated:card_payable",
+          "asset": "fiat:USD/2",
+          "delta": "-100"
+        },
+        {
+          "ledgerMode": "observed",
+          "account": "liabilities:customer_prepayment",
+          "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+          "delta": "1050"
+        },
+        {
+          "ledgerMode": "observed",
+          "account": "income:purchase_principal_applied",
+          "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+          "delta": "-1000"
+        },
+        {
+          "ledgerMode": "observed",
+          "account": "income:service_fee",
+          "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+          "delta": "-50"
+        }
+      ],
+      "evidenceRefs": [
+        "journal:jen_01M48SDSMDF4G8NJ5D9NR3PKSV",
+        "journal:jen_01M48SDSQ8VHKE0P8N0MWC6V8X",
+        "journal:jen_01M48SDSQHH398FT67807KEPHQ",
+        "fixture:nuitee:FIX-pur_01M48SDE6VYYJDTBDSKZ3M6H4B:1"
+      ],
+      "issuedAt": "2026-10-06T14:21:04.609Z"
+    },
+    "statusReason": null,
+    "createdAt": "2026-10-06T14:20:52.817Z",
+    "updatedAt": "2026-10-06T14:21:04.609Z"
+  },
+  "chain": {
+    "signature": "4tY5vmXqeQKPBnwRPU97FEKQDpksxr1SHEHvEMg4WLM8dTyGjWBZw4kK585EbKvvusUwH1JjYVi3zqNv1rqm8X8c",
+    "slot": 508121205,
+    "blockTime": 1791296463,
+    "commitment": "finalized",
+    "transactionSha256": "99dd0972f846da93417aa6233adc891e04397bc8c4745e80ca8debc0a94581a3",
+    "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "amountBaseUnits": "1050",
+    "memo": "t2o:3nyXEZ_gpDvyMP-l-tQKLhE4q9TiGMhlt3FumGpjmbM",
+    "feeLamports": 10001,
+    "source": {
+      "before": "20000000",
+      "after": "19998950"
+    },
+    "destination": {
+      "before": "20000000",
+      "after": "20001050"
+    }
+  },
+  "repeatedFundingStatus": 409,
+  "evidenceCount": 1,
+  "journal": [
+    {
+      "account": "assets:crypto_treasury",
+      "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "side": "debit",
+      "amount": "1050",
+      "ledger_mode": "observed",
+      "kind": "funding_received"
+    },
+    {
+      "account": "liabilities:customer_prepayment",
+      "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "side": "credit",
+      "amount": "1050",
+      "ledger_mode": "observed",
+      "kind": "funding_received"
+    },
+    {
+      "account": "simulated:merchant_purchases",
+      "asset": "fiat:USD/2",
+      "side": "debit",
+      "amount": "100",
+      "ledger_mode": "simulated",
+      "kind": "merchant_payment_simulated_card"
+    },
+    {
+      "account": "simulated:card_payable",
+      "asset": "fiat:USD/2",
+      "side": "credit",
+      "amount": "100",
+      "ledger_mode": "simulated",
+      "kind": "merchant_payment_simulated_card"
+    },
+    {
+      "account": "liabilities:customer_prepayment",
+      "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "side": "debit",
+      "amount": "1050",
+      "ledger_mode": "observed",
+      "kind": "prepayment_applied"
+    },
+    {
+      "account": "income:purchase_principal_applied",
+      "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "side": "credit",
+      "amount": "1000",
+      "ledger_mode": "observed",
+      "kind": "prepayment_applied"
+    },
+    {
+      "account": "income:service_fee",
+      "asset": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1/4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "side": "credit",
+      "amount": "50",
+      "ledger_mode": "observed",
+      "kind": "prepayment_applied"
+    }
+  ],
+  "hotelExecuteCalls": 1,
+  "recheckedAt": "2026-10-06T14:53:43.224Z",
+  "sourceBaseSha": "0afd377681fe0e27e0ea86cf2cfaa34cdb970769",
+  "recheckedImplementationSha256": "bacefe4dde99878d2d9ea3ed96945ec4085f19e4acd27ee8a2a4ab3c564b2e27",
+  "executionDependencies": {
+    "solanaKit": "6.1.0",
+    "x402Svm": "2.26.0"
+  },
+  "recheckDependencies": {
+    "solanaKit": "5.1.0",
+    "x402Svm": "2.26.0",
+    "node": "v24.15.0"
+  }
+}

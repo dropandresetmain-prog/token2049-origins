@@ -6,6 +6,7 @@ import { createShopifyWebhookRouter, type ShopifyReconcileHint } from './executi
 import { createAtlasExecutor } from './execution/atlas/index.js';
 import { createNuiteeExecutor } from './execution/nuitee/index.js';
 import { createCardanoFundingAdapter } from './funding/cardano/index.js';
+import { createSolanaFundingAdapter } from './funding/solana/index.js';
 import { createOcbcAdapter } from './banking/ocbc/adapter.js';
 import { createEvidenceRouter, createInspectRouter } from './evidence/router.js';
 import { CoreError } from './core/errors.js';
@@ -37,7 +38,7 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
   const bankAdapters=[createOcbcAdapter(env)];
   return {
     executors:[createShopifyExecutor(env,{sink:step=>log({component:'shopify',step})}),createAtlasExecutor(env),createNuiteeExecutor(env)],
-    fundingAdapters:[createCardanoFundingAdapter(env,{log})],bankAdapters,
+    fundingAdapters:[createCardanoFundingAdapter(env,{log}),createSolanaFundingAdapter(env)],bankAdapters,
     buildRouters:core=>{
       const routers:NonNullable<GatewayParts['extraRouters']>=[
         {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:core.deps.clock,bankAdapters}),auth:true},

@@ -22,14 +22,20 @@
     "payer": "tsx clients/payer/pay.ts",
     "payer:bridge": "tsx clients/payer/bridge.ts",
     "wallet": "tsx clients/payer/wallet-generate.ts",
-    "db:migrate": "tsx scripts/migrate.ts"
+    "db:migrate": "tsx scripts/migrate.ts",
+    "payer:solana": "tsx clients/solana/pay.ts",
+    "payer:solana:facilitator": "tsx clients/solana/facilitator.ts",
+    "payer:solana:setup": "tsx scripts/solana/setup.ts",
+    "e2e:solana": "tsx scripts/solana/live-e2e.ts"
   },
   "dependencies": {
     "@evolution-sdk/evolution": "0.5.14",
     "@modelcontextprotocol/sdk": "1.32.1",
+    "@solana/kit": "5.1.0",
     "@x402/cardano": "2.26.0",
     "@x402/core": "2.26.0",
     "@x402/fetch": "2.26.0",
+    "@x402/svm": "2.26.0",
     "express": "5.2.1",
     "pg": "8.23.1",
     "playwright-core": "1.63.0",

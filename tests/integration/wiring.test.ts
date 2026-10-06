@@ -15,7 +15,7 @@ describe('production composition boundaries (offline)',()=>{
     const url='http://127.0.0.1:'+(server.address() as AddressInfo).port;
     try {
       expect(parts.executors.map(e=>e.route).sort()).toEqual(['atlas','nuitee','shopify']);
-      expect(parts.fundingAdapters.map(f=>f.rail)).toEqual(['cardano']);
+      expect(parts.fundingAdapters.map(f=>f.rail)).toEqual(['cardano','solana']);
       for(const c of [...parts.executors,...parts.fundingAdapters,...parts.bankAdapters]) expect((await c.readiness()).status).toBe('MISSING_CONFIG');
       expect((await fetch(url+'/inspect')).status).toBe(200);
       expect((await fetch(url+'/v1/evidence/purchases')).status).toBe(401);
