@@ -62,3 +62,24 @@ The Docker access/build concern was resolved through permitted local access: ima
 | Shopify discovery searches recent orders with a finite window. | Persist direct order handles and use verified webhook hints; ambiguous/missing readback stays unresolved. | An undiscovered order may require manual lookup; no second checkout is sent. |
 | Cross-currency charge anomalies have no automatic valuation. | Preserve original currency reservation, record actual anomaly and require operator review; no automatic release. | Exposure cannot be quantified automatically in another currency. Production use is excluded. |
 | Solana, live Masumi/Sokosumi, polished console and submissions remain separate lanes. | Preserve channel/funding contracts and explicit completion matrix. | This first-lane local completion does not mean hackathon completion. |
+
+## External acceptance hardening review disposition
+
+| Finding | Class | Status / action | Why it matters / risk of deferring |
+|---|---|---|---|
+| AN-1 Atlas funding with closed gate | Act Now | Resolved locally: quote/funding guard and execution guard before any write; gate remains false. | Customer funding or supplier hold could precede rejection. Offline regressions pass. |
+| IN-4 relative/missing payer ledger | Act Now | Resolved locally: required absolute path, exclusive setup initialization, pay/bridge require existing valid history. | Lost history could reset signer caps. Operator reconciliation required after loss. |
+| PG-2 swallowed worker database errors | Act Now | Resolved locally: sanitized tick/job machine-code logs, no lifecycle redesign. | Acceptance failures would otherwise disappear; retry/recovery remains durable. |
+| PG-5 unscaled service fee | Act Now | Resolved locally: frozen scaled principal/fee/total allocation; non-zero fee regression. | Unscaled fee could exceed scaled funding and corrupt completion accounting. |
+| Shopify IN-1 hosted fields/forced click | Investigate Now | Unchanged; later UNFUNDED live rehearsal. | Unverified hosted fields or forced click can invalidate payment-safety/acceptance assumptions. |
+| Atlas IN-2 ambiguous pay.do results | Investigate Now | Unchanged payment blocker; preserve gate false. | Ambiguous outcomes may be misclassified; no Atlas payment acceptance yet. |
+| Atlas IN-3 final fee readback / runbook overstatement | Investigate Now | Unchanged payment blocker; verify independently before enabling payment. | Final fees may not match prior zero-fee assumptions; documentation is not external proof. |
+| Legacy unstructured/full-notional obligations | Ignore / Accept Risk | Stored amounts and original commitments preserved; new payer rejects them. Requote for new demo payments, retain old recovery records. | No silent history rewrite, but old challenges cannot be signed by the hardened demo payer. |
+| Windows protected ledger permissions | Ignore / Accept Risk | Apply OS ACLs; mode 0600 is best effort as before. | Absolute paths and initialization do not replace filesystem access control. |
+| Full Chromium runtime packaging/live selectors | Investigate Now | Build-stage packaging only; no browser rehearsal or runtime image verification here. | Host tests cannot establish actual store selector behavior; acceptance remains NOT_RUN. |
+
+P-1 through P-12, PG-1 and other PG findings remain outside this lane. No unrelated remediation or
+provider-routing redesign was performed. The owner-supplied accepted Opus verdict/findings and PostgreSQL review reconciliation pasted in
+Hackathon Build Recommendation were used. Original full core report was absent in inspected worktrees;
+its accepted findings are carried through that reconciliation. Independent review
+must check this financial-policy branch before acceptance.

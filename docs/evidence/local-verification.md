@@ -1,3 +1,132 @@
+# External acceptance hardening — local verification, 2026-10-06
+
+Branch: build/external-acceptance-hardening. Base: 45db8d6a2fd486947b9e6b5045493a849309f326.
+Worktree: C:/Dev/token2049-origins/external-acceptance-hardening. Final SHA: git rev-parse HEAD;
+remote must match before delivery. Original core 2b6260b41149d36fafcb98b387dec9cf43faa31f was verified
+as ancestor, then Commerce Core fast-forwarded/pushed and remote verified at 45db8d6. All worktrees
+were clean before editing. Main remains 95a896c730cf893c3afd00919ebe16ad823a608b; no main merge,
+Render operation, deployment or merge of hardening into Commerce Core.
+
+Accepted review baseline: original owner-supplied findings and the PostgreSQL review/reconciliation
+pasted in Hackathon Build Recommendation, conversation 6ac3a6cd-5400-83ec-8547-957895148604,
+message a1ba86e2-463f-4ae5-b514-6900bc3f2565. Review target 45db8d6, PASS TO INTEGRATE. The report
+reconfirms AN-1/IN-4, PG-2/PG-5 and unchanged Shopify IN-1/Atlas IN-2/IN-3. The original full core
+review was absent in the worktrees; its accepted reconciled findings were used. This is implementation
+verification, not a new independent review.
+
+Environment: Windows ARM64, PowerShell, Node 24.15.0. Local loopback PostgreSQL **18.6** using the
+existing healthy postgres:18 Compose container. Tests use isolated random schemas and real SQL.
+No .env/provider secrets were loaded. No new package dependency or migration.
+The npm PowerShell wrapper referenced a missing npm-cli; commands used the installed Node/npm CLI
+or pinned local binaries. Installation used node plus C:/Program Files/nodejs/node_modules/npm/bin/npm-cli.js
+ci --ignore-scripts (183 packages). No dependency versions/lockfile were changed.
+
+| Check / exact command | Result | Evidence and limits |
+|---|---|---|
+| node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit | PASS | Strict source/scripts/clients/tests. |
+| node node_modules/typescript/bin/tsc -p tsconfig.build.json; node scripts/copy-migrations.mjs | PASS | Production output includes dist/demo/demo-data.json and unchanged SQL migrations. |
+| node node_modules/vitest/vitest.mjs run tests/unit/settlement.test.ts tests/integration/scaled-settlement.test.ts tests/unit/cardano-payer.test.ts tests/unit/cardano-adapter.test.ts tests/unit/atlas-executor.test.ts | PASS | Initial focused financial/payer/gate set: 169/169. Final additional closed-gate readback regression also passes. |
+| node node_modules/vitest/vitest.mjs run tests/unit/atlas-executor.test.ts tests/unit/cardano-payer.test.ts tests/integration/scaled-settlement.test.ts | PASS | Final focused set 101/101; preserves readback after gate closes. |
+| node node_modules/vitest/vitest.mjs run | PASS | **440/440 tests in 24 files**, zero failures/skips; final run at 16:10:58 SGT, duration 9.88s. |
+| Quote/funding/channel contracts and evidence | PASS | Included in full suite; signed wrong scale/amount/asset/payee/network/decimals refuse; commercial and chain amounts visible together. |
+| Journal, Cardano adapter/binding/SDK/payer/ledger | PASS | Included in full suite; fee allocation and trial balance per asset; missing history refuses before signing/gateway access. |
+| Integration, PostgreSQL concurrency/idempotency and funding recovery | PASS | All tests/integration included; real separate connections, locks/fences, restart/replay/recovery retained. |
+| DATABASE_URL=local loopback; node dist/scripts/db-smoke.js | PASS | PostgreSQL 18.6 authenticated; isolated write/read, pool restart/migration rerun; two compiled gateway processes verify health/auth/persistence. Probe schema removed. |
+| DATABASE_URL=local loopback; node dist/scripts/readiness.js | PASS | Exit 0, all five adapters MISSING_CONFIG; Atlas payment gate disabled. No provider calls. |
+| DATABASE_URL=local loopback; node dist/scripts/readiness.js --strict | EXPECTED FAIL | Exit 1 with missing provider configuration; this is fail-closed readiness, not external PASS. |
+| docker build --target build -t t2o-hardening-build:verification . | PASS | Linux ARM64 build packaging includes demo JSON; final Chromium runtime image not tested. |
+| git diff --check | PASS | Two trailing blank lines corrected; final check clean. Exact-file staging; no secret/env/wallet artifacts staged. |
+
+## Explicit regression evidence
+
+- USD 1.00 -> 1000 base units -> 0.001000 test stablecoin.
+- USD 10.00 -> 10000 base units -> 0.010000 test stablecoin.
+- USD 183.40 -> 183400 base units -> 0.183400 test stablecoin.
+- USD 123.47 -> 123470; zero -> zero; USD 500.00 -> 500000. Unsupported currency/precision refuse.
+- Actual configured commercial boundary tested at USD 183.40: exact boundary purchases; one cent over refuses.
+- Quote at 1/1000, edit the current loaded demo SSOT to full_notional, create purchase and restart against
+  changed config: fundingRequirement still has original scale/183400. Funding/receipt/evidence and journal
+  retain both USD 183.40 simulated capacity and 183400 observed fixture token units in distinct assets.
+- USD 100 principal + USD 1 service fee -> 100000 + 1000 = 101000. Later fee/policy config edits do not
+  change posting. Testnet fee/principal allocations are frozen; no negative principal.
+- Wrong signed scale, amount, asset, payee, network and decimals fail before facilitator submission;
+  signature commitment changes for every modified economic/binding field.
+- Atlas OFF: search allowed, executable quote refused; no hold/order/pay/passenger write. An older stored
+  flight quote cannot create a new customer funding requirement. ON behavior stays tested; readback of
+  earlier paid attempts remains available when the gate closes. IN-2/IN-3 were not fixed.
+- Required absolute existing protected payer ledger accepted; missing variable, relative/malformed path,
+  missing initialized history and corrupt history refuse. First-time setup initializes exclusively;
+  existing wallet with missing ledger demands operator reconciliation. Setup tests create temporary
+  offline mnemonic/ledger files and remove them; no wallet was funded or used for a network transaction.
+- Worker DB failure log retains only stage/jobId/whitelisted machine code, with no error body/SQL secrets.
+
+## External status and risks
+
+All external evidence remains **NOT_RUN**: Cardano transfer, Shopify checkout/rehearsal, Atlas calls,
+Nuitée booking, OCBC calls and deployment. Readiness uses credential-free composition only.
+
+AN-1, IN-4, PG-2 and PG-5: PASS locally. Shopify IN-1 and Atlas IN-2/IN-3 remain Investigate Now blockers.
+PG-1 and other parked review findings remain deferred. Legacy unstructured/full-notional obligations
+are preserved but refused by the new demo payer (Ignore / Accept Risk; requote for new demos, retain
+old recovery). Windows ACL enforcement remains an operator responsibility (Ignore / Accept Risk).
+Full runtime/live selector validation remains Investigate Now; do not infer it from host/build tests.
+No unresolved new Act Now finding was identified during implementation checks.
+
+Next action, in a fresh chat: independent review of this branch before the unfunded Shopify rehearsal.
+Do not automatically review, merge, rehearse or deploy.
+
+## Changed-file manifest (42 files)
+
+```text
+.env.payer.example
+Dockerfile
+README.md
+clients/payer/config.ts
+clients/payer/ledger.ts
+clients/payer/payer.ts
+clients/payer/wallet-generate.ts
+demo/demo-data.json
+docs/KNOWN_ISSUES.md
+docs/RUNBOOK.md
+docs/TEST_CHECKLIST.md
+docs/contracts/CHANNEL_CONTRACT.md
+docs/decisions/scaled-testnet-settlement.md
+docs/evidence/cardano-protocol.md
+docs/evidence/local-verification.md
+docs/work/ACTIVE_TASK.md
+scripts/atlas-check.ts
+scripts/nuitee-check.ts
+src/composition.ts
+src/contracts/commerce.ts
+src/contracts/index.ts
+src/contracts/ports.ts
+src/contracts/settlement.ts
+src/core/journal.ts
+src/core/service.ts
+src/core/store.ts
+src/core/views.ts
+src/core/worker.ts
+src/demo/config.ts
+src/evidence/read-model.ts
+src/execution/atlas/executor.ts
+src/funding/cardano/adapter.ts
+src/funding/cardano/binding.ts
+tests/integration/scaled-settlement.test.ts
+tests/support/fixtures.ts
+tests/support/harness.ts
+tests/unit/atlas-executor.test.ts
+tests/unit/cardano-adapter.test.ts
+tests/unit/cardano-payer.test.ts
+tests/unit/settlement.test.ts
+tests/unit/shopify-browser.test.ts
+tests/unit/shopify.test.ts
+```
+
+---
+
+The prior PostgreSQL migration record below is retained as historical evidence. Its remote resource
+operations were performed in that earlier lane, not this hardening lane.
+
 # PostgreSQL local and Render verification — 2026-10-06
 
 - Branch: build/postgres-persistence; base 2b6260b41149d36fafcb98b387dec9cf43faa31f.

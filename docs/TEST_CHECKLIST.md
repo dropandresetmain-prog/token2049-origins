@@ -33,11 +33,27 @@ Local tests and external acceptance are separate. Fixtures are test-only, carry 
 - [x] Sanitized readiness: every real adapter reports MISSING_CONFIG. Strict readiness exits 1 as expected.
 - [x] Container build/runtime/browser/volume checks PASS on Linux ARM64; non-root Chromium launch, scoped auth and database/token persistence across restart. No public deployment/live checkout claim.
 
+## External acceptance hardening — local regressions
+
+- [x] Strict demo JSON boundary; canonical scenarios consume the typed SSOT; relative search dates.
+- [x] USD 1.00 / 10.00 / 183.40 / 123.47 / zero / limit convert exactly; unsupported currency/precision reject.
+- [x] Quote digest binds policy; current demo policy edits and process restart preserve the original stored amount.
+- [x] Commercial principal/fee/total and chain principal/fee/total persist and remain visible in evidence/receipt.
+- [x] Wrong signed scale, amount, asset, payee, network or decimals refuses before facilitator calls.
+- [x] USD 100 + USD 1 fee becomes 0.100000 + 0.001000 = 0.101000; journal balances per distinct asset.
+- [x] Absolute existing protected ledger accepted; missing/relative/malformed path or vanished history refuses.
+- [x] First-time offline setup initializes ledger; existing wallet with missing history demands reconciliation.
+- [x] Atlas closed gate refuses quotes/funding and all execution writes; gate-on behavior/readback retained.
+- [x] Worker error logging omits SQL detail, credentials and raw provider bodies; durable retries unchanged.
+
+External evidence remains **NOT_RUN**. Independent hardening review precedes the separate UNFUNDED
+Shopify rehearsal. Shopify IN-1 and Atlas IN-2/IN-3 are unchanged blockers; do not start these actions here.
+
 ## Fresh external acceptance sequence
 
 1. Provision receive-only Preprod treasury configuration, an official Preprod Blockfrost project, facilitator, disposable payer wallet with tADA and exact tUSDM, separate tokens for the SAME customer, reviewed caps and protected shared payer ledger. Verify supported network/scheme and independent chain access without printing secrets.
 2. Provision own Shopify dev store/Bogus gateway and permissions. Independently resolve Atlas's founder payment-path decision; keep the flag false until approval. Provision verified LiteAPI sandbox key and OCBC API subscriptions/session access.
-3. Run a fresh customer-authenticated search, exact quote and digest/max-total approval. Capture the funding challenge, identifiers and expiry, with secrets/PII removed.
+3. Verify the disclosed scaled-testnet policy and protected existing payer ledger. Run a fresh customer-authenticated search, exact quote and digest/max-total approval. Capture the funding challenge, identifiers and expiry, with secrets/PII removed.
 4. Fund through the bounded payer. Confirm on independent Blockfrost: Preprod network, canonical transaction hash, exact treasury output/asset/amount, signed quote commitment and required depth. Confirm persisted core journal and reservation before merchant execution.
 5. For EACH route, execute a new funded sandbox purchase once, independently retrieve it and capture the safe receipt. Shopify: test PAID + Bogus SALE/CAPTURE; Atlas: approved test balance + explicit zero fee + paid/ticket status; Nuitée: exact booking/client/hotel identities + sandbox simulated payment.
 6. Capture a restart/timeout and duplicate webhook/funding retry against the sandbox without a second merchant write. Compare journal balance, exposure and public evidence labels. Preserve unresolved states; do not manufacture success to finish the checklist.

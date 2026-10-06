@@ -17,7 +17,7 @@ gateway process.
 - Planning release `launch-2026-10-06-v1` imported from
   `dropandresetmain-prog/wip-personal@af648eece01321fec50bcddeee9ba92fd3e10d3a`
   (`token2049-hackathon/`).
-- Commerce Core local implementation is complete on `build/commerce-core`: all six lanes integrated, the PostgreSQL persistence lane replaces its original database before external acceptance.
+- Commerce Core local implementation is complete on `build/commerce-core`: all six lanes integrated; reviewed PostgreSQL is fast-forwarded into Commerce Core. External acceptance hardening is a separate review branch.
 - Runtime and acceptance instructions: [RUNBOOK](docs/RUNBOOK.md), [TEST_CHECKLIST](docs/TEST_CHECKLIST.md), [KNOWN_ISSUES](docs/KNOWN_ISSUES.md), [HANDOFF](docs/HANDOFF.md).
 - No external acceptance has passed yet. Sandbox/testnet evidence is tracked separately from local
   tests in [`docs/work/ACTIVE_TASK.md`](docs/work/ACTIVE_TASK.md).
@@ -65,3 +65,19 @@ reviewed commit; this repository owns execution state.
 Public-testnet payments are real transactions with valueless test assets. Merchant sandboxes produce
 provider-generated test orders/bookings. Internal simulated fiat/card accounting connects them but is
 not a real crypto-to-fiat conversion, bank settlement or card-network transaction.
+
+## Demo settlement policy
+
+The hackathon demo uses a disclosed **1:1000 notional scale** for public-testnet stablecoins:
+USD 183.40 commercial principal -> 0.183400 tUSDM on Cardano Preprod (183,400 base units at 6 decimals).
+These test assets have no real-world value. This is a testnet notional scale, not an FX rate.
+The chain transfer demonstrates payment authorization, amount binding, transaction settlement,
+purchase gating and reconciliation. It does not prove USD redemption, crypto-to-fiat conversion,
+Visa settlement, bank settlement or equivalent economic value. Provider sandbox commerce continues
+at its full commercial test amount. SERVICE_FEE_BPS remains 0 by default; a configured non-zero fee
+uses the same scale as principal.
+
+Canonical secret-free scenario data: [demo/demo-data.json](demo/demo-data.json), validated by
+[src/demo/config.ts](src/demo/config.ts). Runtime endpoints, secrets, exact asset identities,
+protocol constants and independent signer/security caps remain runtime configuration or code.
+See [current settlement decision](docs/decisions/scaled-testnet-settlement.md).

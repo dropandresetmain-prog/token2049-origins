@@ -73,3 +73,14 @@ Compatible Cardano payers include signed metadata label 2049 with the applicatio
 Default MCP clients lack `purchases:fund`; provision a separate read/fund payer client for the SAME customer. Gateway destinations require HTTPS except exact loopback HTTP; the bridge is loopback-only. The gateway never imports signer/client key material.
 
 Evidence routes require owner-scoped `evidence:read`, or `operator:read` for treasury/bank/refresh. `/inspect` is a public static shell. `/v1/webhooks/shopify` verifies raw-byte HMAC before JSON parsing and only schedules independent readback; payload financial claims cannot complete a purchase. Receipt/result provenance overrides environment inference, and `executionEvidenceStatus` distinguishes source-only/pending execution evidence from receipt issuance.
+
+## Explicit notional settlement contract
+
+New funding options include settlement.policy {mode:scaled_testnet,numerator:1,denominator:1000},
+commercialPrincipal, commercialServiceFee, commercialTotal and principalBaseUnits/feeBaseUnits/
+totalBaseUnits. amount still supplies network, exact assetId, decimals and total amountBaseUnits;
+rail and payTo remain explicit. Purchase/receipt/evidence responses retain fundingRequirement after
+payment. USD 183.40 becomes exactly 183400 six-decimal base units (0.183400 tUSDM), not an FX exchange.
+Quote digest and Cardano metadata bind policy/breakdown; current demo edits never recalculate old
+obligations. The historical payablePrincipal field is commercial total including fee. See the
+[current decision](../decisions/scaled-testnet-settlement.md) for disclosure and legacy compatibility.

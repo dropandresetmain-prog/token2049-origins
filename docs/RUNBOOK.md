@@ -10,7 +10,7 @@ Hosted runtime uses Render PostgreSQL. SQLite is not supported. PostgreSQL 18 ma
 current default. Planning sources under `docs/planning/` are historical snapshots for persistence choices.
 
 ```powershell
-Set-Location C:\Dev\token2049-origins\postgres-persistence
+Set-Location C:\Dev\token2049-origins\external-acceptance-hardening
 npm ci
 docker compose up -d --wait
 $env:DATABASE_URL = 'postgresql://origins:origins_local_only@127.0.0.1:55432/origins'
@@ -45,7 +45,7 @@ node --env-file=.env --import tsx scripts/create-client.ts --name "Operator" --c
 
 The default MCP client has offers/quotes/purchase/evidence scopes and lacks `purchases:fund`. The payer role has only purchase read/fund. The operator role has read/evidence/operator scopes. A role is provisioned locally, never accepted from a caller's request body. Custom `--scopes` overrides the default; avoid write-only clients because purchase idempotency retries currently also require read scope.
 
-Copy `.env.payer.example` to ignored `.env.payer` for the separate payer process. Set a reviewed test-token principal budget, daily/cumulative caps, per-transaction ADA fee/output caps, an exact asset and payee, and one ABSOLUTE shared ledger path for all processes using the wallet. These example policy values do not authorize Atlas spending.
+Copy `.env.payer.example` to ignored `.env.payer` for the separate payer process. Set token-denominated limits for the scaled settlement total (principal plus fee), daily/cumulative caps, per-transaction ADA fee/output caps, an exact asset and payee, and one ABSOLUTE shared ledger path for all processes using the wallet. These example policy values do not authorize Atlas spending.
 
 ```powershell
 node --env-file=.env.payer --import tsx clients/payer/wallet-generate.ts
@@ -53,9 +53,9 @@ node --env-file=.env.payer --import tsx clients/payer/wallet-generate.ts
 node --env-file=.env.payer --import tsx clients/payer/pay.ts --purchase pur_REPLACE
 ```
 
-Wallet generation refuses to overwrite a mnemonic file and prints only the public address and faucet references. Protect mnemonic, token and ledger files with OS access controls; mode 0600 alone is not a Windows ACL guarantee. Never load `.env.payer`, mount wallets, or import `clients/payer` into the gateway.
+Wallet generation exclusively initializes both the new mnemonic and protected ledger, and prints only the public address and faucet references. PAYER_LEDGER_FILE is required and must be an absolute file path. Pay/bridge startup and every payment refuse missing or corrupt history. If a wallet exists but its ledger disappeared, stop and reconcile history; never initialize an empty replacement to regain budget. Protect mnemonic, token and ledger files with OS access controls; mode 0600 alone is not a Windows ACL guarantee. Never load `.env.payer`, mount wallets, or import `clients/payer` into the gateway.
 
-The payer first requests the x402 challenge, verifies network/asset/payee/amount/quote policy, signs once, persists its signing/payment ledger and retries the exact payload. The transaction includes metadata label 2049 committing to the resource, purchase, quote, digest, expiry, network, asset, amount and treasury. A vanilla x402 signer without this commitment is unsupported. Details are in [Cardano protocol](evidence/cardano-protocol.md).
+The payer first requests the x402 challenge, verifies the structured scaled_testnet policy, exact commercial/chain arithmetic, decimals, network/asset/payee/amount/quote policy, signs once, persists its signing/payment ledger and retries the exact payload. The transaction includes metadata label 2049 committing to the resource, purchase, quote, digest, expiry, network, asset, amount and treasury. A vanilla x402 signer without this commitment is unsupported. Details are in [Cardano protocol](evidence/cardano-protocol.md).
 
 For MCP automation, create a private bridge-token file independently of the gateway token, set the SAME token-file path for bridge and MCP, and launch:
 
@@ -71,7 +71,7 @@ Use `.env.mcp.example` for the MCP process. Gateway destinations require HTTPS e
 | Provider | Required gate and truthful completion |
 |---|---|
 | Shopify | Own dev store, Storefront token, Admin read credentials, browser executable, explicit dev-store/Bogus flags. Synthetic Test Buyer / example.com identity only. Cart quote includes delivery and tax. Durable `pay_click` precedes the browser click. Independent Admin readback must bind the quote nonce and show `test=true`, `PAID`, successful Bogus SALE/CAPTURE and exact presentment amount. No Admin mark-paid/order-create path exists. |
-| Atlas | Approved sandbox host and credentials. `ATLAS_ALLOW_TEST_BALANCE_PAYMENT` stays false until explicit founder approval of the sandbox test-balance exception. Only explicit zero transaction fees are supported before payment, including final readback. A hold is unpaid. Paid ticketing remains distinct from ticketed. Test-balance usage consumes synthetic capacity and never creates a card liability. |
+| Atlas | Approved sandbox host and credentials. `ATLAS_ALLOW_TEST_BALANCE_PAYMENT` stays false until explicit founder approval of the sandbox test-balance exception. Closed gate permits search but refuses executable quotes, creation of funding requirements and provider writes before holds/passenger submission. Only explicit zero transaction fees are supported before payment, including final readback. A hold is unpaid. Paid ticketing remains distinct from ticketed. Test-balance usage consumes synthetic capacity and never creates a card liability. |
 | Nuitée | Confirmed `sand_` sandbox key. Unknown/production prefixes are blocked. ACC_CREDIT_CARD payment is provider-simulated. Independent GET readback must bind booking ID, client reference, hotel ID, sandbox flag, paid status and exact amount. Ambiguous HTTP 408/5xx cannot release exposure. |
 | OCBC | Application credentials and API subscriptions; customer session where needed. Only token mint and read-only observations. Historical sandbox data is labelled; no observation changes journal or capacity. Card resource contracts remain externally unverified. |
 
@@ -172,3 +172,35 @@ or explicitly authorize an upgrade; this lane authorizes no paid plan.
 
 Official sources: [Postgres creation/connections](https://render.com/docs/postgresql-creating-connecting),
 [free database limits](https://render.com/docs/free), [Blueprint fields](https://render.com/docs/blueprint-spec).
+
+## Demo settlement policy
+
+The hackathon demo uses a disclosed **1:1000 notional scale** for public-testnet stablecoins:
+USD 183.40 commercial principal -> 0.183400 tUSDM on Cardano Preprod (183,400 base units at 6 decimals).
+These test assets have no real-world value. This is a testnet notional scale, not an FX rate.
+The chain transfer demonstrates payment authorization, amount binding, transaction settlement,
+purchase gating and reconciliation. It does not prove USD redemption, crypto-to-fiat conversion,
+Visa settlement, bank settlement or equivalent economic value. Provider sandbox commerce continues
+at its full commercial test amount. SERVICE_FEE_BPS remains 0 by default; a configured non-zero fee
+uses the same scale as principal.
+
+Canonical secret-free scenario data: [demo/demo-data.json](../demo/demo-data.json), validated by
+[src/demo/config.ts](../src/demo/config.ts). Runtime endpoints, secrets, exact asset identities,
+protocol constants and independent signer/security caps remain runtime configuration or code.
+See [current settlement decision](decisions/scaled-testnet-settlement.md).
+
+## Payer limits and operational errors
+
+Example six-decimal asset limits: 500000 per payment (0.500000), 1500000 cumulative (1.500000),
+1000000 per UTC day (1.000000). These are independent token safety caps, not USD balances. They
+correspond to commercial notional ceilings of 500/1500/1000 USD under the fixed scale, including fees.
+Keep one absolute protected ledger path shared by CLI and bridge. POSIX mode 0600 remains best effort;
+apply Windows ACLs. Setup refuses existing wallet/ledger files, and never resets old spend history.
+
+Worker tick/job failures emit sanitized worker.error events with stage, optional jobId and whitelisted
+SQLSTATE/system errorCode. Messages/SQL detail/provider bodies are omitted. Durable retries/recovery
+are unchanged. PG-1 lease renewal stays parked.
+
+Shopify IN-1 hosted-field allow-list/forced pay click must be investigated in the later UNFUNDED live
+rehearsal. Atlas IN-2 ambiguous pay.do and IN-3 final-fee readback remain payment-acceptance blockers;
+the provider table is not external acceptance proof. Do not enable Atlas to bypass these blockers.

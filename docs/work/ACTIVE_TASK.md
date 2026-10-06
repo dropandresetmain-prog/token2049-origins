@@ -13,7 +13,8 @@ Cardano transaction, browser rehearsal, Atlas enablement, main merge or Render d
 - Branch: build/external-acceptance-hardening.
 - Base: 45db8d6a2fd486947b9e6b5045493a849309f326.
 - Worktree: C:/Dev/token2049-origins/external-acceptance-hardening.
-- Hardening remote: pending checkpoints/push.
+- Remote publication: build/external-acceptance-hardening; delivery requires origin SHA == git rev-parse HEAD.
+  The final completion report records the verified SHA (avoids a self-referential commit hash).
 
 ## Scope, risks and verification
 
@@ -23,8 +24,10 @@ stored requirements. No PostgreSQL DDL required.
 
 Targeted fixes: AN-1 Atlas closed gate, IN-4 absolute initialized payer ledger, PG-2 worker logging,
 PG-5 fee scaling. Shopify IN-1 and Atlas IN-2/IN-3 stay blockers. Other findings remain out of scope.
-Review reports were not found in reviewed worktrees; the owner's accepted verdict/findings are the
-current baseline pending report location.
+Accepted baseline: owner-supplied original review findings plus the PostgreSQL review/reconciliation
+pasted in the planning chat, Hackathon Build Recommendation (6ac3a6cd-5400-83ec-8547-957895148604,
+message a1ba86e2-463f-4ae5-b514-6900bc3f2565). The original full core report was not present in the
+reviewed worktrees; its reconciled findings remain authoritative. No new review was started.
 
 Affected areas: contracts/core/funding binding, evidence, independent payer, Atlas, demo scripts,
 packaging/docs. Risks: financial semantics, recalculating old obligations, lost ledger history,
@@ -36,12 +39,28 @@ compiled gateway smoke; local readiness; diff check. External evidence remains N
 
 - [x] Verify and integrate PostgreSQL baseline.
 - [x] Inspect authoritative docs and affected live code.
-- [ ] Demo SSOT and schema.
-- [ ] Frozen settlement, fee scaling and regressions.
-- [ ] Payer ledger and Atlas gate.
-- [ ] Safe worker error logging.
-- [ ] Local verification and docs.
-- [ ] Exact-file commits and hardening branch push; no merge.
+- [x] Demo SSOT and schema.
+- [x] Frozen settlement, fee scaling and regressions.
+- [x] Payer ledger and Atlas gate.
+- [x] Safe worker error logging.
+- [x] Local verification and docs: 440/440 tests in 24 files, typecheck/build, compiled smoke, readiness and diff check.
+- [x] Exact-file checkpoint commits; hardening-only push and remote comparison are the delivery guard. No merge.
 
 Next action: independent review of build/external-acceptance-hardening before the unfunded Shopify
 rehearsal. Do not start that review automatically.
+
+## Verified results and review handoff
+
+No new migrations/dependencies. Financial behavior remains review-gated on this branch; do not merge
+it into Commerce Core yet. Commerce Core remote stays at 45db8d6; main stays at 95a896c. No Render
+resource was read or changed in this lane. AN-1, IN-4, PG-2 and PG-5 pass local regressions. Shopify
+IN-1 and Atlas IN-2/IN-3 remain Investigate Now blockers; PG-1 and other parked findings stay deferred.
+
+Build-stage Docker packaging includes compiled demo JSON. Full runtime image/live Chromium is NOT_RUN.
+Readiness with provider credentials absent is MISSING_CONFIG for all adapters; informational exit 0,
+strict exit 1 as expected. No secrets or local environment files were read into the verification process.
+
+Use a fresh review chat: base 45db8d6, this branch head from git rev-parse HEAD, exact manifest and
+commands in docs/evidence/local-verification.md, current decision in docs/decisions/scaled-testnet-settlement.md.
+Review scope is frozen commercial/chain semantics, fee journal, payer ledger/binding, closed Atlas gate
+and sanitized worker logging. Exclude frontend/Solana/Masumi/deployment/external calls and parked backlog.
