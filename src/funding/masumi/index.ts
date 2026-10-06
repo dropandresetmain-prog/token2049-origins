@@ -8,7 +8,7 @@ export function obligationHash(input: FundingRequirementInput): string {
   return createHash('sha256').update(JSON.stringify({ purchaseId: input.purchaseId, quoteId: input.quoteId, quoteDigest: input.quoteDigest, amount: input.amount, payTo: input.payTo, resourceUrl: input.resourceUrl, expiresAt: input.expiresAt, purpose: 'purchase_principal' })).digest('hex');
 }
 export interface FeeBinding { inputHash: string; identifier: string; payBy: number; submitBy: number; unlockAt: number; disputeUntil: number; nonce: string; expectedPayerVkey?: string; }
-export type FeeObservation = { status: 'pending' | 'escrow_locked' | 'result_submitted' | 'released'; purpose: 'service_fee'; payment: FeePayment; transferReference: string | null; };
+export type FeeObservation = { status: 'pending' | 'escrow_locked' | 'result_submitted' | 'released'; purpose: 'service_fee'; payment: FeePayment; transferReference: string | null; withdrawalAccounting?: 'unreported' | 'matched'; };
 const Amount = z.object({ unit: z.string(), quantity: z.string().regex(/^[0-9]+$/) });
 const Output = z.object({ tx_hash: z.string().optional(), output_index: z.number().int(), address: z.string(), amount: z.array(Amount), data_hash: z.string().nullable(), inline_datum: z.string().nullable() });
 const Utxos = z.object({ outputs: z.array(Output), inputs: z.array(z.object({ tx_hash: z.string(), output_index: z.number().int(), reference: z.boolean(), collateral: z.boolean() })).optional() });
@@ -89,8 +89,12 @@ export async function observeServiceFee(client: MasumiClient, binding: FeeBindin
       if (amounts.length > 1) throw new Error('Duplicate fee asset in tagged payout');
       taggedAmount += BigInt(amounts[0]?.quantity ?? '0');
     }
-    if (taggedAmount !== BigInt(c.feeBaseUnits) || !p.WithdrawnForSeller.some(f => f.unit === c.assetUnit && f.amount === c.feeBaseUnits)) throw new Error('Native payout does not pay the exact frozen seller through the bound output-reference tag');
-    return { status: 'released', purpose: 'service_fee', payment: p, transferReference: locks[0] + '#' + lock.output_index };
+    if (taggedAmount !== BigInt(c.feeBaseUnits)) throw new Error('Native payout does not pay the exact frozen seller through the bound output-reference tag');
+    // This native V2 producer fills amount summaries only for disputed withdrawals. Empty is unreported,
+    // not zero cash: the exact final tagged chain output above is authoritative. Conflicting data still rejects.
+    const reported = p.WithdrawnForSeller.filter(f => f.unit === c.assetUnit);
+    if (p.WithdrawnForSeller.length && (reported.length !== 1 || reported[0]!.amount !== c.feeBaseUnits)) throw new Error('Native withdrawal amount summary conflicts with the independently proved payout');
+    return { status: 'released', purpose: 'service_fee', withdrawalAccounting: p.WithdrawnForSeller.length ? 'matched' : 'unreported', payment: p, transferReference: locks[0] + '#' + lock.output_index };
   }
   // An old transaction can remain confirmed after its output is spent. Independently prove current escrow.
   let unspent = false;

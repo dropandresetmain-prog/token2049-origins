@@ -266,6 +266,488 @@
       "verifiedState": "result_submitted",
       "transferFingerprint": "6f11e3fdaad71192",
       "coreReceiptPresent": true
+    },
+    {
+      "at": "2026-10-06T15:35:30.506Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "ResultSubmitted",
+      "nativePaymentAction": "WaitingForExternalAction",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        }
+      ],
+      "purchaseAction": "WaitingForExternalAction",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "7c01142f9dc3bf4f",
+      "independentConfirmations": 70,
+      "validContract": true,
+      "verifiedState": "result_submitted",
+      "transferFingerprint": "6f11e3fdaad71192",
+      "coreReceiptPresent": true
+    },
+    {
+      "at": "2026-10-06T15:43:50.059Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "ResultSubmitted",
+      "nativePaymentAction": "WithdrawInitiated",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "Pending",
+          "role": null,
+          "previousRole": null,
+          "confirmations": null,
+          "hashFingerprint": "a74c8b58140b4d30"
+        }
+      ],
+      "purchaseAction": "WaitingForExternalAction",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "7c01142f9dc3bf4f",
+      "independentConfirmations": 85,
+      "validContract": true,
+      "verificationError": "Native service state is stale or escrow is no longer unspent",
+      "coreReceiptPresent": true,
+      "coreEvidenceMode": "local_fixture",
+      "coreFundingEvidenceModes": [
+        "local_fixture"
+      ],
+      "coreReceiptFingerprint": "5da23a5db3a618d2"
+    },
+    {
+      "at": "2026-10-06T15:44:37.148Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "ResultSubmitted",
+      "nativePaymentAction": "WithdrawInitiated",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "Pending",
+          "role": null,
+          "previousRole": null,
+          "confirmations": null,
+          "hashFingerprint": "a74c8b58140b4d30"
+        }
+      ],
+      "purchaseAction": "WaitingForExternalAction",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "7c01142f9dc3bf4f",
+      "independentConfirmations": 87,
+      "validContract": true,
+      "currentPaymentTransactionFingerprint": "a74c8b58140b4d30",
+      "currentPaymentIndependentConfirmations": 2,
+      "currentPaymentValidContract": true,
+      "verificationError": "Native service state is stale or escrow is no longer unspent",
+      "coreReceiptPresent": true,
+      "coreEvidenceMode": "local_fixture",
+      "coreFundingEvidenceModes": [
+        "local_fixture"
+      ],
+      "coreReceiptFingerprint": "5da23a5db3a618d2"
+    },
+    {
+      "at": "2026-10-06T15:47:43.172Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "ResultSubmitted",
+      "nativePaymentAction": "WithdrawInitiated",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "Pending",
+          "role": null,
+          "previousRole": null,
+          "confirmations": null,
+          "hashFingerprint": "a74c8b58140b4d30"
+        }
+      ],
+      "purchaseAction": "WaitingForExternalAction",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "7c01142f9dc3bf4f",
+      "independentConfirmations": 94,
+      "validContract": true,
+      "currentPaymentTransactionFingerprint": "a74c8b58140b4d30",
+      "currentPaymentIndependentConfirmations": 9,
+      "currentPaymentValidContract": true,
+      "verificationError": "Native service state is stale or escrow is no longer unspent",
+      "coreReceiptPresent": true,
+      "coreEvidenceMode": "local_fixture",
+      "coreFundingEvidenceModes": [
+        "local_fixture"
+      ],
+      "coreReceiptFingerprint": "5da23a5db3a618d2"
+    },
+    {
+      "at": "2026-10-06T15:49:41.692Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "ResultSubmitted",
+      "nativePaymentAction": "WithdrawInitiated",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "Pending",
+          "role": null,
+          "previousRole": null,
+          "confirmations": null,
+          "hashFingerprint": "a74c8b58140b4d30"
+        }
+      ],
+      "purchaseAction": "WaitingForExternalAction",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "7c01142f9dc3bf4f",
+      "independentConfirmations": 99,
+      "validContract": true,
+      "currentPaymentTransactionFingerprint": "a74c8b58140b4d30",
+      "currentPaymentIndependentConfirmations": 14,
+      "currentPaymentValidContract": true,
+      "verificationError": "Native service state is stale or escrow is no longer unspent",
+      "coreReceiptPresent": true,
+      "coreEvidenceMode": "local_fixture",
+      "coreFundingEvidenceModes": [
+        "local_fixture"
+      ],
+      "coreReceiptFingerprint": "5da23a5db3a618d2"
+    },
+    {
+      "at": "2026-10-06T15:51:13.054Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "ResultSubmitted",
+      "nativePaymentAction": "WaitingForExternalAction",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "FailedViaTimeout",
+          "role": null,
+          "previousRole": null,
+          "confirmations": null,
+          "hashFingerprint": "a74c8b58140b4d30"
+        }
+      ],
+      "purchaseAction": "WaitingForExternalAction",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "7c01142f9dc3bf4f",
+      "independentConfirmations": 103,
+      "validContract": true,
+      "currentPaymentTransactionFingerprint": "a74c8b58140b4d30",
+      "currentPaymentIndependentConfirmations": 18,
+      "currentPaymentValidContract": true,
+      "verificationError": "Native service state is stale or escrow is no longer unspent",
+      "coreReceiptPresent": true,
+      "coreEvidenceMode": "local_fixture",
+      "coreFundingEvidenceModes": [
+        "local_fixture"
+      ],
+      "coreReceiptFingerprint": "5da23a5db3a618d2"
+    },
+    {
+      "at": "2026-10-06T15:52:31.890Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "Withdrawn",
+      "nativePaymentAction": "None",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "Withdrawn",
+          "previousRole": "ResultSubmitted",
+          "confirmations": 20,
+          "hashFingerprint": "a74c8b58140b4d30"
+        }
+      ],
+      "purchaseAction": "None",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "a74c8b58140b4d30",
+      "independentConfirmations": 24,
+      "validContract": true,
+      "currentPaymentTransactionFingerprint": "a74c8b58140b4d30",
+      "currentPaymentIndependentConfirmations": 24,
+      "currentPaymentValidContract": true,
+      "verificationError": "Native payout does not pay the exact frozen seller through the bound output-reference tag",
+      "coreReceiptPresent": true,
+      "coreEvidenceMode": "local_fixture",
+      "coreFundingEvidenceModes": [
+        "local_fixture"
+      ],
+      "coreReceiptFingerprint": "5da23a5db3a618d2"
+    },
+    {
+      "at": "2026-10-06T15:55:54.183Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "Withdrawn",
+      "nativePaymentAction": "None",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "Withdrawn",
+          "previousRole": "ResultSubmitted",
+          "confirmations": 20,
+          "hashFingerprint": "a74c8b58140b4d30"
+        }
+      ],
+      "purchaseAction": "None",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "a74c8b58140b4d30",
+      "independentConfirmations": 35,
+      "validContract": true,
+      "currentPaymentTransactionFingerprint": "a74c8b58140b4d30",
+      "currentPaymentIndependentConfirmations": 36,
+      "currentPaymentValidContract": true,
+      "verifiedState": "released",
+      "nativeWithdrawalAccounting": "unreported",
+      "transferFingerprint": "6f11e3fdaad71192",
+      "coreReceiptPresent": true,
+      "coreEvidenceMode": "local_fixture",
+      "coreFundingEvidenceModes": [
+        "local_fixture"
+      ],
+      "coreReceiptFingerprint": "5da23a5db3a618d2"
+    },
+    {
+      "at": "2026-10-06T15:57:21.835Z",
+      "taskFingerprint": "9fa00595df3081a3",
+      "agentFingerprint": "732739788d1a6daf",
+      "sellerFingerprint": "9520549913f7fc90",
+      "buyerFingerprint": "abbb33ddc5a96fdf",
+      "purpose": "service_fee",
+      "feeBaseUnits": "10000",
+      "assetUnit": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde0014df10745553444d",
+      "nativeState": "Withdrawn",
+      "nativePaymentAction": "None",
+      "nativeResultHashPresent": true,
+      "resultMatchesFrozenCore": true,
+      "nativeTransactions": [
+        {
+          "status": "Confirmed",
+          "role": "ResultSubmitted",
+          "previousRole": "FundsLocked",
+          "confirmations": 20,
+          "hashFingerprint": "7c01142f9dc3bf4f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "FundsLocked",
+          "previousRole": null,
+          "confirmations": 20,
+          "hashFingerprint": "91e4c22256b3df5f"
+        },
+        {
+          "status": "Confirmed",
+          "role": "Withdrawn",
+          "previousRole": "ResultSubmitted",
+          "confirmations": 20,
+          "hashFingerprint": "a74c8b58140b4d30"
+        }
+      ],
+      "purchaseAction": "None",
+      "coreState": "succeeded",
+      "phase": "completed",
+      "submitBy": "2026-10-06T15:18:13.000Z",
+      "unlockAt": "2026-10-06T15:33:13.000Z",
+      "transactionFingerprint": "a74c8b58140b4d30",
+      "independentConfirmations": 39,
+      "validContract": true,
+      "currentPaymentTransactionFingerprint": "a74c8b58140b4d30",
+      "currentPaymentIndependentConfirmations": 39,
+      "currentPaymentValidContract": true,
+      "verifiedState": "released",
+      "nativeWithdrawalAccounting": "unreported",
+      "transferFingerprint": "6f11e3fdaad71192",
+      "coreReceiptPresent": true,
+      "coreEvidenceMode": "local_fixture",
+      "coreFundingEvidenceModes": [
+        "local_fixture"
+      ],
+      "coreReceiptFingerprint": "5da23a5db3a618d2"
     }
   ]
 }

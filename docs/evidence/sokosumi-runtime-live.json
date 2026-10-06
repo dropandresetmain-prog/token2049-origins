@@ -1,0 +1,28 @@
+{
+  "at": "2026-10-06T15:57:20.858Z",
+  "real": "actual authenticated Express task runtime and durable Postgres/core",
+  "simulated": [
+    "merchant",
+    "direct principal"
+  ],
+  "taskFingerprint": "9fa00595df3081a3",
+  "replayHttp": 200,
+  "sameTask": true,
+  "sameNativePayment": true,
+  "alteredBytesHttp": 409,
+  "invalidNonceHttp": 400,
+  "unauthorizedHttp": 401,
+  "unknownOwnedTaskHttp": 404,
+  "statusHttp": 200,
+  "status": "completed",
+  "resultState": "succeeded",
+  "receiptEvidenceMode": "local_fixture",
+  "countsBefore": {
+    "tasks": 3,
+    "purchases": 3
+  },
+  "countsAfter": {
+    "tasks": 3,
+    "purchases": 3
+  }
+}
