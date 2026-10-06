@@ -134,6 +134,8 @@ export class FixtureFundingAdapter implements FundingAdapter {
   readinessStatus: ReadinessStatus = 'LOCAL_TESTS_ONLY';
   verifyCalls = 0;
   confirmResult: 'confirmed' | 'submitted' | 'invalid' = 'confirmed';
+  /** Simulated verification/settlement latency. */
+  delayMs = 0;
 
   constructor(private readonly clock: Clock) {}
 
@@ -156,6 +158,7 @@ export class FixtureFundingAdapter implements FundingAdapter {
 
   async verify(header: string, input: FundingRequirementInput): Promise<FundingVerification> {
     this.verifyCalls++;
+    if (this.delayMs) await new Promise((r) => setTimeout(r, this.delayMs));
     const [tag, ref, amount, state = 'confirmed', asset = FIXTURE_ASSET, payee = FIXTURE_TREASURY, purpose = 'purchase_principal'] = header.split(':');
     if (tag !== 'fixture' || !ref || !amount) return { ok: false, code: 'payment_invalid', reason: 'malformed payment payload' };
     if (Date.parse(input.expiresAt) <= this.clock.now().getTime()) return { ok: false, code: 'payment_invalid', reason: 'requirement expired' };

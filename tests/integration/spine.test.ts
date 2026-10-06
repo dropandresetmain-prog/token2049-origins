@@ -110,6 +110,18 @@ describe('commerce spine (local fixtures)', () => {
     expect(h.funding.verifyCalls).toBe(before);
   });
 
+  it('concurrent fund calls for one purchase settle at most one payment', async () => {
+    const a = await createFundablePurchase(h);
+    h.funding.delayMs = 50;
+    const [r1, r2] = await Promise.all([
+      h.call('POST', `/v1/purchases/${a.purchase.purchaseId}/fund`, { token: h.alice.token, headers: { 'payment-signature': `fixture:cc1:${a.required}` } }),
+      h.call('POST', `/v1/purchases/${a.purchase.purchaseId}/fund`, { token: h.alice.token, headers: { 'payment-signature': `fixture:cc2:${a.required}` } }),
+    ]);
+    expect([r1.status, r2.status].sort()).toEqual([202, 409]);
+    expect(h.funding.verifyCalls).toBe(1);
+    expect(h.gw.db.get<{ n: number }>('SELECT COUNT(*) n FROM funding_evidence')!.n).toBe(1);
+  });
+
   it('overpayment: excess recorded as unapplied refundable obligation', async () => {
     const a = await createFundablePurchase(h);
     const over = (BigInt(a.required) + 1_000_000n).toString();

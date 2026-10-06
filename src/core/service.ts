@@ -56,6 +56,9 @@ export type FundResult =
 const READY_FOR_USE = new Set(['CONFIGURED_UNVERIFIED', 'EXTERNAL_CHECK_PASSED', 'LOCAL_TESTS_ONLY']);
 
 export class CommerceCore {
+  /** Purchases with a payment verification/settlement in flight (single gateway process). */
+  private readonly fundingInFlight = new Set<string>();
+
   constructor(private readonly d: CoreDeps) {}
 
   private now(): string {
@@ -471,6 +474,21 @@ export class CommerceCore {
       return { kind: 'payment_required', requirements, purchase: this.viewOf(p) };
     }
 
+    // One settlement attempt per purchase at a time: a concurrent second payment is refused before it
+    // can be settled on-chain (otherwise it would become an unapplied refundable obligation).
+    if (this.fundingInFlight.has(purchaseId)) {
+      throw new CoreError('conflict', 'a funding attempt for this purchase is already in progress; retry with the same payment after it completes');
+    }
+    this.fundingInFlight.add(purchaseId);
+    try {
+      return await this.verifyAndRecord(purchaseId, adapter, paymentHeader, input);
+    } finally {
+      this.fundingInFlight.delete(purchaseId);
+    }
+  }
+
+  private async verifyAndRecord(purchaseId: string, adapter: FundingAdapter, paymentHeader: string, input: FundingRequirementInput): Promise<FundResult> {
+    let p = getPurchaseRow(this.d.db, purchaseId)!;
     const verification = await adapter.verify(paymentHeader, input);
     if (!verification.ok) {
       const nowIso = this.now();
