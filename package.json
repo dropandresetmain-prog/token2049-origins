@@ -36,9 +36,11 @@
     "console:test": "vitest run --config web/vitest.config.ts",
     "console:typecheck": "tsc -p web/tsconfig.json",
     "payer:hosted": "tsx clients/payer/hosted.ts",
-    "payer:hosted:init-ledger": "tsx clients/payer/hosted.ts --init-ledger"
+    "payer:hosted:init-ledger": "tsx clients/payer/hosted.ts --init-ledger",
+    "cdp:treasury": "tsx src/integrations/coinbase-cdp/cli.ts"
   },
   "dependencies": {
+    "@coinbase/cdp-sdk": "1.57.0",
     "@evolution-sdk/evolution": "0.5.14",
     "@modelcontextprotocol/sdk": "1.32.1",
     "@solana/kit": "5.1.0",

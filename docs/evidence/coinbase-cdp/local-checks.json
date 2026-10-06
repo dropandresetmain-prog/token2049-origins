@@ -1,0 +1,25 @@
+{
+  "baseSha": "0234d20a11e80285318c88511195c5f2d51c0df8",
+  "branch": "feat/coinbase-cdp-treasury",
+  "sdk": "@coinbase/cdp-sdk@1.57.0",
+  "externalApiAttempted": false,
+  "walletProvisioned": false,
+  "faucetRequested": false,
+  "testTransferSent": false,
+  "credentialNamesPresent": false,
+  "trackEligibilityConfirmed": false,
+  "checks": [
+    {
+      "name": "focused Coinbase CDP contract tests",
+      "command": "node_modules/.bin/vitest.cmd run tests/unit/coinbase-cdp.test.ts",
+      "result": "PASS",
+      "testsPassed": 5
+    },
+    {
+      "name": "TypeScript typecheck",
+      "command": "node_modules/.bin/tsc.cmd -p tsconfig.json --noEmit",
+      "result": "PASS"
+    }
+  ],
+  "externalEvidence": "None. CDP credentials are unavailable in process/user/machine environment names and local env key-name inventory; no authenticated call or transaction was attempted."
+}
