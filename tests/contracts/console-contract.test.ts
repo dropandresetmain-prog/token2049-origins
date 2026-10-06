@@ -21,6 +21,7 @@ import {
   PurchaseProofResponse,
 } from '../../web/src/contracts/evidence.js';
 import { createSampleSource } from '../../web/src/source/sample.js';
+import { redact } from '../../src/infrastructure/redact.js';
 
 const source = createSampleSource({ now: Date.parse('2026-10-06T10:20:00Z') });
 
@@ -61,6 +62,19 @@ describe('console contract drift: PurchaseProof', () => {
     for (const { bundle } of await bundles()) {
       expect(PurchaseProofResponse.safeParse({ proof: bundle.proof }).success).toBe(true);
     }
+  });
+
+  it('global source and shadow references remain valid after HTTP boundary redaction', async () => {
+    const global = (await bundles()).find(({ bundle }) => bundle.proof?.sourceOffer && bundle.proof.sandboxExecution);
+    expect(global).toBeDefined();
+    const proof = structuredClone(global!.bundle.proof!);
+    proof.sourceOffer!.variantId = 'gid://shopify/ProductVariant/44309740224767';
+    proof.sandboxExecution!.shadowProductId = 'gid://shopify/Product/10356286586937';
+    proof.sandboxExecution!.shadowVariantId = 'gid://shopify/ProductVariant/50673842487353';
+    const body = redact({ proof });
+    expect(PurchaseProofResponse.safeParse(body).success).toBe(true);
+    expect(body.proof.sourceOffer!.variantId).toBe(proof.sourceOffer!.variantId);
+    expect(body.proof.sandboxExecution!.shadowVariantId).toBe(proof.sandboxExecution!.shadowVariantId);
   });
 });
 

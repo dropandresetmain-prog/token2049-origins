@@ -9,7 +9,15 @@ describe('redaction of Shopify order references', () => {
     expect(redactString(`Order reference ${orderGid}`)).toBe('Order reference gid://shopify/Order/[REDACTED_NUMBER]');
     expect(redactString(`${orderGid}/notes`)).toBe('gid://shopify/Order/[REDACTED_NUMBER]/notes');
     expect(redactString(`${orderGid}\n`)).toBe('gid://shopify/Order/[REDACTED_NUMBER]\n');
-    expect(redactString('gid://shopify/ProductVariant/18933264089145')).toBe('gid://shopify/ProductVariant/[REDACTED_NUMBER]');
+    expect(redactString('gid://shopify/Customer/18933264089145')).toBe('gid://shopify/Customer/[REDACTED_NUMBER]');
+  });
+
+  it.each(['Product', 'ProductVariant', 'Shop', 'Publication'])('preserves canonical %s references required by catalog proof', (type) => {
+    const gid = `gid://shopify/${type}/18933264089145`;
+    expect(redactString(gid)).toBe(gid);
+    expect(redactString(`${gid}\n`)).toContain('[REDACTED_NUMBER]');
+    expect(redactString(`Reference ${gid}`)).toContain('[REDACTED_NUMBER]');
+    expect(redact({ authorization: gid, reference: gid })).toEqual({ authorization: '[REDACTED]', reference: gid });
   });
 
   it('continues masking card-like digits, email, bearer/API tokens and sensitive keys', () => {

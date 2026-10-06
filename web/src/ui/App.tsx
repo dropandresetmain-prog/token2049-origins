@@ -75,6 +75,16 @@ function Console() {
   );
   const currentId = list ? (list.rows.find((r) => r.group === 'in_progress') ?? list.rows[0])?.id ?? null : null;
   const currentHref = currentId ? detailHref(currentId) : listHref('all');
+  const previousCurrentId = useRef<string | null>(null);
+  useEffect(() => {
+    const previous = previousCurrentId.current;
+    previousCurrentId.current = currentId;
+    // Follow the current purchase; leave deliberately opened historical purchases in place.
+    if (previous && currentId && previous !== currentId && route.kind === 'detail' && route.id === previous &&
+        list?.rows.find((row) => row.id === currentId)?.group === 'in_progress') {
+      navigate(currentHref, { replace: true });
+    }
+  }, [currentId, currentHref, list, route.kind, route.kind === 'detail' ? route.id : null]);
 
   /* The list refreshes when it is opened, unless it was fetched moments ago. */
   const refreshList = useCallback(() => {
@@ -87,6 +97,13 @@ function Console() {
       },
     );
   }, [signOut]);
+
+  /* New API purchases must update Current purchase even while a completed detail is open. */
+  useEffect(() => {
+    if (session?.source.kind !== 'gateway') return;
+    const timer = window.setInterval(refreshList, 5000);
+    return () => window.clearInterval(timer);
+  }, [session?.source, refreshList]);
 
   /* Home resolves to the current purchase, replacing the entry so Back does not bounce. */
   const isHome = route.kind === 'home';
