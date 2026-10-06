@@ -6,7 +6,7 @@ import { CdpClient } from '@coinbase/cdp-sdk';
 import { CDP_CHAIN_ID, CDP_MAX_ACTION_WEI, CDP_NETWORK, CDP_TRANSFER_WEI, validateHistory, validateTransfer } from '../../src/integrations/coinbase-cdp/contracts.js';
 import type { CdpPublicIdentity, CdpSettings } from '../../src/integrations/coinbase-cdp/contracts.js';
 import { makeAccountPolicy } from '../../src/integrations/coinbase-cdp/client.js';
-import { provision } from '../../src/integrations/coinbase-cdp/client.js';
+import { provision, readNativeEthBalance } from '../../src/integrations/coinbase-cdp/client.js';
 import { sanitizeCliError } from '../../src/integrations/coinbase-cdp/errors.js';
 import { createHistoryOnce, initialHistory, readHistory, writeHistoryAtomic } from '../../src/integrations/coinbase-cdp/history.js';
 import { executeTestTransfer, transactionExplorerUrl } from '../../src/integrations/coinbase-cdp/transfer.js';
@@ -40,6 +40,16 @@ describe('Coinbase CDP treasury guards', () => {
     expect(() => validateTransfer(CDP_TRANSFER_WEI + 1n, CDP_NETWORK, identity.treasuryAddress, identity.recipientAddress)).toThrow(/per-action limit/);
     expect(() => validateTransfer(CDP_TRANSFER_WEI, 'base', identity.treasuryAddress, identity.recipientAddress)).toThrow(/Base Sepolia/);
     expect(() => validateTransfer(CDP_TRANSFER_WEI, CDP_NETWORK, identity.treasuryAddress, identity.treasuryAddress)).toThrow(/separate/);
+  });
+
+  it('reads native balance through the Wallet API without creating a network-scoped Node client', async () => {
+    const listTokenBalances = vi.fn(async () => ({
+      balances: [{ token: { network: CDP_NETWORK, contractAddress: '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee' }, amount: { amount: 987654321n } }],
+      nextPageToken: undefined,
+    }));
+    const client = { evm: { listTokenBalances } } as unknown as CdpClient;
+    await expect(readNativeEthBalance(client, identity)).resolves.toBe('987654321');
+    expect(listTokenBalances).toHaveBeenCalledWith({ address: identity.treasuryAddress, network: CDP_NETWORK, pageSize: 100 });
   });
 
   it('builds the account policy around the dedicated recipient, action cap, and test network', () => {
