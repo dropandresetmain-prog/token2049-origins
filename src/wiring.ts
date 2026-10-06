@@ -15,7 +15,7 @@ import { CoreError } from './core/errors.js';
 import { appendEvent } from './core/store.js';
 import type { CommerceCore } from './core/service.js';
 import { loadHostedMcpConfig } from './channels/hosted-mcp/config.js';
-import { createHostedMcp } from './channels/hosted-mcp/router.js';
+import { createHostedMcp, provisionPayerClient } from './channels/hosted-mcp/router.js';
 import { createConsoleRedirect, createConsoleRouter } from './console/router.js';
 
 /** A verified webhook provides a lookup hint, never payment truth. Admin readback binds the quote again. */
@@ -49,7 +49,7 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
       runtimeDb = core.deps.db;
       const routers:NonNullable<GatewayParts['extraRouters']>=[
         // Hosted MCP + its OAuth server share this process and public port. Opt-in: absent unless MCP_HOSTED_ENABLED=true.
-        ...(()=>{const hosted=loadHostedMcpConfig(env); return hosted?createHostedMcp({db:core.deps.db,config:hosted}).mounts:[];})(),
+        ...(()=>{const hosted=loadHostedMcpConfig(env); if(!hosted) return []; provisionPayerClient(core.deps.db,hosted).catch(()=>log({component:'hosted-mcp',step:'payer_client_provisioning_failed'})); return createHostedMcp({db:core.deps.db,config:hosted}).mounts;})(),
         {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:core.deps.clock,bankAdapters}),auth:true},
         {path:'/inspect',router:createInspectRouter(),auth:false},
         // The console is the customer frontend; the earlier /proof page now sends people there.

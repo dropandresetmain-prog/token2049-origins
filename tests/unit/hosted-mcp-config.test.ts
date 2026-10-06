@@ -44,10 +44,17 @@ describe('hosted MCP configuration', () => {
     ['a bridge with credentials', { CARDANO_PAYER_BRIDGE_URL: 'http://user:pw@t2o-cardano-payer:8788' }],
     ['a bridge with a path', { CARDANO_PAYER_BRIDGE_URL: 'http://t2o-cardano-payer:8788/pay' }],
     ['a missing passcode file', { MCP_OAUTH_OWNER_PASSCODE_FILE: '/nonexistent/passcode' }],
+    ['a malformed payer token hash', { MCP_PAYER_GATEWAY_TOKEN_SHA256: 'not-a-hash' }],
     ['a non-https extra redirect', { MCP_OAUTH_EXTRA_REDIRECT_URIS: 'http://evil.example/cb' }],
     ['a path-bearing allowed origin', { MCP_ALLOWED_ORIGINS: 'https://x.example/path' }],
   ])('refuses %s', (_name, over) => {
     expect(() => loadHostedMcpConfig(env(over))).toThrow(HostedConfigError);
+  });
+
+  it('accepts a payer token hash (hash only, never the token)', () => {
+    const h = 'a'.repeat(64);
+    expect(loadHostedMcpConfig(env({ MCP_PAYER_GATEWAY_TOKEN_SHA256: h.toUpperCase() }))!.payerTokenSha256).toBe(h);
+    expect(loadHostedMcpConfig(env())!.payerTokenSha256).toBeUndefined();
   });
 
   it('refuses a short owner passcode and never echoes secrets in errors', () => {

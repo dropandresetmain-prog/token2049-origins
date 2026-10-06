@@ -75,12 +75,19 @@ Also returned: merchant, receipt id, verified payment (rail + transfer reference
 
 ## Provisioning checklist (operator, once)
 
-1. Render dashboard → add payment info; apply `render.yaml` (new `t2o-cardano-payer` + web env vars). Keep `autoDeployTrigger: off`.
-2. Create a NEW wallet locally and keep it separate from every historical payer: `PAYER_CARDANO_MNEMONIC_FILE=wallets/hosted-demo.mnemonic PAYER_LEDGER_FILE=<absolute scratch path> npm run wallet` (prints the address only; discard the scratch ledger). Fund the printed address with tADA + the test stablecoin from the faucets. Set `PAYER_EXPECTED_PAY_TO` (treasury) and `PAYER_ALLOWED_ASSET_UNIT` on the payer service.
-3. Secret files — web service: `mcp-owner-passcode` (you choose, ≥16 chars), `cardano-payer-bridge-token`. Payer service: `payer-cardano-mnemonic` (file from step 2), `cardano-payer-bridge-token` (same value), `payer-gateway-token`. Generate tokens with `openssl rand -base64 36`.
-4. Payer gateway token must belong to the hosted customer: against the production DB run `npm run client:create -- --name "hosted payer" --channel http --customer cus_HOSTEDMCPDEMO --role payer` and put the token it writes into `payer-gateway-token`.
-5. On the payer service shell, once: `npm run payer:hosted:init-ledger` (refuses to overwrite). Start the service; `PAYER_BRIDGE_ALLOWED_HOSTS` must equal `t2o-cardano-payer:8788`.
-6. Deploy the web service from this branch. Verify publicly with no spend: `HOSTED_MCP_PASSCODE=… node scripts/hosted-mcp-smoke.mjs --base https://token2049-origins.onrender.com --quote`.
+The existing `token2049-origins` web service is NOT managed by a Blueprint, so never apply the root `render.yaml` (it would try to create a second web service). Use the payer-only Blueprint.
+
+1. Render dashboard -> Billing: add payment info (the payer is a paid private service + disk).
+2. Dashboard -> New -> Blueprint -> this repo, branch `main`, **Blueprint path `deploy/render-payer.yaml`**. Fill the three prompts: `BLOCKFROST_PROJECT_ID` (Preprod key), `PAYER_ALLOWED_ASSET_UNIT` (same value as the web service's `CARDANO_ASSET_UNIT`), `PAYER_EXPECTED_PAY_TO` (same value as `CARDANO_TREASURY_ADDRESS`).
+3. Payer service -> Environment -> Secret Files: `payer-cardano-mnemonic` (the wallet file), `cardano-payer-bridge-token`, `payer-gateway-token`.
+4. Web service -> Environment: set `PUBLIC_BASE_URL=https://token2049-origins.onrender.com`, `MCP_HOSTED_ENABLED=true`, `MCP_PUBLIC_URL=https://token2049-origins.onrender.com`, `MCP_OAUTH_OWNER_PASSCODE_FILE=/etc/secrets/mcp-owner-passcode`, `CARDANO_PAYER_BRIDGE_URL=http://t2o-cardano-payer:8788`, `CARDANO_PAYER_BRIDGE_TOKEN_FILE=/etc/secrets/cardano-payer-bridge-token`; Secret Files: `mcp-owner-passcode`, `cardano-payer-bridge-token` (same value as the payer's). Set Settings -> Branch to `main`.
+5. Register the payer's gateway client: set web env `MCP_PAYER_GATEWAY_TOKEN_SHA256` to the SHA-256 (hex) of the payer's gateway token (`node -e "console.log(require('crypto').createHash('sha256').update(require('fs').readFileSync('payer-gateway-token','utf8').trim()).digest('hex'))"`). On boot the gateway creates `cli_HOSTEDPAYER` for `cus_HOSTEDMCPDEMO` with scopes `purchases:read,purchases:fund` only (hash stored, never the token); rotating the hash replaces it and an operator-revoked client stays revoked.
+6. Fund the payer's address with tADA and the test stablecoin (faucets), then on the payer service shell run once: `npm run payer:hosted:init-ledger` (refuses to overwrite). Restart the payer.
+7. No-spend public verification: `HOSTED_MCP_PASSCODE=<passcode> node scripts/hosted-mcp-smoke.mjs --base https://token2049-origins.onrender.com --quote`.
+
+A NEW wallet is created with `PAYER_CARDANO_MNEMONIC_FILE=<new file> PAYER_LEDGER_FILE=<throwaway absolute path> npm run wallet` (prints the address only; delete the throwaway ledger: the real ledger is created on the payer's disk in step 6).
+
+**Operational risk:** the Render Postgres instance on this workspace is on a plan that expires (`expiresAt` shown by `render postgres list`); OAuth state and all purchase history live there.
 
 ## Connecting ChatGPT
 

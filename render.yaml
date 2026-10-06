@@ -120,6 +120,9 @@ services:
         value: http://t2o-cardano-payer:8788
       - key: CARDANO_PAYER_BRIDGE_TOKEN_FILE
         value: /etc/secrets/cardano-payer-bridge-token
+      # SHA-256 (hex) of the payer's gateway token; registers the payer's gateway client on boot (hash only).
+      - key: MCP_PAYER_GATEWAY_TOKEN_SHA256
+        sync: false
 
   # Dedicated hosted Cardano Preprod payer. PRIVATE SERVICE: no public URL. Needs a paid instance plus a persistent disk
   # (the spend ledger must survive restarts and redeploys). Same region + workspace as the web service is required.

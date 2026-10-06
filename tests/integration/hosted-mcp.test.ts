@@ -8,7 +8,8 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/streamableHttp.js';
 import { startHarness, retailIntent, retailFulfillment, type Harness } from '../support/harness.js';
 import { createClient } from '../../src/infrastructure/auth.js';
-import { createHostedMcp } from '../../src/channels/hosted-mcp/router.js';
+import { createHostedMcp, provisionPayerClient } from '../../src/channels/hosted-mcp/router.js';
+import { sha256Hex } from '../../src/infrastructure/ids.js';
 import type { HostedMcpConfig } from '../../src/channels/hosted-mcp/config.js';
 import { FundingSource, SOLANA_DEVNET_NETWORK, SOLANA_DEVNET_USDC_MINT } from '../../src/contracts/presentation.js';
 import { FixtureFundingAdapter } from '../support/fixtures.js';
@@ -91,7 +92,7 @@ async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; wi
   }
   const config: HostedMcpConfig = {
     publicUrl: new URL(base), allowedOrigins: opts.allowedOrigins ?? ['https://chatgpt.com'], ownerPasscode: PASSCODE,
-    customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO', extraRedirectUris: [], gatewayUrl: base,
+    customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO', payerClientId: 'cli_HOSTEDTESTPAYER', extraRedirectUris: [], gatewayUrl: base,
     ...(bridgeUrl ? { cardanoBridge: { url: bridgeUrl, token: BRIDGE_TOKEN } } : {}),
   };
   h = await startHarness({ port, extraRouters: (core) => createHostedMcp({ db: core.deps.db, config }).mounts });
@@ -603,5 +604,42 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
     const res = await viaStub(mutate(shape(done, { category: 'retail', route: 'shopify', status: 'paid', ref: '#1003' })));
     expect(res.content[0].text).not.toMatch(/ORDER CONFIRMED|BOOKING CONFIRMED|TICKET ISSUED/);
     expect(res.structuredContent.orderConfirmation).toBeUndefined();
+  });
+});
+
+describe('hosted payer gateway client provisioning (hash only)', () => {
+  const cfg = (f: Fixture, hash?: string): HostedMcpConfig => ({
+    publicUrl: new URL(f.base), allowedOrigins: [], ownerPasscode: PASSCODE, customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO',
+    payerClientId: 'cli_HOSTEDTESTPAYER', extraRedirectUris: [], gatewayUrl: f.base, ...(hash ? { payerTokenSha256: hash } : {}),
+  });
+
+  it('registers a payer client scoped to read+fund for the hosted customer only, and is idempotent', async () => {
+    const f = await start();
+    const token = 't2o_' + randomBytes(32).toString('base64url');
+    await provisionPayerClient(f.h.gw.db, cfg(f, sha256Hex(token)));
+    await provisionPayerClient(f.h.gw.db, cfg(f, sha256Hex(token)));
+    const rows = await f.h.gw.db.all<any>("SELECT customer_id, scopes_json, channel FROM api_clients WHERE id = 'cli_HOSTEDTESTPAYER'");
+    expect(rows).toHaveLength(1);
+    expect(rows[0].customer_id).toBe('cus_HOSTEDTESTDEMO');
+    expect(JSON.parse(rows[0].scopes_json)).toEqual(['purchases:read', 'purchases:fund']);
+    // The payer can read/fund purchases but cannot search, quote or buy; the plaintext token is never stored.
+    expect((await f.h.call('POST', '/v1/offers/search', { token, body: { intent: retailIntent() } })).status).toBe(403);
+    expect((await f.h.call('GET', '/v1/purchases/pur_0000000000000', { token })).status).toBe(404);
+    expect(JSON.stringify(await f.h.gw.db.all('SELECT * FROM api_clients'))).not.toContain(token);
+  });
+
+  it('rotates the hash, keeps operator revocation, and does nothing without a configured hash', async () => {
+    const f = await start();
+    const one = 't2o_' + randomBytes(32).toString('base64url'), two = 't2o_' + randomBytes(32).toString('base64url');
+    await provisionPayerClient(f.h.gw.db, cfg(f));
+    expect(await f.h.gw.db.all("SELECT id FROM api_clients WHERE id = 'cli_HOSTEDTESTPAYER'")).toEqual([]);
+    await provisionPayerClient(f.h.gw.db, cfg(f, sha256Hex(one)));
+    await provisionPayerClient(f.h.gw.db, cfg(f, sha256Hex(two)));
+    expect((await f.h.call('GET', '/v1/purchases/pur_0000000000000', { token: one })).status).toBe(401);
+    expect((await f.h.call('GET', '/v1/purchases/pur_0000000000000', { token: two })).status).toBe(404);
+    await f.h.gw.db.run("UPDATE api_clients SET revoked_at = $1 WHERE id = 'cli_HOSTEDTESTPAYER'", new Date().toISOString());
+    await provisionPayerClient(f.h.gw.db, cfg(f, sha256Hex(one)));
+    expect((await f.h.call('GET', '/v1/purchases/pur_0000000000000', { token: one })).status).toBe(401);
+    expect((await f.h.call('GET', '/v1/purchases/pur_0000000000000', { token: two })).status).toBe(401);
   });
 });
