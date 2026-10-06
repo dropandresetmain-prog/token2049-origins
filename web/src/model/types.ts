@@ -161,6 +161,7 @@ export interface PurchaseDetailVM {
   total: { amount: string; currency: string };
   request: { text: string | null; limit: string | null } | null;
   attention: AttentionVM | null;
+  completion: { title: string; reference: CopyableRef | null } | null;
   route: RouteVM;
   stepsHeading: string;
   stepsCount: string;

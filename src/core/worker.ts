@@ -120,6 +120,8 @@ export class Worker {
         n++;
         const locked = await this.db.withExclusiveLock(`worker:${job.purchase_id}`, async () => {
           try {
+            // Actual pickup includes time behind other jobs, not just the configured tick interval.
+            if (job.kind === 'execute_purchase') await appendEvent(this.db, job.purchase_id, 'execution.picked_up', {}, this.now());
             await this.run(job);
           } catch (e) {
             this.logFailure(e, 'job', job.id);
@@ -257,6 +259,11 @@ export class Worker {
           );
           if (ref) await this.db.run('UPDATE purchases SET provider_reference = $1, updated_at = $2 WHERE id = $3', ref, nowIso, p.id);
           await appendEvent(this.db, p.id, 'execution.checkpoint', { step, providerReference: ref }, nowIso);
+          // The first booking/order reference bounds response vs readback on these routes. Atlas's
+          // order reference precedes payment, so it cannot supply this boundary for ticket issuance.
+          if (ref && ((q.route === 'nuitee' && step === 'booking') || (q.route === 'shopify' && step === 'order'))) {
+            await appendEvent(this.db, p.id, 'execution.reference_observed', {}, nowIso);
+          }
         });
         // Keep the in-memory checkpoint aligned with the durable reconciliation data.
         ctx.checkpoints[step] = data;
@@ -347,6 +354,8 @@ export class Worker {
     } catch (e) {
       result = this.resultFromError(e);
     }
+    // execute() includes the adapter's mandatory readback. No raw provider response is recorded.
+    await appendEvent(this.db, p.id, 'execution.adapter_returned', { kind: result.kind }, this.now());
     await this.applyResult(p.id, attemptId, result);
     // The job stays claimed until the result is durable: a crash before this point leaves a
     // leased job that, once recovered, sees the started attempt and reconciles instead of re-executing.

@@ -200,7 +200,7 @@ export const detail = {
   capsule: 'Capsule',
   merchantLabel: 'Merchant',
   progressHeading: 'Progress',
-  completeHeading: 'Purchase complete',
+  completeHeading: 'Purchase activity',
   stepsDone: (done: number, total: number) => `${done} of ${total} done`,
   openActivity: 'View activity',
   openReceipt: 'View receipt',

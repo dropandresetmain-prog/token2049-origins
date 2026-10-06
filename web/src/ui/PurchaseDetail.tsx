@@ -115,7 +115,7 @@ function Step({ step, index }: { step: StepVM; index: number }) {
   );
 }
 
-function Loaded({ vm, onProof, onReceipt, onQuote }: { vm: PurchaseDetailVM; onProof: (t: ProofTab) => void; onReceipt: () => void; onQuote: () => void }) {
+export function Loaded({ vm, onProof, onReceipt, onQuote }: { vm: PurchaseDetailVM; onProof: (t: ProofTab) => void; onReceipt: () => void; onQuote: () => void }) {
   const ui = useUi();
   const { summary, request, attention } = vm;
   return (
@@ -173,6 +173,27 @@ function Loaded({ vm, onProof, onReceipt, onQuote }: { vm: PurchaseDetailVM; onP
             {attention.action.label}
           </button>
         </div>
+      ) : null}
+
+      {vm.completion ? (
+        <section className="completion-panel" aria-label={vm.completion.title}>
+          <div className="completion-mark"><Icon name="check" /></div>
+          <div className="completion-result">
+            <h2>{vm.completion.title}</h2>
+            {vm.completion.reference ? (
+              <div className="completion-reference">
+                <span>{vm.completion.reference.label}</span>
+                <strong className="mono">{vm.completion.reference.value}</strong>
+                <button type="button" className="icon-button" aria-label={vm.completion.reference.copyLabel} onClick={() => ui.copy(vm.completion!.reference!.value)}><Icon name="copy" /></button>
+              </div>
+            ) : null}
+            {vm.route.to.detail ? <p className="fineprint">{vm.route.to.detail}</p> : null}
+          </div>
+          <div className="completion-actions">
+            {vm.receipt ? <button type="button" className="btn primary" onClick={onReceipt}><Icon name="receipt" />{copy.detail.openReceipt}</button> : null}
+            <button type="button" className="btn" onClick={() => onProof('summary')}>{copy.detail.proofButton}<Icon name="arrow" /></button>
+          </div>
+        </section>
       ) : null}
 
       <Route vm={vm} />
