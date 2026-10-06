@@ -81,6 +81,7 @@ if (fresh.access_token) {
   const found = await mcp.callTool({ name: 'find_offers', arguments: { intent: { category: 'retail', query: values.query, quantity: 1, shipToCountry: values.country, spendCeiling: { currency: 'USD', amountMinor: '10000', scale: 2 } } } });
   const offers = found.structuredContent?.offers ?? [];
   check('find_offers (authenticated read)', !found.isError && offers.length > 0, `offers=${offers.length}`);
+  check('find_offers returns a shortlist of at most 3 and forbids quoting before the user chooses', offers.length <= 3 && found.structuredContent?.interaction?.createQuoteAllowedNow === false);
   if (values.quote && offers[0]) {
     process.stdout.write('NOTE  --quote creates one quote (no purchase, no payment) for the first offer using synthetic fulfillment data\n');
     const q = await mcp.callTool({ name: 'create_quote', arguments: { offerId: offers[0].offerId, fulfillment: { category: 'retail', email: 'buyer@example.com', shippingAddress: { firstName: 'Test', lastName: 'Buyer', address1: '1 Test Street', city: 'New York', province: 'NY', zip: '10001', countryCode: values.country } } } });

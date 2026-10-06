@@ -99,7 +99,7 @@ describe('shopping-behaviour instructions', () => {
     expect(INSTRUCTIONS).not.toMatch(/EPICKA|adapter|travel/i);
   });
   it('forbids claiming confirmation before the purchase proves success', () => {
-    expect(INSTRUCTIONS).toMatch(/Never tell the user an order is confirmed unless/);
-    expect(INSTRUCTIONS).toMatch(/orderConfirmation present/);
+    expect(INSTRUCTIONS).toMatch(/Never tell the user a purchase is complete unless/);
+    expect(INSTRUCTIONS).toMatch(/returns orderConfirmation/);
   });
 });

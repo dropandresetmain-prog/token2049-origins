@@ -115,13 +115,49 @@ export function describePurchase(p: PurchaseView): string {
   return projectProgress(p).message;
 }
 
-function describeOffers(offers: OfferView[]): string {
-  if (offers.length === 0) return 'No offers found. Try a different query or a higher spend ceiling.';
-  const lines = offers.map((o) => `- ${o.offerId} | ${o.title} | ${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)} | expires ${o.expiresAt}${o.sourceOffer ? ' | source ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl + ' | execution: Capsule Shopify Sandbox' : ''}`);
+/** Never present more than this many options to the user. */
+export const SHORTLIST_SIZE = 3;
+
+/** Comparable facts only, copied from the offer as returned: nothing is ranked, scored or invented here. */
+export function shortlistOf(offers: OfferView[]) {
+  return offers.slice(0, SHORTLIST_SIZE).map((o) => ({
+    offerId: o.offerId,
+    title: o.title,
+    description: o.description.length > 300 ? o.description.slice(0, 297) + '...' : o.description,
+    category: o.category,
+    route: o.route,
+    providerEnvironment: o.providerEnvironment,
+    indicativePrice: formatMinor(o.indicativePrice),
+    ...(o.sourceOffer ? { merchant: o.sourceOffer.merchantName, productUrl: o.sourceOffer.productUrl, variant: o.sourceOffer.variantTitle, availability: o.sourceOffer.availability } : {}),
+    terms: o.terms.slice(0, 5),
+    expiresAt: o.expiresAt,
+    observedAt: o.sourceObservedAt,
+  }));
+}
+
+/** The only instruction find_offers gives: show options and wait. create_quote is explicitly not the next action. */
+export function offerSelectionGuide(count: number) {
+  return count === 0
+    ? { step: 'no_offers', nextAction: 'ask_user_to_refine_search', createQuoteAllowedNow: false }
+    : {
+        step: 'present_shortlist',
+        nextAction: 'present_options_and_ask_user_to_choose',
+        createQuoteAllowedNow: false,
+        createQuoteAllowedWhen: 'the user has explicitly chosen one of the presented options (use that offerId)',
+        presentAtMost: SHORTLIST_SIZE,
+        markExactlyOneRecommended: true,
+        recommendationMustUseOnlyListedFields: true,
+        askUserWhichOption: true,
+      };
+}
+
+function describeOffers(offers: OfferView[], totalFound: number): string {
+  if (offers.length === 0) return 'No offers found. Ask the user to refine the request or raise the spend ceiling. Nothing was bought.';
+  const lines = offers.map((o, i) => `${i + 1}. ${o.title} | ${o.category}/${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)}${o.sourceOffer ? ' | merchant ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl : ''} | offerId ${o.offerId} | expires ${o.expiresAt}`);
   return [
-    `${offers.length} offer(s). Offers are indicative and NOT executable.`,
+    `Shortlist: ${offers.length} option(s)${totalFound > offers.length ? ` (the top ${offers.length} of ${totalFound} found)` : ''}. Offers are indicative and NOT executable. Nothing is bought or reserved.`,
     ...lines,
-    'NEXT STEP FOR YOU: do not choose for the user and do not call create_quote yet. Present the best 3 viable options (fewer if fewer exist), mark exactly one "Recommended" with a brief reason grounded in the request of the user and these results, and ask which one they want. Call create_quote only after they choose.',
+    'NEXT STEP FOR YOU: present these options to the user (no more than 3), mark exactly ONE as "Recommended" with a short, concrete reason that uses only the facts above and the request of the user (never invent attributes), and ask which option they want. Do NOT call create_quote yet. Call it only after the user explicitly chooses one option, using that offerId.',
   ].join('\n');
 }
 
@@ -149,34 +185,67 @@ export function describeQuote(q: QuoteView, sources: FundingSource[]): string {
 
 /* ---------------- order confirmation ---------------- */
 
+/** Final label per commerce type, and the one provider status that genuinely proves it. Nothing weaker earns the label. */
+const FINAL: Record<PurchaseView['category'], { headline: string; status: PurchaseView['commerceStatus']; referenceLabel: string }> = {
+  retail: { headline: 'ORDER CONFIRMED', status: 'paid', referenceLabel: 'Order' },
+  hotel: { headline: 'BOOKING CONFIRMED', status: 'confirmed', referenceLabel: 'Booking reference' },
+  flight: { headline: 'TICKET ISSUED', status: 'ticketed', referenceLabel: 'Provider order / ticket reference' },
+};
+
+/** Human form of a provider reference: a Shopify order name stays as is, a Shopify gid shows its numeric id. */
+function displayReference(ref: string): string {
+  const gid = /^gid:\/\/shopify\/Order\/(\d+)$/.exec(ref);
+  return gid ? `Shopify order ${gid[1]}` : ref;
+}
+
 /**
- * Present ONLY when the purchase state proves retail success (state succeeded, paid commerce + merchant status, receipt issued).
- * Anything else (pending, unresolved, held) yields no confirmation, so the agent has nothing to over-claim.
+ * Present ONLY when the existing durable completion conditions hold (projectProgress stage "complete": state succeeded, paid commerce
+ * and merchant status, receipt issued) AND the provider status is the one that proves this commerce type (retail paid, hotel
+ * confirmed, flight ticketed) AND a funding payment was verified. Anything else yields no label, so the agent cannot over-claim.
  */
 export function orderConfirmation(p: PurchaseView): Record<string, unknown> | null {
-  if (projectProgress(p).stage !== 'complete' || !p.receipt) return null;
+  if (projectProgress(p).stage !== 'complete' || !p.receipt || !p.providerReference) return null;
+  const final = FINAL[p.category];
   const r = p.receipt;
+  if (p.commerceStatus !== final.status || r.commerceStatus !== final.status) return null;
+  const verified = r.funding.filter((f) => ['confirmed', 'escrow_locked', 'released'].includes(f.paymentState));
+  if (!verified.length) return null;
   return {
-    headline: 'Order confirmed',
+    headline: final.headline,
+    commerceType: p.category,
     environment: r.providerEnvironment,
     merchant: r.sourceOffer?.merchantName ?? null,
     product: r.sourceOffer?.productUrl ?? null,
     orderReference: p.providerReference,
+    reference: { label: final.referenceLabel, value: displayReference(p.providerReference) },
     receiptId: r.receiptId,
     purchaseId: p.purchaseId,
     quoteId: p.quoteId,
     merchantStatus: r.commerceStatus,
     merchantPaymentStatus: r.merchantPaymentStatus,
+    paymentVerified: true,
     principal: formatMinor(r.principal),
     serviceFee: formatMinor(r.serviceFee),
-    payments: r.funding.map((f) => ({ rail: f.rail, network: f.network, transferReference: f.transferReference, verifiedAt: f.verifiedAt })),
+    payments: verified.map((f) => ({ rail: f.rail, network: f.network, transferReference: f.transferReference, verifiedAt: f.verifiedAt })),
+    evidenceRefs: r.evidenceRefs,
     limitations: r.limitations,
     issuedAt: r.issuedAt,
   };
 }
 
+/** Final copy, led by the headline. The host should end its reply with this block (not paraphrase the label away). */
 function confirmationText(c: Record<string, unknown>): string {
-  return `${c.headline as string}. ${c.merchant ? `Merchant: ${c.merchant as string}. ` : ''}Order reference: ${String(c.orderReference)}. Receipt: ${String(c.receiptId)}. Amount ${String(c.principal)} + service fee ${String(c.serviceFee)} (${String(c.environment)} environment). Tell the user "Order confirmed" and share these references.`;
+  const ref = c.reference as { label: string; value: string };
+  const pay = (c.payments as Array<{ rail: string; transferReference: string }>)[0]!;
+  return [
+    c.headline as string,
+    ...(c.merchant ? [`Merchant: ${c.merchant as string}`] : []),
+    `${ref.label}: ${ref.value}`,
+    `Receipt: ${String(c.receiptId)}`,
+    `Payment verified (${pay.rail}): ${pay.transferReference}`,
+    `Amount ${String(c.principal)} + service fee ${String(c.serviceFee)} (${String(c.environment)} environment)`,
+    `End your reply with "${c.headline as string}" followed by these references.`,
+  ].join('\n');
 }
 
 /* ---------------- tool registration ---------------- */
@@ -199,8 +268,10 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       try {
         const assessment = assessPurchaseIntent(intent);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
-        const { offers } = await deps.gateway.searchOffers(assessment.value);
-        return success(deps, describeOffers(offers), { offers, selection: { required: offers.length > 0, presentBest: Math.min(3, offers.length), markOneRecommended: true, askUserToChoose: true } });
+        const { offers: found } = await deps.gateway.searchOffers(assessment.value);
+        // Gateway order is preserved; the host model recommends from these real fields and the user chooses.
+        const offers = found.slice(0, SHORTLIST_SIZE);
+        return success(deps, describeOffers(offers, found.length), { offers, shortlist: shortlistOf(offers), totalFound: found.length, interaction: offerSelectionGuide(offers.length) });
       } catch (e) {
         return gatewayFailure(deps, e);
       }

@@ -49,12 +49,21 @@ the tools forward the caller's own OAuth token to the gateway, which accepts it 
 headers are never consulted (`trust proxy` is off). `Origin` must be absent (server-to-server), the public origin, or one of
 `https://chatgpt.com`, `https://chat.openai.com`, `MCP_ALLOWED_ORIGINS`. Otherwise `403`. Body ≤ 1 MB, errors are generic JSON-RPC errors, outputs go through `redact()` + secret scrubbing.
 
-## Shopping behaviour (server instructions + tool descriptions)
+## Shopping behaviour (mandatory acceptance criteria)
 
-1. `find_offers` → the agent presents the best 3 viable options, marks exactly one **Recommended** with a reason drawn from the user's request and the offers actually returned, and asks the user to choose. Nothing is hardcoded.
-2. Only then `create_quote` (needs real shipping details from the user) → exact terms and available payment options.
-3. The user explicitly selects a payment rail and explicitly approves the exact quote → `buy`.
-4. `get_purchase`/`buy` include `orderConfirmation` (headline `Order confirmed`, merchant, order reference, receipt id, amounts, payment references) **only** when the purchase state proves retail success (`state=succeeded`, paid commerce + merchant status, receipt). Before that the agent has nothing to over-claim.
+1. `find_offers` returns a structured **shortlist of at most 3** real offers (gateway order, never re-ranked, only fields the offer actually carries: title, description, category/route, indicative price, merchant/product URL/variant when sourced, terms, expiry) plus `interaction: { nextAction: "present_options_and_ask_user_to_choose", createQuoteAllowedNow: false, markExactlyOneRecommended: true, presentAtMost: 3 }` and text saying **Do NOT call create_quote yet**. The host model recommends exactly one from those facts (nothing hardcoded) and asks the user which they want.
+2. `create_quote` only after the user explicitly chooses (needs real shipping details) → exact terms and every available funding option (Cardano and Solana, with which are "Connected wallet" vs "External payment action required").
+3. The user explicitly selects a payment rail and explicitly approves the exact quote → `buy`. Missing choice or approval returns `needs_input`; a rail without a hosted payer returns `action_required` and creates nothing.
+4. `get_purchase` is read-only. Polling never creates a purchase or payment (tested: purchases, funding rows and payer calls are unchanged across repeated polls).
+5. `orderConfirmation` is returned (and its headline leads the text) **only** when the existing durable completion conditions hold (`state=succeeded`, paid commerce + merchant status, receipt issued) **and** the provider status proves that commerce type **and** a funding payment was verified:
+
+| Commerce type | Headline | Proof status required | Reference shown |
+| --- | --- | --- | --- |
+| retail | `ORDER CONFIRMED` | `paid` | order name/number (`#1003`) or `Shopify order <id>` |
+| hotel | `BOOKING CONFIRMED` | `confirmed` | booking reference |
+| flight | `TICKET ISSUED` | `ticketed` | provider order / ticket reference |
+
+Also returned: merchant, receipt id, verified payment (rail + transfer reference), amounts, evidence refs, limitations. A held, unpaid, `ticketing`, unresolved or receipt-less purchase gets no success label. The public purchase view exposes one provider reference per purchase, so a separate airline PNR/e-ticket number is **not** shown (it is not available to the MCP; nothing is invented).
 
 ## Hosted payer (Cardano only)
 
