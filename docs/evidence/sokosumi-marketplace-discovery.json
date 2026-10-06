@@ -1,0 +1,38 @@
+{
+  "observedDateUtc": "2026-10-06",
+  "source": "https://api.preprod.sokosumi.com/v1/agents",
+  "authenticatedReadOnly": true,
+  "filters": {
+    "VERIFIED": {
+      "httpStatus": 200,
+      "returnedEntries": 91,
+      "reportedTotal": 92,
+      "exactAgentIdentifierMatchAmongReturned": false
+    },
+    "PENDING": {
+      "httpStatus": 200,
+      "returnedEntries": 91,
+      "reportedTotal": 92,
+      "exactAgentIdentifierMatchAmongReturned": false
+    }
+  },
+  "pagination": {
+    "page2HttpStatus": 200,
+    "page2ReturnedEntries": 91,
+    "page2FirstEntrySameAsPage1": true,
+    "lastPageRequest": {
+      "page": 92,
+      "limit": 1,
+      "httpStatus": 200,
+      "returnedEntries": 1,
+      "reportedNextCursorPresent": true,
+      "exactAgentIdentifierMatch": false
+    },
+    "completeDiscoveryEstablished": false,
+    "reason": "Official page/limit pagination responses were inconsistent and the final-page response still reported a next cursor."
+  },
+  "platformTaskAttempted": false,
+  "listingSubmitted": false,
+  "registrationOrPaymentCreated": false,
+  "secretsOrAgentRecordsIncluded": false
+}
