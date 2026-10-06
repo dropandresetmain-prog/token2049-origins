@@ -13,7 +13,7 @@
       "name": "focused Coinbase CDP contract tests",
       "command": "node_modules/.bin/vitest.cmd run tests/unit/coinbase-cdp.test.ts",
       "result": "PASS",
-      "testsPassed": 5
+      "testsPassed": 8
     },
     {
       "name": "TypeScript typecheck",
@@ -21,5 +21,5 @@
       "result": "PASS"
     }
   ],
-  "externalEvidence": "None. CDP credentials are unavailable in process/user/machine environment names and local env key-name inventory; no authenticated call or transaction was attempted."
+  "externalEvidence": "None. No CDP Wallet credential names were found in process/user/machine environment inventories, recent Downloads and C:\\Dev configuration key-name inventory, PowerShell profiles, or local env key names; no authenticated call or transaction was attempted. A portal sandbox API key was not assumed to be a Wallet API credential."
 }

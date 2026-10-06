@@ -1,8 +1,8 @@
-import { closeSync, fsyncSync, openSync, readFileSync, writeFileSync } from 'node:fs';
+import { closeSync, existsSync, fsyncSync, openSync, readFileSync, writeFileSync } from 'node:fs';
 import { CdpClient } from '@coinbase/cdp-sdk';
-import { CDP_NETWORK, CDP_POLICY_DESCRIPTION, CDP_POLICY_IDEMPOTENCY_KEY, CDP_RECIPIENT_NAME, CDP_TREASURY_NAME, requireAbsoluteFile, validatePair } from './contracts.js';
+import { CDP_NETWORK, CDP_POLICY_ATTACH_IDEMPOTENCY_KEY, CDP_POLICY_DESCRIPTION, CDP_POLICY_IDEMPOTENCY_KEY, CDP_RECIPIENT_NAME, CDP_TREASURY_NAME, requireAbsoluteFile, validatePair } from './contracts.js';
 import type { CdpPublicIdentity, CdpSettings } from './contracts.js';
-import { createHistoryOnce } from './history.js';
+import { createHistoryOnce, protectHistoryDirectory } from './history.js';
 
 const NATIVE_ETH_ADDRESS = '0xeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee';
 
@@ -37,7 +37,11 @@ export function makeAccountPolicy(recipientAddress: `0x${string}`) {
         { type: 'ethValue' as const, ethValue: '1000000000000', operator: '<=' as const },
         { type: 'evmNetwork' as const, networks: [CDP_NETWORK], operator: 'in' as const },
       ],
-    }],
+    }, ...(['sendEvmTransaction', 'signEvmTransaction', 'signEvmMessage', 'signEvmTypedData', 'signEvmHash'] as const).map((operation) => ({
+      action: 'reject' as const,
+      operation,
+      criteria: [],
+    }))],
   };
 }
 
@@ -71,9 +75,22 @@ function saveIdentityOnce(path: string, identity: CdpPublicIdentity): CdpPublicI
 }
 
 export async function provision(client: CdpClient, settings: CdpSettings): Promise<CdpPublicIdentity> {
+  const hasIdentity = existsSync(settings.identityFile);
+  const hasHistory = existsSync(settings.historyFile);
+  if (hasIdentity) {
+    if (!hasHistory) throw new Error('CDP action history is missing for an existing identity; provisioning blocked before API writes');
+    const existing = readIdentity(settings.identityFile);
+    const { readHistory } = await import('./history.js');
+    readHistory(settings.historyFile, existing);
+    return loadProvisioned(client, settings);
+  }
+  if (hasHistory) throw new Error('CDP action history exists without its public identity; provisioning blocked for reconciliation');
+  protectHistoryDirectory(settings.historyFile);
+
   const recipient = await client.evm.getOrCreateAccount({ name: CDP_RECIPIENT_NAME });
   const treasury = await client.evm.getOrCreateAccount({ name: CDP_TREASURY_NAME });
   const pair = validatePair(treasury.address, recipient.address);
+  if (treasury.policies?.length) throw new Error('dedicated CDP treasury already has an attached policy; refusing to alter wallet authority');
 
   const policy = await client.policies.createPolicy({
     policy: makeAccountPolicy(pair.recipientAddress),
@@ -83,7 +100,7 @@ export async function provision(client: CdpClient, settings: CdpSettings): Promi
     const attached = await client.evm.updateAccount({
       address: pair.treasuryAddress,
       update: { accountPolicy: policy.id },
-      idempotencyKey: `capsule-cdp-policy-attach-${pair.treasuryAddress.toLowerCase()}`,
+      idempotencyKey: CDP_POLICY_ATTACH_IDEMPOTENCY_KEY,
     });
     if (!attached.policies?.includes(policy.id)) throw new Error('CDP treasury policy attachment could not be verified');
   }
@@ -111,10 +128,11 @@ export async function loadProvisioned(client: CdpClient, settings: CdpSettings):
     client.evm.getAccount({ address: identity.recipientAddress }),
   ]);
   if (treasury.name !== CDP_TREASURY_NAME || recipient.name !== CDP_RECIPIENT_NAME) throw new Error('CDP accounts do not match the configured Capsule identities');
-  if (!treasury.policies?.includes(identity.policyId)) throw new Error('CDP treasury policy is not active');
+  if (treasury.policies?.length !== 1 || treasury.policies[0] !== identity.policyId) throw new Error('CDP treasury policy set is not the single approved Capsule policy');
   const policy = await client.policies.getPolicyById({ id: identity.policyId });
-  const expected = JSON.stringify(makeAccountPolicy(identity.recipientAddress).rules);
-  if (policy.scope !== 'account' || JSON.stringify(policy.rules) !== expected) throw new Error('CDP treasury policy differs from the approved recipient and limits');
+  const expected = makeAccountPolicy(identity.recipientAddress).rules;
+  const actualRules = policy.rules as unknown as typeof expected;
+  if (policy.scope !== 'account' || JSON.stringify(actualRules) !== JSON.stringify(expected)) throw new Error('CDP treasury policy differs from the approved recipient, limits, and deny rules');
   return identity;
 }
 
