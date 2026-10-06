@@ -1,0 +1,56 @@
+# Masumi / Sokosumi implementation and acceptance
+
+Checkpoint in progress, 2026-10-06. Worktree branch `codex/masumi-sokosumi`, base `0afd377681fe0e27e0ea86cf2cfaa34cdb970769`. Native MPS source `71455701ac22c3380c50da54089e1b7363f6825d`. No dependency added.
+
+## Separate verdicts
+
+- Masumi native registry, authenticated task fee, exact independent Preprod lock/result and actual standard task runtime: **PASS**. Withdrawal is pending immutable 15:33:13 UTC contract unlock, vendor automatic 10-minute grace (15:43:13 UTC eligibility), and 20 confirmations; this report will be finalized after payout readback.
+- Sokosumi marketplace: **PARTIAL**. Real Preprod account authentication and catalog discovery passed the initial audit. Our MIP-003 runtime is exercised live, but no actual marketplace-originated task, externally reachable listing or platform result delivery has been proved.
+- Masumi merchant purchase-principal funding: **BLOCKED by protocol semantics**, deliberately unavailable. Native task remuneration cannot fund dynamic merchant principal before work. Core direct funding remains authoritative.
+
+## Files and behavior
+
+`src/integrations/masumi/client.ts` implements bounded native Preprod API/chain calls, exact schemas, safe errors and immutable configuration. `src/funding/masumi/index.ts` independently verifies service-fee obligations and exposes a fail-closed principal seam. `src/channels/sokosumi/{runtime,main}.ts` provides authenticated MIP-003 routes with durable owner/task/core mapping, native payment/result checkpoints, fresh core guidance and terminal receipt, and reconcile-only recovery after ambiguous writes. `src/wiring.ts` reports the disabled Masumi principal adapter explicitly.
+
+The task input contains an already approved canonical purchase request. A fee lock returns running/direct funding instructions until actual authenticated core truth is terminal. Only independently confirmed matching native result hash completes the task. Input and output hashes follow MIP-004, with the original purchaser identifier and exact input/output bytes. Native purchaser nonce support is explicitly limited to 14–26 even lowercase hex characters; arbitrary strings are rejected before a native write.
+
+Native fees are **additional to the quote-approved core total**, disclosed in availability/start/result. They do not replace the gateway fee. The isolated live fixture gateway sets serviceFeeBps=0 to isolate this experiment; production composition retains its configured gateway fee and must show both amounts. Fee/pricing/identity/contract/recipient changes fail startup for a reused durable job store; use a separately provisioned store/registry for new terms. Credentials may rotate without repricing.
+
+`tests/support/masumi.ts`, `tests/unit/masumi-fee.test.ts`, `tests/integration/sokosumi-runtime.test.ts` cover protocol vectors, stale states, exact money/identity/deadlines, strict payment credentials, replay, finality, tagged actual payout, auth, immutable repricing, timeout recovery and fresh core receipts. `tests/integration/wiring.test.ts` includes the explicit unavailable rail. `.gitignore` excludes private runtime state. `.env.masumi.example` contains placeholders only.
+
+`scripts/masumi-*.{mjs,ts}` are local acceptance tools, not production provisioning. They read private existing environment/config and preserve write checkpoints in ignored `.runtime/`; inspect them before use. Never rerun setup/funding to obtain another passing result. Sanitized evidence is `docs/evidence/masumi-live.json`.
+
+## Live provenance and boundaries
+
+Real: authenticated native MPS at loopback 3012; native registry mint; isolated Preprod selling/purchasing wallets; actual Express task runtime 3013; actual core 3014/Postgres/worker/journal/receipt; independent Preprod Blockfrost readback. Simulated outside this lane: hotel merchant and direct purchase principal only. Marketplace platform calls have not been substituted with fixtures and are not claimed as proved.
+
+Isolated public wallet fingerprints: seller `9520549913f7fc90`, buyer `abbb33ddc5a96fdf`. Native registry fingerprint `732739788d1a6daf`. Root payer `a2e66045653afe62` was never signed by this lane. One actual paid fee is 10000 atomic / 0.01 official six-decimal tUSDM. Buyer prerequisites were two native transfers totaling 18 test ADA +0.1tUSDM, preserving all wallet/DB state.
+
+An earlier immutable native request expired unpaid after insufficient native ADA buffer. Authoritative source/DB showed no signed/broadcast transaction; independent buyer history and balances showed only the two prerequisite top-ups. Its invalid request and private audit are preserved. The actual wrapper now returns failed/native_payment_invalid_expired while retaining its succeeded fixture core result, rather than hiding the merchant outcome. A pre-native failed creation checkpoint is also preserved. Neither was reset or hidden. After definitive no-exposure reconciliation, the authorized fresh retry used task fingerprint `9fa00595df3081a3`; payBy 15:03:13, submitBy 15:18:13, unlock15:33:13, dispute15:48:13 UTC.
+
+Current lock fingerprint `91e4c22256b3df5f`, result `7c01142f9dc3bf4f`, stable original transfer reference fingerprint `6f11e3fdaad71192`. Result initially appeared Pending/FailedViaTimeout but subsequently confirmed as the same transaction; no replacement write was made. By 15:16:33 UTC native ResultSubmitted and independent 27-block proof matched the frozen MIP output hash. Actual wrapper restart returned completed/succeeded with the same task/payment/core receipt.
+
+Historical exact native V2 datum field3 is None: payout proof uses the frozen configured seller address and exact inline own_ref tag plus ordinary escrow consumption. This proves actual recipient/value, not a contract-fixed return address. Some recipient addresses are unsupported and fail closed until full address decoding is implemented. Reference/collateral inputs cannot count as ordinary consumption. Explicit L2/unknown layers reject; omitted API layer requires persisted signed forceLayer=L1 plus independent Preprod proof. Missing required chain fields or bounded UTXO discovery failure remains unavailable, never success.
+
+## Run and recovery
+
+Install existing locked dependencies with Node 24, inject variables from `.env.masumi.example` privately, run `node node_modules/tsx/dist/cli.mjs src/channels/sokosumi/main.ts`. The wrapper creates only its own durable tables. Keep the core and native MPS separately provisioned; never expose their administrative authority. Public `/availability` and `/input_schema`; bearer-protected `/start_job` and `/status?job_id=<uuid>`.
+
+POST start replay uses the same owner/external identifier and exact input hash. Core create uses its own durable idempotency key. Unknown native creation is resolve-only; an empty bounded list is not no-write proof. Unknown result submission is reconcile-only, retaining receipt/hash/deadline. Definitive rejection and deadline expiry expose actionable recovery with the frozen core result. Native invalid/no-transaction expired requests return failed but require an independent exposure audit before replacement. Pending native state past payBy remains reconciliation required, never asserted unpaid from time alone. Native vendor manual recovery is narrowly guarded in the acceptance tool; it cannot create a new obligation or alter terms.
+
+## Issues and next task
+
+| Classification | Issue/action | Risk if deferred |
+| --- | --- | --- |
+| Act Now | Keep purchase principal on a verified direct rail; do not select Masumi task earnings/escrow as cash. | Unfunded merchant spend or hidden fee/principal substitution. |
+| Investigate Now | Actual Sokosumi platform-to-agent authentication, approved public Preprod host/listing metadata and bounded purchaser task remain unproved. Use the prepared marketplace handoff below. | Local native success mistaken for marketplace delivery. |
+| Park for Later | Full Some recipient-address decoding and dispute/refund/WithdrawAuthorized transitions; unsupported cases fail closed. | Those valid native variants require operator reconciliation instead of automatic observation. |
+| Ignore / Accept Risk | Local synthetic fixture merchant/principal are allowed outside this lane and labelled. Retain evidence modes. | This run cannot establish real hotel fulfillment or direct funding acceptance. |
+
+Concrete marketplace preparation: `C:/Dev/token2049-origins/integration-e2e/masumi-sokosumi/SOKOSUMI_NEXT_STEPS.md`. Read-only discovery at 15:22:05 UTC returned 200 with 91 entries; none matched the actual synthetic registry identifier/name. Sanitized readback is docs/evidence/sokosumi-discovery.json. Correct account API origin is `https://api.preprod.sokosumi.com`; existing Preprod key already authenticates. Listing metadata/public origin require explicit approved values under IMPLEMENTATION_PLAN; no public publication was performed. Recommend a fresh chat for that distinct marketplace hosting/auth/task milestone, preserving this checkpoint and immutable native refs.
+
+Primary protocol: https://www.masumi.network/dev/masumi/mips/_mip-004 ; https://www.masumi.network/dev/masumi/documentation/technical-documentation/agentic-service-api ; native V2 validator/source and official Blockfrost OpenAPI. The native source enforces a 10-minute automatic withdrawal grace after unlock. Local shared environment had automatic withdrawal disabled; the owned service was restarted with AUTO_WITHDRAW_PAYMENTS=true in its process environment only. dotenv preserves this explicit value. No shared .env change, security confirmation threshold, grace buffer or immutable terms were relaxed.
+
+## Validation
+
+Node 24.15 typecheck and build pass. Scoped 33 tests pass (24 fee proof, 9 task runtime); the unrelated 25-test MCP file also passed focused recheck. Exact-secret scan checked 24 intended files against 30 configured/generated private values, with zero matches after excluding only full public absolute project paths. Full serial run had 546/547 passes with one existing MCP 10-second beforeEach startup timeout; final unchanged full rerun on a distinct database at the project PostgreSQL test service (127.0.0.1:55432) passed 547/547 across 28 files in 56.82 seconds. Earlier MPS-hosted test runs also had varying unrelated funding/human/MCP hook timeouts; no test behavior was changed. Commands: `node node_modules/typescript/bin/tsc -p tsconfig.json --noEmit`; `node node_modules/typescript/bin/tsc -p tsconfig.build.json` + `node scripts/copy-migrations.mjs`; with privately injected dedicated test DATABASE_URL, `node node_modules/vitest/vitest.mjs run --maxWorkers=1 --no-file-parallelism`. No timeout behavior was changed. Payout observation remains pending. Initial full tests on the shared live DB had unrelated pool/advisory-lock timing failures; final runs use an isolated new local test database and serial files, without changing production timeout behavior.

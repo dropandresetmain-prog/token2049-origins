@@ -1,0 +1,36 @@
+import { describe, it, expect } from 'vitest';
+import { assertFeeBinding, observeServiceFee, createMasumiFundingAdapter } from '../../src/funding/masumi/index.js';
+import { FeePayment, MasumiClient, validateServiceUrl } from '../../src/integrations/masumi/client.js';
+import { mipInputHash, mipOutputHash } from '../../src/channels/sokosumi/runtime.js';
+import { binding, config, nonce, lockHash, makeMasumiFixture } from '../support/masumi.js';
+describe('Masumi protocol and independent fee proof', () => {
+  it('matches independently fixed MIP-004 vectors and preserves original input string', () => {
+    expect(mipInputHash(nonce, { purchase_request: '{"quoteId":"q"}' })).toBe('80d94fbcbc9698bfcaee3f3c151fee83448477da982ae5a78614b6e5a8c45608');
+    expect(mipOutputHash(nonce, '{"state":"succeeded"}')).toBe('b816361adb1e20ae7089eec986b84707b0a6ea0478abc11b73a093aac8f1205f');
+    expect(mipInputHash(nonce, { purchase_request: '{ "quoteId": "q" }' })).not.toBe(mipInputHash(nonce, { purchase_request: '{"quoteId":"q"}' }));
+  });
+  it('normalizes native empty initial result hashes', () => { const f = makeMasumiFixture(); expect(FeePayment.parse({ ...f.p, resultHash: '' }).resultHash).toBeNull(); });
+  it('finds lock by role in reverse history and keeps the original consumed reference after result', async () => {
+    const f = makeMasumiFixture(); const first = await observeServiceFee(f.client, binding); expect(first.status).toBe('escrow_locked'); expect(first.transferReference).toBe(lockHash + '#0');
+    await f.client.submitResult(binding.identifier, '55'.repeat(32)); const next = await observeServiceFee(f.client, binding); expect(next.status).toBe('result_submitted'); expect(next.transferReference).toBe(first.transferReference);
+  });
+  it.each(['amount','asset','agent','seller','payer','hash','payBy','submitBy','unlock','dispute'] as const)('rejects %s mismatch', async (field) => {
+    const f = makeMasumiFixture();
+    if(field==='amount')f.p.RequestedFunds[0]!.amount='9999'; if(field==='asset')f.p.RequestedFunds[0]!.unit='other'; if(field==='agent')f.p.agentIdentifier='wrong'; if(field==='seller')f.p.SmartContractWallet!.walletVkey='wrong'; if(field==='payer')f.p.BuyerWallet!.walletVkey='wrong'; if(field==='hash')f.p.inputHash='66'.repeat(32); if(field==='payBy')f.p.payByTime='1'; if(field==='submitBy')f.p.submitResultTime='1'; if(field==='unlock')f.p.unlockTime='1'; if(field==='dispute')f.p.externalDisputeUnlockTime='1';
+    await expect(observeServiceFee(f.client,binding)).rejects.toThrow('stored service-fee');
+  });
+  it('rejects stale service escrow, wrong transaction role and insufficient finality', async () => {
+    const spent=makeMasumiFixture();spent.spend();await expect(observeServiceFee(spent.client,binding)).rejects.toThrow('stale');
+    const role=makeMasumiFixture();role.p.CurrentTransaction!.newOnChainState='ResultSubmitted';role.p.TransactionHistory=[];await expect(observeServiceFee(role.client,binding)).rejects.toThrow('lock');
+    const finality=makeMasumiFixture();finality.loseFinality();await expect(observeServiceFee(finality.client,binding)).rejects.toThrow('final');
+  });
+  it('never calls an old escrow released cash', async()=>{const f=makeMasumiFixture();f.p.onChainState='Withdrawn';await expect(observeServiceFee(f.client,binding)).rejects.toThrow('payout requires');});
+  it('independently verifies exact seller payout, and rejects redirected or wrong-money payout',async()=>{ const f=makeMasumiFixture();await f.client.submitResult(binding.identifier,'55'.repeat(32));f.withdraw();expect(await observeServiceFee(f.client,binding)).toMatchObject({status:'released',purpose:'service_fee',transferReference:lockHash+'#0'});f.p.sellerReturnAddress='addr_test1attacker';await expect(observeServiceFee(f.client,binding)).rejects.toThrow();f.p.sellerReturnAddress=null;f.p.WithdrawnForSeller[0]!.amount='10001';await expect(observeServiceFee(f.client,binding)).rejects.toThrow(); });
+  it.each(['reference','collateral'] as const)('rejects %s-only transition and payout inputs',async kind=>{const f=makeMasumiFixture();await f.client.submitResult(binding.identifier,'55'.repeat(32));f.inputAs(kind);await expect(observeServiceFee(f.client,binding)).rejects.toThrow();f.inputAs('spend');f.withdraw();f.payoutAs(kind);await expect(observeServiceFee(f.client,binding)).rejects.toThrow('Native payout did not consume');});
+  it('rejects script or stake-only seller credentials and mismatched optional recipient',async()=>{for(const field of ['script','stake','recipient']){const f=makeMasumiFixture();f.alterDatum(d=>{if(field==='script')d.json_value.fields[2].fields[0].constructor=1;if(field==='stake'){d.json_value.fields[2].fields[0].fields[0].bytes='ee'.repeat(28);d.json_value.fields[2].fields[1]={constructor:0,fields:[{bytes:config.sellerVkey}]};}if(field==='recipient')d.json_value.fields[3]={constructor:0,fields:[{constructor:0,fields:[{constructor:0,fields:[{bytes:'ee'.repeat(28)}]},{constructor:1,fields:[]}]}]};return d;});await expect(observeServiceFee(f.client,binding)).rejects.toThrow();}});
+  it('rejects an untagged otherwise matching seller payout',async()=>{const f=makeMasumiFixture();await f.client.submitResult(binding.identifier,'55'.repeat(32));f.withdraw();f.untagPayout();await expect(observeServiceFee(f.client,binding)).rejects.toThrow('output-reference tag');});
+  it('rejects a tag bound to another output or a redirected actual payout',async()=>{for(const kind of ['hash','index','address']){const f=makeMasumiFixture();await f.client.submitResult(binding.identifier,'55'.repeat(32));f.withdraw();if(kind==='hash')f.wrongTag('aa'.repeat(32),0);if(kind==='index')f.wrongTag('22'.repeat(32),1);if(kind==='address')f.redirectPayout();await expect(observeServiceFee(f.client,binding)).rejects.toThrow('output-reference tag');}});
+  it('uses registered fixed pricing and never sends dynamic RequestedFunds',async()=>{const f=makeMasumiFixture();await f.client.createPayment(binding.inputHash,nonce,{payBy:binding.payBy,submitBy:binding.submitBy,unlockAt:binding.unlockAt,disputeUntil:binding.disputeUntil});expect(f.calls[0]!.body).not.toHaveProperty('RequestedFunds');});
+  it('keeps Masumi fees unavailable to core principal funding',async()=>{const a=createMasumiFundingAdapter({MASUMI_PAYMENT_SERVICE_URL:'https://example.test',MASUMI_PAYMENT_API_KEY:'private'});expect(a.acceptedAsset()).toBeNull();expect(await a.verify('any',{} as any)).toMatchObject({ok:false,settlementAttempted:false});expect(await a.recover!('ref',{} as any)).toMatchObject({ok:false});});
+  it('fails closed on transport loss without leaking provider secrets',async()=>{const f=makeMasumiFixture();f.failChain();await expect(observeServiceFee(f.client,binding)).rejects.toThrow('unavailable');expect(()=>validateServiceUrl('http://public.test')).toThrow();expect(()=>new MasumiClient({...config,blockfrostBaseUrl:'https://cardano-mainnet.blockfrost.io/api/v0'})).toThrow();});
+});

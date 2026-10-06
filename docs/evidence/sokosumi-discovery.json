@@ -1,0 +1,10 @@
+{
+  "at": "2026-10-06T15:22:05.068Z",
+  "origin": "https://api.preprod.sokosumi.com",
+  "httpStatuses": [
+    200
+  ],
+  "entriesInspected": 91,
+  "projectAgentMatches": 0,
+  "platformTaskPerformed": false
+}
