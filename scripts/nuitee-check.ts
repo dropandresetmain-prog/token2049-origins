@@ -13,10 +13,11 @@ import { PurchaseIntent, HotelFulfillment } from '../src/contracts/intent.js';
 import { formatMinor, money } from '../src/contracts/money.js';
 import type { ExecutionContext, ExecutionResult } from '../src/contracts/ports.js';
 
+import { demoData, demoDate } from '../src/demo/config.js';
+
 const wantBook = process.argv.includes('--book');
 const wantQuote = wantBook || process.argv.includes('--quote');
 const out = (s: string) => process.stdout.write(`${s}\n`);
-const isoDay = (offsetDays: number) => new Date(Date.now() + offsetDays * 86_400_000).toISOString().slice(0, 10);
 let failed = false;
 
 const ex = createNuiteeExecutor(process.env);
@@ -26,12 +27,12 @@ if (ready.status !== 'EXTERNAL_CHECK_PASSED') process.exit(1);
 
 const intent = PurchaseIntent.parse({
   category: 'hotel',
-  spendCeiling: money('USD', 200000),
-  destination: { cityName: 'Singapore', countryCode: 'SG' },
-  checkin: isoDay(60),
-  checkout: isoDay(62),
-  occupancies: [{ adults: 1 }],
-  guestNationality: 'SG',
+  spendCeiling: money('USD', demoData.hotel.maxCommercialMinor),
+  destination: { cityName: demoData.hotel.cityName, countryCode: demoData.hotel.countryCode },
+  checkin: demoDate(demoData.hotel.checkInDaysFromNow),
+  checkout: demoDate(demoData.hotel.checkOutDaysFromNow),
+  occupancies: [{ adults: demoData.hotel.adults }],
+  guestNationality: demoData.hotel.guestNationality,
 });
 
 const offers = await ex.search(intent);
@@ -43,8 +44,8 @@ if (!first) process.exit(1);
 if (wantQuote) {
   const fulfillment = HotelFulfillment.parse({
     category: 'hotel',
-    holder: { firstName: 'Test', lastName: 'Traveller', email: 'test.traveller@example.com', phone: '+6500000000' },
-    guests: [{ occupancyNumber: 1, firstName: 'Test', lastName: 'Traveller', email: 'test.traveller@example.com' }],
+    holder: demoData.traveller,
+    guests: [{ occupancyNumber: 1, firstName: demoData.traveller.firstName, lastName: demoData.traveller.lastName, email: demoData.traveller.email }],
   });
   const q = await ex.quote({ executionRef: first.executionRef, intent }, fulfillment);
   out(`quote: ${formatMinor(q.merchantTotal)} (expires ${q.expiresAt})`);

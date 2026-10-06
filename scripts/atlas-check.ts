@@ -12,8 +12,10 @@ import { createAtlasExecutor } from '../src/execution/atlas/index.js';
 import { FlightIntent } from '../src/contracts/intent.js';
 import { formatMinor, money } from '../src/contracts/money.js';
 
-const [from = 'MNL', to = 'CEB', date] = process.argv.slice(2);
-const departDate = date ?? new Date(Date.now() + 30 * 86_400_000).toISOString().slice(0, 10);
+import { demoData, demoDate } from '../src/demo/config.js';
+
+const [from = demoData.flight.from, to = demoData.flight.to, date] = process.argv.slice(2);
+const departDate = date ?? demoDate(demoData.flight.departDaysFromNow);
 
 const ex = createAtlasExecutor(process.env);
 const r = await ex.readiness();
@@ -21,7 +23,7 @@ process.stdout.write(`atlas readiness: ${r.status}${r.missing.length ? ` missing
 
 if (r.status === 'EXTERNAL_CHECK_PASSED' || r.status === 'CONFIGURED_UNVERIFIED') {
   try {
-    const intent = FlightIntent.parse({ category: 'flight', spendCeiling: money('USD', 100000), from, to, departDate, adults: 1 });
+    const intent = FlightIntent.parse({ category: 'flight', spendCeiling: money('USD', demoData.flight.maxCommercialMinor), from, to, departDate, adults: demoData.flight.adults });
     const offers = await ex.search(intent);
     process.stdout.write(`search ${from}-${to} ${departDate}: ${offers.length} offer(s)\n`);
     for (const o of offers.slice(0, 3)) process.stdout.write(`  ${o.title}  ${formatMinor(o.indicativePrice)}  expires ${o.expiresAt}\n`);
