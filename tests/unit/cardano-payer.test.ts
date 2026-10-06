@@ -142,7 +142,7 @@ describe('localhost payer bridge', () => {
   });
   it('rejects extra signer fields instead of exposing secret material through status', async () => {
     const token = 'test-only-identity-token-0123456789';
-    const source = { sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano' as const, network: 'cardano:preprod', publicAddress: 'addr_test1publicidentity000000', displayAddress: 'addr_test1…000000', assetId: 'fixture', readiness: 'configured' as const, mnemonic: 'must-never-return' };
+    const source = { sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano' as const, network: 'cardano:preprod' as const, publicAddress: 'addr_test1publicidentity000000', displayAddress: 'addr_test1…000000', assetId: 'fixture', readiness: 'configured' as const, mnemonic: 'must-never-return' };
     const pay = vi.fn();
     const server = createBridge({ payer: { pay }, token, source: async () => source });
     await new Promise<void>(resolve => server.listen(0, '127.0.0.1', resolve));

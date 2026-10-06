@@ -32,10 +32,34 @@ export function projectProgress(p: PurchaseView): HumanProgress {
   }
 }
 
-export const FundingSource = z.object({
-  sourceId: z.string().regex(/^src_[0-9a-f]{32}$/), rail: z.literal('cardano'), network: z.string().min(1).max(100),
-  publicAddress: z.string().regex(/^addr_test1[0-9a-z]{10,200}$/),
-  displayAddress: z.string().max(40), assetId: z.string().min(1).max(150),
+/**
+ * Connected payer identity, a closed union per rail. Addresses and networks are validated per rail so a
+ * Cardano address can never be presented as Solana (or the reverse). Masumi is deliberately absent: Masumi
+ * task remuneration is never a connected purchase-principal payer.
+ * The Solana literals mirror src/funding/solana/wire.ts (NETWORK / TEST_MINT); a unit test pins them.
+ */
+export const SOLANA_DEVNET_NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1' as const;
+export const SOLANA_DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU' as const;
+const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const sourceBase = {
+  sourceId: z.string().regex(/^src_[0-9a-f]{32}$/),
+  displayAddress: z.string().max(40),
   readiness: z.enum(['configured', 'unavailable']),
+};
+export const CardanoFundingSource = z.object({
+  ...sourceBase, rail: z.literal('cardano'), network: z.literal('cardano:preprod'),
+  publicAddress: z.string().regex(/^addr_test1[0-9a-z]{10,200}$/),
+  assetId: z.string().min(1).max(150),
 }).strict();
+export const SolanaFundingSource = z.object({
+  ...sourceBase, rail: z.literal('solana'), network: z.literal(SOLANA_DEVNET_NETWORK),
+  publicAddress: z.string().regex(SOLANA_ADDRESS),
+  assetId: z.literal(SOLANA_DEVNET_USDC_MINT),
+}).strict();
+export const FundingSource = z.discriminatedUnion('rail', [CardanoFundingSource, SolanaFundingSource]);
 export type FundingSource = z.infer<typeof FundingSource>;
+
+/** Stable mask shown to humans: first 14 and last 6 characters of a public address. */
+export function maskAddress(address: string): string {
+  return `${address.slice(0, 14)}…${address.slice(-6)}`;
+}

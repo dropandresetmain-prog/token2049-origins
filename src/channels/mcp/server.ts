@@ -16,10 +16,9 @@ const INSTRUCTIONS = [
  */
 export function createMcpServer(config: McpConfig): McpServer {
   const server = new McpServer({ name: 'commerce-gateway', version: '0.1.0' }, { instructions: INSTRUCTIONS });
-  const bridge = BridgeClient.from(config);
   registerTools(server, {
     gateway: new GatewayClient(config),
-    ...(bridge ? { bridge } : {}),
+    bridges: BridgeClient.fromConfig(config),
     secrets: secretsOf(config),
   });
   return server;

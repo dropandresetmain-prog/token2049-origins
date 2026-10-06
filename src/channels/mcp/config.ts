@@ -1,5 +1,9 @@
 import { readFileSync } from 'node:fs';
 
+export type PayerRail = 'cardano' | 'solana';
+export const PAYER_RAILS: readonly PayerRail[] = ['cardano', 'solana'];
+export interface BridgeEndpoint { url: string; token: string }
+
 /**
  * Resolved runtime configuration for the MCP channel. Secrets are held as plain strings in memory
  * only; they are read from files (never from argv or env values) and are scrubbed from every output.
@@ -9,8 +13,8 @@ export interface McpConfig {
   gatewayUrl: string;
   /** Bearer token for ONE gateway API client (one customer, scope-limited). */
   gatewayToken: string;
-  /** Optional separate bounded payer process. Absent => `buy` returns action_required. */
-  bridge?: { url: string; token: string };
+  /** Optional separate bounded payer processes, at most one per rail. Absent => `buy` returns action_required. */
+  bridges?: Partial<Record<PayerRail, BridgeEndpoint>>;
   /** Optional streamable-HTTP listener port on 127.0.0.1. Absent => stdio. */
   httpPort?: number;
   /** Test seam: replaces global fetch for gateway and bridge calls. */
@@ -59,7 +63,32 @@ function requireHttpUrl(value: string | undefined, label: string, loopbackOnly =
   return u.toString().replace(/\/+$/, '');
 }
 
-/** Build config from environment variables: GATEWAY_URL, GATEWAY_TOKEN_FILE, PAYER_BRIDGE_*, MCP_HTTP_PORT. */
+/**
+ * Per-rail bridge variables. PAYER_BRIDGE_* is the legacy spelling of the CARDANO bridge only; it is never
+ * reinterpreted as another rail and may not be combined with CARDANO_PAYER_BRIDGE_*.
+ */
+const BRIDGE_VARS: Record<PayerRail, { url: string; token: string }[]> = {
+  cardano: [{ url: 'CARDANO_PAYER_BRIDGE_URL', token: 'CARDANO_PAYER_BRIDGE_TOKEN_FILE' }, { url: 'PAYER_BRIDGE_URL', token: 'PAYER_BRIDGE_TOKEN_FILE' }],
+  solana: [{ url: 'SOLANA_PAYER_BRIDGE_URL', token: 'SOLANA_PAYER_BRIDGE_TOKEN_FILE' }],
+};
+
+function loadBridges(env: NodeJS.ProcessEnv): Partial<Record<PayerRail, BridgeEndpoint>> {
+  const bridges: Partial<Record<PayerRail, BridgeEndpoint>> = {};
+  for (const rail of PAYER_RAILS) {
+    // Each pair is all-or-nothing: a URL without a token (or vice versa) is a misconfiguration, not "no bridge".
+    const present = BRIDGE_VARS[rail].filter((v) => env[v.url] || env[v.token]);
+    if (present.length > 1) throw new ConfigError(`${present.map((v) => v.url).join(' and ')} configure the same ${rail} bridge; set only one`);
+    const v = present[0];
+    if (!v) continue;
+    if (!env[v.url] || !env[v.token]) throw new ConfigError(`${v.url} and ${v.token} must be set together`);
+    bridges[rail] = { url: requireHttpUrl(env[v.url], v.url, true), token: readTokenFile(env[v.token]!, v.token) };
+  }
+  // One bridge process per rail: the same endpoint under two rails would make the payer identity ambiguous.
+  if (bridges.cardano && bridges.solana && bridges.cardano.url === bridges.solana.url) throw new ConfigError('Cardano and Solana payer bridges must use different URLs');
+  return bridges;
+}
+
+/** Build config from environment variables: GATEWAY_URL, GATEWAY_TOKEN_FILE, *_PAYER_BRIDGE_*, PAYER_BRIDGE_*, MCP_HTTP_PORT. */
 export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConfig {
   const gatewayUrl = requireHttpUrl(env.GATEWAY_URL, 'GATEWAY_URL');
   if (!env.GATEWAY_TOKEN_FILE) throw new ConfigError('GATEWAY_TOKEN_FILE is required');
@@ -67,13 +96,8 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConf
 
   const cfg: McpConfig = { gatewayUrl, gatewayToken };
 
-  // Bridge is all-or-nothing: a URL without a token (or vice versa) is a misconfiguration, not "no bridge".
-  const bu = env.PAYER_BRIDGE_URL;
-  const bt = env.PAYER_BRIDGE_TOKEN_FILE;
-  if (bu || bt) {
-    if (!bu || !bt) throw new ConfigError('PAYER_BRIDGE_URL and PAYER_BRIDGE_TOKEN_FILE must be set together');
-    cfg.bridge = { url: requireHttpUrl(bu, 'PAYER_BRIDGE_URL', true), token: readTokenFile(bt, 'PAYER_BRIDGE_TOKEN_FILE') };
-  }
+  const bridges = loadBridges(env);
+  if (Object.keys(bridges).length) cfg.bridges = bridges;
 
   if (env.MCP_HTTP_PORT) {
     const port = Number(env.MCP_HTTP_PORT);
@@ -85,5 +109,5 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConf
 
 /** All secret strings in a config, for output scrubbing. */
 export function secretsOf(cfg: McpConfig): string[] {
-  return [cfg.gatewayToken, cfg.bridge?.token].filter((s): s is string => !!s);
+  return [cfg.gatewayToken, ...Object.values(cfg.bridges ?? {}).map((b) => b.token)];
 }

@@ -143,9 +143,11 @@ Read-only observation only. Never treat OCBC snapshots as purchase settlement/ca
 MCP process:
 - GATEWAY_URL
 - GATEWAY_TOKEN_FILE
-- optional PAYER_BRIDGE_URL
-- optional PAYER_BRIDGE_TOKEN_FILE
+- optional CARDANO_PAYER_BRIDGE_URL + CARDANO_PAYER_BRIDGE_TOKEN_FILE (legacy alias PAYER_BRIDGE_URL/PAYER_BRIDGE_TOKEN_FILE = Cardano only)
+- optional SOLANA_PAYER_BRIDGE_URL + SOLANA_PAYER_BRIDGE_TOKEN_FILE
 - optional MCP_HTTP_PORT
+
+Each URL/token pair is all-or-nothing, must be loopback, and the two rails must use different URLs. The Solana bridge process reads SOLANA_PAYER_BRIDGE_TOKEN_FILE and optional SOLANA_PAYER_BRIDGE_PORT (default 8789) plus the existing SOLANA_PAYER_* configuration (`npm run payer:solana:bridge`).
 
 Stdio is the preferred local host mode. HTTP mode is loopback-only and unauthenticated inbound; do not expose it directly.
 

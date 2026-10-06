@@ -24,6 +24,7 @@
     "wallet": "tsx clients/payer/wallet-generate.ts",
     "db:migrate": "tsx scripts/migrate.ts",
     "payer:solana": "tsx clients/solana/pay.ts",
+    "payer:solana:bridge": "tsx clients/solana/bridge.ts",
     "payer:solana:facilitator": "tsx clients/solana/facilitator.ts",
     "payer:solana:setup": "tsx scripts/solana/setup.ts",
     "e2e:solana": "tsx scripts/solana/live-e2e.ts",

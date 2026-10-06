@@ -38,7 +38,7 @@ The tool:
 3. collects explicit approval of exact terms/payment choice;
 4. checks whether a purchase already exists for that quote;
 5. follows matching existing approval rather than creating a duplicate;
-6. invokes the payer bridge only for a newly created not_received purchase and only when source rail/network/asset match;
+6. resolves the ONE connected payer whose source matches the selected option's rail + network + asset, then invokes only that payer's bridge and only for a newly created not_received purchase (never another rail, no fallback; if two bridges claim the same identity it fails without paying);
 7. rereads gateway state after payer response.
 
 If an existing purchase already has payment or merchant activity, conflicting retry copy tells the host to follow it with get_purchase, not create another purchase.
@@ -47,9 +47,9 @@ If an existing purchase already has payment or merchant activity, conflicting re
 
 Default MCP idempotency derives from quoteId + selectedFundingOptionId. Backend quote uniqueness, purchase idempotency and payer histories remain authoritative across retries/processes. The user is never responsible for avoiding duplicate clicks.
 
-## Payer bridge
+## Payer bridges
 
-Optional bounded payer bridge is separate and loopback-only.
+Optional bounded payer bridges are separate and loopback-only. At most one per rail: Cardano Preprod (`clients/payer/bridge.ts`) and Solana Devnet (`clients/solana/bridge.ts`). Both may be connected at once. `create_quote` returns `fundingSources` (all reachable sources) and marks each quote option connected only when a source matches its rail/network/asset; the user still selects the option explicitly.
 
 Public status may expose:
 - stable source ID
@@ -71,8 +71,8 @@ Optional HTTP transport binds loopback only. It has no inbound auth of its own a
 Environment:
 - GATEWAY_URL
 - GATEWAY_TOKEN_FILE
-- optional PAYER_BRIDGE_URL
-- optional PAYER_BRIDGE_TOKEN_FILE
+- optional CARDANO_PAYER_BRIDGE_URL + CARDANO_PAYER_BRIDGE_TOKEN_FILE (legacy alias: PAYER_BRIDGE_URL + PAYER_BRIDGE_TOKEN_FILE, always Cardano; do not set both spellings)
+- optional SOLANA_PAYER_BRIDGE_URL + SOLANA_PAYER_BRIDGE_TOKEN_FILE
 - optional MCP_HTTP_PORT
 
 Remote gateway URL must use HTTPS; token files should be absolute/protected when launched from desktop clients.
