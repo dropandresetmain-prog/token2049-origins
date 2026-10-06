@@ -213,7 +213,7 @@ async function discoverWeb(opts) {
     repo: web.repo,
     branch: web.branch,
     region: web.serviceDetails?.region,
-    autoDeploy: web.autoDeploy,
+    autoDeployTrigger: web.autoDeployTrigger,
     url,
   };
 }
@@ -235,7 +235,7 @@ async function ensurePayer(opts, web, dryRun) {
       ownerId: web.ownerId,
       repo: web.repo,
       branch: 'main',
-      autoDeploy: 'no',
+      autoDeployTrigger: 'off',
       serviceDetails: {
         runtime: 'docker',
         plan: 'free',
@@ -258,7 +258,7 @@ async function ensurePayer(opts, web, dryRun) {
   if (plan !== 'free') fail(`Payer service "${opts.payerName}" is on plan "${plan}", not free; refusing to continue`);
   const patch = {};
   if (found.branch !== 'main') patch.branch = 'main';
-  if (found.autoDeploy !== 'no') patch.autoDeploy = 'no';
+  if (found.autoDeployTrigger !== 'off') patch.autoDeployTrigger = 'off';
   if (normalizeDockerfile(found.serviceDetails?.envSpecificDetails?.dockerfilePath) !== 'Dockerfile.payer') {
     patch.serviceDetails = { envSpecificDetails: { dockerfilePath: './Dockerfile.payer' } };
   }
@@ -521,7 +521,7 @@ async function main() {
       log('  web branch: patched to main');
     }
   } else log('  web branch: already main');
-  if (web.autoDeploy && web.autoDeploy !== 'no') log(`  warning: web autoDeploy is "${web.autoDeploy}", left unchanged`);
+  if (web.autoDeployTrigger && web.autoDeployTrigger !== 'off') log(`  warning: web autoDeployTrigger is "${web.autoDeployTrigger}", left unchanged`);
   const webDesired = new Map([
     ['PUBLIC_BASE_URL', web.url],
     ['MCP_PUBLIC_URL', web.url],

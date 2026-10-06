@@ -35,7 +35,7 @@ interface FakeService {
   ownerId: string;
   repo: string;
   branch: string;
-  autoDeploy: string;
+  autoDeployTrigger: string;
   serviceDetails: Json;
   env: Map<string, string>;
   secretFiles: Map<string, string>;
@@ -108,7 +108,7 @@ async function startFake(opts: { payerPlan?: string; existingPayer?: boolean } =
     ownerId: s.ownerId,
     repo: s.repo,
     branch: s.branch,
-    autoDeploy: s.autoDeploy,
+    autoDeployTrigger: s.autoDeployTrigger,
     serviceDetails: s.serviceDetails,
   });
 
@@ -159,7 +159,7 @@ async function startFake(opts: { payerPlan?: string; existingPayer?: boolean } =
           ownerId: b.ownerId as string,
           repo: b.repo as string,
           branch: b.branch as string,
-          autoDeploy: b.autoDeploy as string,
+          autoDeployTrigger: b.autoDeployTrigger as string,
           serviceDetails: { ...details, url: `${origin}/payer` },
           env: new Map(),
           secretFiles: new Map(),
@@ -175,7 +175,7 @@ async function startFake(opts: { payerPlan?: string; existingPayer?: boolean } =
       if (!sub && method === 'PATCH') {
         const b = body as Json;
         if (b.branch) svc.branch = b.branch as string;
-        if (b.autoDeploy) svc.autoDeploy = b.autoDeploy as string;
+        if (b.autoDeployTrigger) svc.autoDeployTrigger = b.autoDeployTrigger as string;
         const esd = ((b.serviceDetails as Json | undefined)?.envSpecificDetails ?? undefined) as Json | undefined;
         if (esd?.dockerfilePath) {
           svc.serviceDetails = { ...svc.serviceDetails, envSpecificDetails: { ...(svc.serviceDetails.envSpecificDetails as Json), dockerfilePath: esd.dockerfilePath } };
@@ -216,7 +216,7 @@ async function startFake(opts: { payerPlan?: string; existingPayer?: boolean } =
     ownerId: 'own-1',
     repo: 'https://github.com/example/token2049-origins',
     branch: 'build/demo-polish-latency',
-    autoDeploy: 'no',
+    autoDeployTrigger: 'off',
     serviceDetails: { runtime: 'docker', plan: 'free', region: 'singapore', url: `${origin}/web` },
     env: new Map([
       ['DATABASE_URL', DB_URL],
@@ -238,7 +238,7 @@ async function startFake(opts: { payerPlan?: string; existingPayer?: boolean } =
       ownerId: 'own-1',
       repo: web.repo,
       branch: 'develop',
-      autoDeploy: 'yes',
+      autoDeployTrigger: 'commit',
       serviceDetails: payerDetails('t2o-cardano-payer', opts.payerPlan ?? 'free'),
       env: new Map([['PAYER_MAX_PER_PAYMENT_BASE_UNITS', '500000']]),
       secretFiles: new Map(),
@@ -310,7 +310,7 @@ describe('provision-hosted-mcp-render', () => {
     expect(creates).toHaveLength(1);
     const body = creates[0]!.body as Json;
     const details = body.serviceDetails as Json;
-    expect(body).toMatchObject({ type: 'web_service', name: 't2o-cardano-payer', ownerId: 'own-1', branch: 'main', autoDeploy: 'no' });
+    expect(body).toMatchObject({ type: 'web_service', name: 't2o-cardano-payer', ownerId: 'own-1', branch: 'main', autoDeployTrigger: 'off' });
     expect(body.repo).toBe('https://github.com/example/token2049-origins');
     expect(details).toMatchObject({ runtime: 'docker', plan: 'free', region: 'singapore', healthCheckPath: '/health' });
     expect(details.envSpecificDetails).toMatchObject({ dockerfilePath: './Dockerfile.payer', dockerContext: '.' });
@@ -362,7 +362,7 @@ describe('provision-hosted-mcp-render', () => {
       MCP_PAYER_GATEWAY_TOKEN_SHA256: createHash('sha256').update(GATEWAY_TOKEN).digest('hex'),
     });
     expect(web.branch).toBe('main');
-    expect(web.autoDeploy).toBe('no');
+    expect(web.autoDeployTrigger).toBe('off');
 
     // per-key PUT only; every env write targets a single key; nothing outside the expected sets
     const envWrites = writes(fake).filter((r) => r.path.includes('/env-vars'));
@@ -417,7 +417,7 @@ describe('provision-hosted-mcp-render', () => {
     expect(fake.requests.some((r) => r.method === 'POST' && r.path === '/v1/services')).toBe(false);
     const patches = fake.requests.filter((r) => r.method === 'PATCH' && r.path === '/v1/services/srv-payer');
     expect(patches).toHaveLength(1);
-    expect(patches[0]!.body).toMatchObject({ branch: 'main', autoDeploy: 'no' });
+    expect(patches[0]!.body).toMatchObject({ branch: 'main', autoDeployTrigger: 'off' });
     expect(payerOf(fake)!.branch).toBe('main');
     expect(res.out).toContain('Hosted MCP: PASS');
   });

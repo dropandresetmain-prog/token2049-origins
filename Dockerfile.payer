@@ -1,6 +1,6 @@
-# Hosted Cardano Preprod payer (private service). It holds spending authority (a mnemonic secret file) and a durable
-# spend ledger on a persistent disk, so it is a separate image from the public gateway and is never publicly routable.
-# Testnet only. See docs/channels/hosted-mcp.md.
+# Hosted Cardano Preprod payer: a FREE Render web service (no disk, no private network). It holds spending authority (a mnemonic
+# secret file); its spend ledger lives in the shared PostgreSQL database (migration 0005). It is a separate image from the public
+# gateway. Testnet only. See docs/channels/hosted-mcp.md.
 FROM node:24-bookworm-slim
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -10,6 +10,6 @@ ENV NODE_ENV=production
 COPY tsconfig.json ./
 COPY src ./src
 COPY clients/payer ./clients/payer
-# The persistent disk is mounted at /var/data and is root-owned on Render, so this service runs as root inside its container.
-EXPOSE 8788
+# Render injects PORT (default 10000); the bridge listens on it.
+EXPOSE 10000
 CMD ["node_modules/.bin/tsx", "clients/payer/hosted.ts"]

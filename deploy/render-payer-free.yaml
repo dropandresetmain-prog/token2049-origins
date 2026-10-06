@@ -1,0 +1,54 @@
+# Reference Blueprint for the hosted Cardano payer on a FREE web service (no disk, no private network).
+# The preferred path is `node scripts/provision-hosted-mcp-render.mjs` (one command; see docs/channels/hosted-mcp.md): it creates
+# this service, sets these variables one by one, uploads the secret files and deploys. Use this file only if you want the
+# dashboard flow (Blueprint path: deploy/render-payer-free.yaml); never apply the root render.yaml for the payer.
+# Secret files (dashboard -> Environment -> Secret Files): payer-cardano-mnemonic, cardano-payer-bridge-token, payer-gateway-token.
+services:
+  - type: web
+    name: t2o-cardano-payer
+    runtime: docker
+    dockerfilePath: ./Dockerfile.payer
+    branch: main
+    region: singapore
+    plan: free
+    autoDeployTrigger: 'off'
+    healthCheckPath: /health
+    envVars:
+      # Same Render Postgres as the gateway (use its INTERNAL URL). The payer ledger lives there; there is no disk.
+      - key: DATABASE_URL
+        sync: false
+      # This service's own public hostname (no scheme): the only Host it answers to.
+      - key: PAYER_BRIDGE_ALLOWED_HOSTS
+        value: t2o-cardano-payer.onrender.com
+      - key: PAYER_BRIDGE_TOKEN_FILE
+        value: /etc/secrets/cardano-payer-bridge-token
+      - key: PAYER_GATEWAY_URL
+        value: https://token2049-origins.onrender.com
+      - key: PAYER_GATEWAY_TOKEN_FILE
+        value: /etc/secrets/payer-gateway-token
+      - key: PAYER_CARDANO_NETWORK
+        value: cardano:preprod
+      - key: PAYER_CARDANO_MNEMONIC_FILE
+        value: /etc/secrets/payer-cardano-mnemonic
+      # Public address of the dedicated demo wallet; start-up refuses a mnemonic that derives anything else.
+      - key: PAYER_WALLET_ADDRESS
+        value: addr_test1qzxfrsznxqm4y2f40jv4xfdydpagzmva82c4asgzdvhsk6eqrvlay7vdxxca7rzlk5z29pe756yq58rutu6v4d02hmtqjy2drl
+      - key: BLOCKFROST_PROJECT_ID
+        sync: false
+      - key: BLOCKFROST_BASE_URL
+        value: https://cardano-preprod.blockfrost.io/api/v0
+      - key: PAYER_ALLOWED_ASSET_UNIT
+        sync: false
+      - key: PAYER_EXPECTED_PAY_TO
+        sync: false
+      # Hard small caps (base units of the allowed asset, 6 decimals). Cumulative never resets (it is read from Postgres).
+      - key: PAYER_MAX_PER_PAYMENT_BASE_UNITS
+        value: '500000'
+      - key: PAYER_MAX_CUMULATIVE_BASE_UNITS
+        value: '1500000'
+      - key: PAYER_MAX_DAILY_BASE_UNITS
+        value: '1000000'
+      - key: PAYER_MAX_FEE_LOVELACE
+        value: '2000000'
+      - key: PAYER_MAX_ADA_OUTPUT_LOVELACE
+        value: '3000000'

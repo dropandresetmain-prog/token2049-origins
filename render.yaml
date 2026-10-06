@@ -115,66 +115,12 @@ services:
       # Render secret files (dashboard -> Environment -> Secret Files). Never environment values.
       - key: MCP_OAUTH_OWNER_PASSCODE_FILE
         value: /etc/secrets/mcp-owner-passcode
-      # Hosted Cardano payer on the private network. The bridge token is a secret file shared with the payer service.
+      # Hosted Cardano payer: a second FREE web service (no disk, no private network) reached over HTTPS at this exact origin.
+      # Prefer `node scripts/provision-hosted-mcp-render.mjs`, which creates it and sets everything below; see docs/channels/hosted-mcp.md.
       - key: CARDANO_PAYER_BRIDGE_URL
-        value: http://t2o-cardano-payer:8788
+        value: https://t2o-cardano-payer.onrender.com
       - key: CARDANO_PAYER_BRIDGE_TOKEN_FILE
         value: /etc/secrets/cardano-payer-bridge-token
       # SHA-256 (hex) of the payer's gateway token; registers the payer's gateway client on boot (hash only).
       - key: MCP_PAYER_GATEWAY_TOKEN_SHA256
         sync: false
-
-  # Dedicated hosted Cardano Preprod payer. PRIVATE SERVICE: no public URL. Needs a paid instance plus a persistent disk
-  # (the spend ledger must survive restarts and redeploys). Same region + workspace as the web service is required.
-  - type: pserv
-    name: t2o-cardano-payer
-    runtime: docker
-    dockerfilePath: ./Dockerfile.payer
-    branch: main
-    region: singapore
-    plan: starter
-    autoDeployTrigger: 'off'
-    disk:
-      name: payer-ledger
-      mountPath: /var/data
-      sizeGB: 1
-    envVars:
-      - key: PORT
-        value: '8788'
-      - key: PAYER_BRIDGE_PORT
-        value: '8788'
-      # Exact host:port the web service uses to reach this bridge.
-      - key: PAYER_BRIDGE_ALLOWED_HOSTS
-        value: t2o-cardano-payer:8788
-      - key: PAYER_BRIDGE_TOKEN_FILE
-        value: /etc/secrets/cardano-payer-bridge-token
-      # The payer reads the 402 challenge from the PUBLIC gateway URL (must equal PUBLIC_BASE_URL) with a payer-scoped token.
-      - key: PAYER_GATEWAY_URL
-        value: https://token2049-origins.onrender.com
-      - key: PAYER_GATEWAY_TOKEN_FILE
-        value: /etc/secrets/payer-gateway-token
-      - key: PAYER_CARDANO_NETWORK
-        value: cardano:preprod
-      - key: PAYER_CARDANO_MNEMONIC_FILE
-        value: /etc/secrets/payer-cardano-mnemonic
-      - key: PAYER_LEDGER_FILE
-        value: /var/data/payer-ledger.json
-      - key: BLOCKFROST_PROJECT_ID
-        sync: false
-      - key: BLOCKFROST_BASE_URL
-        value: https://cardano-preprod.blockfrost.io/api/v0
-      - key: PAYER_ALLOWED_ASSET_UNIT
-        sync: false
-      - key: PAYER_EXPECTED_PAY_TO
-        sync: false
-      # Hard small caps (base units of the allowed asset, 6 decimals). Cumulative never resets.
-      - key: PAYER_MAX_PER_PAYMENT_BASE_UNITS
-        value: '500000'
-      - key: PAYER_MAX_CUMULATIVE_BASE_UNITS
-        value: '1500000'
-      - key: PAYER_MAX_DAILY_BASE_UNITS
-        value: '1000000'
-      - key: PAYER_MAX_FEE_LOVELACE
-        value: '2000000'
-      - key: PAYER_MAX_ADA_OUTPUT_LOVELACE
-        value: '3000000'

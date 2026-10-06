@@ -11,14 +11,15 @@ existing gateway Express app (`src/channels/hosted-mcp/`), so Render keeps one p
 (`MCP_HOSTED_ENABLED=true`); with it unset, no `/mcp` or OAuth route exists. The local stdio and loopback-HTTP modes
 (`src/channels/mcp/main.ts`, `http.ts`) are unchanged.
 
-## Request path
+## Request path (all free Render services + the existing Render Postgres)
 
 ```
-ChatGPT ──HTTPS──> /mcp (Host/Origin check → OAuth bearer → stateless MCP server per request)
+ChatGPT ──HTTPS──> token2049-origins /mcp (Host/Origin check → OAuth bearer → stateless MCP server per request)
                       │  tool call → gateway contract (zod-validated) over 127.0.0.1 with the caller's own scoped token
-                      │  buy       → Render PRIVATE network → t2o-cardano-payer /pay {purchaseId}
+                      │  buy       → HTTPS + bearer → t2o-cardano-payer /pay {purchaseId}   (second FREE web service)
                       ▼
           payer → public gateway /v1/purchases/{id}/fund (x402, payer-scoped token) → Cardano Preprod
+          payer ledger → Render Postgres (hosted_payer_ledger; no disk, no files)
 ```
 
 ## Authentication (OAuth 2.1 / MCP authorization)
@@ -65,29 +66,30 @@ headers are never consulted (`trust proxy` is off). `Origin` must be absent (ser
 
 Also returned: merchant, receipt id, verified payment (rail + transfer reference), amounts, evidence refs, limitations. A held, unpaid, `ticketing`, unresolved or receipt-less purchase gets no success label. The public purchase view exposes one provider reference per purchase, so a separate airline PNR/e-ticket number is **not** shown (it is not available to the MCP; nothing is invented).
 
-## Hosted payer (Cardano only)
+## Hosted payer (Cardano only, free web service)
 
-`t2o-cardano-payer` is a Render **private service** (`Dockerfile.payer`, `clients/payer/hosted.ts`): the existing bounded payer + bridge behind private-network access (private peers only, exact `Host` allowlist, bearer token, no `Origin`). It accepts only `{purchaseId}` and takes rail/network/asset/payee/amount from the purchase and its own caps (`PAYER_*`: 0.5 / 1.5 cumulative / 1.0 daily in asset units; edit in `render.yaml`). The MCP calls it over `http://t2o-cardano-payer:8788`; Solana has no hosted payer, so a Solana choice returns `action_required` (no fallback; a Solana bridge in hosted config is a startup error).
+`t2o-cardano-payer` is a second **free Render web service** (`Dockerfile.payer`, `clients/payer/hosted.ts`): the existing bounded payer and bridge, run in public-hosted mode. No private service, no disk, no tunnel.
 
-**History durability.** The ledger (`PAYER_LEDGER_FILE=/var/data/payer-ledger.json`) lives on a Render persistent disk. Every payment is reserved before signing and the identical signed header is resent on retry, so history, caps and at-most-once behaviour survive restarts and redeploys. A missing ledger stops the service (never silently recreated); a crash lock is logged and left for the operator (never auto-cleared), per `docs/evidence/cardano-protocol.md`. Render also takes daily disk snapshots, but never restore one without reconciling payments made since.
+**Public surface (only):** `GET /health`, `GET /status`, `POST /pay {"purchaseId": "pur_…"}`. `/pay` takes nothing else (extra keys are rejected): the payer fetches the canonical purchase and 402 requirements from the gateway and checks them against its own policy (Cardano Preprod, one asset, one payee, per-payment/daily/cumulative caps). It is publicly reachable, so it additionally requires: HTTPS (proxy header), the exact configured `Host`, no `Origin`, a long random bearer token (constant-time compare), a 4 KB body limit, no redirects (outbound calls refuse them), a 120 req/min process-wide limit and a lockout after 10 failed authentications per minute. Responses and logs never contain the token, mnemonic, signed payloads or gateway token. The gateway calls exactly the configured payer origin (`CARDANO_PAYER_BRIDGE_URL`, https, bare origin, never the gateway itself) and has no fallback; a Solana bridge in hosted config is a startup error, so a Solana choice returns `action_required`.
 
-**Cost.** A private service and a disk both require a paid plan: Starter instance **$7/mo** + 1 GB disk **$0.25/mo** ≈ **$7.25/mo** (Render list prices; confirm in the dashboard). The workspace currently has no payment info on file (`render blueprints validate` → `need_payment_info`), so this cannot be provisioned until you add it. The existing free web service can send private-network requests to the payer.
+**History durability (PostgreSQL ledger, migration `0005`).** `hosted_payer_ledger` holds one row per purchase with the same semantics as the file ledger: spend is reserved (`signing`) before signing, the exact signed header is stored (`signed`) before it can be sent and resent identically on retry, then `accepted`. Caps are summed from the table, so they survive sleeping, restarts and redeploys. Concurrency uses a session advisory lock (overlapping deploys serialize; a crashed holder releases automatically) plus table triggers: facts and signed headers are immutable, status never moves backwards, signed rows cannot be deleted, the identity row is permanent. A `signing` row left by a crash is ambiguous, so that purchase is **refused** (operator reconciliation), never re-signed; in-process signing failures release only their own unsent reservation.
 
-## Provisioning checklist (operator, once)
+**Identity.** The ledger is bound to the configured wallet (`PAYER_WALLET_ADDRESS`). Start-up derives the address from the mnemonic and refuses if it differs, or if the database already belongs to a different wallet; every signer is re-checked the same way. Only the new dedicated demo wallet is used; no historical ledger is imported or reset.
 
-The existing `token2049-origins` web service is NOT managed by a Blueprint, so never apply the root `render.yaml` (it would try to create a second web service). Use the payer-only Blueprint.
+**Cold starts.** Free services sleep. The gateway allows up to 60 s for the payer's `/status` (a wake-up) and up to 100 s for `/pay`. A timeout never causes a second payment: the outcome is ambiguous, `buy` reports the payment attempt as unconfirmed, and durable payer history plus the gateway purchase decide what is real (`get_purchase`). The no-spend smoke wakes the payer first (`/health`, `/status`); nothing keeps it awake afterwards.
 
-1. Render dashboard -> Billing: add payment info (the payer is a paid private service + disk).
-2. Dashboard -> New -> Blueprint -> this repo, branch `main`, **Blueprint path `deploy/render-payer.yaml`**. Fill the three prompts: `BLOCKFROST_PROJECT_ID` (Preprod key), `PAYER_ALLOWED_ASSET_UNIT` (same value as the web service's `CARDANO_ASSET_UNIT`), `PAYER_EXPECTED_PAY_TO` (same value as `CARDANO_TREASURY_ADDRESS`).
-3. Payer service -> Environment -> Secret Files: `payer-cardano-mnemonic` (the wallet file), `cardano-payer-bridge-token`, `payer-gateway-token`.
-4. Web service -> Environment: set `PUBLIC_BASE_URL=https://token2049-origins.onrender.com`, `MCP_HOSTED_ENABLED=true`, `MCP_PUBLIC_URL=https://token2049-origins.onrender.com`, `MCP_OAUTH_OWNER_PASSCODE_FILE=/etc/secrets/mcp-owner-passcode`, `CARDANO_PAYER_BRIDGE_URL=http://t2o-cardano-payer:8788`, `CARDANO_PAYER_BRIDGE_TOKEN_FILE=/etc/secrets/cardano-payer-bridge-token`; Secret Files: `mcp-owner-passcode`, `cardano-payer-bridge-token` (same value as the payer's). Set Settings -> Branch to `main`.
-5. Register the payer's gateway client: set web env `MCP_PAYER_GATEWAY_TOKEN_SHA256` to the SHA-256 (hex) of the payer's gateway token (`node -e "console.log(require('crypto').createHash('sha256').update(require('fs').readFileSync('payer-gateway-token','utf8').trim()).digest('hex'))"`). On boot the gateway creates `cli_HOSTEDPAYER` for `cus_HOSTEDMCPDEMO` with scopes `purchases:read,purchases:fund` only (hash stored, never the token); rotating the hash replaces it and an operator-revoked client stays revoked.
-6. Fund the payer's address with tADA and the test stablecoin (faucets), then on the payer service shell run once: `npm run payer:hosted:init-ledger` (refuses to overwrite). Restart the payer.
-7. No-spend public verification: `HOSTED_MCP_PASSCODE=<passcode> node scripts/hosted-mcp-smoke.mjs --base https://token2049-origins.onrender.com --quote`.
+**Cost / limits.** All free: two free web services + the existing Render Postgres. Render shares 750 free instance-hours per month across the workspace's free services, and the Postgres instance shown by `render postgres list` has an `expiresAt` date (OAuth state and purchase history live there).
 
-A NEW wallet is created with `PAYER_CARDANO_MNEMONIC_FILE=<new file> PAYER_LEDGER_FILE=<throwaway absolute path> npm run wallet` (prints the address only; delete the throwaway ledger: the real ledger is created on the payer's disk in step 6).
+## One-command provisioning
 
-**Operational risk:** the Render Postgres instance on this workspace is on a plan that expires (`expiresAt` shown by `render postgres list`); OAuth state and all purchase history live there.
+```
+set RENDER_API_KEY=<your Render API key>        (PowerShell: $env:RENDER_API_KEY="...")
+node scripts/provision-hosted-mcp-render.mjs
+```
+
+It uses the official Render REST API (never the CLI; never the replace-all env endpoint): finds the workspace and the existing `token2049-origins` service; reads its env vars (reusing `DATABASE_URL`, `BLOCKFROST_PROJECT_ID`, `CARDANO_ASSET_UNIT`, `CARDANO_TREASURY_ADDRESS`); creates the free `t2o-cardano-payer` web service if absent (aborts if one exists on a paid plan); sets each payer and gateway env var with a per-variable PUT; uploads the secret files from `C:\Dev\token2049-setup\secrets\hosted-demo\` (`payer.mnemonic`, `cardano-payer-bridge-token`, `payer-gateway-token`, `mcp-owner-passcode`); points the gateway at `main`; deploys both and waits for `live`; verifies `/health`, `/console/`, the payer's `/health` and `/status`, and the unauthenticated `/mcp` challenge; checks the wallet's tADA/tUSDM balance; runs the no-spend smoke (`scripts/hosted-mcp-smoke.mjs --payer-url … --quote`). It ends with `Hosted MCP: PASS`, `Payer: READY` (or `NOT FUNDED`), `MCP URL: …`. Flags: `--dry-run` (reads only), `--no-deploy`. Secrets are never printed; the key is never written anywhere. The gateway registers the payer's gateway client itself on boot from `MCP_PAYER_GATEWAY_TOKEN_SHA256` (hash only), and both services run the append-only migrations, so there is no manual ledger initialisation.
+
+Reference only: `deploy/render-payer-free.yaml` (dashboard Blueprint path for the payer). Do not apply the root `render.yaml`.
 
 ## Connecting ChatGPT
 

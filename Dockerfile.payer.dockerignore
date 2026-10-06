@@ -1,0 +1,30 @@
+# Build context for Dockerfile.payer only (BuildKit picks <Dockerfile>.dockerignore over .dockerignore).
+# The payer image MUST contain clients/payer; everything else keeps the gateway's exclusions.
+node_modules
+dist
+data
+wallets
+keys
+secrets
+.env
+.env.*
+!.env.example
+!web/.env.gateway
+artifacts
+logs
+traces
+docs/evidence/raw
+.git
+
+# Signer material and private runtime state must never enter the gateway build context.
+clients/solana
+integration-e2e
+external-acceptance-hardening
+human-orchestration
+*.pem
+*.key
+*.skey
+*.vkey
+*.mnemonic
+*seed*.txt
+*wallet*.json
