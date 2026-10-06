@@ -319,10 +319,11 @@ class NuiteeExecutor implements CommerceExecutor {
     const status = (b.status ?? '').toUpperCase();
     const payment = (b.paymentStatus ?? '').toLowerCase();
     const base = { status: b.status, paymentStatus: b.paymentStatus, sandbox: b.sandbox ?? null };
-    // Consistency checks: a readback describing a different booking is an anomaly, not a success.
-    if (b.bookingId && b.bookingId !== bookingId) return unknown('readback returned a different booking id', base);
-    if (b.clientReference && b.clientReference !== clientReference) return unknown('readback client reference does not match this attempt', base);
-    if (b.hotelId && ref && b.hotelId !== ref.hotelId) return unknown('readback hotel does not match the quote', base);
+    // Completion and no-charge cancellation both require independently bound identities.
+    // Missing fields cannot prove that this is our booking or the approved hotel.
+    if (!b.bookingId || b.bookingId !== bookingId) return unknown('readback booking id is missing or differs from this booking', base);
+    if (!b.clientReference || b.clientReference !== clientReference) return unknown('readback client reference is missing or differs from this attempt', base);
+    if (!ref || !b.hotelId || b.hotelId !== ref.hotelId) return unknown('readback hotel identity is missing or differs from the stored quote', base);
 
     if (status === 'CANCELLED' || status === 'CANCELED') {
       // We never cancel; a cancelled sandbox booking carries no real charge. Without the sandbox

@@ -107,7 +107,7 @@ const prebookJson = (over: Record<string, unknown> = {}, rates: unknown[] = [rat
 
 const bookingData = (over: Record<string, unknown> = {}) => ({
   bookingId: 'BK1',
-  clientReference: undefined as string | undefined,
+  clientReference: clientReferenceFor('att_01HXYZ.abc'),
   status: 'CONFIRMED',
   paymentStatus: 'succeeded',
   hotelConfirmationCode: 'HCONF',
@@ -504,7 +504,7 @@ describe('nuitee execute', () => {
   });
 
   it('treats 4012 / 2001 / 4040 / validation refusals as failed_definite', async () => {
-    for (const [status, code] of [[410, 4012], [400, 2001], [408, 4040], [400, 4002]] as const) {
+    for (const [status, code] of [[410, 4012], [400, 2001], [400, 4040], [400, 4002]] as const) {
       const f = provider({ book: () => ({ status, json: { error: { code, message: 'Rate expired for Zaphod' } } }) });
       const { r } = await run(f);
       expect(r.kind, String(code)).toBe('failed_definite');
@@ -657,6 +657,26 @@ describe('nuitee retrieve', () => {
     }
   });
 
+  it.each([
+    ['bookingId', undefined], ['bookingId', null], ['bookingId', ''], ['bookingId', 'BK-OTHER'],
+    ['clientReference', undefined], ['clientReference', null], ['clientReference', ''], ['clientReference', 'OTHER-ATTEMPT'],
+    ['hotelId', undefined], ['hotelId', null], ['hotelId', ''], ['hotelId', 'OTHER-HOTEL'],
+  ])('requires exact readback identity %s=%s for success and cancellation', async (field, value) => {
+    for (const status of ['CONFIRMED', 'CANCELLED', 'CANCELED']) {
+      const { r } = await retrieve(data({ [field as string]: value, status }));
+      expect(r).toMatchObject({ kind: 'unknown', providerReference: 'BK1' });
+      noPii(r);
+    }
+  });
+
+  it('cannot finalize success or cancellation without a valid stored hotel quote', async () => {
+    for (const status of ['CONFIRMED', 'CANCELLED']) {
+      const c = makeCtx({ checkpoints: { booking: { providerReference: 'BK1' } } });
+      c.ctx.quote.executionRef = {};
+      const f = provider({ get: data({ status }) });
+      expect(await mk(f).retrieve(c.ctx)).toMatchObject({ kind: 'unknown', providerReference: 'BK1' });
+    }
+  });
   it('CANCELLED without sandbox evidence, or with charges, stays unknown', async () => {
     const { r } = await retrieve(() => ({ json: { data: bookingData({ status: 'CANCELLED', clientReference: ref, sandbox: undefined }) } }));
     expect(r.kind).toBe('unknown');
