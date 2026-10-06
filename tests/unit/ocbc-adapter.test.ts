@@ -68,6 +68,40 @@ describe('OCBC normalization', () => {
 });
 
 describe('OCBC read-only client and adapter', () => {
+  it('reads the verified account-history resource and preserves provider failures', async () => {
+    const calls: URL[] = [];
+    let historyFails = false;
+    const fetchImpl: typeof fetch = async (input, init = {}) => {
+      const url = new URL(String(input));
+      calls.push(url);
+      if (url.pathname === '/token') return response({ access_token: 'temporary-app-token', expires_in: 3600 });
+      if (url.pathname === '/transactional/corporateAccountListing/1.0') {
+        return response({ Success: true, Results: [{ accountId: 'test-account-id', accountMaskedNumber: '123456789012', balance: { currencyCode: 'SGD', ledgerBalance: '12.30' } }] });
+      }
+      if (url.pathname === '/transactional/creditcardlisting/1.0/retrieveCreditCardList') return response({ Success: true, Results: [] });
+      // A literal verified path catches endpoint regressions that a mock based on OCBC_APIS would hide.
+      if (url.pathname === '/transactional/accounttransactionhistory/1.0/') {
+        expect(init.method).toBe('GET');
+        expect(url.searchParams.get('accountId')).toBe('test-account-id');
+        return response(historyFails
+          ? { Success: false, Results: { Status: 'ERROR', ErrorMsg: 'synthetic provider failure' } }
+          : { Success: true, Results: { responseList: [{ amount: '1.23', currencyCode: 'SGD', debitCreditIndicator: 'D', transactionDate: '30-04-2018', description: 'Test debit' }] } });
+      }
+      return response({ Success: false }, 404);
+    };
+    const observations = await createOcbcAdapter(credentials, { fetchImpl, maxTransactionCalls: 1 }).observe();
+    const transactions = observations.filter((o) => o.kind === 'account_transaction');
+    expect(transactions).toHaveLength(1);
+    expect(transactions[0]).toMatchObject({ maskedReference: '****9012', currency: 'SGD', amount: { amountMinor: '123' }, description: 'DEBIT Test debit', source: 'ocbc:sandbox:accounttransactionhistory/1.0' });
+    expect(JSON.stringify(observations)).not.toContain('test-account-id');
+    expect(calls.some((u) => u.pathname === '/transactional/corpTransHistory/1.0')).toBe(false);
+
+    historyFails = true;
+    const failed = await createOcbcAdapter(credentials, { fetchImpl, maxTransactionCalls: 1 }).observe();
+    expect(failed.filter((o) => o.kind === 'account_transaction')).toHaveLength(0);
+    expect(failed[0]?.caveats.join(' ')).toContain('unusable payload');
+  });
+
   it('uses only the fixed official host and GET bank-resource methods', async () => {
     const calls: Array<{ url: string; method: string; headers: Headers }> = [];
     const fetchImpl: typeof fetch = async (input, init = {}) => {

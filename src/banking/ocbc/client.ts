@@ -32,7 +32,7 @@ export const OCBC_ENV = {
 /** Documented sandbox resources (public Swagger). Documentation is not proof of entitlement. */
 export const OCBC_APIS = {
   accountListing: { label: 'corporateAccountListing/1.0', path: '/transactional/corporateAccountListing/1.0' },
-  accountTransactions: { label: 'corpTransHistory/1.0', path: '/transactional/corpTransHistory/1.0' },
+  accountTransactions: { label: 'accounttransactionhistory/1.0', path: '/transactional/accounttransactionhistory/1.0/' },
   creditCardList: { label: 'creditcardlisting/1.0', path: '/transactional/creditcardlisting/1.0/retrieveCreditCardList' },
   creditCardUnbilled: { label: 'creditcardhistory/1.0', path: '/transactional/creditcardhistory/1.0/retrieveCreditCardTranHistory' },
 } as const;
