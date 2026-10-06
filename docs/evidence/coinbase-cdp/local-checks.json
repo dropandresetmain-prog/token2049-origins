@@ -2,7 +2,6 @@
   "baseSha": "0234d20a11e80285318c88511195c5f2d51c0df8",
   "branch": "feat/coinbase-cdp-treasury",
   "sdk": "@coinbase/cdp-sdk@1.57.0",
-  "externalApiAttempted": false,
   "walletProvisioned": false,
   "faucetRequested": false,
   "testTransferSent": false,
@@ -21,5 +20,9 @@
       "result": "PASS"
     }
   ],
-  "externalEvidence": "The existing Drop & Reset SANDBOX portal account is confirmed to provide payment-integration sandbox credentials and simulated accounts, not API Key Wallet credentials. No CDP Wallet credential names were found in process/user/machine environment inventories, recent Downloads and C:\\Dev configuration key-name inventory, PowerShell profiles, or local env key names. No authenticated Wallet API call, wallet creation, faucet request, or transaction was attempted."
+  "externalEvidence": "A read-only authenticated CDP payment-sandbox Accounts API list call via the existing CLI succeeded and returned zero accounts (see sandbox-account-list.json). This is not an API Key Wallet call. No wallet credentials were found in the inspected environment/config name inventories; no API Key Wallet wallet creation, faucet request, or transaction was attempted.",
+  "walletApiAttempted": false,
+  "sandboxApiReadAttempted": true,
+  "sandboxApiReadResult": "success_empty_account_list",
+  "sandboxCliVersion": "2.0.102"
 }
