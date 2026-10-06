@@ -17,7 +17,8 @@ gateway process.
 - Planning release `launch-2026-10-06-v1` imported from
   `dropandresetmain-prog/wip-personal@af648eece01321fec50bcddeee9ba92fd3e10d3a`
   (`token2049-hackathon/`).
-- First long-horizon implementation lane (Commerce Core) is in progress on `build/commerce-core`.
+- Commerce Core local implementation is complete on `build/commerce-core`: all six lanes integrated, 396 offline tests passing.
+- Runtime and acceptance instructions: [RUNBOOK](docs/RUNBOOK.md), [TEST_CHECKLIST](docs/TEST_CHECKLIST.md), [KNOWN_ISSUES](docs/KNOWN_ISSUES.md), [HANDOFF](docs/HANDOFF.md).
 - No external acceptance has passed yet. Sandbox/testnet evidence is tracked separately from local
   tests in [`docs/work/ACTIVE_TASK.md`](docs/work/ACTIVE_TASK.md).
 

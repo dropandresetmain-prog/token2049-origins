@@ -63,3 +63,13 @@ evidence. Success ⇒ `202` + `PAYMENT-RESPONSE`. Replay ⇒ `409 payment_replay
 `tests/support/fixtures.ts` (test-only) provides deterministic executors and a fixture funding rail; payment header
 format `fixture:<txref>:<baseUnits>[:<state>][:<asset>][:<payee>][:<purpose>]`. These are never wired into the runnable
 gateway (`src/wiring.ts`).
+
+## Durable funding and evidence implementation notes
+
+The production Cardano adapter implements `prepare` before any settlement and `recover` for read-only recovery. Core atomically persists a prepared canonical transfer reference and immutable funding requirement before facilitator verify/settle. A proven pre-settlement rejection (`settlementAttempted:false`) permits a new attempt; omission/ambiguity preserves recovery and blocks a second transfer. Confirmed transfers arriving after closure are recorded as refundable unapplied obligations. Funding/confirmation jobs continue read-only after retry thresholds and are repaired on startup.
+
+Compatible Cardano payers include signed metadata label 2049 with the application commitment documented in `docs/evidence/cardano-protocol.md`. Transaction validity must end by quote expiry. The exact x402 resource URL is frozen for new purchases so changing deployment origins cannot change recovery commitments. Earlier local records require their original public base URL.
+
+Default MCP clients lack `purchases:fund`; provision a separate read/fund payer client for the SAME customer. Gateway destinations require HTTPS except exact loopback HTTP; the bridge is loopback-only. The gateway never imports signer/client key material.
+
+Evidence routes require owner-scoped `evidence:read`, or `operator:read` for treasury/bank/refresh. `/inspect` is a public static shell. `/v1/webhooks/shopify` verifies raw-byte HMAC before JSON parsing and only schedules independent readback; payload financial claims cannot complete a purchase. Receipt/result provenance overrides environment inference, and `executionEvidenceStatus` distinguishes source-only/pending execution evidence from receipt issuance.

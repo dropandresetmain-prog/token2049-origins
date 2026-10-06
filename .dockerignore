@@ -12,3 +12,18 @@ logs
 traces
 docs/evidence/raw
 .git
+
+# Signer material and private runtime state must never enter the gateway build context.
+clients/payer
+*.pem
+*.key
+*.skey
+*.vkey
+*.mnemonic
+*seed*.txt
+*wallet*.json
+*.db
+*.db-wal
+*.db-shm
+*.sqlite
+*.sqlite3

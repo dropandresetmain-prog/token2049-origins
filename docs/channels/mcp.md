@@ -33,7 +33,7 @@ A thin Model Context Protocol server over the canonical HTTP gateway (`src/chann
 
 | Variable | Required | Meaning |
 |---|---|---|
-| `GATEWAY_URL` | yes | Gateway base URL, e.g. `http://127.0.0.1:8080` |
+| `GATEWAY_URL` | yes | Gateway base URL, e.g. `http://127.0.0.1:8787` |
 | `GATEWAY_TOKEN_FILE` | yes | Path to a file holding the gateway bearer token (whitespace trimmed). Never pass the token in env or argv. |
 | `PAYER_BRIDGE_URL` | no | Base URL of the bounded payer process. Must be set together with the token file. |
 | `PAYER_BRIDGE_TOKEN_FILE` | no | File holding the bridge bearer token. |
@@ -41,15 +41,16 @@ A thin Model Context Protocol server over the canonical HTTP gateway (`src/chann
 
 ## Running
 
-Entrypoint: `src/channels/mcp/main.ts` (no npm script yet; see "Recommended npm scripts" in the lane report).
+Entrypoint: `src/channels/mcp/main.ts`; `npm run mcp` uses the process environment. For an explicit environment file on Windows:
 
-```
+```powershell
+Set-Location C:\Dev\token2049-origins-core
 # stdio (default)
-GATEWAY_URL=http://127.0.0.1:8080 GATEWAY_TOKEN_FILE=/secure/mcp.token npx tsx src/channels/mcp/main.ts
-
-# streamable HTTP, loopback only
-MCP_HTTP_PORT=8787 GATEWAY_URL=... GATEWAY_TOKEN_FILE=... npx tsx src/channels/mcp/main.ts
+node --env-file=.env.mcp --import tsx src/channels/mcp/main.ts
+# Optional HTTP mode uses MCP_HTTP_PORT=8789 in .env.mcp; gateway and bridge keep their own ports.
 ```
+
+Use absolute token-file paths when a desktop client starts the process from another directory. Remote gateway URLs require HTTPS; payer bridges require exact loopback hosts. Query/fragment/userinfo and redirects are refused. See the [runbook](../RUNBOOK.md) and `.env.mcp.example`.
 
 stdout is the protocol channel in stdio mode; diagnostics go to stderr and never include token values.
 
@@ -71,7 +72,7 @@ never calls `/fund`, so `purchases:fund` belongs to the payer bridge's client, n
       "args": ["tsx", "src/channels/mcp/main.ts"],
       "cwd": "/path/to/token2049-origins",
       "env": {
-        "GATEWAY_URL": "http://127.0.0.1:8080",
+        "GATEWAY_URL": "http://127.0.0.1:8787",
         "GATEWAY_TOKEN_FILE": "/path/to/secrets/mcp.token"
       }
     }
