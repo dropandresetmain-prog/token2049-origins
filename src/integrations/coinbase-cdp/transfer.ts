@@ -17,6 +17,7 @@ interface RpcReceipt {
 }
 
 export interface CdpRpc {
+  assertNetwork(): Promise<void>;
   transaction(hash: string): Promise<RpcTransaction | null>;
   receipt(hash: string): Promise<RpcReceipt | null>;
 }
@@ -36,6 +37,11 @@ export class PublicBaseSepoliaRpc implements CdpRpc {
     if (!response.ok) throw new Error('Base Sepolia readback is unavailable');
     const body = await response.json() as { result?: T | null };
     return body.result ?? null;
+  }
+
+  async assertNetwork(): Promise<void> {
+    const chainId = await this.call<string>('eth_chainId', []);
+    if (!chainId || BigInt(chainId) !== BigInt(CDP_CHAIN_ID)) throw new Error('configured CDP RPC is not Base Sepolia');
   }
 
   transaction(hash: string): Promise<RpcTransaction | null> {
@@ -89,6 +95,7 @@ export async function executeTestTransfer(
     } else {
       if (history.status !== 'idle' || history.attempted) throw new Error('CDP transfer reservation is inconsistent; operator reconciliation required');
       if (CDP_TRANSFER_WEI > CDP_MAX_TOTAL_WEI) throw new Error('CDP cumulative test transfer limit reached');
+      await rpc.assertNetwork();
       history = update(history, { attempted: true, status: 'pending', txHash: null });
       writeHistoryAtomic(settings.historyFile, history);
     }
@@ -96,7 +103,7 @@ export async function executeTestTransfer(
     let transactionHash: `0x${string}`;
     try {
       const account = await client.evm.getAccount({ address: identity.treasuryAddress });
-      const scoped = await account.useNetwork(CDP_NETWORK);
+      const scoped = await account.useNetwork(settings.rpcUrl);
       const result = await scoped.sendTransaction({
         transaction: { to: identity.recipientAddress, value: CDP_TRANSFER_WEI },
         idempotencyKey: history.idempotencyKey,
@@ -105,7 +112,7 @@ export async function executeTestTransfer(
     } catch {
       history = update(history, { status: 'unknown' });
       writeHistoryAtomic(settings.historyFile, history);
-      throw new Error('CDP transfer result is unknown; reservation is held. Re-run only this same explicit test action to recover its idempotent result.');
+      throw new Error('CDP transfer result is unknown; reservation is held. Do not retry or resend. Use read-only operator reconciliation to determine the outcome.');
     }
 
     history = update(history, { status: 'submitted', txHash: transactionHash });
