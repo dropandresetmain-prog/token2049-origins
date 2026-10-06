@@ -35,15 +35,26 @@ function readTokenFile(path: string, label: string): string {
   return token;
 }
 
-function requireHttpUrl(value: string | undefined, label: string): string {
+function requireHttpUrl(value: string | undefined, label: string, loopbackOnly = false): string {
   if (!value) throw new ConfigError(`${label} is required`);
+  const raw = value.trim();
+  const authority = /^https?:\/\/([^/?#\\]+)(?:[/?#]|$)/i.exec(raw);
+  if (!authority || /[\u0000-\u0020\u007f\\]/.test(raw))
+    throw new ConfigError(`${label} must be an absolute http(s) URL without whitespace or backslashes`);
   let u: URL;
   try {
-    u = new URL(value);
+    u = new URL(raw);
   } catch {
     throw new ConfigError(`${label} is not a valid URL`);
   }
   if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new ConfigError(`${label} must be http(s)`);
+  // Base URLs receive bearer credentials and fixed paths. Reject ambiguous URL suffixes and userinfo,
+  // including empty delimiters that URL normalisation would otherwise silently discard.
+  if (u.username || u.password || authority[1]!.includes('@')) throw new ConfigError(`${label} must not embed credentials`);
+  if (value.includes('?') || value.includes('#')) throw new ConfigError(`${label} must not include a query or fragment`);
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+  if (loopbackOnly && !loopback) throw new ConfigError(`${label} must use a loopback host`);
+  if (u.protocol === 'http:' && !loopback) throw new ConfigError(`${label} must use https except on loopback`);
   // Strip trailing slashes so paths can be appended safely.
   return u.toString().replace(/\/+$/, '');
 }
@@ -61,7 +72,7 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConf
   const bt = env.PAYER_BRIDGE_TOKEN_FILE;
   if (bu || bt) {
     if (!bu || !bt) throw new ConfigError('PAYER_BRIDGE_URL and PAYER_BRIDGE_TOKEN_FILE must be set together');
-    cfg.bridge = { url: requireHttpUrl(bu, 'PAYER_BRIDGE_URL'), token: readTokenFile(bt, 'PAYER_BRIDGE_TOKEN_FILE') };
+    cfg.bridge = { url: requireHttpUrl(bu, 'PAYER_BRIDGE_URL', true), token: readTokenFile(bt, 'PAYER_BRIDGE_TOKEN_FILE') };
   }
 
   if (env.MCP_HTTP_PORT) {
