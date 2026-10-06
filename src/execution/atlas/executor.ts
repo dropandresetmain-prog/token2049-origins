@@ -1,4 +1,4 @@
-import type { z } from 'zod';
+import { z } from 'zod';
 import type { CommerceExecutor, ExecutionContext, ExecutionResult, ProviderEvidence, ProviderOffer, ProviderQuote } from '../../contracts/ports.js';
 import type { PurchaseIntent, Fulfillment, FlightFulfillment } from '../../contracts/intent.js';
 import type { Readiness, ReadinessStatus } from '../../contracts/common.js';
@@ -33,6 +33,8 @@ export interface AtlasExecutorOptions {
 }
 
 const SOURCE = 'atlas:sandbox';
+// A latest readback must explicitly verify zero fees before payment; absence is not zero.
+const FeeOrderDetails = OrderDetailsBody.extend({ totalTransactionFee: z.union([z.string(), z.number()]).nullish() });
 const PAYMENT_METHOD_BALANCE = 1;
 const READINESS_OK_TTL_MS = 10 * 60_000;
 const READINESS_BLOCKED_TTL_MS = 2 * 60_000;
@@ -333,25 +335,35 @@ class AtlasExecutor implements CommerceExecutor {
     return { orderNo };
   }
 
+  private feeState(fee: OrderBody['totalTransactionFee'], scale: number): 'zero' | 'nonzero' | 'unverifiable' {
+    if (fee == null || (typeof fee === 'string' && fee.trim() === '')) return 'unverifiable';
+    try { return toMinor(fee, scale) === 0n ? 'zero' : 'nonzero'; }
+    catch { return 'unverifiable'; }
+  }
+
   /**
-   * Compare the order total with the quote. Whether `totalPrice` includes `totalTransactionFee` is
-   * UNVERIFIED (the sandbox fee is 0), so either reading that equals the quote is accepted.
+   * The all-in meaning of totalPrice versus totalTransactionFee is unverified. Only an explicit
+   * zero fee is supported: accepting either total alone or total plus fee could underfund payment.
    */
   private async checkOrderTotal(
     client: AtlasClient,
     body: OrderBody,
     ref: QuoteRef,
   ): Promise<{ kind: 'ok' } | { kind: 'mismatch'; detail: string } | { kind: 'unverifiable' }> {
+    const fee = this.feeState(body.totalTransactionFee, ref.scale);
+    if (fee === 'unverifiable') return { kind: 'unverifiable' };
+    if (fee === 'nonzero') return { kind: 'mismatch', detail: 'nonzero transaction fee is unsupported until all-in fee semantics are verified' };
     let total = body.totalPrice;
     let currency = body.currency;
-    let fee = body.totalTransactionFee;
     if (total == null || !currency) {
       try {
-        const d = await this.call(client, '/queryOrderDetails.do', { orderNo: body.orderNo }, OrderDetailsBody);
+        const d = await this.call(client, '/queryOrderDetails.do', { orderNo: body.orderNo }, FeeOrderDetails);
         if (d.status !== 0) return { kind: 'unverifiable' };
+        const readbackFee = this.feeState(d.totalTransactionFee, ref.scale);
+        if (readbackFee === 'unverifiable') return { kind: 'unverifiable' };
+        if (readbackFee === 'nonzero') return { kind: 'mismatch', detail: 'readback reports an unsupported nonzero transaction fee' };
         total = d.totalPrice;
         currency = d.currency;
-        fee = undefined;
       } catch {
         return { kind: 'unverifiable' };
       }
@@ -362,8 +374,7 @@ class AtlasExecutor implements CommerceExecutor {
     if (currency !== ref.currency) return { kind: 'mismatch', detail: `currency ${currency} differs from quoted ${ref.currency}` };
     try {
       const t = toMinor(total, ref.scale);
-      const withFee = t + toMinor(fee, ref.scale);
-      if (t === expected || withFee === expected) return { kind: 'ok' };
+      if (t === expected) return { kind: 'ok' };
       return { kind: 'mismatch', detail: `quoted ${quoted}, order ${formatMinor(money(currency, t, ref.scale))}` };
     } catch {
       return { kind: 'mismatch', detail: `quoted ${quoted}, order total not exactly representable` };
@@ -373,9 +384,9 @@ class AtlasExecutor implements CommerceExecutor {
   /** Gate-open payment path: pre-check, checkpoint, pay once, read back. Never repeats pay.do. */
   private async payHold(ctx: ExecutionContext, ref: QuoteRef, client: AtlasClient, orderNo: string): Promise<ExecutionResult> {
     // Pre-check: the only state a payment may be issued against is a held order at the quoted total.
-    let pre: OrderDetailsBody;
+    let pre: z.infer<typeof FeeOrderDetails>;
     try {
-      pre = await this.call(client, '/queryOrderDetails.do', { orderNo }, OrderDetailsBody);
+      pre = await this.call(client, '/queryOrderDetails.do', { orderNo }, FeeOrderDetails);
     } catch {
       return { kind: 'unknown', reason: 'atlas_precheck_unavailable', providerReference: orderNo, evidence: [] };
     }
@@ -386,6 +397,12 @@ class AtlasExecutor implements CommerceExecutor {
     }
     if (st === '-3') return { kind: 'failed_definite', reason: 'atlas_order_cancelled', providerReference: orderNo, evidence: this.evidence(orderNo, { orderStatus: st }) };
     if (st !== '0') return { kind: 'unknown', reason: 'atlas_precheck_unmapped_status', providerReference: orderNo, evidence: [] };
+    const fee = this.feeState(pre.totalTransactionFee, ref.scale);
+    if (fee !== 'zero') {
+      return fee === 'nonzero'
+        ? { kind: 'terms_changed', reason: 'atlas_precheck_nonzero_fee_unsupported', evidence: this.evidence(orderNo, { stage: 'pre_pay_check', note: 'not paid; all-in fee semantics are unverified' }) }
+        : { kind: 'unknown', reason: 'atlas_precheck_fee_unverifiable', providerReference: orderNo, evidence: [] };
+    }
     const expected = BigInt(ref.expectedTotalMinor);
     let totalOk = false;
     try {
@@ -617,4 +634,3 @@ function parseTimestamp(v: string | number | null | undefined): number | null {
   const t = Date.parse(sgt ?? v);
   return Number.isNaN(t) ? null : t;
 }
-

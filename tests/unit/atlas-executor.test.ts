@@ -78,6 +78,7 @@ const details = (over: Record<string, unknown> = {}) => ({
   status: 0,
   orderNo: ORDER_NO,
   orderStatus: '0',
+  totalTransactionFee: 0,
   ticketStatus: '0',
   totalPrice: 318.6,
   currency: 'USD',
@@ -443,6 +444,34 @@ describe('atlas execute: payment gate', () => {
     s.fake.on('/queryOrderDetails.do', () => (paid ? (opts.after ? opts.after() : details({ orderStatus: '1', payTime: '2026-10-06 20:01:00' })) : details()));
     return s;
   }
+
+  it.each([5, undefined, null, '', 'unparseable', '0.001'])('never pays quote 10 when order total is 10 and fee is %s', async fee => {
+    const { fake, ex } = setup(ENV_ON);
+    fake.on('/order.do', () => orderBody({ totalPrice: 10, totalTransactionFee: fee }));
+    fake.on('/queryOrderDetails.do', () => details({ totalPrice: 10, totalTransactionFee: 0 }));
+    fake.on('/pay.do', () => ({ status: 0 }));
+    const h = new CtxHarness(fake);
+    const ctx = h.ctx();
+    ctx.quote.merchantTotal = money('USD', 1000);
+    ctx.quote.executionRef = { ...QUOTE_REF, expectedTotalMinor: '1000' };
+    expect((await ex.execute(ctx)).kind).toBe(fee === 5 ? 'terms_changed' : 'unknown');
+    expect(fake.count('/pay.do')).toBe(0);
+    expect(h.persisted.pay_attempt).toBeUndefined();
+    expect(h.persisted.order).toBeDefined();
+  });
+
+  it.each([5, undefined, null, '', 'unparseable', '0.001'])('requires explicit zero fee on pre-payment readback, including resume: %s', async fee => {
+    for (const resumed of [false, true]) {
+      const { fake, ex } = setup(ENV_ON);
+      fake.on('/order.do', () => orderBody());
+      fake.on('/queryOrderDetails.do', () => details({ totalTransactionFee: fee }));
+      fake.on('/pay.do', () => ({ status: 0 }));
+      const h = new CtxHarness(fake, resumed ? { create_attempt: CREATE_ATTEMPT, order: { providerReference: ORDER_NO } } : {});
+      expect((await ex.execute(h.ctx())).kind).toBe(fee === 5 ? 'terms_changed' : 'unknown');
+      expect(fake.count('/pay.do')).toBe(0);
+      expect(h.persisted.pay_attempt).toBeUndefined();
+    }
+  });
 
   it('gate on: pre-check, pay_attempt checkpoint, pay once, then status 1 -> succeeded/ticketing/test_balance_paid', async () => {
     const { fake, ex } = gateOnScript();
