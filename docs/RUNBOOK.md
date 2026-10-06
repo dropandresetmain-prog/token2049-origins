@@ -281,3 +281,9 @@ explicit checkpoints. Any ambiguous irreversible chain/order result stops writes
 Provider references: [Storefront authentication](https://shopify.dev/docs/api/storefront/latest),
 [delegate lifetime](https://shopify.dev/docs/apps/build/authentication-authorization/delegate-api-access),
 [Admin access tokens](https://shopify.dev/docs/apps/build/authentication-authorization/access-tokens).
+
+## Shopify Global Catalog sandbox addition
+
+Configure nonsecret `SHOPIFY_SANDBOX_PUBLICATION_ID` alongside existing owned development-store/Bogus configuration. Live discovery is opt-in typed `discovery: live`; no Catalog API key is required for the verified keyless UCP profile. Runtime caps USD100 item, quantity1; exact sandbox total remains subject to Capsule intent/approval. Product creation happens after selection only; products are retained for audit/demo.
+
+[Lane decision](decisions/shopify-real-discovery-sandbox-execution.md) documents runtime scopes, migration0003 and boundary. [Protocol](evidence/shopify-protocol.md) contains the test-only unfunded harness command. [Evidence](evidence/shopify-global-sandbox-e2e.md) is PARTIAL: do not run a fresh paid test until original E2E outcome reconciliation completes. No production fixture toggle or real Cardano call exists in this lane.

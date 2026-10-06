@@ -151,6 +151,58 @@ describe('hosted checkout quote-only boundary', () => {
     expect(readCheckoutTotals(body, money('USD',2500), money('USD',500), 'Standard')).toBeNull();
   });
 
+  it('reads a standalone Shipping / Free row as zero only with a settled, balanced zero-shipping quote', () => {
+    expect(readCheckoutTotals('Standard\nSubtotal USD $25.00\nShipping\nFree\nTotal USD $25.00', money('USD',2500), money('USD',0), 'Standard'))
+      .toEqual({ subtotal:money('USD',2500), shipping:money('USD',0), tax:money('USD',0), total:money('USD',2500), shippingTitle:'Standard' });
+    expect(readCheckoutTotals('Standard\nSubtotal USD $25.00\nShipping\nFree\nTotal tax USD $2.00\nTotal USD $27.00', money('USD',2500), money('USD',0), 'Standard'))
+      .toEqual({ subtotal:money('USD',2500), shipping:money('USD',0), tax:money('USD',200), total:money('USD',2700), shippingTitle:'Standard' });
+  });
+
+  it('does not use a free-shipping row to override the expected nonzero shipping charge', () => {
+    expect(readCheckoutTotals('Subtotal USD $25.00\nShipping\nFree\nTotal USD $25.00', money('USD',2500), money('USD',500), 'Standard')).toBeNull();
+  });
+
+  it.each([
+    ['conflicting numeric shipping rows', 'Subtotal USD $25.00\nShipping USD $0.00\nShipping USD $5.00\nTotal USD $25.00'],
+    ['free and nonzero numeric shipping', 'Subtotal USD $25.00\nShipping\nFree\nShipping USD $5.00\nTotal USD $25.00'],
+    ['free plus conflicting numeric duplicates', 'Subtotal USD $25.00\nShipping\nFree\nShipping USD $0.00\nShipping USD $5.00\nTotal USD $25.00'],
+    ['free plus wrong-currency numeric shipping', 'Subtotal USD $25.00\nShipping\nFree\nShipping SGD $0.00\nTotal USD $25.00'],
+  ])('rejects %s instead of falling back to a free row', (_label, body) => {
+    expect(readCheckoutTotals(body, money('USD',2500), money('USD',0), 'Standard')).toBeNull();
+  });
+
+  it('rejects free and numeric shipping disagreement even when the numeric row matches the expected nonzero charge', () => {
+    expect(readCheckoutTotals('Subtotal USD $25.00\nShipping\nFree\nShipping USD $5.00\nTotal USD $30.00', money('USD',2500), money('USD',500), 'Standard')).toBeNull();
+  });
+
+  it.each([
+    ['missing subtotal', 'Shipping\nFree\nTotal USD $25.00'],
+    ['missing final total', 'Subtotal USD $25.00\nShipping\nFree'],
+    ['incomplete tax row', 'Subtotal USD $25.00\nShipping\nFree\nTax\nTotal USD $25.00'],
+    ['nonzero tax without a tax row', 'Subtotal USD $25.00\nShipping\nFree\nTotal USD $27.00'],
+    ['unbalanced explicit tax', 'Subtotal USD $25.00\nShipping\nFree\nTax USD $1.00\nTotal USD $27.00'],
+    ['conflicting final totals', 'Subtotal USD $25.00\nShipping\nFree\nTotal USD $25.00\nTotal USD $24.00'],
+    ['calculating charges', 'Subtotal USD $25.00\nShipping\nFree\nCalculating taxes\nTotal USD $25.00'],
+    ['estimated taxes', 'Subtotal USD $25.00\nShipping\nFree\nEstimated taxes USD $0.00\nTotal USD $25.00'],
+    ['charges deferred to next step', 'Subtotal USD $25.00\nShipping\nFree\nTaxes calculated at next step\nTotal USD $25.00'],
+    ['promotional free-shipping text without a summary shipping row', 'Free shipping\nSubtotal USD $25.00\nTotal USD $25.00'],
+  ])('rejects %s with free shipping evidence', (_label, body) => {
+    expect(readCheckoutTotals(body, money('USD',2500), money('USD',0), 'Standard')).toBeNull();
+  });
+
+  it('reads a settled hosted quote with free shipping without entering a card or paying', async () => {
+    const s = fixture();
+    s.quoteInput.expectedShipping = money('USD',0);
+    s.setText('Standard\nBogus Gateway\nSubtotal USD $25.00\nShipping\nFree\nTax USD $2.00\nTotal USD $27.00');
+    await expect(s.driver.quote(s.quoteInput)).resolves.toEqual({
+      subtotal:money('USD',2500), shipping:money('USD',0), tax:money('USD',200), total:money('USD',2700), shippingTitle:'Standard',
+    });
+    expect(s.page.frameLocator).not.toHaveBeenCalled();
+    expect(s.button.click).not.toHaveBeenCalled();
+    expect(s.pay).not.toHaveBeenCalled();
+    expect(s.browser.close).toHaveBeenCalledOnce();
+  });
+
   it('stops quote discovery on a challenge and still closes the browser', async () => {
     const s = fixture(); s.setText('Verify you are human');
     await expect(s.driver.quote(s.quoteInput)).rejects.toMatchObject({code:'captcha_challenge'});

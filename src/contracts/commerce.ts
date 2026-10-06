@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { SourceOffer, SandboxRepresentation, SandboxExecution } from './provenance.js';
 import { SettlementBreakdown, validateSettlement } from './settlement.js';
 import { CryptoAmount, Money } from './money.js';
 import {
@@ -23,6 +24,7 @@ import {
 export const OfferView = z
   .object({
     offerId: OfferId,
+    sourceOffer: SourceOffer.optional(),
     category: Category,
     route: ProviderRoute,
     providerEnvironment: ProviderEnvironment,
@@ -87,12 +89,14 @@ export const QuoteView = z
     supersedesQuoteId: QuoteId.nullable(),
     customerId: CustomerId,
     offerId: OfferId,
+    sourceOffer: SourceOffer.optional(),
     category: Category,
     route: ProviderRoute,
     providerEnvironment: ProviderEnvironment,
     title: z.string(),
     breakdown: z.array(PriceLine),
     merchantTotal: Money,
+    sandboxRepresentation: SandboxRepresentation.optional(),
     serviceFee: Money,
     /** merchantTotal + serviceFee: the amount purchase funding must cover. */
     payablePrincipal: Money,
@@ -196,6 +200,8 @@ export type FundingSummary = z.infer<typeof FundingSummary>;
 export const ReceiptView = z
   .object({
     receiptId: z.string(),
+    sourceOffer: SourceOffer.optional(),
+    sandboxExecution: SandboxExecution.optional(),
     purchaseId: PurchaseId,
     quoteId: QuoteId,
     quoteDigest: z.string(),

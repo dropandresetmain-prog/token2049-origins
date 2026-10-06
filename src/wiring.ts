@@ -1,6 +1,7 @@
 import { Router } from 'express';
 import type { GatewayParts } from './composition.js';
-import { createShopifyExecutor } from './execution/shopify/index.js';
+import { createGlobalSandboxExecutor } from './execution/shopify/globalSandbox.js';
+import type { Db } from './infrastructure/db.js';
 import { loadShopifyConfig } from './execution/shopify/config.js';
 import { createShopifyWebhookRouter, type ShopifyReconcileHint } from './execution/shopify/webhook.js';
 import { createAtlasExecutor } from './execution/atlas/index.js';
@@ -36,10 +37,12 @@ export async function enqueueShopifyReadback(core: CommerceCore, hint: ShopifyRe
 /** Optional missing credentials report readiness and never fall back to fixtures. */
 export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unknown>)=>void): GatewayParts {
   const bankAdapters=[createOcbcAdapter(env)];
+  let runtimeDb: Db | undefined;
   return {
-    executors:[createShopifyExecutor(env,{sink:step=>log({component:'shopify',step})}),createAtlasExecutor(env),createNuiteeExecutor(env)],
+    executors:[createGlobalSandboxExecutor(env,()=>{ if(!runtimeDb) throw new Error('gateway_not_initialized'); return runtimeDb; },{sink:step=>log({component:'shopify',step})}),createAtlasExecutor(env),createNuiteeExecutor(env)],
     fundingAdapters:[createCardanoFundingAdapter(env,{log}),createSolanaFundingAdapter(env)],bankAdapters,
     buildRouters:core=>{
+      runtimeDb = core.deps.db;
       const routers:NonNullable<GatewayParts['extraRouters']>=[
         {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:core.deps.clock,bankAdapters}),auth:true},
         {path:'/inspect',router:createInspectRouter(),auth:false},

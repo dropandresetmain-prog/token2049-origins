@@ -182,9 +182,13 @@ export class StorefrontClient {
   }
 
   /** Available variants only, price exact (decimal string parsed to minor units). */
-  async findVariants(opts: { query?: string; productRef?: string; country: string }): Promise<CatalogVariant[]> {
+  async findVariants(opts: { query?: string; productRef?: string; country: string; includeSandboxShadows?: boolean }): Promise<CatalogVariant[]> {
     const out: CatalogVariant[] = [];
+    // Reserved shadow titles are controlled and verified during preparation. Ordinary discovery
+    // cannot turn retained audit products into purchases without source provenance.
+    const blockedShadow = (title: string) => !opts.includeSandboxShadows && title.startsWith('[CAPSULE SANDBOX] ');
     const pushProduct = (p: z.infer<typeof ProductSchema>): void => {
+      if (blockedShadow(p.title)) return;
       for (const v of p.variants.nodes) {
         if (!v.availableForSale) continue;
         out.push({
@@ -202,7 +206,7 @@ export class StorefrontClient {
       const n = r.node;
       if (!n) return [];
       if ('variants' in n) pushProduct(n);
-      else if (n.availableForSale) {
+      else if (n.availableForSale && !blockedShadow(n.product.title)) {
         out.push({
           variantId: n.id,
           title: n.title === 'Default Title' ? n.product.title : `${n.product.title} - ${n.title}`,
@@ -218,7 +222,7 @@ export class StorefrontClient {
       this.fetchImpl,
       this.ep,
       SEARCH_QUERY,
-      { q: `${text} available_for_sale:true`, country: opts.country },
+      { q: `${text} available_for_sale:true${opts.includeSandboxShadows ? '' : ' tag_not:capsule-sandbox'}`, country: opts.country },
       z.object({ products: z.object({ nodes: z.array(ProductSchema) }) }),
     );
     for (const p of r.products.nodes) pushProduct(p);

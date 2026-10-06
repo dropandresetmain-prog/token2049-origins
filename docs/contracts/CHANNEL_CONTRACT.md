@@ -177,3 +177,9 @@ payment. USD 183.40 becomes exactly 183400 six-decimal base units (0.183400 tUSD
 Quote digest and Cardano metadata bind policy/breakdown; current demo edits never recalculate old
 obligations. The historical payablePrincipal field is commercial total including fee. See the
 [current decision](../decisions/scaled-testnet-settlement.md) for disclosure and legacy compatibility.
+
+## Optional live retail discovery provenance
+
+Retail intent optionally accepts `discovery: live | controlled_catalog`. Omission preserves controlled catalog behavior. Existing generic MCP/HTTP operations are unchanged. Live OfferView optionally includes strict reduced `sourceOffer`; QuoteView includes sourceOffer and `sandboxRepresentation`; ReceiptView/PurchaseProof include sourceOffer and `sandboxExecution`. Source merchant identity/item price/observation are separate from owned sandbox variant, exact total, order and execution evidence. Fields are optional for backward compatibility; no raw provider bag or source checkout handle is public.
+
+For a live selected offer, matching create_quote retries reuse its immutable quote. Changed fulfillment or expiry requires new discovery/selection. Human approval still binds the canonical digest and selected funding option. Fixture funding is explicitly labelled local_fixture and never means externally confirmed Cardano. No new Shopify-only public tools.

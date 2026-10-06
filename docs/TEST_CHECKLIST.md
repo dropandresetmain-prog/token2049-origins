@@ -138,3 +138,16 @@ Current overall verdict UNRESOLVED. Preserve original state and wait for read-on
 - [ ] Original abandoned-checkout Timeline error/outcome obtained from human.
 - [ ] Issue 31 authoritatively reconciled; zero orders/fresh page are insufficient.
 - [ ] Paid Shopify/readback/receipt PASS. Overall UNRESOLVED; no Pay retry.
+## Global Catalog / controlled sandbox lane
+
+- [x] Official keyless UCP search and same-variant lookup, runtime available USD source.
+- [x] Strict source normalization, caps, unavailable/currency/subscription rejection, unsafe-link rejection.
+- [x] One native-ID shadow, crash reconciliation, publication and independent Storefront visibility; no images.
+- [x] Local PostgreSQL repeated/concurrent prepare, immutable quote, same-purchase execution and source/sandbox fixture proof.
+- [x] Old Shopify local regressions; ordinary discovery/direct lookup excludes retained shadows.
+- [x] Settled free shipping remains exact zero only; duplicate/currency/tax/total checks preserved.
+- [ ] Real shadow immutable checkout quote (guard unresolved).
+- [ ] Real new Bogus order, independent order readback and receipt (NOT_RUN; original E2E ambiguity blocks Pay).
+- [ ] Resolve Catalog transaction-retention interpretation before deployment/broader use.
+
+Harness and evidence: [protocol](evidence/shopify-protocol.md), [lane log](evidence/shopify-global-sandbox-e2e.md). Local provider fixtures never imply fresh external payment or Cardano confirmation.

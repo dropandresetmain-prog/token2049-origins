@@ -151,3 +151,6 @@ timeout/challenge and actual Pay failure. Manual harness saves sanitized boolean
 hostnames/status counts. Four regressions preserve one Pay, original errors and cleanup ordering.
 Full 518/518, focused 78/78, typecheck/build pass. This cannot recover the original lost session;
 payment/state/retry semantics unchanged. Full evidence/classifications in append-only E2E ledger.
+## Shopify Global Catalog sandbox lane — 2026-10-06
+
+Scope: isolated `build/shopify-global-sandbox`. [Evidence](evidence/shopify-global-sandbox-e2e.md) records each classified issue, action and deferral risk. Investigate Now: preceding unresolved post-Pay outcome blocks new paid tests; new shadow exact checkout summary remains unproved; confirm reduced transaction-offer retention against official Catalog no-caching guidance before deployment. Act Now fixes completed locally: native unique-ID metafield input, publication UserError selection, strict free-shipping row, retained-shadow discovery/provenance bypass. Park for Later: FX, cleanup scheduling, delegated budgets. Accept Risk: untracked development inventory and undocumented numeric keyless quota, bounded by test-store/item/quantity guards. Overall PARTIAL; no real new quote/order/receipt acceptance claim.

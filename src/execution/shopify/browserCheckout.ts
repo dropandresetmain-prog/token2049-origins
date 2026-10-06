@@ -117,21 +117,23 @@ export function sameCheckoutTotals(a: CheckoutTotals, b: CheckoutTotals): boolea
 /** Reads a complete checkout summary, never an API estimate or a subtotal-only page. */
 export function readCheckoutTotals(text: string, subtotal: Money, shipping: Money, shippingTitle: string): CheckoutTotals | null {
   if (subtotal.currency !== shipping.currency || subtotal.scale !== shipping.scale || /calculating|calculated at (?:the )?next step|estimated taxes/i.test(text)) return null;
-  const row = (label: string): bigint | null => {
-    const pattern = String.raw`(?:^|\n)\s*LABEL\s*\n?\s*(?:[A-Z]{3}\s*)?\$?\s*AMOUNT(?=\s|$)`.replace('LABEL', label).replace('AMOUNT', AMOUNT);
+  const row = (label: string, allowFree = false): bigint | null => {
+    const pattern = String.raw`(?:^|\n)\s*LABEL\s*\n?\s*(?:[A-Z]{3}\s*)?\$?\s*AMOUNT(?=\s|$)`.replace('LABEL', label).replace('AMOUNT', allowFree ? `(?:${AMOUNT}|(Free))` : AMOUNT);
     const matches = [...text.matchAll(new RegExp(pattern, 'g'))];
     if (!matches.length) return null;
     try {
       const values = matches.map(m => {
         if ((m[0].match(/\b[A-Z]{3}\b/g) ?? []).some(currency => currency !== subtotal.currency)) throw new Error('row_currency_mismatch');
-        return parseDecimalToMinor(m[1]!.replace(/,/g, ''), subtotal.scale);
+        return allowFree && m[2] === 'Free' ? 0n : parseDecimalToMinor(m[1]!.replace(/,/g, ''), subtotal.scale);
       });
       return values.every(v => v === values[0]) ? values[0]! : null;
     } catch { return null; }
   };
   if (/(?:^|\n)\s*(?:Duties|Discounts?|Gift card applied)\s*\n?\s*(?:[A-Z]{3}\s*)?[-$\d]/i.test(text)) return null;
   const item = row('Subtotal');
-  const delivery = row('Shipping');
+  // A settled summary may display Free instead of a numeric zero. It must still match the
+  // selected shipping rate, agree across duplicate rows, and balance the final total.
+  const delivery = row('Shipping', true);
   const totals = parseDisplayedTotals(text, subtotal.scale);
   const total = totals.at(-1);
   if (item === null || delivery === null || total === undefined || !totals.every(v => v === total) || !displayedTotalMatches(text, { ...subtotal, amountMinor: total.toString() })) return null;
