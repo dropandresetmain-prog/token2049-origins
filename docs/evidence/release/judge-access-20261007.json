@@ -1,0 +1,114 @@
+{
+  "status": "CANDIDATE_ACCEPTED",
+  "verifiedAt": "2026-10-07T15:34:04.234Z",
+  "runtimeCandidateSha": "d9785ecaa75d2bd00158a13a0baae8cdecaacfed",
+  "activationSourceSha": "a02216ccb69e78e6800a45c81cd349021fd834ef",
+  "submissionDocsSourceSha": "835de08c709f5802d63ab21d4e62575f47baa406",
+  "liveConsole": "https://token2049-origins.onrender.com/console/",
+  "judgePassword": "Provided privately; never included in Git",
+  "judgeScopes": [
+    "purchases:read",
+    "evidence:read",
+    "operator:read"
+  ],
+  "mutationPolicy": "Dedicated judge client rejects every non-GET HTTP request; local auth regressions verify bank refresh and commerce mutations denied",
+  "authenticatedGetChecks": [
+    {
+      "path": "/v1/evidence/purchases",
+      "status": 200
+    },
+    {
+      "path": "/v1/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "status": 200
+    },
+    {
+      "path": "/v1/evidence/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "status": 200
+    },
+    {
+      "path": "/v1/evidence/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5/proof",
+      "status": 200
+    },
+    {
+      "path": "/v1/evidence/treasury",
+      "status": 200
+    },
+    {
+      "path": "/v1/evidence/bank",
+      "status": 200
+    },
+    {
+      "path": "/v1/capabilities",
+      "status": 200
+    }
+  ],
+  "browserScreens": [
+    {
+      "view": "completed purchase",
+      "url": "https://token2049-origins.onrender.com/console/#/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "alerts": 0
+    },
+    {
+      "view": "proof",
+      "url": "https://token2049-origins.onrender.com/console/#/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "alerts": 0
+    },
+    {
+      "view": "receipt",
+      "url": "https://token2049-origins.onrender.com/console/#/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "alerts": 0
+    },
+    {
+      "view": "purchases",
+      "url": "https://token2049-origins.onrender.com/console/#/purchases",
+      "alerts": 0
+    },
+    {
+      "view": "treasury",
+      "url": "https://token2049-origins.onrender.com/console/#/treasury",
+      "alerts": 0
+    },
+    {
+      "view": "connections",
+      "url": "https://token2049-origins.onrender.com/console/#/connections",
+      "alerts": 0
+    }
+  ],
+  "browserRequestsAllGet": true,
+  "credentialInBrowserStorage": false,
+  "browserPageErrors": [],
+  "anonymousGithub": {
+    "public": true,
+    "readmeRendered": true,
+    "oneLinerRendered": true,
+    "logoLoaded": true,
+    "ownerSessionRequired": false
+  },
+  "navigation": {
+    "relativeLinksAnchorsImages": 117,
+    "failures": 0
+  },
+  "tests": {
+    "backend": {
+      "files": 75,
+      "passed": 1216
+    },
+    "console": {
+      "files": 9,
+      "passed": 87
+    },
+    "crePassed": 6,
+    "backendTypecheck": "PASS",
+    "consoleTypecheck": "PASS",
+    "productionBuild": "PASS"
+  },
+  "security": {
+    "boundedIntroducedHistory": "PASS",
+    "trackedTip": "PASS",
+    "evidencePii": "PASS",
+    "exactJudgePasswordAbsentFromGit": "PASS"
+  },
+  "newPaymentOrOrderPerformed": false,
+  "additionalSolanaNuiteeRecording": "Cancelled by founder; existing proof accepted",
+  "finalDeployment": "See token2049-submission tag and final operator freeze record; candidate acceptance does not claim all payers already use this SHA"
+}
