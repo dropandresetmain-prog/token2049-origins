@@ -45,7 +45,10 @@ with existing Web2 commerce. Travel and retail scenarios are illustrations.
 - [x] Verify Markdown links/anchors, scope, source fidelity and secret patterns.
 - [x] Commit rewritten documents and verify the remote diff and blobs.
 - [x] Prepare Markdown copies and a readable HTML review copy.
-- [ ] Founder content approval; no automatic merge or slides.
+- [x] Add explicit Cardano, Solana and Chainlink requirement-to-evidence tables.
+- [x] Add Coinbase CDP operational-treasury proof and OCBC/manual-reconciliation story.
+- [x] Update ARCHITECTURE to separate customer funding, operational crypto treasury and fiat observation.
+- [ ] Founder approval of the new track/treasury update; no automatic merge or slide production.
 
 ## Sources supporting the market narrative
 
@@ -55,6 +58,7 @@ with existing Web2 commerce. Travel and retail scenarios are illustrations.
 - Official Cardano developer portal: x402 and Masumi capabilities.
 - Official Solana payments documentation: payment design and fee sponsorship.
 - Official Chainlink CRE documentation: workflow orchestration.
+- User-supplied Coinbase CDP proof-closure evidence: `c74ff8b`, `docs/work/COINBASE_CDP.md`, `docs/evidence/coinbase-cdp/server-wallet-proof.json`; Base Sepolia Server Wallet transfer executed with official `cdp` CLI and independently read back.
 - Sources are linked in the pitch. No invented market size, adoption percentage or benchmark.
 
 ## Internal release inputs retained from the earlier draft
@@ -65,6 +69,7 @@ with existing Web2 commerce. Travel and retail scenarios are illustrations.
 | Investigate Now | Confirm unassisted Solana evaluation path. Inspected hosted MCP uses Cardano; Solana completed run uses supplied payer/facilitator. | Final judge onboarding. |
 | Act Now | Supply final deck Drive link, embedded recording and Cardano video at most 3 minutes. Media production remains a separate approved lane. | Final submission assets. |
 | Investigate Now | Reconcile CRE with final candidate and core-product qualification. Simulation is valid evidence; documented run uses retained Capsule proof plus fresh Koios data. | Final integration and entry review. |
+| Investigate Now | Reconcile the user-supplied CDP proof-closure lane into the final candidate. The connector currently exposes the older `feat/coinbase-cdp-treasury` lane but not `feat/cdp-proof-closure` / `c74ff8b`; treat the supplied proof details as the source for this narrative update until the final integration branch exposes the files. | Final evidence-link integrity; not a reason to weaken or invent the CDP result. |
 | Investigate Now | Obtain founder build/reuse declaration, resolve Cardano open-source/private-access wording, confirm deadline timezone and .pptx acceptance if used. | Submission compliance. |
 | Ignore / Accept Risk | Prototype uses public testnets and provider sandboxes; no commercial off-ramp is demonstrated. State the implementation directly, once where relevant. | Environment clarity. |
 | Park for Later | Public onboarding, production conversion/settlement partnerships and expanded execution capacity. | Forward-looking product direction, not delivered features. |
@@ -79,18 +84,15 @@ Preserve historical evidence and the existing architecture compatibility pointer
 
 ## Checkpoint
 
-Narrative drafts written and locally checked. Markdown checks passed: 97 relative
-links, 16 local anchors and 15 external-URL syntax checks across the root and
-navigation documents. No credential-pattern findings. Public-market references were
-opened in the web tool; retained purchase evidence was not rerun.
-Content commit: `cb8e520b8de99c717ae86aa3efd109a4d5c0688e`.
-Remote compare confirms four content/navigation Markdown files changed. All four
-Git blob hashes match the locally validated UTF-8 files. The update was a
-fast-forward with an expected-head lease. The reader has three documents and
-working local anchor navigation. No browser/runtime/production build was run.
-Re-read this ledger before verification and before final handback.
+Founder-approved narrative remains intact. Content update commit `13fc6f4a448d18d765972ca9d8d067df1681a94a` adds:
+- track requirement-to-evidence tables for Cardano, Solana and Chainlink;
+- Coinbase CDP Server Wallet operational-treasury story and proof matrix;
+- OCBC + CDP manual fiat/crypto reconciliation framing;
+- architecture separation between customer purchase funding, operational treasury and fiat observation;
+- direct treasury navigation from README and updated documentation index.
+
+No application code, provider/payment call, deployment, schema, credential, repository visibility or main branch changed. The proof-closure branch/commit supplied by the founder was not visible through the current GitHub connector; the public docs therefore reference its evidence paths and provenance as supplied, without copying or fabricating the missing raw file.
 
 ## Next action
 
-Commit this internal verification checkpoint, recheck the final branch/main refs,
-and return the rewritten documents for Min Htet's review. Stop; do not merge.
+Return the updated submission docs for founder review. If approved, integrate them with the final candidate alongside the CRE and Coinbase CDP evidence lanes, then hand the approved narrative plus demo footage and DESIGN.md to the deck-production lane. Do not merge automatically.
