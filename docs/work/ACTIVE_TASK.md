@@ -37,7 +37,7 @@
 - Registered scopes exactly purchases:read, evidence:read, operator:read; existing rows upgraded preserving owner and revocation.
 - Browser keeps bearer only in memory; sign-in input is already password type.
 - Password copy implemented and production console build passes.
-- Dedicated password generated in operator-only DPAPI storage outside Git; plaintext never printed or committed. No Render hash changed yet. Live acceptance waits for deployment handover.
+- Dedicated password generated in operator-only DPAPI storage outside Git; plaintext never committed; prepared credential will be handed to founder once in private chat, explicitly marked inactive. No Render hash changed yet. Live acceptance waits for deployment handover.
 
 ## Evidence convergence
 - Main has historical Atlas/Cardano and Nuitée/Solana combined PASS evidence.
@@ -52,16 +52,16 @@
 - Release README uses remote submission narrative with verified access/evidence corrections; stale main remains unchanged until promotion.
 
 ## Gates
-- Bounded scan: 377 current text files and 129 introduced doc/CRE/CDP history blobs; no secret or evidence-PII findings.
+- Bounded scan: 382 current text files and 129 introduced doc/CRE/CDP history blobs; no secret or evidence-PII findings. Exact prepared password scan of tracked files and own introduced history PASS.
 - Earlier full-tip scan: 532 unique blobs; only documented local/sample DB credential URLs, no real secret findings.
 - Re-scan final runtime history and exact password before promotion.
-- Root/index/architecture/CRE/CDP navigation: 116 relative links, anchors and image paths PASS. Original CDP proof bytes match SHA-256 0d138a9d8a6d6cc4aa6e23acf561ec61042be78725e37abb6fda07f0a294ba78.
+- Root/index/architecture/CRE/CDP navigation: initial 116 relative links, anchors and image paths PASS; final local check re-run after partial activation evidence retained. Original CDP proof bytes match SHA-256 0d138a9d8a6d6cc4aa6e23acf561ec61042be78725e37abb6fda07f0a294ba78.
 - Anonymous GitHub release branch renders README and evidence matrix; public Sign in control confirms no owner session. Logo loads (1024px intrinsic); architecture page headings render anonymously. Final default-branch recheck pending promotion.
 - Current public /health HTTP 200; fresh console tab woke free gateway and reached old Access key prompt. Final Password prompt and authenticated cold test pending.
 - Auth/evidence regressions: 51 tests PASS; console: 85 tests PASS; backend/console typechecks and production build PASS.
 - No real payment/order initiated by release lane.
 - Main promotion / exact final deployment / freeze: BLOCKED on Atlas exact gate approval, final recording/E2E checkpoint and safe runtime handover.
-- GitHub receive-pack returned HTTP 500 repeatedly for both lanes latest documentation/evidence pushes; attempt Git Data API for this release branch only.
+- GitHub receive-pack returned HTTP 500 repeatedly for both lanes latest documentation/evidence pushes. Scoped Git Data API recovery also returned HTTP 500 with empty body (confirmed headers); no ref changed.
 - Release code/evidence checkpoint is pushed through 1f5700d; later docs retained locally until publication recovers.
 
 ## Next action
