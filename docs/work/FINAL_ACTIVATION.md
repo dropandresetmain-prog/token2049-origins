@@ -1,6 +1,6 @@
-# Final activation — recording checkpoint
+# Final activation — proof accepted
 
-Status: **READY FOR FINAL SOLANA + NUITÉE E2E**. Stop here for Min Htet to begin recording and explicitly approve the live E2E. No payment, provider order or booking was executed during activation.
+Status: **COMPLETE — existing proof accepted**. Min Htet reports that slides and videos have been submitted and that existing proof is sufficient. The planned Solana × Nuitée recording/live E2E is cancelled. No payment, provider order or booking was executed during activation. The readiness evidence below remains the historical verification snapshot.
 
 Branch: integration/final-activation. Verified branch SHA: 20f985123f614e3d07963779f7c354ce68736457. All three live services use tested runtime SHA afa59b1459aec6fad545ab5eeec1b2b37a15445c; subsequent commits contain evidence only.
 
@@ -23,6 +23,6 @@ Typecheck and build pass. Focused suites passed: 33 Option B/payment tests; 103 
 
 Implementation files previously changed: clients/solana/blocked-history.ts, ledger-import.ts, pg-ledger.ts, ledger-port.ts, ledger.ts, pay.ts, hosted-sponsor.ts, bridge.ts, hosted.ts; scripts/provision-hosted-solana-render.mjs; additive SQL migration 0009; focused regression tests. Migrations 0001–0008, Cardano caps/history, CDP runtime, Sokosumi and submission documents were not changed.
 
-Next step: continue in this same chat only after the recording/live-E2E approval. Obtain a fresh quote and balance/readiness evidence for that run; never act on either blocked historical purchase or candidate. The sandbox Atlas gate does not authorize creating an Atlas order or using its balance in this checkpoint.
+Next step: none for this activation milestone. No recording or final live payment/booking is pending. Any future execution requires a new explicit instruction and fresh readiness/quote evidence; both historical purchases and candidates remain permanently blocked.
 
 Evidence: docs/evidence/final-activation/option-b-checkpoint.json, option-b-services.json, option-b-mcp.json, historical-block-policy.json. Previous evidence is retained.

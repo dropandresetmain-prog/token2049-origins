@@ -1,6 +1,6 @@
 {
   "at": "2026-10-07T15:17:11.907Z",
-  "status": "READY FOR FINAL SOLANA + NUITEE E2E",
+  "status": "COMPLETE_PROOF_ACCEPTED",
   "recordingCheckpointReached": true,
   "runtimeSha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c",
   "deployedSha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c",
@@ -314,7 +314,7 @@
   "activeSolanaIncomplete": 0,
   "activeCardanoSigning": 0,
   "activeCardanoSigned": 0,
-  "nextSafeAction": "STOP. Min Htet begins recording and explicitly approves the live Solana + Nuitee E2E. No valid buy, payment, order or booking is authorized by this readiness checkpoint.",
+  "nextSafeAction": "None for this milestone. Final recording/live E2E cancelled by the user. Preserve all evidence and permanent historical blocks; future execution requires a new explicit instruction.",
   "verificationBranchSha": "20f985123f614e3d07963779f7c354ce68736457",
   "deployments": [
     {
@@ -338,5 +338,13 @@
       "status": "live",
       "sha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c"
     }
-  ]
+  ],
+  "previousReadinessStatus": "READY FOR FINAL SOLANA + NUITEE E2E",
+  "closure": {
+    "at": "2026-10-07T15:19:29.914Z",
+    "basis": "User reports slides and videos submitted; existing proof accepted as sufficient",
+    "solanaNuiteeRecordingCancelled": true,
+    "finalLiveE2EPerformed": false,
+    "finalLiveE2ERequired": false
+  }
 }
