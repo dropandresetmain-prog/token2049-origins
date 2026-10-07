@@ -1,0 +1,54 @@
+{
+  "at": "2026-10-07T13:04:31.243Z",
+  "noSpend": true,
+  "readOnlyRender": true,
+  "services": {
+    "gateway": {
+      "id": "srv-db2jgqnavr4c73e9blrg",
+      "url": "https://token2049-origins.onrender.com",
+      "branch": "main"
+    },
+    "cardano": {
+      "id": "srv-db2mnk1srm7s73c1f5c0",
+      "url": "https://t2o-cardano-payer.onrender.com",
+      "plan": "free",
+      "branch": "main",
+      "caps": {
+        "PAYER_MAX_PER_PAYMENT_BASE_UNITS": "5100000",
+        "PAYER_MAX_CUMULATIVE_BASE_UNITS": "5100000",
+        "PAYER_MAX_DAILY_BASE_UNITS": "5100000",
+        "PAYER_MAX_FEE_LOVELACE": "2500000000"
+      }
+    },
+    "solana": null
+  },
+  "deploys": [
+    {
+      "id": "dep-db32j6gg6u5c73cbcto0",
+      "status": "live",
+      "commit": "974a39bfb59adb0a317d0db05a12268bbbb6242d",
+      "createdAt": "2026-10-07T11:14:35.162502Z"
+    },
+    {
+      "id": "dep-db32j667bikc73bpmfk0",
+      "status": "deactivated",
+      "commit": "974a39bfb59adb0a317d0db05a12268bbbb6242d",
+      "createdAt": "2026-10-07T11:14:32.653758Z"
+    },
+    {
+      "id": "dep-db32idbbc2fs73cdb980",
+      "status": "deactivated",
+      "commit": "5343235ebe6c341abdda95450065950a3d1051b7",
+      "createdAt": "2026-10-07T11:12:53.576432Z"
+    }
+  ],
+  "gateway": {
+    "atlasGate": "false",
+    "atlasConfigured": true,
+    "nuiteeConfigured": true,
+    "cardanoBridgeConfigured": true,
+    "solanaBridgeConfigured": false,
+    "databaseConfigured": true,
+    "atlasConfigurationVerifiedWithRequiredClientFields": true
+  }
+}

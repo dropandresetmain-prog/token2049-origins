@@ -1,0 +1,38 @@
+{
+  "at": "2026-10-07T13:11:11.149Z",
+  "noSpend": true,
+  "policyPath": "C:/Dev/token2049-setup/secrets/hosted-demo-solana/final-activation.env",
+  "authorization": "Operator explicitly approved these exact limits in current activation chat after automatic-review rejection.",
+  "scale": "USD 1 commercial notional = 0.001 valueless Devnet USDC = 1000 base units",
+  "identities": [
+    {
+      "address": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+      "aclVerified": true,
+      "identityVerified": true,
+      "noSigning": true
+    },
+    {
+      "address": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+      "aclVerified": true,
+      "identityVerified": true,
+      "noSigning": true
+    }
+  ],
+  "network": "Solana Devnet",
+  "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+  "payee": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+  "sourceTokenAccount": "2dWzL6j5sxpcfrqmuQdhbj22A4WXz2JwDNdbwa9wheMs",
+  "treasuryTokenAccount": "6imvBRJazCiUyJ96nBfFnFBBrKaJjZvALzyLCW8nkpJF",
+  "perPaymentBaseUnits": "250000",
+  "cumulativeBaseUnits": "500000",
+  "commercialCeilingUsdMinor": "25000",
+  "sponsorFeeCapLamports": "100000",
+  "committedBaseUnits": "94220",
+  "cumulativeRemainingBaseUnits": "405780",
+  "perPaymentHeadroomBaseUnits": "250000",
+  "sponsorCommittedFeeLamports": "25002",
+  "sponsorFeeRemainingLamports": "74998",
+  "balancesVerified": false,
+  "usableHeadroomVerified": false,
+  "canonicalHistoriesUnchanged": true
+}

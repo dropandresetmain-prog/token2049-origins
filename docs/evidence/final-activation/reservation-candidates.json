@@ -1,0 +1,65 @@
+{
+  "at": "2026-10-07T13:04:21.912Z",
+  "noSpend": true,
+  "canonicalFilesUnchanged": true,
+  "histories": [
+    {
+      "role": "payer",
+      "owner": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+      "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+      "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "sourceSha256": "19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664",
+      "entries": 7,
+      "committedBaseUnits": "94220",
+      "committedFeeLamports": "0"
+    },
+    {
+      "role": "sponsor",
+      "owner": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+      "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+      "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "sourceSha256": "1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4",
+      "entries": 6,
+      "committedBaseUnits": "0",
+      "committedFeeLamports": "25002"
+    }
+  ],
+  "reservations": [
+    {
+      "purchaseId": "pur_01M48S9JMWEXMS34EEYCZ0YYKP",
+      "amountBaseUnits": "1050",
+      "createdAt": "2026-10-06T14:18:49.772Z",
+      "candidateSha256": "e160ac6f4994e3331aae4d7897eec893cd66ac0e4e553eedcd7e1ed4f5bdd1ff",
+      "messageSha256": "d85f3cb4be9572490f196828f3c414822e81bea9603db515bd9d7d5045dfc880",
+      "payerSignatureValid": true,
+      "sponsorSignaturePresent": false,
+      "candidateSponsorSignature": null,
+      "recentBlockhash": "8Lapr4sV1g8oXjeQJxgo9G2aEoFn8Xh17sodFLvyx3bM",
+      "memo": "t2o:3b67cb96d691538bc2652a83543d2f545a604b60626c863f904823a52428db66",
+      "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "source": "2dWzL6j5sxpcfrqmuQdhbj22A4WXz2JwDNdbwa9wheMs",
+      "destination": "6imvBRJazCiUyJ96nBfFnFBBrKaJjZvALzyLCW8nkpJF",
+      "matchingSponsorReservations": [],
+      "classification": "unknown",
+      "reason": "Local candidate decoded; independent chain history and blockhash expiry still required."
+    },
+    {
+      "purchaseId": "pur_01M48SB32BXEZGS9KPC74NNGM5",
+      "amountBaseUnits": "1050",
+      "createdAt": "2026-10-06T14:19:39.369Z",
+      "candidateSha256": "4f96cb7f463a96db588934fa889ff31423444fb575769a6b753979ba0553de09",
+      "messageSha256": "71d67131ff7f03650b8dfde415576db3fa29c6858412f5cd268899e5e7636a1c",
+      "payerSignatureValid": true,
+      "sponsorSignaturePresent": false,
+      "candidateSponsorSignature": null,
+      "recentBlockhash": "A6VaT2W1oKf1Fs5Suzh7o2TYrupHKx5rTd5oY7r7y1hu",
+      "memo": "t2o:322f79db5f0b475ad7a224c150ece36c0901d252d9d3b89c4d08a4c4fd89761e",
+      "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "source": "2dWzL6j5sxpcfrqmuQdhbj22A4WXz2JwDNdbwa9wheMs",
+      "destination": "6imvBRJazCiUyJ96nBfFnFBBrKaJjZvALzyLCW8nkpJF",
+      "matchingSponsorReservations": [],
+      "classification": "unknown",
+      "reason": "Local candidate decoded; independent chain history and blockhash expiry still required."
+    }
+  ]
+}

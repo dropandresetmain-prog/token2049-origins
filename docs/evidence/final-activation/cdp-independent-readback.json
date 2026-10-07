@@ -1,0 +1,17 @@
+{
+  "at": "2026-10-07T13:05:54.488Z",
+  "readOnly": true,
+  "result": "PASS",
+  "originalProofUnchanged": true,
+  "source": "https://sepolia.base.org",
+  "transactionHash": "0xb0348248fa5166944be2db148f8d05e7d76b0f5f8e9746dcdcc8b2596a9cdb2d",
+  "from": "0xa4ce927fda1d30efbc0ce81877e53036a75fd486",
+  "to": "0x708fcca1ff481d47782fadf6814ff61fcc2e4570",
+  "valueWei": "1000000000000",
+  "status": "0x1",
+  "blockNumber": 47803692,
+  "blockTimestampUtc": "2026-10-07T12:21:12.000Z",
+  "treasuryBalanceWei": "98873999999835",
+  "recipientBalanceWei": "1000000000000",
+  "note": "Original observedAtSGT text has a timezone typo: 12:20 UTC is 20:20 SGT. Original evidence retained byte-for-byte."
+}

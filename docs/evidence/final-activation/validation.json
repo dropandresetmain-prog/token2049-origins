@@ -1,0 +1,70 @@
+{
+  "at": "2026-10-07T13:14:00.649Z",
+  "scope": "Activation changed files and retained evidence; not a comprehensive secret audit.",
+  "migrations": [
+    {
+      "name": "0001_initial.sql",
+      "sha256": "0b0c60b9a4802dd14079462d07ade84942e62f2ff30c0434d221725a57276255",
+      "identicalToCandidate": true
+    },
+    {
+      "name": "0002_journal_truncate_guard.sql",
+      "sha256": "6eae5af236e97a9a10afe7e40797c05a69a0f200d5654d1d957dd86d7f143804",
+      "identicalToCandidate": true
+    },
+    {
+      "name": "0003_shopify_shadows.sql",
+      "sha256": "6911f552a873c887f71463e035150c24557edead21600dc04a870cb64ed2b527",
+      "identicalToCandidate": true
+    },
+    {
+      "name": "0004_mcp_oauth.sql",
+      "sha256": "b49195dad775cdb5f3cbee70426f968c8710189835c326f999d8c683d4798736",
+      "identicalToCandidate": true
+    },
+    {
+      "name": "0005_hosted_payer_ledger.sql",
+      "sha256": "9a164307157cb73264dcff9f7650932be6b7843d3ce19b6bdf01af6d666011ca",
+      "identicalToCandidate": true
+    },
+    {
+      "name": "0006_hosted_payer_import.sql",
+      "sha256": "33eeb53edf3369199b72d33483cf5dda57d23fb2fb098195252059db3c8b903d",
+      "identicalToCandidate": true
+    },
+    {
+      "name": "0007_payment_handoffs.sql",
+      "sha256": "6d4ff824164a496ee8fbc03c3347c45ddbbd9a13297c4c33244f217a522b173a",
+      "identicalToCandidate": true
+    },
+    {
+      "name": "0008_hosted_solana_ledger.sql",
+      "sha256": "f38ced5ee67552e250ad2072fd65a37f84b896ca94ab66871b5a94259f8541da",
+      "identicalToCandidate": true
+    }
+  ],
+  "migrationsUnchanged": true,
+  "secretScan": {
+    "filesChecked": 18,
+    "exactSecretExposure": false,
+    "privateKeyPatterns": false,
+    "pass": true
+  },
+  "originalHistoriesUnchanged": true,
+  "tests": {
+    "typecheck": "PASS",
+    "build": "PASS",
+    "aclAndLedger": {
+      "files": 2,
+      "tests": 6,
+      "result": "PASS"
+    },
+    "providersReadinessAndPgImport": {
+      "files": 4,
+      "tests": 155,
+      "result": "PASS"
+    },
+    "fullBackendSuite": "NOT RUN: final post-E2E gate not reached",
+    "consoleChecks": "NOT RUN: final post-E2E gate not reached"
+  }
+}

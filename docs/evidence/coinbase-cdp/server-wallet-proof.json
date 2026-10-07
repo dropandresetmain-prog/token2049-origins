@@ -1,0 +1,34 @@
+{
+  "observedOn": "2026-10-07",
+  "observedAtSGT": "2026-10-07 12:20-12:22 SGT (CDP createdAt/blockTimestamp reported in UTC: 12:20:39Z - 12:21:12Z)",
+  "product": "CDP Server Wallet (non-custodial EVM accounts), production API host, testnet only",
+  "tooling": "@coinbase/cdp-cli (API key + Wallet Secret held in OS keyring; no secret in repo)",
+  "network": "base-sepolia",
+  "chainId": 84532,
+  "accounts": {
+    "treasury": { "name": "capsule-treasury-test", "address": "0xa4ce927fdA1d30EfBC0CE81877e53036A75fD486", "createdAt": "2026-10-07T12:20:39.702Z" },
+    "recipient": { "name": "capsule-recipient-test", "address": "0x708FCca1Ff481D47782fadF6814fF61Fcc2E4570", "createdAt": "2026-10-07T12:20:41.840Z" }
+  },
+  "faucet": { "token": "eth", "amountWei": "100000000000000", "transactionHash": "0x8e442639693b2f94415ae9f4c70cdfae32d51460149557ce0912ca122f15a84b" },
+  "treasuryAction": {
+    "kind": "native ETH transfer, treasury -> recipient",
+    "amountWei": "1000000000000",
+    "transactionHash": "0xb0348248fa5166944be2db148f8d05e7d76b0f5f8e9746dcdcc8b2596a9cdb2d",
+    "submittedVia": "cdp evm accounts send transaction (CDP signs in TEE)"
+  },
+  "independentReadback": {
+    "source": "public Base Sepolia RPC https://sepolia.base.org (not CDP)",
+    "receiptStatus": "0x1 (success)",
+    "blockNumber": 47803692,
+    "blockTimestampUtc": "2026-10-07T12:21:12Z",
+    "gasUsed": 21000,
+    "from": "0xa4ce927fda1d30efbc0ce81877e53036a75fd486",
+    "to": "0x708fcca1ff481d47782fadf6814fF61fcc2e4570",
+    "valueWei": "1000000000000",
+    "treasuryBalanceWeiAfter": "98873999999835",
+    "recipientBalanceWeiAfter": "1000000000000"
+  },
+  "cdpAccountListAfter": ["capsule-treasury-test", "capsule-recipient-test"],
+  "notReadBack": "No account policy was attached (adapter provisioning path not used); guardrails are the testnet-only scope and one tiny action, not a CDP policy.",
+  "secretsRecorded": false
+}
