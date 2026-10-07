@@ -73,7 +73,7 @@ Verify:
 - sandbox key;
 - target search dates/location produce a bookable rate;
 - prebook/fee shape compatible with current adapter;
-- synthetic traveller;
+- saved demo customer profile (`customerProfile`; see hosted MCP doc);
 - enough sandbox capability for one demo run.
 
 ### Atlas

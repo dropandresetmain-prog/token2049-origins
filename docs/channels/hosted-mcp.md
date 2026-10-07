@@ -53,7 +53,7 @@ headers are never consulted (`trust proxy` is off). `Origin` must be absent (ser
 ## Shopping behaviour (mandatory acceptance criteria)
 
 1. `find_offers` returns a structured **shortlist of at most 3** real offers (gateway order, never re-ranked, only fields the offer actually carries: title, description, category/route, indicative price, merchant/product URL/variant when sourced, terms, expiry) plus `interaction: { nextAction: "present_options_and_ask_user_to_choose", createQuoteAllowedNow: false, markExactlyOneRecommended: true, presentAtMost: 3 }` and text saying **Do NOT call create_quote yet**. The host model recommends exactly one from those facts (nothing hardcoded) and asks the user which they want.
-2. `create_quote` only after the user explicitly chooses (needs real shipping details) → exact terms and every available funding option (Cardano and Solana, with which are "Connected wallet" vs "External payment action required").
+2. `create_quote` only after the user explicitly chooses; `{ category }` alone is enough because the saved demo customer profile fills shipping / booking-holder / traveller details server-side → exact terms and every available funding option (Cardano and Solana, with which are "Connected wallet" vs "External payment action required").
 3. The user explicitly selects a payment rail and explicitly approves the exact quote → `buy`. Missing choice or approval returns `needs_input`; a rail without a hosted payer returns `action_required` and creates nothing.
 4. `get_purchase` is read-only. Polling never creates a purchase or payment (tested: purchases, funding rows and payer calls are unchanged across repeated polls).
 5. `orderConfirmation` is returned (and its headline leads the text) **only** when the existing durable completion conditions hold (`state=succeeded`, paid commerce + merchant status, receipt issued) **and** the provider status proves that commerce type **and** a funding payment was verified:
@@ -125,3 +125,14 @@ ChatGPT → Settings → Connectors → Advanced → enable **Developer mode** �
 - `/mcp` is stateless: no server-initiated streams or sessions. Long payments (the bridge call can take up to ~100 s) depend on the client's tool timeout; if it times out, `get_purchase` shows the outcome.
 - Consent throttling is global (one owner), not per IP, because the platform proxy hides client IPs.
 - Payer container runs as root so it can write the root-owned disk mount (untested on Render; see report).
+
+## Saved demo customer profile (customer-facing language)
+
+**DEMO configuration**, `demo/demo-data.json` → `customerProfile` (schema in `src/demo/config.ts`, merge in `src/demo/profile.ts`). Placeholder values only (example.com email, placeholder phone and passport number, no secrets); they make no claim about any real person.
+
+- The hosted `/mcp` endpoint merges the profile into `create_quote` fulfillment **before** canonical validation (`MCP_DEMO_PROFILE=off` disables it; stdio/local MCP uses it only when a profile is passed explicitly). Retail → shipping + email; hotel → holder + first guest; flight → contact + passenger (+ demo passport). Core, HTTP and the provider contracts are unchanged.
+- An explicit user value is never overwritten. A user-named different person does not inherit the saved customer's DOB, gender, nationality or passport; overriding any delivery-location field means the rest of the location is asked for. Anything a provider still reports as required comes back as `needs_input` for that field only.
+- Customer wording: offers, quotes, progress and the final confirmation use normal commerce language (no "fake/synthetic/sandbox" copy, no "(test environment)" suffix). The environment is disclosed **once**, immediately before approval, with the exact line from the quote result (`demoDisclosure`): "Demo transaction: payment uses testnet funds and the merchant checkout runs in a sandbox. No real money will be charged." For Shopify Global source offers it adds: "The source store receives no order or payment; the demo checkout is completed in Capsule's sandbox store."
+- Environment, testnet and sandbox facts are unchanged in structured results, receipts, proof and evidence (`providerEnvironment`, `terms`, `orderConfirmation.environment`, `limitations`).
+- The text shows only a delivery line ("Delivering to Marina Bay Sands, Singapore"); DOB, passport, phone and email are never emitted in text, logs or proof.
+- The Shopify executor's buyer guard accepts exactly two identities: the legacy Test Buyer (no phone) or the saved demo customer (its own phone); the email must stay on example.com.

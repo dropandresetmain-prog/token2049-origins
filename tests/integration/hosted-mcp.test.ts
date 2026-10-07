@@ -598,6 +598,9 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
     expect(text).toContain(line);
     expect(text).toMatch(/Receipt: rcp_/);
     expect(text).toMatch(/Payment verified \(cardano\): /);
+    // The customer-facing confirmation carries no environment suffix or demo caveat; the environment stays in the structured result.
+    expect(text).not.toMatch(/environment\)|sandbox|test environment|Demo transaction/i);
+    expect(res.structuredContent.orderConfirmation.environment).toBeTruthy();
     expect(res.structuredContent.orderConfirmation).toMatchObject({ headline, commerceType: category, paymentVerified: true });
     // The other commerce types' labels never appear.
     for (const other of ['ORDER CONFIRMED', 'BOOKING CONFIRMED', 'TICKET ISSUED'].filter((h) => h !== headline)) expect(text).not.toContain(other);

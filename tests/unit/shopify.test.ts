@@ -101,6 +101,20 @@ describe('Shopify exact quote boundary', () => {
     expect(await s.executor.execute(s.ctx)).toMatchObject({ kind: 'terms_changed' });
     expect(s.complete.complete).not.toHaveBeenCalled();
   });
+  it('accepts only known demo buyers: the legacy Test Buyer or the saved demo customer', async () => {
+    const s = await setup();
+    const code = async (fulfillment: RetailFulfillment) => s.executor.quote({ executionRef: { variantId: 'gid://shopify/ProductVariant/123', quantity: 2 }, intent }, fulfillment).then(() => 'quoted', (e: { providerCode?: string }) => e.providerCode);
+    const demo = demoData.customerProfile.retail;
+    // The saved customer passes the buyer guard (the fixture cart is for the legacy buyer, so it stops later at the cart/address checks).
+    const passes = async (fulfillment: RetailFulfillment) => expect(await code(fulfillment)).not.toBe('shopify_test_buyer_required');
+    await passes(demo);
+    await passes({ ...demo, shippingAddress: { ...demo.shippingAddress, phone: undefined } });
+    // Anyone else, another phone, or a non-example.com email is refused before any cart work.
+    expect(await code({ ...demo, shippingAddress: { ...demo.shippingAddress, firstName: 'Ada' } })).toBe('shopify_test_buyer_required');
+    expect(await code({ ...demo, shippingAddress: { ...demo.shippingAddress, phone: '+6591234567' } })).toBe('shopify_test_buyer_required');
+    expect(await code({ ...demo, email: 'min@gmail.com' })).toBe('shopify_test_buyer_required');
+    expect(await code({ ...f, shippingAddress: { ...f.shippingAddress, phone: '+6500000000' } })).toBe('shopify_test_buyer_required');
+  });
   it('rejects changed buyer and expired quote before browser work', async () => {
     const s = await setup();
     s.ctx.fulfillment = { ...f, email: 'changed@example.com' };
@@ -111,7 +125,7 @@ describe('Shopify exact quote boundary', () => {
     expect((await createShopifyExecutor({}).readiness()).status).toBe('MISSING_CONFIG');
     await expect(createShopifyExecutor({ ...env, SHOPIFY_DEV_STORE_CONFIRMED: 'false' }).search(intent)).rejects.toThrow();
     const s = await setup();
-    await expect(s.executor.quote({ executionRef: {}, intent }, { ...f, email: 'buyer@real.com' })).rejects.toThrow('Synthetic');
+    await expect(s.executor.quote({ executionRef: {}, intent }, { ...f, email: 'buyer@real.com' })).rejects.toThrow('Demo buyer');
     expect(loadShopifyConfig({ ...env, SHOPIFY_STORE_DOMAIN: '127.0.0.1' }).invalid).toContain('SHOPIFY_STORE_DOMAIN');
   });
 });

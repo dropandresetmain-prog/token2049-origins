@@ -10,6 +10,7 @@ import type { PurchaseView, QuoteView, OfferView } from '../../contracts/commerc
 import { redact, redactString } from '../../infrastructure/redact.js';
 import { GatewayClient, GatewayError } from './client.js';
 import type { BridgeClient } from './bridge.js';
+import { applyDemoProfile, deliveryLabel, type DemoCustomerProfile } from '../../demo/profile.js';
 
 /** Dependencies of the tool layer. `bridges` may be empty: without one `buy` can never move money. */
 export interface ToolDeps {
@@ -22,6 +23,8 @@ export interface ToolDeps {
    * repeat calls join the operation. Payment handoffs also have a durable gateway claim, so restarts cannot start a second attempt.
    */
   background?: BackgroundJobs;
+  /** DEMO configuration: saved customer merged into create_quote fulfillment before validation. Absent => the user must supply every field. */
+  profile?: DemoCustomerProfile;
   /** Present on the hosted endpoint: tools declare OAuth security schemes and enforce the token's scopes. */
   auth?: { resourceMetadataUrl: string };
 }
@@ -208,7 +211,7 @@ export function offerSelectionGuide(count: number) {
 
 function describeOffers(offers: OfferView[], totalFound: number): string {
   if (offers.length === 0) return 'No offers found. Ask the user to refine the request or raise the spend ceiling. Nothing was bought.';
-  const lines = offers.map((o, i) => `${i + 1}. ${o.title} | ${o.category}/${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)}${o.sourceOffer ? ' | merchant ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl : ''} | offerId ${o.offerId} | expires ${o.expiresAt}${o.checkout ? ' | SEARCH ONLY: ' + o.checkout.reason : ''}`);
+  const lines = offers.map((o, i) => `${i + 1}. ${o.title} | ${o.category}/${o.route} | indicative ${formatMinor(o.indicativePrice)}${o.sourceOffer ? ' | merchant ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl : ''} | offerId ${o.offerId} | expires ${o.expiresAt}${o.checkout ? ' | SEARCH ONLY: ' + o.checkout.reason : ''}`);
   if (offers.every(o => o.checkout?.status === 'search_only')) return [...lines, 'Checkout is unavailable for these results. Explain the limitation now. Do not collect fulfillment or passenger details and do not call create_quote.'].join('\n');
   const conversion = offers[0]?.searchConversion;
   return [
@@ -219,7 +222,19 @@ function describeOffers(offers: OfferView[], totalFound: number): string {
   ].join('\n');
 }
 
-export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms: Map<string, bigint> = new Map()): string {
+/**
+ * The single customer-facing disclosure of the demo environment. It is stated once, immediately before approval/buy;
+ * offers, quotes, progress and confirmations stay in normal commerce language. Environment facts remain in structured results.
+ */
+export const DEMO_DISCLOSURE = 'Demo transaction: payment uses testnet funds and the merchant checkout runs in a sandbox. No real money will be charged.';
+export const SOURCE_STORE_NOTE = "The source store receives no order or payment; the demo checkout is completed in Capsule's sandbox store.";
+export function demoDisclosure(q: Pick<QuoteView, 'sourceOffer'>): string {
+  return q.sourceOffer ? `${DEMO_DISCLOSURE} ${SOURCE_STORE_NOTE}` : DEMO_DISCLOSURE;
+}
+/** Terms that only restate the demo environment stay in structured output; the one disclosure covers them in text. */
+const ENVIRONMENT_TERM = /(sandbox|development store|bogus|simulated|testnet|test)/i;
+
+export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms: Map<string, bigint> = new Map(), delivery: string | null = null): string {
   const fund = q.fundingOptions.map(f => {
     const digits = f.amount.amountBaseUnits.padStart(f.amount.decimals + 1, '0');
     const amount = f.amount.decimals ? digits.slice(0, -f.amount.decimals) + '.' + digits.slice(-f.amount.decimals) : digits;
@@ -235,18 +250,18 @@ export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms:
       ' · selection ' + f.fundingOptionId;
   });
   return [
-    'Exact quote for "' + q.title + '" via ' + q.route + ' (' + q.providerEnvironment + ').',
+    'Exact quote for "' + q.title + '" via ' + q.route + '.',
     'Merchant total ' + formatMinor(q.merchantTotal) + ' + service fee ' + formatMinor(q.serviceFee) + ' = payable ' + formatMinor(q.payablePrincipal) + '.',
     ...(q.displayConversion ? [
       'Reference equivalent of payable: about ' + formatMinor(q.displayConversion.convertedPayable) + ' (user budget ' + formatMinor(q.displayConversion.userBudget) + ').',
       'FX reference: Frankfurter, ' + q.displayConversion.snapshot.referenceDate + '; 1 ' + q.displayConversion.snapshot.from + ' = ' + q.displayConversion.snapshot.rate + ' ' + q.displayConversion.snapshot.to + '.',
       'Approve the exact USD merchant quote and an explicit funding option. Funding uses the USD payable under its stated testnet policy; SGD is a budget/display reference only. Pass payablePrincipal as maxTotal. This FX reference is frozen.',
     ] : []),
-    'Fulfillment: ' + q.fulfillmentSummary,
-    ...q.terms.map(t => 'Terms: ' + t),
+    delivery ?? 'Fulfillment: ' + q.fulfillmentSummary,
+    ...q.terms.filter(t => !ENVIRONMENT_TERM.test(t)).map(t => 'Terms: ' + t),
     'Expires ' + q.expiresAt + '.',
     ...(fund.length ? ['Available funding options:', ...fund] : ['No payment source is currently available. Purchase creation is unavailable.']),
-    'Nothing has been purchased yet. Show these exact terms to the user, ask them to select one available funding option, then ask for explicit approval of the terms and that payment choice. Only then call buy with selectedFundingOptionId, quoteId, maxTotal and quoteDigest from this quote. Never infer a choice or fabricate customer information.',
+    'Nothing has been purchased yet. Show these exact terms to the user, ask them to select one available funding option, then ask for explicit approval of the terms and that payment choice. Only then call buy with selectedFundingOptionId, quoteId, maxTotal and quoteDigest from this quote. Never infer a choice or fabricate customer information. Do not ask for name, email, phone, address or traveller details: the saved customer profile already covers them. Immediately before asking for that final approval, state this once, verbatim: "' + demoDisclosure(q) + '" Do not repeat it elsewhere.',
   ].join('\n');
 }
 
@@ -311,7 +326,7 @@ function confirmationText(c: Record<string, unknown>): string {
     `${ref.label}: ${ref.value}`,
     `Receipt: ${String(c.receiptId)}`,
     `Payment verified (${pay.rail}): ${pay.transferReference}`,
-    `Amount ${String(c.principal)} + service fee ${String(c.serviceFee)} (${String(c.environment)} environment)`,
+    `Amount ${String(c.principal)} + service fee ${String(c.serviceFee)}`,
     ...(c.displayConversion ? [
       'Your reference budget equivalent (including service fee): about ' + formatMinor((c.displayConversion as NonNullable<QuoteView['displayConversion']>).convertedPayable) +
       ' · Frankfurter, ' + (c.displayConversion as NonNullable<QuoteView['displayConversion']>).snapshot.referenceDate,
@@ -381,7 +396,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       title: 'Create exact quote',
       description:
-        'Turn the offerId the USER CHOSE into an immutable quote with the exact price breakdown, funding requirement, expiry and digest. Call only after the user picked one of the presented offers. Takes buyer/shipping/traveller details in `fulfillment`. In sandbox, ask the user to supply synthetic traveller and shipping data. Never invent required customer information or silently fill demo defaults. Nothing is bought.',
+        'Turn the offerId the USER CHOSE into an immutable quote with the exact price breakdown, funding requirement, expiry and digest. Call only after the user picked one of the presented offers. Capsule has a saved customer profile for shipping, booking-holder and traveller details: pass `fulfillment: { category }` and it is filled in server-side. Include a fulfillment field only to override it. Do not ask the user for details the profile already covers; ask only for information a result reports as missing. Never invent customer information. Nothing is bought.',
       inputSchema: { offerId: OfferId, fulfillment: FulfillmentDraft },
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       ...securityMeta(deps, 'create_quote'),
@@ -390,13 +405,13 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       const denied = missingScope(deps, 'create_quote', extra);
       if (denied) return denied;
       try {
-        const assessment = assessFulfillment(fulfillment);
+        const assessment = assessFulfillment(deps.profile ? applyDemoProfile(fulfillment, deps.profile) : fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
         const { quote } = await deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
         const payers = await connectedPayers(deps);
         const fundingSources = payers.map(p => p.source);
         const headrooms = new Map(payers.flatMap(p => (p.headroom !== undefined ? [[p.source.sourceId, p.headroom] as [string, bigint]] : [])));
-        return success(deps, describeQuote(quote, fundingSources, headrooms), { quote, fundingSources });
+        return success(deps, describeQuote(quote, fundingSources, headrooms, deliveryLabel(assessment.value)), { quote, fundingSources, demoDisclosure: demoDisclosure(quote) });
       } catch (e) {
         return gatewayFailure(deps, e);
       }

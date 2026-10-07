@@ -2,7 +2,7 @@ import { z } from 'zod';
 import data from '../../demo/demo-data.json' with { type: 'json' };
 import { SettlementPolicy } from '../contracts/settlement.js';
 import { IntegerString } from '../contracts/money.js';
-import { RetailFulfillment, HotelFulfillment } from '../contracts/intent.js';
+import { RetailFulfillment, HotelFulfillment, FlightFulfillment } from '../contracts/intent.js';
 
 const text = z.string().min(1);
 const country = z.string().regex(/^[A-Z]{2}$/);
@@ -12,6 +12,7 @@ export const DemoConfig = z.object({
   version: z.literal(1), settlementPolicy: SettlementPolicy, settlementLabel: text,
   buyer: RetailFulfillment.omit({ category: true }),
   traveller: HotelFulfillment.shape.holder,
+  customerProfile: z.object({ note: text, retail: RetailFulfillment, hotel: HotelFulfillment, flight: FlightFulfillment }).strict(),
   retail: z.object({ ...scenario, query: text, productHandle: text.nullable(), productRef: z.string().regex(/^gid:\/\/shopify\/ProductVariant\/\d+$/).nullable(), quantity: z.number().int().min(1).max(10), shipToCountry: country, scalingExampleMinor: IntegerString }).strict(),
   retailJudgeSandbox: z.object({ query: text, maxCommercialMinor: IntegerString, maxItemMinor: z.literal('10000'), currency: z.literal('USD'), quantity: z.literal(1), shipToCountry: country }).strict(),
   hotel: z.object({ ...scenario, cityName: text, countryCode: country, checkInDaysFromNow: days, checkOutDaysFromNow: days, adults: z.number().int().min(1).max(6), guestNationality: country }).strict().refine(h => h.checkOutDaysFromNow > h.checkInDaysFromNow),

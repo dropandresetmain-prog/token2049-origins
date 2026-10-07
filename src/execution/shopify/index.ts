@@ -5,6 +5,7 @@ import { RetailIntent, RetailFulfillment, type PurchaseIntent, type Fulfillment 
 import { Money, compareMoney } from '../../contracts/money.js';
 import { systemClock, type Clock } from '../../infrastructure/clock.js';
 import { ProviderError } from '../../core/errors.js';
+import { demoData } from '../../demo/config.js';
 import { loadShopifyConfig } from './config.js';
 import { StorefrontClient, QUOTE_ATTRIBUTE, cheapestSelections, readCartTotals, readCartTerms, readCartAddress, type StorefrontCart } from './storefront.js';
 import { AdminClient, type AdminOrder } from './admin.js';
@@ -107,8 +108,12 @@ export class ShopifyExecutor implements CommerceExecutor {
   }
   private fulfillment(value: Fulfillment) {
     const f = RetailFulfillment.safeParse(value);
-    if (!f.success || !/^[A-Za-z0-9._+-]+@example\.com$/i.test(f.data.email) || f.data.shippingAddress.firstName !== 'Test' || f.data.shippingAddress.lastName !== 'Buyer' || f.data.shippingAddress.phone || (f.data.shippingAddress.province && !/^[A-Z0-9-]{1,6}$/.test(f.data.shippingAddress.province)))
-      throw new ProviderError('rejected', 'shopify_test_buyer_required', 'Synthetic Test Buyer fulfillment with example.com email, no phone, and province code is required');
+    // Only known demo identities may reach the development store: the legacy Test Buyer (no phone) or the saved demo customer (its own phone).
+    const demo = demoData.customerProfile.retail.shippingAddress;
+    const a = f.success ? f.data.shippingAddress : null;
+    const knownBuyer = !!a && ((a.firstName === 'Test' && a.lastName === 'Buyer' && !a.phone) || (a.firstName === demo.firstName && a.lastName === demo.lastName && (!a.phone || a.phone === demo.phone)));
+    if (!f.success || !a || !knownBuyer || !/^[A-Za-z0-9._+-]+@example\.com$/i.test(f.data.email) || (a.province && !/^[A-Z0-9-]{1,6}$/.test(a.province)))
+      throw new ProviderError('rejected', 'shopify_test_buyer_required', 'Demo buyer fulfillment with example.com email, a known demo buyer identity, and province code is required');
     return f.data;
   }
   private expiry(): string { return new Date(this.clock.now().getTime() + 10 * 60_000).toISOString(); }

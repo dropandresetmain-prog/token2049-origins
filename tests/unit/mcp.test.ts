@@ -119,11 +119,11 @@ describe('MCP channel', () => {
     ...extra,
   });
 
-  it('exposes exactly the four thin tools, with sandbox guidance on create_quote', async () => {
+  it('exposes exactly the four thin tools, with saved-profile guidance on create_quote', async () => {
     const m = await connect(cfg);
     const { tools } = await m.client.listTools();
     expect(tools.map((t) => t.name).sort()).toEqual(['buy', 'create_quote', 'find_offers', 'get_purchase']);
-    expect(tools.find((t) => t.name === 'create_quote')!.description).toMatch(/synthetic/i);
+    expect(tools.find((t) => t.name === 'create_quote')!.description).toMatch(/saved customer profile/i);
     await m.close();
   });
 

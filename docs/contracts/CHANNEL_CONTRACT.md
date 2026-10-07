@@ -14,7 +14,8 @@ conflict the code wins. After pre-Masumi promotion, `main` is the implementation
 4. **Idempotency.** `POST /v1/purchases` requires `Idempotency-Key`. Channels derive it deterministically from their
    own correlation ID, e.g. Sokosumi: `sokosumi:<externalTaskId>`. Same key + different body ⇒ `409 idempotency_conflict`.
 5. **PII stays in fulfillment.** Send traveller/shipping data only in `POST /v1/quotes.fulfillment`. Public results never
-   echo it. Use synthetic data in sandbox.
+   echo it. The hosted MCP pre-fills the saved demo customer (`demo/demo-data.json` → `customerProfile`) server-side; the
+   core and HTTP API still accept arbitrary customer fulfillment.
 
 ## Operations
 
