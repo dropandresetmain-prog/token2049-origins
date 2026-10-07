@@ -1,4 +1,4 @@
-# Judge-ready release checkpoint
+# Judge-ready release — frozen
 
 ## Authority and scope
 - Release branch: release/judge-ready; isolated checkout C:/Dev/t2o-wt-judge-release.
@@ -42,27 +42,29 @@
 - Anonymous release README, one-liner and logo PASS; important relative links/anchors/images 117 PASS.
 - Earlier GitHub HTTP 500 failures recovered; completed candidate published successfully.
 - Gateway candidate deploy dep-db36atbtqb8s73fo32jg: LIVE d9785ecaa75d2bd00158a13a0baae8cdecaacfed.
-- Current Cardano/Solana payer deploys remain afa59b1459aec6fad545ab5eeec1b2b37a15445c before final convergence.
+- Gateway, Cardano and Solana services all LIVE on final main SHA above, branch main, auto-deploy off; health/status and retained caps/rows/import markers PASS.
 - All three auto-deploy settings off. Release is the sole deployment owner after activation closure.
 - Gateway changed only console hash plus branch; all other gateway env values verified unchanged.
 - Both payer environment digests and protected ledger snapshots retained for final comparison.
-- Final main/deployed SHA and tag not yet frozen; exact final freeze record will resolve token2049-submission.
+- FINAL_SUBMISSION_SHA=743e0475a3f02b8263aea4e4b73b1b6eae7531e1
+- FINAL_DEPLOYED_SHA=743e0475a3f02b8263aea4e4b73b1b6eae7531e1
+- FINAL_TAG=token2049-submission (annotated, pushed, peeled SHA verified).
 
 ## Validation and evidence
 - Backend: 1216 tests / 75 files PASS; console: 87 tests / 9 files PASS; CRE: 6 tests PASS.
 - Backend/console typechecks and production build PASS; locked dependency audit reports zero vulnerabilities.
 - Test-only corrections: migration count nine; short-deadline offer search collects pending result.
-- Bounded scan: 438 current text files + 247 introduced history blobs, no secret/PII findings.
-- Exact dedicated judge password absent from tracked files and introduced Git history (468 tracked paths).
+- Final freeze bounded scan: 439 text files + 256 introduced history blobs, no secret/PII findings.
+- Exact dedicated judge password absent from tracked files and complete introduced Git history (469 tracked paths).
 - CRE secrets.yaml contains variable names only; exact curated CDP wallet-proof gitignore exception.
 - CDP = official CLI Server Wallet proof / Base Sepolia operational treasury, not customer settlement.
 - OCBC = read-only fiat observations; Capsule ledger reconciliation/manual adjustment; no automatic conversion or rebalancing.
-- Cold judge candidate test PASS. Default-main and exact final all-service verification remain after promotion.
+- Cold judge final test PASS after exact all-service deployment. Anonymous default-main README/logo PASS; all six UI views PASS; no page errors or stored credential.
 
-## Next action
-- Re-read checkpoint before main/deployment/freeze.
-- Report READY TO PROMOTE with exact release/main/deployed/source SHAs and scoped manifest.
-- Verify origin/main ancestry, push exact candidate to main without force or shared-checkout changes.
-- Deploy exact final main SHA to gateway/Cardano/Solana with branch main and auto-deploy off.
-- Verify health, dedicated judge access, unchanged payer env/caps/rows/import markers and anonymous default README.
-- Then tag/freeze; no further runtime cycle. Record exact SHA in final freeze record and final report.
+## Freeze and next action
+- STATUS: JUDGE READY. No remaining release blocker.
+- Frozen main/tag are immutable unless an obvious judge-blocking defect requires a new explicit release.
+- This post-freeze operator checkpoint is docs-only on release/judge-ready; intentionally not promoted to frozen main or deployed.
+- Detailed non-secret freeze/read-only verification records retained under ignored .runtime/final-freeze.json and final-service-verification.json.
+- Min Htet: paste the one-time private judge password into the submission judge-access field with the console URL.
+- No Solana recording/payment/booking approval remains; no Sokosumi work.
