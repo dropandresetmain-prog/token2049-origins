@@ -26,9 +26,10 @@
 - [x] PostgreSQL ledger/import/retirement and immutable reservation tests pass.
 - [x] Public Solana payer with internal sponsor and independently verified finality.
 - [x] Free Render provisioning and dual-source configuration/tests.
-- [x] Provider/readiness checkpoint 2e07802; Solana checkpoint next.
-- [ ] Final gates once; secret scan, migration checksums, ancestry, clean status.
-- [ ] Completion report with honest hosted evidence limits.
+- [x] Checkpoints: 2e07802 provider/readiness; 421ed55 Solana; e1029a4 fixture corrections.
+- [x] Final gates run once; failed/affected test checks corrected and rechecked.
+- [x] Secret scan, migration checksums/order, ancestry and whitespace checks pass.
+- [x] Completion report saved and documentation checkpoint committed.
 
 ## Current checkpoint
 - Candidate Atlas gate enabled; exact sandbox, zero-fee and single-pay guards preserved.
@@ -47,11 +48,15 @@
 - Solana focused suite: 33 tests pass; permission/smoke/transient: 6 pass, 47 skipped.
 - Actual service uses isolated PostgreSQL/fake RPC, retaining identical imports on restart.
 - Legacy facilitator still requires explicit URL/token; hosted mode needs neither.
+- Typecheck/build/console typecheck pass; console tests 87 pass.
+- Full suite: 1210 pass, one stale migration-count failure; corrected affected suites 12 pass.
+- 0001-0007 byte-identical to base; 0008 is the only new migration.
+- Safe to integrate: YES. Safe to deploy: NO, protected-state blockers remain.
 
 ## Next action
-- Commit verified Solana milestone, then run the final repository gate once.
-- Check migration ordering/checksums, secrets, ancestry and clean status.
-- Save completion report/handoff; stop at final checkpoint for user decision.
+- Stop for user decision after the final clean-status/SHA check.
+- Use a fresh chat for reservation reconciliation, key ACLs, explicit caps and balances.
+- Read docs/work/HOSTED_COMMERCE_COMPLETION.md for evidence, risks and exact next task.
 - Real migration/deployment/funding remain unauthorized and blocked by protected state.
 
 ## Critical constraints
