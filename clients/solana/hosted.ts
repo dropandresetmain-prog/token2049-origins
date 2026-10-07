@@ -30,13 +30,36 @@ export function hostedSolanaConfig(env: NodeJS.ProcessEnv) {
   return { cfg, port, hosts, token };
 }
 
-export async function solanaHostedSummary(cfg: SolanaPayerConfig, payer: PgSolanaLedger, sponsor: PgSolanaLedger): Promise<Record<string, unknown>> {
+export async function solanaHostedSummary(cfg: SolanaPayerConfig, payer: PgSolanaLedger, sponsor: PgSolanaLedger, rpc = new SolanaRpc(cfg.rpcUrl)): Promise<Record<string, unknown>> {
   const [p, s] = await Promise.all([payer.summary(), sponsor.summary()]);
   const remaining = cfg.maxTotal - BigInt(p.committedBaseUnits as string);
   const feeRemaining = cfg.maxFees - BigInt(s.committedFeeLamports as string);
-  const headroom = remaining < cfg.maxPerPayment ? remaining : cfg.maxPerPayment;
-  return { address: cfg.payer, payer: p, sponsor: s, caps: { perPayment: cfg.maxPerPayment.toString(), cumulative: cfg.maxTotal.toString(), sponsorFee: cfg.maxFees.toString() },
-    headroomBaseUnits: (headroom > 0n && feeRemaining >= 10001n ? headroom : 0n).toString() };
+  const balances = await solanaHostedBalances(cfg, rpc);
+  let headroom = remaining < cfg.maxPerPayment ? remaining : cfg.maxPerPayment;
+  if (!balances.verified) headroom = 0n;
+  else if (BigInt(balances.payerUsdcBaseUnits) < headroom) headroom = BigInt(balances.payerUsdcBaseUnits);
+  return { address: cfg.payer, payer: p, sponsor: s, balances, cumulativeRemainingBaseUnits: remaining.toString(), sponsorFeeRemainingLamports: feeRemaining.toString(),
+    caps: { perPayment: cfg.maxPerPayment.toString(), cumulative: cfg.maxTotal.toString(), commercialUsdMinor: cfg.maxCommercial.toString(), sponsorFee: cfg.maxFees.toString() },
+    headroomBaseUnits: (headroom > 0n && feeRemaining >= 10001n && balances.verified && BigInt(balances.sponsorLamports) >= 10001n ? headroom : 0n).toString() };
+}
+
+/** Read-only finalized balances are bound to the protected network, mint and token owners. */
+export async function solanaHostedBalances(cfg: SolanaPayerConfig, rpc = new SolanaRpc(cfg.rpcUrl)) {
+  const at = new Date().toISOString();
+  try {
+    await rpc.assertNetwork();
+    await Promise.all([rpc.assertMint(cfg.mint), rpc.assertToken(cfg.source, cfg.mint, cfg.payer), rpc.assertToken(cfg.tokenAccount, cfg.mint, cfg.payee)]);
+    const [payer, sponsor, source, treasury] = await Promise.all([
+      rpc.call<{ context: { slot: number }; value: number }>('getBalance', [cfg.payer, { commitment: 'finalized' }]),
+      rpc.call<{ context: { slot: number }; value: number }>('getBalance', [cfg.sponsor, { commitment: 'finalized' }]),
+      rpc.call<{ context: { slot: number }; value: { amount: string; decimals: number } }>('getTokenAccountBalance', [cfg.source, { commitment: 'finalized' }]),
+      rpc.call<{ context: { slot: number }; value: { amount: string; decimals: number } }>('getTokenAccountBalance', [cfg.tokenAccount, { commitment: 'finalized' }]),
+    ]);
+    if (![payer.value, sponsor.value].every(n => Number.isSafeInteger(n) && n >= 0) ||
+        [source.value, treasury.value].some(v => v.decimals !== 6 || !/^[0-9]+$/.test(v.amount))) throw new Error('Invalid balance response');
+    return { verified: true as const, at, commitment: 'finalized', payerLamports: String(payer.value), sponsorLamports: String(sponsor.value), payerUsdcBaseUnits: source.value.amount, treasuryUsdcBaseUnits: treasury.value.amount,
+      slots: { payer: payer.context.slot, sponsor: sponsor.context.slot, source: source.context.slot, treasury: treasury.context.slot } };
+  } catch { return { verified: false as const, at, failure: 'chain_balance_check_unavailable' }; }
 }
 
 /** Permanently blocked history remains committed; only active incomplete attempts prevent new readiness. */
@@ -76,7 +99,7 @@ export async function startHostedSolana(env: NodeJS.ProcessEnv, opts: { db?: Db;
     const sponsor = await createHostedSponsor(cfg, sponsorLedger, { rpc: opts.rpc });
     const payer = new SolanaBridgePayer({ config: cfg, assertAllowed: id => payerLedger.assertAllowed(id), ready: () => hostedSolanaReady(cfg, payerLedger, sponsorLedger, opts.rpc),
       pay: (config, purchaseId) => paySolanaPurchase(config, purchaseId, { ledger: payerLedger, ...sponsor }) });
-    server = createBridge({ payer, token, access: { mode: 'hosted', allowedHosts: hosts }, source: () => payer.source(), summary: () => solanaHostedSummary(cfg, payerLedger, sponsorLedger) });
+    server = createBridge({ payer, token, access: { mode: 'hosted', allowedHosts: hosts }, source: () => payer.source(), summary: () => solanaHostedSummary(cfg, payerLedger, sponsorLedger, opts.rpc) });
     await listenHosted(server, opts.port ?? port);
     const running = server;
     return { server: running, db, close: async () => { await new Promise<void>(resolve => running.close(() => resolve())); if (!opts.db) await db.close(); } };

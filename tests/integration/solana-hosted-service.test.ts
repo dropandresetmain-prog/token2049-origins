@@ -60,8 +60,8 @@ function testRpc() {
     call: vi.fn(async (method: string) => {
       calls.push(method);
       if (method === 'getSignaturesForAddress') return [];
-      if (method === 'getTokenAccountBalance') return { value: { amount: '50000' } };
-      if (method === 'getBalance') return { value: 1_000_000 };
+      if (method === 'getTokenAccountBalance') return { context: { slot: 123 }, value: { amount: '50000', decimals: 6 } };
+      if (method === 'getBalance') return { context: { slot: 123 }, value: 1_000_000 };
       throw new Error(`unexpected fake RPC method: ${method}`);
     }),
   };
