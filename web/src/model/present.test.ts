@@ -44,18 +44,26 @@ describe('presenters over sample purchases', () => {
     expect(vm.steps.find((s) => s.key === 'ordering')?.status).toBe('attention');
   });
 
-  it('found at another store: the order goes to the test store, never the source store', async () => {
+  it('leads with the source store while disclosing the separate test checkout', async () => {
     const vm = await detail('found-elsewhere');
-    expect(vm.route.to.name).toBe('Capsule test store');
-    expect(vm.route.to.detail).toBe('Found at Harbor and Pine');
+    expect(vm.route.to.name).toBe('Harbor and Pine');
+    expect(vm.route.to.detail).toBe('Checkout via Capsule');
     const boundary = "This is a test order placed with Capsule's test store. Harbor and Pine receives no order and no payment.";
     expect(vm.summary.notes).toContain(boundary);
     expect(vm.receipt?.notes[0]).toBe(boundary);
-    expect(vm.proof.sections[1]!.fields.find((f) => f.label === 'Merchant')?.value).toBe('Capsule test store');
+    expect(vm.proof.sections[1]!.fields.find((f) => f.label === 'Merchant')?.value).toBe('Harbor and Pine');
+    expect(vm.steps.find((s) => s.key === 'ordering')?.detail).toBe('Sent to Capsule checkout.');
+    expect(vm.steps.find((s) => s.key === 'confirmed')?.detail).toBe('Capsule checkout confirmed. Order paid.');
     expect(vm.quote?.source?.link.href).toBe('https://harborandpine.example/products/merino-crew-socks');
     // Receipt notes are console copy, never the gateway's engineering wording.
     for (const n of vm.receipt!.notes) expect(n).not.toMatch(/fixture|sandbox|provider|notional|OCBC|ledger|capacity|\u2014/i);
     // An ordinary Shopify purchase has no source store.
     expect((await detail('completed')).quote?.source).toBeNull();
+  });
+
+  it('keeps the source store visible when the console cannot read the quote', async () => {
+    const bundle = await source.getPurchase(source.idFor('found-elsewhere')!);
+    expect(presentDetail({ ...bundle, quote: null }, ctx).route.to.name).toBe('Harbor and Pine');
+    expect(presentDetail({ ...bundle, quote: null, proof: null }, ctx).route.to.name).toBe('Harbor and Pine');
   });
 });

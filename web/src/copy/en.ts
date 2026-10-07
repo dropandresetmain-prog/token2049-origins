@@ -176,6 +176,9 @@ export const allowance: Record<'active' | 'consumed' | 'released' | 'held_unreso
  * The source store never receives an order or a payment, and the copy must never suggest it did.
  */
 export const sourceStore = {
+  sourceStoreKind: 'Source store',
+  checkoutName: 'Capsule checkout',
+  checkoutVia: 'Checkout via Capsule',
   testStoreName: 'Capsule test store',
   testStoreKind: 'Shopify test store',
   foundAt: (store: string) => `Found at ${store}`,
