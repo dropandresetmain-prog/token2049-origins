@@ -1,94 +1,69 @@
-# Capsule — TOKEN2049 Origins Commerce Gateway
+# Capsule
 
-> Any agent. Agent-native money in. Ordinary commerce out.
+<img src="assets/brand/capsule-wordmark-accent.webp" alt="Capsule" width="280">
 
-Capsule is a buyer-side commerce gateway for AI agents. The user's existing agent handles conversation and reasoning; Capsule handles typed commerce intent, exact quotes, explicit human authority, testnet funding verification, durable execution, reconciliation, accounting and proof.
+**Any agent. Agent-native money in. Ordinary commerce out.**
 
-## Current authoritative baseline
+Capsule is a commerce gateway for AI agents. Your existing assistant finds offers, presents an exact quote and asks for approval; Capsule coordinates payment, provider execution and verification. The Capsule console lets you follow the transaction and inspect its result.
 
-- Repository: dropandresetmain-prog/token2049-origins
-- Latest integration base: 84c0aef7a7acd1851c590c54ccd8881b9dc365d5; current source tip is `git rev-parse HEAD`.
-- Status: native Masumi service-fee/task runtime integrated; Sokosumi marketplace delivery remains partial.
-- Previous pre-Masumi gate: 697/697 tests across 33 files plus install/build/migration/smoke checks PASS. Current Masumi integration checks: [MASUMI_INTEGRATION.md](docs/work/MASUMI_INTEGRATION.md).
-- Deployment: NOT RUN.
-- Masumi: native registry, escrow, result, exact seller payout and restart/replay PASS with external merchant/principal fixtures. Public Sokosumi listing/authenticated platform delivery remains unverified.
-- Final external E2E: NOT RUN on this integrated main.
-
-Main includes the latest E2E fixes, Cardano + Solana funding lanes, OCBC history fix, Nuitée and Atlas provider lanes, Shopify deterministic + Global Catalog/shadow work, thin MCP, PostgreSQL, evidence/proof, and approved Capsule UI V3 design references.
-
-## Recorded external evidence
-
-| Lane | Recorded result | Important limit |
-| --- | --- | --- |
-| Cardano | Real Preprod funding/recovery PASS | Merchant execution was a fixture; protected payer budget/history must be preserved |
-| Solana | Finalized Devnet funding/recovery PASS | Merchant fixture; provided payer/preparation path required |
-| Nuitée | Sandbox booking/readback PASS | USD 96.24 includes processing fee; tested payment method only |
-| Atlas | Sandbox payment/ticketing PASS | Ambiguous-create recovery NOT VERIFIED |
-| OCBC | Read-only sandbox observation/history PASS | Historical sandbox data; no settlement/debit claim |
-| Shopify deterministic | Paid attempt UNRESOLVED | One Pay attempt; held unresolved reservation; no confirmed order/receipt |
-| Shopify Global | Discovery/shadow/publication/readback PASS | Exact sandbox quote PARTIAL/UNRESOLVED; paid order NOT RUN |
-| MCP | Protocol/local journeys PASS | ChatGPT host connection NOT VERIFIED |
-| Masumi / Sokosumi | Native fee/task/payout PASS | Merchant/principal fixtures; actual Sokosumi marketplace delivery PARTIAL |
-| UI | V3 design approved | Static reference only; not wired into runtime |
-
-These rows are deliberately separate. A local green suite does not upgrade an external row.
-
-## Core contract
-
-Canonical flow:
-
-1. collect missing information through structured needs_input;
-2. find normalized offers;
-3. create an exact immutable quote;
-4. show available funding options;
-5. human explicitly selects a funding option and approves the quote;
-6. verify funding;
-7. execute exactly once with durable checkpoints;
-8. reconcile unknown outcomes by readback, never blind retry;
-9. return a concise proof/receipt backed by durable evidence.
-
-Purchase-principal funding rails: Cardano Preprod and Solana Devnet. Masumi is integrated separately as task remuneration; its escrow never funds merchant principal. Its core principal seam deliberately reports unavailable.
-
-Commerce providers currently implemented: Shopify, Atlas and Nuitée. Shopify has two retail discovery modes:
-- deterministic Capsule-owned store flow;
-- live Shopify Global Catalog discovery -> durable shadow in Capsule's dev store -> same controlled sandbox execution path.
-
-The source merchant receives no order/payment in the Global Catalog flow. Source offer evidence and Capsule sandbox execution evidence stay distinct.
-
-## Database
-
-Capsule uses PostgreSQL only.
-
-- Local dev/tests: official PostgreSQL 18 via Docker Compose.
-- Hosted DB provisioned: Render PostgreSQL, Singapore.
-- SQLite is unsupported.
-- Applied migrations: 0001_initial.sql, 0002_journal_truncate_guard.sql, 0003_shopify_shadows.sql.
-
-## Demo settlement
-
-Public-testnet stablecoins use a disclosed 1:1000 notional scale. Example:
-
-USD 183.40 commercial notional -> 0.183400 six-decimal test stablecoin.
-
-This is not FX and does not establish crypto-to-fiat settlement. Provider sandboxes continue to use the full commercial test amount.
-
-## UI
-
-Capsule is the approved name. DESIGN.md and docs/design/ui-v3/ are the approved design reference. The production runtime has not yet been wired to V3.
+**Capsule is a TOKEN2049 Origins hackathon prototype. It is not available for public use.** The hosted evaluation below is for authorised TOKEN2049 judges, not an open signup or a production purchasing service.
 
 ## Start here
 
-Current docs:
-- docs/DOCS_INDEX.md — what is authoritative vs historical
-- docs/HANDOFF.md — complete project handoff
-- docs/ROADMAP.md — remaining hackathon work
-- docs/KNOWN_ISSUES.md — current triage
-- docs/ENVIRONMENT.md — runtime/services/configuration
-- docs/architecture/CURRENT_ARCHITECTURE.md — current system architecture
-- docs/demo/CANONICAL_DEMO.md — target judge flow
-- docs/demo/SEED_DATA.md — seed/preflight discipline
-- docs/RUNBOOK.md — operations
-- docs/TEST_CHECKLIST.md — verification gates
-- docs/work/ACTIVE_TASK.md — current checkpoint and next action
+| I want to… | Read |
+| --- | --- |
+| Understand the problem, solution, stack and submission | [PROJECT_SUBMISSION.md](PROJECT_SUBMISSION.md) |
+| Review the Main track | [Main-track submission](PROJECT_SUBMISSION.md#main-track) |
+| Review Cardano / Agentic Commerce | [Cardano submission and evidence](PROJECT_SUBMISSION.md#cardano) |
+| Review Best Use of Solana | [Solana submission and transaction](PROJECT_SUBMISSION.md#solana) |
+| Review Best Workflow with CRE | [Chainlink submission and simulation](PROJECT_SUBMISSION.md#chainlink) |
+| Understand the technical design | [ARCHITECTURE.md](ARCHITECTURE.md) |
+| Review the visual system | [DESIGN.md](DESIGN.md) |
+| Find setup, contracts, runbooks and retained evidence | [Documentation index](docs/DOCS_INDEX.md) |
 
-Historical planning snapshots under docs/planning/ and append-only lane evidence under docs/evidence/ remain intentionally unchanged.
+**Track judges:** all three partner write-ups are in `PROJECT_SUBMISSION.md`; there are no separate partner submission documents.
+
+<a id="judge-quick-start"></a>
+## TOKEN2049 judges — try Capsule
+
+You need a ChatGPT account/workspace that permits custom MCP connections, plus privately supplied Capsule evaluation access. The MCP consent passcode and the console access key are different credentials. Neither belongs in this repository or in a chat prompt.
+
+### 1. Connect the MCP
+
+In ChatGPT, add a custom MCP server using the [official connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt). Current interfaces use **Plugins → + → Add custom MCP server**; workspace permissions and older interfaces can differ.
+
+| Setting | Value |
+| --- | --- |
+| Name | `Capsule` |
+| Server URL | `https://token2049-origins.onrender.com/mcp` |
+| Transport | Streamable HTTP |
+| Authentication | OAuth |
+| Client ID / secret | Leave empty for dynamic registration |
+
+Complete Capsule's consent screen with the evaluation access supplied privately by the team. Enable Capsule in a new conversation. Capsule's own connection/authentication implementation is documented in [hosted MCP](docs/channels/hosted-mcp.md).
+
+### 2. Ask your assistant
+
+Start with a search, for example:
+
+> I forgot my travel adapter. Find me a universal travel adapter for around S$35.
+
+Choose an offer, review the exact total, select an available payment method and explicitly approve the quote before purchasing. Inventory, shipping and fees can change; the search price is not the final quote. This example does not promise same-day delivery.
+
+The inspected hosted MCP supports automatic **Cardano** funding. Solana has a separately verified supplied-payer path; it is not advertised here as a one-click hosted payment option. See the [Solana evaluation boundary](PROJECT_SUBMISSION.md#solana).
+
+### 3. Watch it happen
+
+Open the [Capsule console](https://token2049-origins.onrender.com/console/) and enter the separately supplied console access key. Use the same evaluation customer as your MCP session to see its purchases.
+
+The console is read-only: it shows progress, payment, merchant confirmation and receipts. Approvals remain in your assistant. The hosted service can take time to wake or complete a quote; pending means pending, not a failed or completed purchase.
+
+### Evaluation boundary
+
+Payments use public-testnet assets with no cash value; commerce executes against provider test environments. Shopify discoveries can come from real stores, but demo orders go to Capsule's test store, not the source merchant. Detailed boundaries and evidence are in [PROJECT_SUBMISSION.md](PROJECT_SUBMISSION.md#evidence).
+
+The URLs above are the repository's documented evaluation endpoints, not a new availability certification. Final judge access and the recorded evaluation path are still tracked in the [submission finalisation checklist](PROJECT_SUBMISSION.md#finalisation). Public visitors should use the documentation rather than attempt to obtain evaluation credentials.
+
+## Developers
+
+For configuration and self-hosted development, start with the [documentation index](docs/DOCS_INDEX.md), [environment reference](docs/ENVIRONMENT.md) and [runbook](docs/RUNBOOK.md). Judge evaluation does not require cloning the repository, running a database or providing wallet keys.
