@@ -37,7 +37,7 @@
 - Registered scopes exactly purchases:read, evidence:read, operator:read; existing rows upgraded preserving owner and revocation.
 - Browser keeps bearer only in memory; sign-in input is already password type.
 - Password copy implemented and production console build passes.
-- Dedicated password generated in operator-only DPAPI storage outside Git; plaintext never committed; prepared credential will be handed to founder once in private chat, explicitly marked inactive. No Render hash changed yet. Live acceptance waits for deployment handover.
+- Dedicated password generated in operator-only DPAPI storage outside Git; plaintext never committed or disclosed. Automatic approval review rejected decrypt/print into tool transcript before deployment; password remains sealed. Private handoff approval question is pending. No Render hash changed yet. Live acceptance waits for deployment handover.
 
 ## Evidence convergence
 - Main has historical Atlas/Cardano and Nuitée/Solana combined PASS evidence.
@@ -55,7 +55,7 @@
 - Bounded scan: 382 current text files and 129 introduced doc/CRE/CDP history blobs; no secret or evidence-PII findings. Exact prepared password scan of tracked files and own introduced history PASS.
 - Earlier full-tip scan: 532 unique blobs; only documented local/sample DB credential URLs, no real secret findings.
 - Re-scan final runtime history and exact password before promotion.
-- Root/index/architecture/CRE/CDP navigation: initial 116 relative links, anchors and image paths PASS; final local check re-run after partial activation evidence retained. Original CDP proof bytes match SHA-256 0d138a9d8a6d6cc4aa6e23acf561ec61042be78725e37abb6fda07f0a294ba78.
+- Root/index/architecture/CRE/CDP navigation: final 117 relative links, anchors and image paths PASS after partial activation evidence retained. Original CDP proof bytes match SHA-256 0d138a9d8a6d6cc4aa6e23acf561ec61042be78725e37abb6fda07f0a294ba78.
 - Anonymous GitHub release branch renders README and evidence matrix; public Sign in control confirms no owner session. Logo loads (1024px intrinsic); architecture page headings render anonymously. Final default-branch recheck pending promotion.
 - Current public /health HTTP 200; fresh console tab woke free gateway and reached old Access key prompt. Final Password prompt and authenticated cold test pending.
 - Auth/evidence regressions: 51 tests PASS; console: 85 tests PASS; backend/console typechecks and production build PASS.
