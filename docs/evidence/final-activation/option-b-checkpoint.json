@@ -1,0 +1,280 @@
+{
+  "at": "2026-10-07T15:08:07.013Z",
+  "status": "PARTIAL_ATLAS_GATE_APPROVAL_REQUIRED",
+  "recordingCheckpointReached": false,
+  "runtimeSha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c",
+  "deployedSha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c",
+  "chainClassification": "unknown",
+  "migrationPolicy": "historical_unresolved_permanently_blocked",
+  "import": {
+    "identitiesBound": true,
+    "originalHashesVerified": true,
+    "originalCountsVerified": true,
+    "payer": {
+      "role": "payer",
+      "owner": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+      "entries": 7,
+      "historicalBlocked": 2,
+      "incomplete": 0,
+      "committedBaseUnits": "94220",
+      "committedFeeLamports": "0",
+      "imported": {
+        "sourceSha256": "19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664",
+        "entries": 7,
+        "committedBaseUnits": "94220",
+        "committedFeeLamports": "0",
+        "importedAt": "2026-10-07T14:56:01.756Z"
+      }
+    },
+    "sponsor": {
+      "role": "sponsor",
+      "owner": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+      "entries": 6,
+      "historicalBlocked": 0,
+      "incomplete": 0,
+      "committedBaseUnits": "0",
+      "committedFeeLamports": "25002",
+      "imported": {
+        "sourceSha256": "1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4",
+        "entries": 6,
+        "committedBaseUnits": "0",
+        "committedFeeLamports": "25002",
+        "importedAt": "2026-10-07T14:56:01.790Z"
+      }
+    },
+    "rerunVerifiedAfterDeploymentAndControlledRestart": true,
+    "conflictAndNonemptyDestinationRejection": "PASS in isolated PostgreSQL regression tests",
+    "exactSourceArchives": "Stored as immutable full original text; exact match checked at each startup"
+  },
+  "legacy": [
+    {
+      "role": "payer",
+      "owner": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+      "sourceSha256": "19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664",
+      "originalBytesUnchanged": true,
+      "retired": true,
+      "permanentLock": true
+    },
+    {
+      "role": "sponsor",
+      "owner": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+      "sourceSha256": "1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4",
+      "originalBytesUnchanged": true,
+      "retired": true,
+      "permanentLock": true
+    }
+  ],
+  "historicalCandidates": [
+    {
+      "purchaseId": "pur_01M48S9JMWEXMS34EEYCZ0YYKP",
+      "httpStatus": 403,
+      "code": "policy_violation",
+      "message": "Historical unresolved Solana purchase is permanently blocked",
+      "classification": "historical_unresolved",
+      "replayPolicy": "permanently_blocked",
+      "amountBaseUnits": "1050",
+      "exposureReleased": false
+    },
+    {
+      "purchaseId": "pur_01M48SB32BXEZGS9KPC74NNGM5",
+      "httpStatus": 403,
+      "code": "policy_violation",
+      "message": "Historical unresolved Solana purchase is permanently blocked",
+      "classification": "historical_unresolved",
+      "replayPolicy": "permanently_blocked",
+      "amountBaseUnits": "1050",
+      "exposureReleased": false
+    }
+  ],
+  "solana": {
+    "ok": true,
+    "source": {
+      "sourceId": "src_5f44db62376459a75a564e4d3bc8099a",
+      "displayAddress": "5iSWoZSucVSaNj…2X5MZ6",
+      "readiness": "configured",
+      "rail": "solana",
+      "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+      "publicAddress": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+      "assetId": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+    },
+    "ledger": {
+      "address": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+      "payer": {
+        "role": "payer",
+        "owner": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+        "entries": 7,
+        "historicalBlocked": 2,
+        "incomplete": 0,
+        "committedBaseUnits": "94220",
+        "committedFeeLamports": "0",
+        "imported": {
+          "sourceSha256": "19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664",
+          "entries": 7,
+          "committedBaseUnits": "94220",
+          "committedFeeLamports": "0",
+          "importedAt": "2026-10-07T14:56:01.756Z"
+        }
+      },
+      "sponsor": {
+        "role": "sponsor",
+        "owner": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+        "entries": 6,
+        "historicalBlocked": 0,
+        "incomplete": 0,
+        "committedBaseUnits": "0",
+        "committedFeeLamports": "25002",
+        "imported": {
+          "sourceSha256": "1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4",
+          "entries": 6,
+          "committedBaseUnits": "0",
+          "committedFeeLamports": "25002",
+          "importedAt": "2026-10-07T14:56:01.790Z"
+        }
+      },
+      "balances": {
+        "verified": true,
+        "at": "2026-10-07T15:05:54.033Z",
+        "commitment": "finalized",
+        "payerLamports": "10000000000",
+        "sponsorLamports": "4999974998",
+        "payerUsdcBaseUnits": "19907880",
+        "treasuryUsdcBaseUnits": "20092120",
+        "slots": {
+          "payer": 508494239,
+          "sponsor": 508494239,
+          "source": 508494239,
+          "treasury": 508494239
+        }
+      },
+      "cumulativeRemainingBaseUnits": "405780",
+      "sponsorFeeRemainingLamports": "74998",
+      "caps": {
+        "perPayment": "250000",
+        "cumulative": "500000",
+        "commercialUsdMinor": "25000",
+        "sponsorFee": "100000"
+      },
+      "headroomBaseUnits": "250000"
+    }
+  },
+  "cardano": {
+    "ok": true,
+    "source": {
+      "sourceId": "src_21f098873f368133fc671af8b3716703",
+      "displayAddress": "addr_test1qrwg…tthyxm",
+      "readiness": "configured",
+      "rail": "cardano",
+      "network": "cardano:preprod",
+      "publicAddress": "addr_test1qrwghp45ywnyn6vvm6utfk3xmjxap97mve5gql2cj2fq6wnqdqnepvemxymt7h4f4hteytznvy5n9kte95vtvufetnqqtthyxm",
+      "assetId": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d"
+    },
+    "ledger": {
+      "address": "addr_test1qrwghp45ywnyn6vvm6utfk3xmjxap97mve5gql2cj2fq6wnqdqnepvemxymt7h4f4hteytznvy5n9kte95vtvufetnqqtthyxm",
+      "network": "cardano:preprod",
+      "asset": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+      "entries": {
+        "total": 5,
+        "signing": 0,
+        "signed": 0,
+        "accepted": 5
+      },
+      "committedBaseUnits": "94820",
+      "dailyBaseUnits": "27990",
+      "caps": {
+        "perPayment": "5100000",
+        "cumulative": "5100000",
+        "daily": "5100000"
+      },
+      "headroomBaseUnits": "5005180",
+      "imported": {
+        "entries": 4,
+        "committedBaseUnits": "66830",
+        "sourceSha256": "0909a33e5de6296ebccb5df2a5f700c67e16a800cc3d195d8465fb25d46b9381",
+        "importedAt": "2026-10-06T21:46:34.957Z"
+      }
+    }
+  },
+  "recovery": {
+    "controlledRestartResponses": [
+      {
+        "role": "cardano",
+        "httpStatus": 200,
+        "sha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c"
+      },
+      {
+        "role": "solana",
+        "httpStatus": 200,
+        "sha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c"
+      }
+    ],
+    "cardanoImportedMarkerUnchanged": true,
+    "cardanoCapsUnchanged": true,
+    "cardanoHistoryUnchanged": true,
+    "bothConfiguredAfterRestart": true,
+    "publicMcpRecovered": true,
+    "idlePlatformColdStart": "NOT EXERCISED; controlled process restart accepted"
+  },
+  "dualRailMcp": {
+    "nuiteeQuoteId": "quo_01M4BECGQ6XDBJZ609Q6H3XHD8",
+    "bothOptionsVisible": true,
+    "bothSourcesConfigured": true,
+    "missingRailRefused": {
+      "status": "needs_input",
+      "phase": "funding_selection",
+      "hasPurchase": false
+    },
+    "invalidRailRefused": {
+      "isError": true,
+      "code": "invalid_request",
+      "hasPurchase": false
+    },
+    "noFallback": "PASS: public missing/invalid selection refusals and existing dual-rail tests"
+  },
+  "providers": {
+    "nuitee": {
+      "executableQuoteAccepted": true,
+      "bookingPerformed": false
+    },
+    "atlas": {
+      "searchAccepted": true,
+      "executableQuoteAccepted": false,
+      "gate": "false",
+      "blocker": "Automatic approval review requires explicit approval for ATLAS_ALLOW_TEST_BALANCE_PAYMENT=true; pending user question"
+    }
+  },
+  "checks": {
+    "typecheck": "PASS",
+    "build": "PASS",
+    "optionBAndPaymentRegressions": {
+      "files": 6,
+      "tests": 33,
+      "result": "PASS"
+    },
+    "additionalSolanaAndProviderRegressions": {
+      "files": 6,
+      "tests": 103,
+      "result": "PASS"
+    },
+    "balanceAndHostedService": {
+      "files": 2,
+      "tests": 5,
+      "result": "PASS"
+    },
+    "dualRailProviderReadiness": {
+      "files": 4,
+      "tests": 179,
+      "result": "PASS"
+    },
+    "diffCheck": "PASS",
+    "fullBackendSuite": "NOT RUN; focused affected-flow checks completed"
+  },
+  "noNewWallet": true,
+  "noSigning": true,
+  "noSubmission": true,
+  "noProviderOrder": true,
+  "noBooking": true,
+  "activeSolanaIncomplete": 0,
+  "activeCardanoSigning": 0,
+  "activeCardanoSigned": 0,
+  "nextSafeAction": "Approve the exact guarded Atlas sandbox gateway setting; deploy config, verify executable Atlas quote without order/payment, then stop at recording approval. Continue in the same chat."
+}
