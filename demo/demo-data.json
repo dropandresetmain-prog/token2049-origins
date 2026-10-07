@@ -8,21 +8,21 @@
   },
   "traveller": { "firstName": "Test", "lastName": "Traveller", "email": "test.traveller@example.com", "phone": "+6500000000" },
   "customerProfile": {
-    "note": "DEMO configuration: saved Capsule demo customer used to pre-fill fulfillment in the hosted MCP. Placeholder values only (example.com email, placeholder phone and passport); no claim about any real person. No secrets.",
+    "note": "DEMO configuration: saved Capsule demo customer used to pre-fill fulfillment in the hosted MCP. Realistic Singapore-format values (example.com email); no claim about any real person's identity, contact details or passport. No secrets.",
     "retail": {
       "category": "retail", "email": "min.htet.hset@example.com",
-      "shippingAddress": { "firstName": "Min Htet", "lastName": "Hset", "address1": "10 Bayfront Avenue", "address2": "Marina Bay Sands", "city": "Singapore", "zip": "018956", "countryCode": "SG", "phone": "+6500000000" }
+      "shippingAddress": { "firstName": "Min Htet", "lastName": "Hset", "address1": "10 Bayfront Avenue", "address2": "Marina Bay Sands", "city": "Singapore", "zip": "018956", "countryCode": "SG", "phone": "+6591234567" }
     },
     "hotel": {
       "category": "hotel",
-      "holder": { "firstName": "Min Htet", "lastName": "Hset", "email": "min.htet.hset@example.com", "phone": "+6500000000" },
+      "holder": { "firstName": "Min Htet", "lastName": "Hset", "email": "min.htet.hset@example.com", "phone": "+6591234567" },
       "guests": [{ "occupancyNumber": 1, "firstName": "Min Htet", "lastName": "Hset", "email": "min.htet.hset@example.com" }]
     },
     "flight": {
       "category": "flight",
-      "contact": { "givenName": "Min Htet", "familyName": "Hset", "email": "min.htet.hset@example.com", "mobile": "0065-00000000" },
+      "contact": { "givenName": "Min Htet", "familyName": "Hset", "email": "min.htet.hset@example.com", "mobile": "0065-91234567" },
       "passengers": [{ "givenName": "Min Htet", "familyName": "Hset", "gender": "M", "birthday": "1993-01-01", "nationality": "SG", "passengerType": "adult",
-        "document": { "type": "passport", "number": "DEMO123456", "expiry": "2031-12-31", "issuingCountry": "SG" } }]
+        "document": { "type": "passport", "number": "K1234567D", "expiry": "2031-12-31", "issuingCountry": "SG" } }]
     }
   },
   "retail": { "id": "shopify-retail", "label": "Shopify development-store test order", "query": "agent commerce test tee", "productHandle": "agent-commerce-test-tee", "productRef": "gid://shopify/ProductVariant/50670884094009", "quantity": 1, "shipToCountry": "US", "maxCommercialMinor": "50000", "scalingExampleMinor": "18340" },

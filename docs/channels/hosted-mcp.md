@@ -128,7 +128,7 @@ ChatGPT → Settings → Connectors → Advanced → enable **Developer mode** �
 
 ## Saved demo customer profile (customer-facing language)
 
-**DEMO configuration**, `demo/demo-data.json` → `customerProfile` (schema in `src/demo/config.ts`, merge in `src/demo/profile.ts`). Placeholder values only (example.com email, placeholder phone and passport number, no secrets); they make no claim about any real person.
+**DEMO configuration**, `demo/demo-data.json` → `customerProfile` (schema in `src/demo/config.ts`, merge in `src/demo/profile.ts`). Realistic Singapore-format values (example.com email, no secrets); they make no claim about any real person's identity, contact details or passport.
 
 - The hosted `/mcp` endpoint merges the profile into `create_quote` fulfillment **before** canonical validation (`MCP_DEMO_PROFILE=off` disables it; stdio/local MCP uses it only when a profile is passed explicitly). Retail → shipping + email; hotel → holder + first guest; flight → contact + passenger (+ demo passport). Core, HTTP and the provider contracts are unchanged.
 - An explicit user value is never overwritten. A user-named different person does not inherit the saved customer's DOB, gender, nationality or passport; overriding any delivery-location field means the rest of the location is asked for. Anything a provider still reports as required comes back as `needs_input` for that field only.

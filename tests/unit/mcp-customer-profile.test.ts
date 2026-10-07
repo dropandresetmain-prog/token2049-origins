@@ -16,7 +16,7 @@ const intents = {
   hotel: { category: 'hotel', destination: { cityName: 'Singapore', countryCode: 'SG' }, checkin: '2026-12-01', checkout: '2026-12-03', occupancies: [{ adults: 1 }], guestNationality: 'SG', spendCeiling: usd('200000') },
   flight: { category: 'flight', from: 'MNL', to: 'CEB', departDate: '2026-12-01', adults: 1, spendCeiling: usd('100000') },
 } as const;
-const PII = ['DEMO123456', '1993-01-01', '6500000000', '65-00000000', 'min.htet.hset', 'Bayfront', '018956', 'Hset'];
+const PII = ['K1234567D', '1993-01-01', '91234567', 'min.htet.hset', 'Bayfront', '018956', 'Hset'];
 
 interface Result { isError?: boolean; structuredContent?: any; content: Array<{ text: string }> }
 const text = (r: Result) => r.content.map(c => c.text).join('\n');
@@ -69,11 +69,11 @@ describe('hosted MCP saved customer profile', () => {
   });
 
   it('explicit user values override the saved profile and are sent to the gateway', async () => {
-    const { m, quoted } = await quoteFor('retail', { category: 'retail', email: 'ada@example.com', shippingAddress: { phone: '+6591234567' } });
+    const { m, quoted } = await quoteFor('retail', { category: 'retail', email: 'ada@example.com', shippingAddress: { phone: '+6598765432' } });
     expect(quoted.isError).toBeFalsy();
     const f = sent.find(s => s.path === '/v1/quotes')!.body.fulfillment;
     expect(f.email).toBe('ada@example.com');
-    expect(f.shippingAddress).toEqual({ ...profile.retail.shippingAddress, phone: '+6591234567' });
+    expect(f.shippingAddress).toEqual({ ...profile.retail.shippingAddress, phone: '+6598765432' });
     await m.close();
   });
 

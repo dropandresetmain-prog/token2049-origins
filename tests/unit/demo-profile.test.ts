@@ -20,9 +20,9 @@ describe('saved demo customer profile', () => {
   it('is DEMO data in the canonical shapes', () => {
     expect(profile.note).toMatch(/^DEMO configuration/);
     for (const f of [profile.retail, profile.hotel, profile.flight]) expect(Fulfillment.safeParse(f).success).toBe(true);
-    expect(profile.retail.shippingAddress).toMatchObject({ firstName: 'Min Htet', lastName: 'Hset', address1: '10 Bayfront Avenue', address2: 'Marina Bay Sands', city: 'Singapore', zip: '018956', countryCode: 'SG', phone: '+6500000000' });
-    expect(profile.flight.passengers[0]).toMatchObject({ givenName: 'Min Htet', familyName: 'Hset', gender: 'M', birthday: '1993-01-01', nationality: 'SG', passengerType: 'adult', document: { type: 'passport', number: 'DEMO123456', expiry: '2031-12-31', issuingCountry: 'SG' } });
-    expect(profile.flight.contact.mobile).toBe('0065-00000000');
+    expect(profile.retail.shippingAddress).toMatchObject({ firstName: 'Min Htet', lastName: 'Hset', address1: '10 Bayfront Avenue', address2: 'Marina Bay Sands', city: 'Singapore', zip: '018956', countryCode: 'SG', phone: '+6591234567' });
+    expect(profile.flight.passengers[0]).toMatchObject({ givenName: 'Min Htet', familyName: 'Hset', gender: 'M', birthday: '1993-01-01', nationality: 'SG', passengerType: 'adult', document: { type: 'passport', number: 'K1234567D', expiry: '2031-12-31', issuingCountry: 'SG' } });
+    expect(profile.flight.contact.mobile).toBe('0065-91234567');
     expect(profile.hotel.guests[0]).toMatchObject({ occupancyNumber: 1, email: 'min.htet.hset@example.com' });
   });
 
@@ -37,12 +37,12 @@ describe('saved demo customer profile', () => {
   });
 
   it('never overwrites an explicit user value', () => {
-    const r = ready({ category: 'retail', email: 'ada@example.com', shippingAddress: { phone: '+6591234567' } }) as typeof profile.retail;
+    const r = ready({ category: 'retail', email: 'ada@example.com', shippingAddress: { phone: '+6598765432' } }) as typeof profile.retail;
     expect(r.email).toBe('ada@example.com');
-    expect(r.shippingAddress.phone).toBe('+6591234567');
+    expect(r.shippingAddress.phone).toBe('+6598765432');
     expect(r.shippingAddress.address1).toBe('10 Bayfront Avenue');
-    const h = ready({ category: 'hotel', holder: { phone: '+6591234567' } }) as typeof profile.hotel;
-    expect(h.holder).toMatchObject({ phone: '+6591234567', firstName: 'Min Htet' });
+    const h = ready({ category: 'hotel', holder: { phone: '+6598765432' } }) as typeof profile.hotel;
+    expect(h.holder).toMatchObject({ phone: '+6598765432', firstName: 'Min Htet' });
     const f = ready({ category: 'flight', passengers: [{ birthday: '1990-05-05' }] }) as typeof profile.flight;
     expect(f.passengers[0]).toMatchObject({ birthday: '1990-05-05', givenName: 'Min Htet', document: profile.flight.passengers[0]!.document });
   });
@@ -62,7 +62,7 @@ describe('saved demo customer profile', () => {
   it('describes delivery without street, postcode, phone or email', () => {
     const label = deliveryLabel(profile.retail)!;
     expect(label).toBe('Delivering to Marina Bay Sands, Singapore');
-    expect(label).not.toMatch(/Bayfront|018956|6500000000|example\.com/);
+    expect(label).not.toMatch(/Bayfront|018956|6591234567|example\.com/);
     expect(deliveryLabel(profile.hotel)).toBeNull();
   });
 

@@ -111,7 +111,7 @@ describe('Shopify exact quote boundary', () => {
     await passes({ ...demo, shippingAddress: { ...demo.shippingAddress, phone: undefined } });
     // Anyone else, another phone, or a non-example.com email is refused before any cart work.
     expect(await code({ ...demo, shippingAddress: { ...demo.shippingAddress, firstName: 'Ada' } })).toBe('shopify_test_buyer_required');
-    expect(await code({ ...demo, shippingAddress: { ...demo.shippingAddress, phone: '+6591234567' } })).toBe('shopify_test_buyer_required');
+    expect(await code({ ...demo, shippingAddress: { ...demo.shippingAddress, phone: '+6598765432' } })).toBe('shopify_test_buyer_required');
     expect(await code({ ...demo, email: 'min@gmail.com' })).toBe('shopify_test_buyer_required');
     expect(await code({ ...f, shippingAddress: { ...f.shippingAddress, phone: '+6500000000' } })).toBe('shopify_test_buyer_required');
   });
