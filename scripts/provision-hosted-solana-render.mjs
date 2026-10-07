@@ -5,6 +5,7 @@ import { pathToFileURL } from 'node:url';
 import { createHash } from 'node:crypto';
 import path from 'node:path';
 import { resolveRenderKey, configureRenderAccess, discoverWeb, lookupPayer, applyPayer, getEnvVars, putEnvVars, putSecretFiles, hostedSecret, track } from './provision-hosted-mcp-render.mjs';
+import { HistoricalBlockPolicy, blockedHistoryEvidence } from '../clients/solana/blocked-history.js';
 import { loadSolanaPayerConfig } from '../clients/solana/config.js';
 import { loadSigner, assertPrivateKeyFile } from '../clients/solana/signer.js';
 import { SolanaLedger } from '../clients/solana/ledger.js';
@@ -38,7 +39,7 @@ async function main() {
   const args = process.argv.slice(2);
   const apply = args.includes('--apply');
   const value = flag => { const index = args.indexOf(flag); return index >= 0 ? args[index + 1] : undefined; };
-  const allowed = new Set(['--apply', '--dry-run', '--policy-file', '--payer-ledger', '--sponsor-ledger', '--branch', '--secrets-dir', '--owner-id']);
+  const allowed = new Set(['--apply', '--dry-run', '--policy-file', '--payer-ledger', '--sponsor-ledger', '--branch', '--secrets-dir', '--owner-id', '--historical-block-policy']);
   for (let i = 0; i < args.length; i++) {
     if (!allowed.has(args[i])) throw new Error('unknown provisioning argument');
     if (!['--apply', '--dry-run'].includes(args[i])) { if (!args[i + 1] || args[i + 1].startsWith('--')) throw new Error('provisioning argument requires a value'); i++; }
@@ -64,6 +65,8 @@ async function main() {
     return { ...input, text, expectedSha256: solanaSourceHash(text) };
   });
   const rows = inputs.map(parseSolanaImport);
+  const blockPolicy = value('--historical-block-policy') ? HistoricalBlockPolicy.parse(JSON.parse(readFileSync(value('--historical-block-policy'), 'utf8'))) : undefined;
+  const blocked = blockPolicy ? blockedHistoryEvidence(blockPolicy, inputs, rows) : [];
   const committed = rows[0].reduce((n, e) => n + BigInt(e.amount), 0n);
   const fees = rows[1].reduce((n, e) => n + BigInt(e.fee), 0n);
   const incomplete = rows.flat().filter(e => !e.id.startsWith('history:') && (!e.signature || !e.header)).length;
@@ -73,7 +76,7 @@ async function main() {
     caps: { perPayment: cfg.maxPerPayment.toString(), cumulative: cfg.maxTotal.toString(), sponsorFee: cfg.maxFees.toString() },
     remainingBaseUnits: (cfg.maxTotal - committed).toString(), legacyRetired: inputs.every(input => existsSync(input.path + '.retired')) }));
   if (committed >= cfg.maxTotal || fees + 10001n > cfg.maxFees) throw new Error('existing Solana history exhausts the policy');
-  if (apply && incomplete) throw new Error('unresolved legacy reservations require reconciliation before migration');
+  if (apply && incomplete !== blocked.length) throw new Error('unresolved legacy reservations require reconciliation before migration');
   configureRenderAccess({ key: resolveRenderKey(), dryRun: !apply, base: process.env.RENDER_API_BASE });
   const opts = { webName: 'token2049-origins', payerName: 't2o-solana-payer', ownerId: value('--owner-id') || '', branch: value('--branch') || 'feat/hosted-commerce-completion', dockerfile: './Dockerfile.solana' };
   const web = await discoverWeb(opts);
@@ -92,11 +95,13 @@ async function main() {
   const service = await applyPayer(opts, web, existing, !apply);
   const url = service?.url || 'https://t2o-solana-payer.onrender.com';
   const plan = solanaProvisionPlan(env, inputs, { ...web, databaseUrl: track(webEnv.get('DATABASE_URL')) }, url, tokens);
+  if (blockPolicy) plan.payer.set('SOLANA_HISTORICAL_BLOCK_POLICY_FILE', '/etc/secrets/solana-historical-block-policy');
   const payerFiles = new Map([
     ['solana-payer-key', track(readFileSync(cfg.keyFile, 'utf8'))], ['solana-sponsor-key', track(readFileSync(cfg.sponsorKeyFile, 'utf8'))],
     ['solana-legacy-payer', inputs[0].text], ['solana-legacy-sponsor', inputs[1].text],
     ['solana-payer-bridge-token', tokens.bridge], ['solana-payer-gateway-token', tokens.gateway],
   ]);
+  if (blockPolicy) payerFiles.set('solana-historical-block-policy', JSON.stringify(blockPolicy));
   await putEnvVars('solana payer', service?.id || '(new)', existing ? await getEnvVars(existing.id) : new Map(), plan.payer, !apply);
   await putSecretFiles('solana payer', service?.id || '(new)', payerFiles, !apply);
   await putEnvVars('gateway', web.id, webEnv, plan.gateway, !apply);

@@ -18,10 +18,12 @@ export async function createHostedSponsor(cfg: SolanaPayerConfig, ledger: Solana
   const scheme = new ExactSvmScheme(signer, undefined, { maxComputeUnits: 20000, maxPriorityFeeMicroLamports: 1, maxRequiredSignatures: 2 });
   return {
     prepare: async (payload: PaymentPayload): Promise<{ header: string; signature: string }> => ledger.exclusive(async () => {
+      await ledger.assertAllowed?.(String((payload.accepted.extra?.funding as { purchaseId?: unknown } | undefined)?.purchaseId ?? ''));
       validatePayment(payload, payload.accepted, cfg);
       const raw = (payload.payload as { transaction: string }).transaction;
       const transfer = decodeTransaction(raw, false);
       const id = createHash('sha256').update(transfer.message).digest('hex');
+      await ledger.assertAllowed?.(id, createHash('sha256').update(raw).digest('hex'));
       const existing = (await ledger.read()).find(e => e.id === id);
       if (existing?.header && existing.signature) return { header: existing.header, signature: existing.signature };
       if (existing) throw new Error('incomplete sponsor reservation requires reconciliation');
@@ -46,6 +48,7 @@ export async function createHostedSponsor(cfg: SolanaPayerConfig, ledger: Solana
     broadcast: async (payload: PaymentPayload): Promise<void> => ledger.exclusive(async () => {
       const raw = (payload.payload as { transaction: string }).transaction;
       const transfer = decodeTransaction(raw);
+      await ledger.assertAllowed?.(String((payload.accepted.extra?.funding as { purchaseId?: unknown } | undefined)?.purchaseId ?? ''), createHash('sha256').update(transfer.message).digest('hex'), createHash('sha256').update(raw).digest('hex'), transfer.signature ?? '');
       const entry = (await ledger.read()).find(e => e.signature === transfer.signature);
       if (!entry?.header || encodePaymentSignatureHeader(payload) !== entry.header) throw new Error('Solana broadcast candidate not durably bound');
       await rpc.assertNetwork();

@@ -1,0 +1,10 @@
+{
+  "version": 1,
+  "mode": "historical_unresolved_permanently_blocked",
+  "payerSourceSha256": "19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664",
+  "sponsorSourceSha256": "1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4",
+  "purchaseIds": [
+    "pur_01M48S9JMWEXMS34EEYCZ0YYKP",
+    "pur_01M48SB32BXEZGS9KPC74NNGM5"
+  ]
+}

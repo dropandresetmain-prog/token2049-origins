@@ -27,6 +27,7 @@ export interface SolanaBridgeDeps {
   /** Test seams; production uses the real payment implementation and offline readiness check. */
   pay?: typeof paySolanaPurchase;
   ready?: () => Promise<boolean>;
+  assertAllowed?: (purchaseId: string) => Promise<void>;
 }
 
 /** Offline only: the protected ledger must already exist and parse, and the key file must match the payer address. */
@@ -53,6 +54,7 @@ export class SolanaBridgePayer {
 
   async pay(purchaseId: string): Promise<{ transferReference: string | null; resumed: boolean }> {
     if (!/^pur_[A-Za-z0-9]{10,40}$/.test(purchaseId)) throw new PayerError('invalid_request', 'purchaseId is not a valid purchase id');
+    try { await this.d.assertAllowed?.(purchaseId); } catch { throw new PayerError('policy_violation', 'Historical unresolved Solana purchase is permanently blocked'); }
     if ((await this.source()).readiness !== 'configured') throw new PayerError('internal', 'Solana payer is not ready');
     let r: { status: number; signature: string };
     try {

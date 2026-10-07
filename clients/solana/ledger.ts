@@ -8,7 +8,7 @@ import type { SolanaRpc } from '../../src/funding/solana/rpc.js';
 export const SolanaEntry = z.object({ id: z.string().min(1), signature: z.string().nullable(), amount: z.string().regex(/^[0-9]+$/), fee: z.string().regex(/^[0-9]+$/), header: z.string().nullable(), createdAt: z.string() }).strict();
 export const SolanaSnapshot = z.object({ version: z.literal(1), owner: z.string(), network: z.literal(NETWORK), mint: z.literal(TEST_MINT), entries: z.array(SolanaEntry) }).strict();
 const Entry = SolanaEntry, Ledger = SolanaSnapshot;
-export type SolanaLedgerEntry = z.infer<typeof Entry>;
+export type SolanaLedgerEntry = z.infer<typeof Entry> & { historicalBlocked?: boolean };
 /** Persist directory entries as well as file contents on the Linux hosted disk. */
 export function syncDirectory(path: string): void {
   if (process.platform === 'win32') return; // Windows cannot open directory handles through this API.

@@ -10,6 +10,7 @@ import { loadSolanaPayerConfig, type SolanaPayerConfig } from './config.js';
 import { SolanaBridgePayer } from './bridge.js';
 import { PgSolanaLedger } from './pg-ledger.js';
 import { importSolanaHistories, verifySolanaImport } from './ledger-import.js';
+import { HistoricalBlockPolicy } from './blocked-history.js';
 import { createHostedSponsor } from './hosted-sponsor.js';
 import { paySolanaPurchase } from './pay.js';
 import { loadSigner } from './signer.js';
@@ -38,7 +39,7 @@ export async function solanaHostedSummary(cfg: SolanaPayerConfig, payer: PgSolan
     headroomBaseUnits: (headroom > 0n && feeRemaining >= 10001n ? headroom : 0n).toString() };
 }
 
-/** An imported unresolved reservation remains a liability and never advertises a connected signer. */
+/** Permanently blocked history remains committed; only active incomplete attempts prevent new readiness. */
 export async function hostedSolanaReady(cfg: SolanaPayerConfig, payer: PgSolanaLedger, sponsor: PgSolanaLedger, rpc = new SolanaRpc(cfg.rpcUrl)): Promise<boolean> {
   try {
     const [p, s] = await Promise.all([payer.summary(), sponsor.summary()]);
@@ -68,12 +69,12 @@ export async function startHostedSolana(env: NodeJS.ProcessEnv, opts: { db?: Db;
       await importSolanaHistories(db, [
         { role: 'payer', owner: cfg.payer, text: readFileSync(env.SOLANA_LEGACY_PAYER_LEDGER_FILE ?? '', 'utf8'), expectedSha256: env.SOLANA_LEGACY_PAYER_LEDGER_SHA256 ?? '' },
         { role: 'sponsor', owner: cfg.sponsor, text: readFileSync(env.SOLANA_LEGACY_SPONSOR_LEDGER_FILE ?? '', 'utf8'), expectedSha256: env.SOLANA_LEGACY_SPONSOR_LEDGER_SHA256 ?? '' },
-      ], (owner, entries) => verifySolanaImport(rpc, owner, entries));
+      ], (owner, entries) => verifySolanaImport(rpc, owner, entries), env.SOLANA_HISTORICAL_BLOCK_POLICY_FILE ? HistoricalBlockPolicy.parse(JSON.parse(readFileSync(env.SOLANA_HISTORICAL_BLOCK_POLICY_FILE, 'utf8'))) : undefined);
     }
     const payerLedger = await PgSolanaLedger.open(db, 'payer', cfg.payer);
     const sponsorLedger = await PgSolanaLedger.open(db, 'sponsor', cfg.sponsor);
     const sponsor = await createHostedSponsor(cfg, sponsorLedger, { rpc: opts.rpc });
-    const payer = new SolanaBridgePayer({ config: cfg, ready: () => hostedSolanaReady(cfg, payerLedger, sponsorLedger, opts.rpc),
+    const payer = new SolanaBridgePayer({ config: cfg, assertAllowed: id => payerLedger.assertAllowed(id), ready: () => hostedSolanaReady(cfg, payerLedger, sponsorLedger, opts.rpc),
       pay: (config, purchaseId) => paySolanaPurchase(config, purchaseId, { ledger: payerLedger, ...sponsor }) });
     server = createBridge({ payer, token, access: { mode: 'hosted', allowedHosts: hosts }, source: () => payer.source(), summary: () => solanaHostedSummary(cfg, payerLedger, sponsorLedger) });
     await listenHosted(server, opts.port ?? port);

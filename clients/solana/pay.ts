@@ -13,7 +13,8 @@ export interface SolanaPaymentDeps { ledger?: SolanaLedgerPort; prepare?: (paylo
 export async function paySolanaPurchase(cfg: SolanaPayerConfig, purchaseId: string, deps: SolanaPaymentDeps = {}): Promise<{status:number;signature:string;header:string}> {
   if (!/^pur_[A-Za-z0-9]{10,40}$/.test(purchaseId)) throw new Error('invalid purchase id');
   if (cfg.settlementMode === 'payer_broadcast' && (!deps.ledger || !deps.prepare || !deps.broadcast)) throw new Error('hosted Solana requires durable ledger and internal sponsor');
-  const rpc=new SolanaRpc(cfg.payerRpcUrl), ledger=deps.ledger ?? new SolanaLedger(cfg.payerLedger,cfg.payer);
+  const rpc=new SolanaRpc(cfg.payerRpcUrl), ledger: SolanaLedgerPort=deps.ledger ?? new SolanaLedger(cfg.payerLedger,cfg.payer);
+  await ledger.assertAllowed?.(purchaseId);
   const token=readFileSync(cfg.tokenFile,'utf8').trim(), resource=cfg.gatewayUrl+'/v1/purchases/'+purchaseId+'/fund';
   return ledger.exclusive(async()=>{
     let entry=(await ledger.read()).find(e=>e.id===purchaseId);
