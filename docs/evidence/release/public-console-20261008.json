@@ -1,0 +1,157 @@
+{
+  "checkedAt": "2026-10-07T16:03:01.713Z",
+  "candidateSha": "93841120401c215b9f68cd1f8f7436c2586ba7f7",
+  "url": "https://token2049-origins.onrender.com/console/",
+  "mode": "public read-only demo; no password",
+  "authorization": "Founder approved publishing synthetic/demo observations and removing website password",
+  "mcpAccess": "OAuth still required; judges ask Min Htet directly for the access code",
+  "result": "PASS",
+  "api": [
+    {
+      "path": "/v1/evidence/purchases",
+      "status": 200,
+      "receiptPresent": false
+    },
+    {
+      "path": "/v1/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "status": 200,
+      "receiptPresent": false
+    },
+    {
+      "path": "/v1/evidence/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "status": 200,
+      "receiptPresent": true
+    },
+    {
+      "path": "/v1/evidence/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5/proof",
+      "status": 200,
+      "receiptPresent": false
+    },
+    {
+      "path": "/v1/evidence/treasury",
+      "status": 200,
+      "receiptPresent": false
+    },
+    {
+      "path": "/v1/evidence/bank",
+      "status": 200,
+      "receiptPresent": false
+    },
+    {
+      "path": "/v1/capabilities",
+      "status": 200,
+      "receiptPresent": false
+    }
+  ],
+  "views": [
+    {
+      "view": "completed purchase",
+      "url": "https://token2049-origins.onrender.com/console/#/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "headings": [
+        "ORICO GaN 20W Universal Global Travel Adapter with 2 USB-C & 1 USB-A Ports",
+        "Order confirmed",
+        "How this purchase moves",
+        "Your assistant",
+        "ORICO",
+        "Purchase activity",
+        "Summary",
+        "Payment"
+      ],
+      "alerts": 0
+    },
+    {
+      "view": "proof",
+      "url": "https://token2049-origins.onrender.com/console/#/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "headings": [
+        "ORICO GaN 20W Universal Global Travel Adapter with 2 USB-C & 1 USB-A Ports",
+        "Order confirmed",
+        "How this purchase moves",
+        "Your assistant",
+        "ORICO",
+        "Purchase activity",
+        "Summary",
+        "Payment",
+        "Proof",
+        "Payment",
+        "Order",
+        "Spending allowance"
+      ],
+      "alerts": 0
+    },
+    {
+      "view": "receipt",
+      "url": "https://token2049-origins.onrender.com/console/#/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+      "headings": [
+        "ORICO GaN 20W Universal Global Travel Adapter with 2 USB-C & 1 USB-A Ports",
+        "Order confirmed",
+        "How this purchase moves",
+        "Your assistant",
+        "ORICO",
+        "Purchase activity",
+        "Summary",
+        "Payment",
+        "Receipt",
+        "Notes"
+      ],
+      "alerts": 0
+    },
+    {
+      "view": "purchases",
+      "url": "https://token2049-origins.onrender.com/console/#/purchases",
+      "headings": [
+        "Purchases"
+      ],
+      "alerts": 0
+    },
+    {
+      "view": "treasury",
+      "url": "https://token2049-origins.onrender.com/console/#/treasury",
+      "headings": [
+        "Treasury",
+        "Simulated purchasing capacity",
+        "Reservations",
+        "Simulated accounts",
+        "Observed test funds",
+        "Owed to customers",
+        "Observed accounts",
+        "Purchases by state",
+        "Ledger health"
+      ],
+      "alerts": 0
+    },
+    {
+      "view": "connections",
+      "url": "https://token2049-origins.onrender.com/console/#/connections",
+      "headings": [
+        "Connections",
+        "Payments in",
+        "Cardano",
+        "Solana",
+        "Masumi",
+        "Merchants",
+        "Shopify",
+        "Nuitée",
+        "Atlas",
+        "OCBC sandbox observations",
+        "OCBC"
+      ],
+      "alerts": 0
+    }
+  ],
+  "passwordPromptVisible": 0,
+  "allObservedApiCallsGet": true,
+  "noAuthorizationHeader": true,
+  "pageErrors": [],
+  "noNewPaymentOrOrder": true,
+  "tests": {
+    "backend": 1219,
+    "console": 88
+  },
+  "evidenceBoundaries": [
+    "Fixed hosted demo customer; foreign purchases return 404",
+    "Only specified GET console reads public",
+    "Payment, funding, quote, bank refresh, OAuth and payer authority remain authenticated",
+    "Treasury aggregates and masked sandbox bank observations visible",
+    "Historical completed purchase proof verified; no new transaction created"
+  ]
+}

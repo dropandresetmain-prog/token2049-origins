@@ -41,13 +41,16 @@
 - Backend 1219 tests/76 files PASS; console 88 tests/9 files PASS.
 - Backend and console typechecks PASS; console production build PASS.
 - Current public auth tests verify read allowlist, ownership, default-off, invalid bearer and mutation denial.
-- Full gateway build PASS; 117 important links PASS; 440 files/256 history blobs scanned, no findings.
-- Fresh anonymous deployed browser acceptance pending candidate deployment.
+- Full gateway build PASS; 117 important links PASS; 440 files/270 history blobs scanned, no findings.
+- Fresh anonymous deployed browser: Purchases/Proof/Receipt/Treasury/Connections PASS; no password/bearer; all GET.
+- Candidate gateway 93841120401c215b9f68cd1f8f7436c2586ba7f7 LIVE, dep-db36pfrbc2fs73cq43g0.
+- Acceptance: docs/evidence/release/public-console-20261008.json; no new payment/order.
 
 ## Deployment and freeze
 - GitHub PUBLIC/default main; current frozen services main/auto-deploy off.
 - Release is sole Render deployment owner; gateway adds only public read flag.
-- Final candidate/main/deployed SHA pending; exact SHA required on all three services.
+- Candidate code accepted; final promotion includes only acceptance JSON and checkpoint in addition to tested code.
+- Exact final main SHA is required on all three services; final deployment remains next.
 - Preserve previous tag; create token2049-submission-public-console only after verified final deployment.
 
 ## Next action
