@@ -2,7 +2,7 @@ import type { Db } from '../infrastructure/db.js';
 import type { Clock } from '../infrastructure/clock.js';
 import { iso } from '../infrastructure/clock.js';
 import { digestOf, newId } from '../infrastructure/ids.js';
-import { CoreError } from './errors.js';
+import { CoreError, ProviderError } from './errors.js';
 import { assessPurchaseIntent, assessFulfillment, providerRequirements } from '../contracts/input.js';
 import { CreatePurchaseRequest as PurchaseRequestSchema } from '../contracts/api.js';
 import type { ActorContext } from './actor.js';
@@ -243,7 +243,12 @@ export class CommerceCore {
     await this.assertRouteReady(ex);
 
     await this.assessProvider(ex, providerIntent, fulfillment);
-    const pq = await ex.quote({ offerId, executionRef: JSON.parse(offer.execution_ref_json), intent: providerIntent }, fulfillment);
+    const pq = await ex.quote({ offerId, executionRef: JSON.parse(offer.execution_ref_json), intent: providerIntent }, fulfillment).catch((error: unknown) => {
+      if (error instanceof ProviderError) throw new CoreError('provider_error', error.message, {
+        route: offer.route, providerCode: error.providerCode, outcome: error.outcome, retryable: error.retryable,
+      });
+      throw error;
+    });
 
     // Spend ceiling from intent applies to the exact payable principal.
     const fee = this.serviceFee(pq.merchantTotal);

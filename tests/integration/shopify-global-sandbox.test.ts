@@ -73,6 +73,15 @@ describe('Global discovery -> one shadow -> existing commerce core (all provider
     expect((await quote()).body.quote).toEqual(first); expect(latest).toHaveBeenCalledTimes(1);
     expect(admin.create).toHaveBeenCalledTimes(1);
   });
+  it('returns an actionable provider failure when the published shadow is unavailable in the shipping context', async () => {
+    sf.findVariants.mockResolvedValue([]);
+    const response = await quote();
+    expect(response.status).toBe(502);
+    expect(response.body.error).toMatchObject({ code: 'provider_error', message: expect.stringContaining('Operator must verify'),
+      details: { route: 'shopify', providerCode: 'shadow_not_visible', outcome: 'not_sent', retryable: false } });
+    expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM quotes'))?.n).toBe(0);
+    expect(h.retail.executeCalls).toBe(0);
+  });
   it('durably prepares once on repeated calls and checks publication plus Storefront before ready', async () => {
     const first = await preparer().prepare(offerId, selected, intent);
     expect(first.sandboxRepresentation.shadowVariantId).toBe('gid://shopify/ProductVariant/500');

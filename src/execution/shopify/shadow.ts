@@ -54,7 +54,7 @@ export class ShadowPreparer {
         const visible = await this.deps.storefront.findVariants({ productRef: variantId, includeSandboxShadows: true, country: retail.shipToCountry });
         if (visible.length !== 1 || visible[0]!.variantId !== variantId || visible[0]!.unitPrice.currency !== source.observedPrice.currency ||
             visible[0]!.unitPrice.amountMinor !== source.observedPrice.amountMinor || visible[0]!.unitPrice.scale !== source.observedPrice.scale)
-          throw new ProviderError('not_sent', 'shadow_not_visible', 'Published shadow is not sale-ready at the frozen source price in Storefront');
+          throw new ProviderError('not_sent', 'shadow_not_visible', `Sandbox product is unavailable for ${retail.shipToCountry} at its frozen USD price. Operator must verify market publication, inventory and shipping setup; nothing was purchased.`);
         const representation = SandboxRepresentation.parse({ provider: 'shopify', environment: 'test', boundary: SANDBOX_BOUNDARY,
           shadowProductId: product.id, shadowVariantId: variantId, publicationId: this.deps.admin.publicationId, sourceDigest: digest });
         await db.run(`UPDATE shopify_shadow_mappings SET state='ready',representation_json=$1,updated_at=$2 WHERE offer_id=$3 AND store_domain=$4 AND source_digest=$5`,
