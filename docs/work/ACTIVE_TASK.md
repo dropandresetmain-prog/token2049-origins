@@ -37,7 +37,7 @@
 - Registered scopes exactly purchases:read, evidence:read, operator:read; existing rows upgraded preserving owner and revocation.
 - Browser keeps bearer only in memory; sign-in input is already password type.
 - Password copy implemented and production console build passes.
-- Dedicated password generated in operator-only DPAPI storage outside Git; plaintext never committed or disclosed. Automatic approval review rejected decrypt/print into tool transcript before deployment; password remains sealed. Private handoff approval question is pending. No Render hash changed yet. Live acceptance waits for deployment handover.
+- Dedicated password generated in operator-only DPAPI storage outside Git; plaintext never committed or disclosed. Automatic approval review rejected decrypt/print into tool transcript before deployment; password remains sealed. Founder explicitly chose to keep it sealed until live access passes; do not disclose it before successful live verification. No Render hash changed yet. Live acceptance waits for deployment handover.
 
 ## Evidence convergence
 - Main has historical Atlas/Cardano and Nuitée/Solana combined PASS evidence.
