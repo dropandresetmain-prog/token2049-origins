@@ -226,5 +226,3 @@ describe('retiring legacy Solana files', () => {
     }
   });
 });
-
-

@@ -220,6 +220,3 @@ describe('hosted internal Solana sponsor', () => {
     expect(await f.ledger.read()).toContainEqual(expect.objectContaining({ signature: prepared.signature, header: prepared.header }));
   });
 });
-
-
-

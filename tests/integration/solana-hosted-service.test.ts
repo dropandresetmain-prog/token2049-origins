@@ -76,9 +76,10 @@ describe('hosted Solana public service', () => {
     writeFileSync(payerTokenFile, BRIDGE_TOKEN);
     writeFileSync(gatewayTokenFile, GATEWAY_TOKEN);
 
-    const [payerSigner, sponsorSigner, payeeSigner, payerSourceSigner, treasuryTokenSigner] = await Promise.all(
-      Array.from({ length: 5 }, () => generateKeyPairSigner()),
-    );
+    const [payerSigner, sponsorSigner, payeeSigner, payerSourceSigner, treasuryTokenSigner] = await Promise.all([
+      generateKeyPairSigner(), generateKeyPairSigner(), generateKeyPairSigner(),
+      generateKeyPairSigner(), generateKeyPairSigner(),
+    ]);
     const signCalls: string[] = [];
     const tracked = (signer: typeof payerSigner) => ({
       ...signer,
@@ -87,7 +88,7 @@ describe('hosted Solana public service', () => {
         return signer.signMessages(...args);
       },
     });
-    const signers = new Map([
+    const signers = new Map<string, ReturnType<typeof tracked>>([
       [payerSigner.address, tracked(payerSigner)],
       [sponsorSigner.address, tracked(sponsorSigner)],
     ]);
