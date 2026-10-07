@@ -85,3 +85,15 @@ Do not retry old unresolved Shopify purchase pur_01M48PSSTDQDR4VGPAQPC2VRYZ.
 ## Next action
 
 Start a fresh planning chat from main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540. Inspect repository/current docs and decide the shortest path through remaining P0 work. Do not auto-start implementation before the plan is approved.
+
+## Partner-lane integration ledger (branch integration/partner-lanes-final)
+Base 5343235ebe6c341abdda95450065950a3d1051b7. Lane merge-base was 0234d20 (ancestor of main); commits were cherry-picked, no stale history merged. Not merged to main, not deployed.
+
+| Lane | Status | Checkpoint | Conflicts | Focused tests |
+|---|---|---|---|---|
+| Chainlink CRE | PASS (code/sim evidence only) | df1a2c0 | none | bun 6/6, tsc clean |
+| Hosted Solana MCP | PARTIAL | 82df9a4 | package.json, hosted-mcp config/router/integration test, bridge.ts private-mode removed on main | 234 hosted/payer/integration tests |
+| Sokosumi | PARTIAL (no listing/job proof) | e6da869 | none | 45 Sokosumi/Masumi |
+| Coinbase CDP | PARTIAL (zero sandbox accounts) | 2319681 | package.json scripts only; lock unchanged | 10 CDP |
+
+Open decisions for Min Htet: Solana paid private service + persistent disk (or port Solana history to PostgreSQL); Sokosumi listing/live task evidence; CDP wallet/testnet proof.
