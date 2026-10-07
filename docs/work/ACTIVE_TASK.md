@@ -11,18 +11,19 @@
 - Full final report read: SAFE TO MERGE = NO; candidate not deployed.
 - Reconcile Solana candidates is active in the activation worktree, implementing approved Option B historical quarantine.
 - Do not integrate activation, deploy, modify protected Solana state, or retire any signer until that lane completes.
+- Latest activation progress: hosted import retains 7 payer / 6 sponsor rows; original IDs reject replay (403); active incomplete count zero. No final merge report yet.
 - Submission docs remote tip: 835de08; narrative rewrite complete with track/CDP/OCBC update.
-- Latest docs tracker requests founder review of track/treasury update; inspect approved scope before final convergence.
+- Remote docs incorporated for release review per founder request; its tracker is excluded. No independent narrative rewrite.
 
 ## GitHub / deployment
-- GitHub repository PUBLIC; default branch main verified with gh.
+- GitHub repository PUBLIC; default branch main verified with gh. Repository About now points to the live console and Capsule one-liner.
 - Initial worktrees and all local/remote branch heads inventoried.
 - Local main is behind origin/main; do not switch shared checkout.
-- Reported existing gateway deployed SHA: 974a39bfb59adb0a317d0db05a12268bbbb6242d; live API verification pending.
+- Initial gateway deployed SHA independently verified: 974a39bfb59adb0a317d0db05a12268bbbb6242d.
 - Live Render inventory: gateway branch main, SHA 974a39bfb59adb0a317d0db05a12268bbbb6242d, auto-deploy yes, free plan.
 - Cardano branch main, SHA d7ae869a358410e20b47e23901d6879fb8e348fc, auto-deploy no, free plan.
 - Activation remains the sole deployment owner while active; settings unchanged by release lane.
-- Database health: pending.
+- Initial hosted DB PASS: purchase list/detail/proof all HTTP 200; exact human-run transaction and receipt re-read. Treasury/bank HTTP 403 as expected before access fix deploy. Final candidate recheck required.
 - Final deployed SHA: NOT FROZEN.
 - Final submission SHA / tag: NOT CREATED.
 
@@ -40,21 +41,21 @@
 ## Evidence convergence
 - Main has historical Atlas/Cardano and Nuitée/Solana combined PASS evidence.
 - Human Cardano/Shopify report retained at docs/evidence/human-cardano-shopify-20261007.md.
-- Payment/order/receipt/proof and fresh MCP ORDER CONFIRMED verified by controller; budget/approval transcript acceptance remains partial.
+- Payment/order/receipt/proof and fresh MCP ORDER CONFIRMED verified by controller; budget/approval transcript acceptance remains partial. Release retained fresh curated GET proof JSON.
 - CRE source/evidence imported from feat/chainlink-cre bounded paths; six verifier tests and typecheck pass.
 - Remote submission documents imported from 835de08, excluding its ACTIVE_TASK tracker; factual/access/link reconciliation only.
-- CDP c74ff8b is work note only; original proof copied from independent CDP proof worktree, byte preservation to verify.
+- CDP c74ff8b is work note only; original proof copied from independent CDP proof worktree and byte preservation verified.
 - Added exact .gitignore exception for curated server-wallet-proof.json, avoiding prior broad wallet-name exclusion.
 - Preserve CLI provenance: CDP operational treasury, not runtime-adapter proof.
 - OCBC read-only observations, no customer settlement or automatic conversion/rebalancing.
-- Main README has stale deployment/MCP/UI/Shopify claims; use submission narrative, reconcile runtime facts.
+- Release README uses remote submission narrative with verified access/evidence corrections; stale main remains unchanged until promotion.
 
 ## Gates
 - Bounded scan: 377 current text files and 129 introduced doc/CRE/CDP history blobs; no secret or evidence-PII findings.
 - Earlier full-tip scan: 532 unique blobs; only documented local/sample DB credential URLs, no real secret findings.
 - Re-scan final runtime history and exact password before promotion.
 - Root/index/architecture/CRE/CDP navigation: 116 relative links, anchors and image paths PASS. Original CDP proof bytes match SHA-256 0d138a9d8a6d6cc4aa6e23acf561ec61042be78725e37abb6fda07f0a294ba78.
-- Anonymous GitHub repository HTTP 200 verified without Authorization; final default-branch rendering remains pending promotion.
+- Anonymous GitHub release branch renders README and evidence matrix; public Sign in control confirms no owner session. Logo loads (1024px intrinsic); architecture page headings render anonymously. Final default-branch recheck pending promotion.
 - Current public /health HTTP 200; fresh console tab woke free gateway and reached old Access key prompt. Final Password prompt and authenticated cold test pending.
 - Auth/evidence regressions: 51 tests PASS; console: 85 tests PASS; backend/console typechecks and production build PASS.
 - No real payment/order initiated by release lane.
@@ -65,4 +66,3 @@
 - Inspect auth middleware and focused tests; implement narrow read-only judge access.
 - Inspect submission docs and CRE/CDP evidence before importing approved paths.
 - Re-read this file before lane integration, promotion, deployment, or completion.
-

@@ -1,0 +1,84 @@
+{
+  "observedAtUtc": "2026-10-07T15:02:45.252Z",
+  "source": "Authenticated GET of existing stored Capsule proof; no new payment/order",
+  "sourceUrl": "https://token2049-origins.onrender.com/v1/evidence/purchases/pur_01M4B0089ZRHS1J0MGMHA8Z9D5/proof",
+  "recordedRunSha": "5343235ebe6c341abdda95450065950a3d1051b7",
+  "purchaseId": "pur_01M4B0089ZRHS1J0MGMHA8Z9D5",
+  "quoteId": "quo_01M4AZYSQQ6T6WX9PX6MPN6VZA",
+  "commercialAmount": {
+    "currency": "USD",
+    "amountMinor": "2799",
+    "scale": 2
+  },
+  "progress": {
+    "stage": "complete",
+    "label": "Order confirmed",
+    "message": "Order confirmed. Order reference: gid://shopify/Order/[REDACTED_NUMBER]. View the receipt for purchase details.",
+    "paymentConfirmed": true,
+    "merchantAction": "reported",
+    "outcomeFinal": true,
+    "nextAction": null
+  },
+  "funding": {
+    "confirmationStatus": "confirmed",
+    "applied": true,
+    "transfers": [
+      {
+        "reference": "d7f24c68b37613342390ff5e5a6b1510e9c22e375c9ed2723fcb5d50231c5a53",
+        "confirmationStatus": "confirmed",
+        "application": "applied",
+        "evidenceMode": "fresh_external",
+        "verifiedAt": "2026-10-07T10:55:21.484Z"
+      }
+    ]
+  },
+  "merchant": {
+    "provider": "shopify",
+    "environment": "test",
+    "result": "paid",
+    "paymentStatus": "simulated_paid",
+    "providerReference": "gid://shopify/Order/18934659776569",
+    "evidenceMode": "fresh_external"
+  },
+  "receipt": {
+    "receiptId": "rcp_01M4B05156B4F3PJFN861M9SN3",
+    "finalResult": "Order confirmed",
+    "issuedAt": "2026-10-07T10:57:06.177Z"
+  },
+  "timeline": [
+    {
+      "step": "requested",
+      "status": "complete",
+      "timestamp": "2026-10-07T10:51:53.869Z"
+    },
+    {
+      "step": "quote_confirmed",
+      "status": "complete",
+      "timestamp": "2026-10-07T10:53:41.475Z"
+    },
+    {
+      "step": "approved",
+      "status": "complete",
+      "timestamp": "2026-10-07T10:54:29.685Z"
+    },
+    {
+      "step": "funded",
+      "status": "complete",
+      "timestamp": "2026-10-07T10:55:21.484Z"
+    },
+    {
+      "step": "merchant_execution",
+      "status": "complete",
+      "timestamp": "2026-10-07T10:55:22.497Z"
+    },
+    {
+      "step": "result_verified",
+      "status": "complete",
+      "timestamp": "2026-10-07T10:57:06.177Z"
+    }
+  ],
+  "humanAcceptance": {
+    "status": "PARTIAL",
+    "reason": "Human approval transcript and authorization to raise requested budget from S$35 to S$40 were not captured by the controller."
+  }
+}

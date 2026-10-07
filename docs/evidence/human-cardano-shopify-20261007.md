@@ -27,3 +27,5 @@ Approval-to-receipt latency was 156.492 seconds. Sampled memory reached 508.19 M
 Source: the completed human-E2E controller report and its authenticated evidence/proof reconciliation. The private transcript, customer fulfillment data and raw local monitoring files are intentionally excluded. Cleanup performed no new payment or order.
 
 **Investigate Now:** verify the human approval transcript and budget-change authorization before claiming full user-journey acceptance. Deferring preserves a gap in authority evidence, despite the confirmed backend outcome.
+
+Cleanup independently re-read the completed purchase, receipt and confirmed transfer from the authenticated GET proof API. The curated [readback artifact](human-cardano-shopify-20261007.json) omits customer fulfillment and credentials.
