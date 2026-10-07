@@ -2,7 +2,7 @@
 
 Date: 7 October 2026, Singapore time. Branch: `codex/hosted-stall-recovery`.
 
-## Published and deployed state
+## Combined baseline before the Singapore repair
 
 - Recovery commit: `4c565a7`.
 - Original FX commit: `25c36ce`; integrated as `b86551e`. Conflicts in MCP instructions, offer descriptions and core search preserve both FX authority and recovery behavior.
@@ -65,11 +65,11 @@ Checks: all 1,101 backend tests across 58 files and all 84 console tests across 
 
 Deployment: the market configuration change applies live. Gateway code checkpoint `e8d19bcc9f9fa30f4c0b93eec351902444fcf1dd` was pushed on `codex/hosted-stall-recovery` and deployed as `dep-db2pojgm7kps73brm3fg`; Render reports `live` at that exact SHA. Payer code and authority are unaffected, so the payer remains `live` at `d7ae869a358410e20b47e23901d6879fb8e348fc`. Automatic deployment stays off on both services; service branches, payer policy, signer, ledger and secret files are unchanged.
 
-Hosted verification: pending final collection. The old local SG smoke fixture initially supplied `province: "Singapore"`, which correctly failed the synthetic province-code guard. Singapore requires no province, so acceptance omits it; no runtime guard was changed. A first configuration-only hosted attempt timed out at `fill_email`; this was not reproduced locally. Local diagnosis then reproduced and fixed the absent-city failure. Hosted verification calls only search/quote plus read-only payer readiness and OAuth checks; it contains no `/pay` or `buy` call.
+Hosted verification on `e8d19bc` failed as recorded below. The old local SG smoke fixture initially supplied `province: "Singapore"`, which correctly failed the synthetic province-code guard. Singapore requires no province, so acceptance omits it; no runtime guard was changed. A first configuration-only hosted attempt timed out at `fill_email`; this was not reproduced locally. Local diagnosis then reproduced and fixed the absent-city failure. Hosted verification calls only search/quote plus read-only payer readiness and OAuth checks; it contains no `/pay` or `buy` call.
 
-### Confirmed capacity blocker after the code deployment
+### Capacity blocker on e8d19bc, resolved by the free-plan fix below
 
-**Act Now:** the final hosted quote on `e8d19bc` did not complete. OAuth/MCP, payer readiness and the original SGD 3,500 search passed. Checkout advanced through email and country selection to `fill_name`, then the MCP collection request timed out. Render event `evt-db2pq7p7lnhs73ceog90` at `2026-10-07T01:15:11.178974Z` explicitly reports `server_failed`, reason `oomKilled`, memory limit `512Mi`, instance `srv-db2jgqnavr4c73e9blrg-mwz67`. The gateway restarted (`gateway listening` at 01:15:23 UTC). Memory samples rose from about 93 MB before checkout to 397 MB at 01:14:30 and 457 MB at 01:15:00, before the fatal peak. The current plan is `free`, one instance. This establishes an infrastructure failure, not another availability or FX failure.
+**Act Now at e8d19bc:** the final hosted quote on `e8d19bc` did not complete. OAuth/MCP, payer readiness and the original SGD 3,500 search passed. Checkout advanced through email and country selection to `fill_name`, then the MCP collection request timed out. Render event `evt-db2pq7p7lnhs73ceog90` at `2026-10-07T01:15:11.178974Z` explicitly reports `server_failed`, reason `oomKilled`, memory limit `512Mi`, instance `srv-db2jgqnavr4c73e9blrg-mwz67`. The gateway restarted (`gateway listening` at 01:15:23 UTC). Memory samples rose from about 93 MB before checkout to 397 MB at 01:14:30 and 457 MB at 01:15:00, before the fatal peak. The current plan is `free`, one instance. This establishes an infrastructure failure, not another availability or FX failure.
 
 The in-memory quote job was lost on restart; there is no final hosted quote or USD funding instruction to accept from this attempt. Do not report the local USD 24.00 quote as a hosted quote. No purchase, payment or order was submitted, and loss of a quote job never authorizes payment retries.
 
@@ -89,4 +89,42 @@ All browser sessions, including quotes and purchases, share one queue. Page, con
 
 Live retail quote retry already uses a PostgreSQL advisory lock and durable quote lookup before provider I/O. A new regression reconstructs the gateway over the same database and verifies unchanged digest, expiry and terms without calling the provider; changed fulfillment still fails. Payment retries continue to use durable claims, core checkpoints and payer ledger state. Browser execution still checks the actual frozen total and breakdown immediately before the single durable Pay checkpoint; changed terms stop before payment and require reauthorization. No payment recovery rule was changed.
 
-Checks: 1,114 backend tests across 59 files and 84 console tests across nine files passed; both typechecks, gateway build and whitespace checks passed. Coverage includes settled API success without a quote browser, fallback for every estimate flag, readback drift, delayed payment-section hydration, cleanup failures, serialization with and without low-memory flags, telemetry privacy/failure isolation, restart quote reuse and existing pre-pay/payment recovery boundaries. Docker runtime-user launch passed. Constrained live quote-only and hosted acceptance are still being collected before the next deployment checkpoint.
+Checks: 1,114 backend tests across 59 files and 84 console tests across nine files passed; both typechecks, gateway build and whitespace checks passed. Coverage includes settled API success without a quote browser, fallback for every estimate flag, readback drift, delayed payment-section hydration, cleanup failures, serialization with and without low-memory flags, telemetry privacy/failure isolation, restart quote reuse and existing pre-pay/payment recovery boundaries. Docker runtime-user launch passed. The final Docker image also built and passed its runtime-user smoke. A synthetic SG quote using the final driver passed under a hard 512 MiB Linux container limit and a 0.1 CPU cap, with a sampled working-set peak of 478,322,688 bytes; raw cgroup peak reached the limit while reclaimable cache was trimmed, without an OOM. This ARM64 local run is not a measurement of Render or a purchase acceptance.
+
+### Hosted acceptance on the free plan
+
+Gateway `d081b7ade87f75ce401bf48c0de5bf900039a24a` is live as `dep-db2q600m7kps73bt5pv0`. The payer remains live at `d7ae869a358410e20b47e23901d6879fb8e348fc`; signing history, ledger, policy, secrets and deployed payer image are unchanged. Gateway plan is still `free`, one instance, and automatic deployment is off on both services. No extra service was created.
+
+Hosted OAuth/MCP and read-only payer readiness passed, followed by the original SGD 3,500 search and a synthetic Singapore exact quote. First acceptance completed in 90 seconds, with one `quote_pending` collected using identical arguments. It used the browser fallback because the API costs were still estimates. At 2026-10-07T01:44:54.437Z, quote `quo_01M4A0HX5TSWD86K8JBPB9CKAZ` had:
+
+| Authority/evidence | Verified value |
+| --- | --- |
+| Country | SG |
+| Frozen source item | USD 16.00 |
+| Selected Standard shipping | USD 8.00 |
+| Observed settled tax | USD 0.00 |
+| Merchant total / fee / USD approval | USD 24.00 / USD 0.00 / USD 24.00 |
+| Original user budget | SGD 35.00 |
+| Frozen provider search bound | USD 27.37 |
+| Frozen FX | Frankfurter USD -> SGD 1.2787; reference 2026-10-07; fetched 01:43:23.636Z |
+| Reference payable, rounded up | SGD 30.69 |
+| Cardano Preprod instruction | 24,000 base units = 0.024000 tUSDM; USD 24.00 commercial total; policy 1:1000 |
+| Digest | `sha256:6a861844d7e3e6b426a368cf2b4eb0e78e1e6c7a2cbdcb957271eda4cf6e8bfe` |
+| Created / expires | 01:44:53.186Z / 01:54:53.185Z on 2026-10-07 |
+
+The harness compared the entire frozen search evidence, computed SGD rounding from that snapshot, compared source item to the exact breakdown, checked USD approval/fee arithmetic and Cardano notional, and collected the same quote again. Digest, FX, funding and expiry remained identical. No card was entered, `buy` or `/pay` called, order placed, transfer signed/sent, or payer ledger written. These quote IDs and expiry are historical verification evidence, not ongoing approval authority.
+
+Hosted cgroup counters were 167,731,200 bytes before launch, 250,392,576 after launch, 507,478,016 at quote completion and 246,161,408 after page/context/browser close. Render's 30-second independent memory samples reached 441,466,880 bytes for this run. Point-in-time counters and sampled metrics are not a proof of a subsecond peak. No new `server_failed` event occurred; the last OOM remains the original 01:15:11 UTC event. A second fresh quote on the warm process also passed all checks in 81 seconds at 01:47:29.288Z. Quote `quo_01M4A0PKNFP9WG18AQSEASZVFS`, digest `sha256:bee79d40704e9b67e0fa8ebfba5ca6e4852437e1af120770eed03f0328decb1b`, expires 01:57:27.790Z. Its amounts and funding policy match the first run; its independent search snapshot was fetched at 01:46:06.932Z and remained frozen on collection. Second-run cgroup counters were 246,804,480 before launch, 282,333,184 after launch, 515,342,336 at quote completion and 253,812,736 after close. Both runs retained the same gateway instance and had no new OOM/crash event. This is successful quote acceptance with limited memory headroom, not full-purchase memory acceptance.
+
+Additional files in the free-plan fix: `Dockerfile`; `src/execution/shopify/index.ts`, `storefront.ts`, `browserCheckout.ts` and `memoryTelemetry.ts`; `tests/unit/shopify.test.ts`, `shopify-browser.test.ts`, `shopify-browser-lowmem.test.ts` and `shopify-memory.test.ts`; `tests/integration/shopify-global-sandbox.test.ts`; this handoff. The prior SG repair's operator script and its tests are listed above. No dependency, schema, payer or production-Shopify configuration changed.
+### Remaining issues and next milestone
+
+- **Park for Later: purchase memory acceptance.** The two hosted quote completions reached about 484 and 491 MiB of cgroup memory against a 512 MiB limit. Browser close released about 249 MiB each time. Before a purchase milestone, measure the single purchase browser through a deliberate pre-pay stop and then perform only explicitly authorized acceptance. Deferring leaves a possible purchase OOM risk; an unknown outcome after Pay still requires durable reconciliation. No browser isolation or paid upgrade is recommended without evidence that the final purchase browser alone exceeds the gateway limit.
+- **Ignore / Accept Risk: SG API costs remain estimates.** Keep strict API settlement checks and the verified browser fallback. Revisit API coverage if Shopify supplies trustworthy final totals; do not manufacture tax or clear estimate flags. Deferring retains the browser's time and memory cost for this sandbox, so today's SG flow still uses a quote browser plus a purchase browser, sequentially.
+- **Park for Later: earlier email timeouts.** Neither accepted run reproduced them. Investigate if they recur; deferral can leave intermittent quote preparation failures, never authorization to retry payment.
+- **Ignore / Accept Risk: unfinished search/quote jobs are in process.** A restart can lose work before quote persistence. Retrying the selected live offer can recreate harmless cart state or fetch its existing durable quote; changed/expired authority still fails. Payment and purchase retries retain durable state and the payer's signing history. A durable job-system rewrite is outside this demo fix.
+
+No remaining Act Now blocker was observed in synthetic Singapore quoting. The gateway code checkpoint is `d081b7a`; its parent `e8d19bc` contains the SG market repair and absent-city regression. Reproduce with `npm.cmd test`, `npm.cmd run console:test`, both typecheck commands and `npm.cmd run build`; tests use isolated local PostgreSQL schemas and fixtures. Live harnesses and credential loading remain under ignored `.runtime/deploy-acceptance`; committed evidence here contains no credentials, buyer fields, cart keys or checkout URLs.
+
+Use a fresh chat for a distinct purchase milestone, using this handoff and the FX/recovery notes. The exact next task is a quote-only refresh plus purchase-browser memory measurement through a pre-pay stop, retaining existing approval, total, checkpoint and reconciliation rules. No `buy`, payment, Pay click or order is authorized by this completed investigation.
+
