@@ -19,6 +19,8 @@ declare module 'express-serve-static-core' {
 
 export interface HttpAppOptions {
   core: CommerceCore;
+  /** Explicitly publish only the hosted demo customer's console reads. All writes still require credentials. */
+  publicConsoleCustomerId?: string;
   /** Extra routers mounted after auth (e.g. evidence). */
   extraRouters?: Array<{ path: string; router: Router; auth: boolean; beforeJson?: boolean }>;
   log?: (line: Record<string, unknown>) => void;
@@ -59,11 +61,20 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
 
   const auth = async (req: Request, _res: Response, next: NextFunction) => {
     try {
-      req.actor = (await authenticate(core.deps.db, req.header('authorization'), req.requestId));
+      const path = req.originalUrl.split('?')[0]!;
+      const publicRead = req.method === 'GET' && (
+        ['/v1/evidence/purchases', '/v1/evidence/treasury', '/v1/evidence/bank'].includes(path) ||
+        /^\/v1\/purchases\/pur_[A-Za-z0-9]{10,40}$/.test(path) ||
+        /^\/v1\/evidence\/purchases\/pur_[A-Za-z0-9]{10,40}(?:\/proof)?$/.test(path));
+      // This opt-in publishes a fixed demo view, never general anonymous API access or caller-selected ownership.
+      req.actor = opts.publicConsoleCustomerId && !req.header('authorization') && publicRead
+        ? { customerId: opts.publicConsoleCustomerId, clientId: 'cli_PUBLICCONSOLE', channel: 'console',
+            scopes: new Set(['purchases:read', 'evidence:read', 'operator:read']), requestId: req.requestId }
+        : await authenticate(core.deps.db, req.header('authorization'), req.requestId);
       // The judge reader can inspect treasury data, but operator:read also guards a bank-refresh write.
       // Reject every non-GET request before routing so this credential cannot acquire mutation authority.
-      if (req.actor.clientId === 'cli_HOSTEDCONSOLE' && req.method !== 'GET') {
-        throw new CoreError('forbidden', 'judge console password permits GET requests only');
+      if (['cli_HOSTEDCONSOLE', 'cli_PUBLICCONSOLE'].includes(req.actor.clientId) && req.method !== 'GET') {
+        throw new CoreError('forbidden', 'judge console permits GET requests only');
       }
       next();
     } catch (e) {
@@ -151,7 +162,8 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
     '/v1/purchases/:id',
     auth,
     asyncH(async (req, res) => {
-      res.json({ purchase: (await core.getPurchase(req.actor!, String(req.params.id))) });
+      const body = { purchase: await core.getPurchase(req.actor!, String(req.params.id)) };
+      res.json(req.actor!.clientId === 'cli_PUBLICCONSOLE' ? redact(body) : body);
     }),
   );
 

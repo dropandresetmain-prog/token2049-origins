@@ -46,11 +46,11 @@ export function createGatewaySource(opts: GatewaySourceOptions): ConsoleSource {
   const doFetch: typeof fetch = opts.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
   // Quote scope is constant for this credential. Reconnecting creates a new source and retries.
   // A forbidden optional read must not be repeated on every purchase poll.
-  let quoteForbidden = false;
+  let quoteForbidden = !accessKey;
 
   async function request<S extends z.ZodType>(path: string, schema: S, init: { auth: boolean } = { auth: true }): Promise<{ data: z.output<S>; raw: unknown }> {
     const headers: Record<string, string> = { Accept: 'application/json' };
-    if (init.auth) headers.Authorization = `Bearer ${accessKey}`;
+    if (init.auth && accessKey) headers.Authorization = `Bearer ${accessKey}`;
 
     let response: Response;
     try {

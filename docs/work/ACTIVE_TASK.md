@@ -1,68 +1,58 @@
-# Judge-ready release checkpoint
+# Public judge console release checkpoint
 
 ## Authority and scope
-- Release branch: release/judge-ready; isolated checkout C:/Dev/t2o-wt-judge-release.
-- Shared checkout and activation worktree remain untouched by this lane.
-- Initial origin/main: 2833c79b0d423cf58fe28142d27bdc510a9bb0a0; recheck before promotion.
-- Sokosumi skipped by explicit founder decision; inherited archival code/evidence retained, no new work.
+- Branch: release/public-judge-console; isolated checkout C:/Dev/t2o-wt-judge-release.
+- Current origin/main and all three live services: 743e0475a3f02b8263aea4e4b73b1b6eae7531e1.
+- Existing tag token2049-submission resolves to that prior freeze; preserve it.
+- Founder reopened freeze to remove the website password and accepted public synthetic/demo observations.
+- Highlight in README: judges ask Min Htet directly for the MCP OAuth access code.
+- No private submission access field assumed. No credential is published or decrypted for this release.
+- Shared checkout and completed activation worktree remain untouched.
 
-## Completed lane convergence
-- Activation source: a02216ccb69e78e6800a45c81cd349021fd834ef (remote, COMPLETE_PROOF_ACCEPTED).
-- Tested activation runtime: afa59b1459aec6fad545ab5eeec1b2b37a15445c.
-- Latest Atlas approval and closure read from Reconcile Solana candidates; lane idle/completed.
-- Approved ATLAS_ALLOW_TEST_BALANCE_PAYMENT=true deployed; Atlas and Nuitee executable dual-rail quotes PASS.
-- Founder cancelled extra Solana/Nuitee recording/live E2E; submitted slides/videos and retained proof accepted.
-- Original SAFE TO MERGE=NO partial state superseded by completed Option B and founder closure.
-- Release review: SAFE TO MERGE=YES for completed candidate after preserved replay guards and 1216 backend tests PASS.
-- Complete activation merged, no partial cherry-pick; judge GET-only restriction preserved.
-- Submission docs source: 835de08c709f5802d63ab21d4e62575f47baa406; approved narrative imported, its tracker excluded.
-- CRE implementation/evidence and original CDP proof included; CDP proof byte preservation verified.
+## Lane convergence
+- Final Activation completed and included: a02216ccb69e78e6800a45c81cd349021fd834ef.
+- Atlas test-balance setting approved in the other chat and deployed; retain it.
+- Hosted Atlas/Nuitee executable dual-rail quotes PASS; historical actual E2Es retained.
+- Extra Solana/Nuitee recording cancelled by founder; no new payment/order for cleanup.
+- Submission narrative source 835de08c709f5802d63ab21d4e62575f47baa406 included in main.
+- CDP proof, CRE simulation/fresh Koios, Cardano/Shopify, OCBC and historical evidence retained.
+- Sokosumi further work skipped by explicit founder decision.
 
-## Protected runtime truth
-- Solana payer 7 rows / 94220 committed units; sponsor 6 rows / 25002 fee lamports.
-- Two old 1050-unit candidates remain historical unresolved/permanently blocked; full exposure retained.
-- Source hashes, identities, immutable archives and import markers verified; legacy signers retired and locked.
-- Active Solana incomplete=0; Cardano signing/signed=0.
-- Cardano 5 accepted rows / 94820 committed units; original caps/history/import marker unchanged.
-- Hosted health/status and controlled restart PASS; platform idle cold start not claimed.
-- Existing Cardano/Shopify purchase and receipt independently reread; human budget/approval acceptance remains partial.
-- Historical Atlas/Cardano and Nuitee/Solana actual E2Es retained; no new payment/order initiated by release lane.
+## Access behavior
+- Explicit MCP_PUBLIC_CONSOLE_READ_ONLY=true publishes fixed cus_HOSTEDMCPDEMO reads.
+- Anonymous GET: list, owned status/detail/proof, Treasury and bank observations only.
+- Read scopes exactly purchases:read, evidence:read, operator:read; no caller-selected ownership.
+- Purchase/evidence redaction retained; other customers inaccessible; invalid bearer rejected.
+- All mutations, OAuth, quote APIs, payment/signing and payer endpoints retain authentication.
+- Browser connects without a credential; optional quote reads skipped; live polling retained.
+- Public Treasury aggregates/masked sandbox bank values approved by founder as demo data.
+- Existing protected-console acceptance artifact retained as historical evidence.
 
-## Judge access
-- Dedicated cli_HOSTEDCONSOLE scopes exactly purchases:read, evidence:read, operator:read.
-- Every non-GET request forbidden before routing, including bank refresh; regression tests PASS.
-- Only password SHA-256 configured server-side; operator-only DPAPI password outside Git.
-- Founder chose private handoff only after live access passes. Live access now PASS; disclose once in final report.
-- Browser Password prompt works; fresh context login and Purchases, proof, Receipt, Treasury, Connections PASS.
-- All observed console API calls GET; no mutation control; no page errors; browser storage contains no credential.
-- Acceptance artifact: docs/evidence/release/judge-access-20261007.json (no password/PII).
+## Protected runtime
+- Solana payer 7 rows/94220 committed units; sponsor 6 rows/25002 fee lamports.
+- Two historical 1050-unit candidates remain unresolved, permanently blocked, exposure retained.
+- Source identities/import markers/caps/retired signer locks must stay unchanged.
+- Active Solana incomplete=0; Cardano signing/signed=0 at prior freeze.
+- Cardano 5 accepted rows/94820 committed units; preserved caps/history.
+- CDP official CLI Server Wallet/Base Sepolia operational treasury; not exact adapter proof.
+- OCBC read-only fiat observation; internal ledger/manual reconciliation; no automatic conversion/rebalancing.
 
-## GitHub and deployment
-- Repository PUBLIC; default branch main. About points to live console and Capsule one-liner.
-- Anonymous release README, one-liner and logo PASS; important relative links/anchors/images 117 PASS.
-- Earlier GitHub HTTP 500 failures recovered; completed candidate published successfully.
-- Gateway candidate deploy dep-db36atbtqb8s73fo32jg: LIVE d9785ecaa75d2bd00158a13a0baae8cdecaacfed.
-- Current Cardano/Solana payer deploys remain afa59b1459aec6fad545ab5eeec1b2b37a15445c before final convergence.
-- All three auto-deploy settings off. Release is the sole deployment owner after activation closure.
-- Gateway changed only console hash plus branch; all other gateway env values verified unchanged.
-- Both payer environment digests and protected ledger snapshots retained for final comparison.
-- Final main/deployed SHA and tag not yet frozen; exact final freeze record will resolve token2049-submission.
+## Validation
+- Backend 1219 tests/76 files PASS; console 88 tests/9 files PASS.
+- Backend and console typechecks PASS; console production build PASS.
+- Current public auth tests verify read allowlist, ownership, default-off, invalid bearer and mutation denial.
+- Full gateway build PASS; 117 important links PASS; 440 files/256 history blobs scanned, no findings.
+- Fresh anonymous deployed browser acceptance pending candidate deployment.
 
-## Validation and evidence
-- Backend: 1216 tests / 75 files PASS; console: 87 tests / 9 files PASS; CRE: 6 tests PASS.
-- Backend/console typechecks and production build PASS; locked dependency audit reports zero vulnerabilities.
-- Test-only corrections: migration count nine; short-deadline offer search collects pending result.
-- Bounded scan: 438 current text files + 247 introduced history blobs, no secret/PII findings.
-- Exact dedicated judge password absent from tracked files and introduced Git history (468 tracked paths).
-- CRE secrets.yaml contains variable names only; exact curated CDP wallet-proof gitignore exception.
-- CDP = official CLI Server Wallet proof / Base Sepolia operational treasury, not customer settlement.
-- OCBC = read-only fiat observations; Capsule ledger reconciliation/manual adjustment; no automatic conversion or rebalancing.
-- Cold judge candidate test PASS. Default-main and exact final all-service verification remain after promotion.
+## Deployment and freeze
+- GitHub PUBLIC/default main; current frozen services main/auto-deploy off.
+- Release is sole Render deployment owner; gateway adds only public read flag.
+- Final candidate/main/deployed SHA pending; exact SHA required on all three services.
+- Preserve previous tag; create token2049-submission-public-console only after verified final deployment.
 
 ## Next action
-- Re-read checkpoint before main/deployment/freeze.
-- Report READY TO PROMOTE with exact release/main/deployed/source SHAs and scoped manifest.
-- Verify origin/main ancestry, push exact candidate to main without force or shared-checkout changes.
-- Deploy exact final main SHA to gateway/Cardano/Solana with branch main and auto-deploy off.
-- Verify health, dedicated judge access, unchanged payer env/caps/rows/import markers and anonymous default README.
-- Then tag/freeze; no further runtime cycle. Record exact SHA in final freeze record and final report.
+- Re-read before deployment, main promotion and completion.
+- Run build/scans, commit exact files, push candidate and deploy gateway exact candidate SHA.
+- Verify fresh anonymous Purchases/Proof/Receipt/Treasury/Connections and GET-only requests.
+- Promote tested candidate safely; deploy exact main SHA to all services and verify protected state.
+- Freeze and provide README file to Min Htet. No new orders/payments.

@@ -15,6 +15,7 @@ export interface GatewayParts {
   fundingAdapters: FundingAdapter[];
   bankAdapters: BankObservationAdapter[];
   fx?: FxReferenceSource;
+  publicConsoleCustomerId?: string;
   extraRouters?: Array<{ path: string; router: Router; auth: boolean; beforeJson?: boolean }>;
   buildRouters?: (core: CommerceCore) => NonNullable<GatewayParts['extraRouters']>;
   close?: () => Promise<void>;
@@ -51,6 +52,6 @@ export async function buildGateway(parts: GatewayParts, opts: { env?: NodeJS.Pro
   });
   const worker = new Worker(core, opts.log);
   const extraRouters = [...(parts.extraRouters ?? []), ...(parts.buildRouters?.(core) ?? [])];
-  const app = createHttpApp({ core, extraRouters, ...(opts.log ? { log: opts.log } : {}) });
+  const app = createHttpApp({ core, extraRouters, ...(parts.publicConsoleCustomerId ? { publicConsoleCustomerId: parts.publicConsoleCustomerId } : {}), ...(opts.log ? { log: opts.log } : {}) });
   return { env, db, core, worker, app, close: async () => { try { await parts.close?.(); } finally { await db.close(); } } };
 }

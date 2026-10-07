@@ -12,16 +12,17 @@ Capsule is a buyer-side commerce gateway for that connection. An assistant uses 
 
 Retail, flights and hotels demonstrate the same idea: let the agent use a common purchasing interface while the provider keeps its existing commerce workflow. Read the [project story](PROJECT_SUBMISSION.md) for the opportunity, implementation and partner contributions.
 
-**Built for TOKEN2049 Origins. Access is currently limited to judges; public access is not open yet.**
+**Built for TOKEN2049 Origins. The live demo console is public; MCP transactions require an access code.**
 
 <a id="judge-quick-start"></a>
 ## TOKEN2049 judges — try Capsule
 
 ### Get judge access
 
-Open the [live Capsule console](https://token2049-origins.onrender.com/console/) to inspect completed purchases, receipts, proof, Treasury and Connections. **Judge password provided privately in submission.** The console is read-only.
+Open the [live Capsule console](https://token2049-origins.onrender.com/console/) to inspect completed purchases, receipts, proof, Treasury and Connections. **No password required.** The console is read-only.
 
-Assistant evaluation uses a separate OAuth access code, supplied privately by the Capsule team.
+> **JUDGES: Ask Min Htet directly for the Capsule MCP access code before connecting your assistant.**
+> The website needs no password. Enter the MCP code only on Capsule's OAuth consent screen.
 
 ### Connect your assistant
 
@@ -34,7 +35,7 @@ In ChatGPT, open **Plugins → + → Add custom MCP server** and use these setti
 | Authentication | OAuth |
 | Client ID / secret | Leave blank |
 
-Create the connection, enter your evaluation access code on Capsule's consent screen and approve. Start a new conversation with Capsule enabled.
+Select **Create as a plugin**, enter the access code from Min Htet on Capsule's consent screen and approve. Install Capsule, start a new conversation, and type **@Capsule** to select it. Account and workspace policies may control access to custom MCP servers.
 
 ### Make a request
 
@@ -44,7 +45,7 @@ Choose an offer, review the exact total and select a payment method. Capsule ask
 
 ### Watch the transaction
 
-Open the [Capsule console](https://token2049-origins.onrender.com/console/) with your judge password. Follow payment confirmation, provider execution and the result, then open the receipt and proof. Your assistant is where you approve; the console is where you see what happened. Longer-running steps continue while the assistant checks their progress.
+Open the [Capsule console](https://token2049-origins.onrender.com/console/) alongside your conversation; no login is needed. Follow payment confirmation, provider execution and the result, then open the receipt and proof. Your assistant is where you approve; the console is where you see what happened. Longer-running steps continue while the assistant checks their progress.
 
 The demonstration uses public-testnet funds and provider sandboxes. Shopify listings come from real stores; demonstration orders run through Capsule's Shopify test store.
 

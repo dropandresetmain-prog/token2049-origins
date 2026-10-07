@@ -35,7 +35,7 @@ export const TEST_ENV = {
   SIMULATED_CARD_CAPACITY_USD_MINOR: '20000',
 } as NodeJS.ProcessEnv;
 
-export async function startHarness(opts: { schema?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[]; settlementPolicy?: SettlementPolicy; serviceFeeBps?: number; port?: number; extraRouters?: (core: Gateway['core']) => NonNullable<Parameters<typeof buildGateway>[0]['extraRouters']> } = {}): Promise<Harness> {
+export async function startHarness(opts: { publicConsoleCustomerId?: string; schema?: string; db?: Db; clock?: ManualClock; bankAdapters?: BankObservationAdapter[]; settlementPolicy?: SettlementPolicy; serviceFeeBps?: number; port?: number; extraRouters?: (core: Gateway['core']) => NonNullable<Parameters<typeof buildGateway>[0]['extraRouters']> } = {}): Promise<Harness> {
   const clock = opts.clock ?? new ManualClock();
   const db = opts.db ?? await createTestDb(opts.schema);
   const retail = new FixtureExecutor('shopify', 'retail', clock);
@@ -43,7 +43,7 @@ export async function startHarness(opts: { schema?: string; db?: Db; clock?: Man
   const flight = new FixtureExecutor('atlas', 'flight', clock, 15000n);
   const funding = new FixtureFundingAdapter(clock);
   const gw = await buildGateway(
-    { executors: [retail, hotel, flight], fundingAdapters: [funding], bankAdapters: opts.bankAdapters ?? [], buildRouters: core => [
+    { ...(opts.publicConsoleCustomerId ? { publicConsoleCustomerId: opts.publicConsoleCustomerId } : {}), executors: [retail, hotel, flight], fundingAdapters: [funding], bankAdapters: opts.bankAdapters ?? [], buildRouters: core => [
       { path: '/v1/evidence', router: createEvidenceRouter({ db: core.deps.db, clock, bankAdapters: opts.bankAdapters ?? [] }), auth: true },
       { path: '/proof', router: createProofPageRouter(), auth: false },
       ...(opts.extraRouters?.(core) ?? []),
@@ -54,7 +54,7 @@ export async function startHarness(opts: { schema?: string; db?: Db; clock?: Man
   gw.core.deps.config.serviceFeeBps = opts.serviceFeeBps ?? 0;
   const now = clock.now().toISOString();
   const existing = (await db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM api_clients'))!;
-  const alice = await createClient(db, { displayName: 'Alice', channel: 'test', label: `alice-${existing.n}` }, now);
+  const alice = await createClient(db, { ...(opts.publicConsoleCustomerId ? { customerId: opts.publicConsoleCustomerId } : {}), displayName: 'Alice', channel: 'test', label: `alice-${existing.n}` }, now);
   const bob = await createClient(db, { displayName: 'Bob', channel: 'test', label: `bob-${existing.n}` }, now);
   const server = await new Promise<Server>((r) => {
     const s = gw.app.listen(opts.port ?? 0, '127.0.0.1', () => r(s));

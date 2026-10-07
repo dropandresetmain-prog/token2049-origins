@@ -4,7 +4,7 @@ import * as operatorCopy from '../copy/operator.js';
 import type { ConsoleMode, ConsoleSource, PurchaseListResult } from '../contracts/source.js';
 import { defaultFormatContext } from '../model/format.js';
 import { presentList } from '../model/present.js';
-import { sampleSource, sourceConfig } from '../source/index.js';
+import { gatewaySource, sampleSource, sourceConfig } from '../source/index.js';
 import { UiProvider, useUi } from './context.js';
 import { Dock } from './Dock.js';
 import { AboutDialog } from './Dialogs.js';
@@ -35,6 +35,8 @@ function Console() {
   const ui = useUi();
   const config = useMemo(() => sourceConfig(), []);
   const sample = useMemo(() => (config.kind === 'sample' ? sampleSource() : null), [config]);
+  const [probingPublic, setProbingPublic] = useState(config.kind === 'gateway');
+  const [publicSession, setPublicSession] = useState(false);
   const [session, setSession] = useState<Session | null>(null);
   const [bootError, setBootError] = useState<ErrorInfo | null>(null);
   const [attempt, setAttempt] = useState(0);
@@ -48,32 +50,39 @@ function Console() {
   const sessionRef = useRef<Session | null>(null);
   sessionRef.current = session;
 
-  /* Sample mode connects on its own. Gateway mode waits for the sign-in form. */
+  /* A public demo connects with no credential; protected gateways still fall back to password sign-in. */
   useEffect(() => {
-    if (!sample) return;
+    const source = sample ?? (config.kind === 'gateway' ? gatewaySource(config.baseUrl, '') : null);
+    if (!source) return;
     let alive = true;
     setBootError(null);
-    Promise.all([sample.environment(), sample.listPurchases()]).then(
+    Promise.all([source.environment(), source.listPurchases()]).then(
       ([env, raw]) => {
-        if (alive) setSession({ source: sample, mode: env.mode, raw, at: Date.now() });
+        if (alive) { setSession({ source, mode: env.mode, raw, at: Date.now() }); setPublicSession(!sample); setProbingPublic(false); }
       },
       (e: unknown) => {
-        if (alive) setBootError(errorInfo(e));
+        if (alive) {
+          const error = errorInfo(e);
+          if (sample || !['unauthenticated', 'forbidden'].includes(error.code)) setBootError(error);
+          setProbingPublic(false);
+        }
       },
     );
     return () => {
       alive = false;
     };
-  }, [sample, attempt]);
+  }, [sample, config, attempt]);
 
   const signOut = useCallback((message: string) => {
     setSession(null);
+    setPublicSession(false);
     setOperatorAccess('unknown');
     setNotice(message);
   }, []);
 
   const connected = useCallback((c: Connected) => {
     setNotice(null);
+    setPublicSession(false);
     setSession({ source: c.source, mode: c.mode, raw: c.list, at: Date.now() });
   }, []);
 
@@ -187,6 +196,8 @@ function Console() {
   };
 
   if (config.kind === 'gateway' && !session) {
+    if (probingPublic) return <ListSkeleton />;
+    if (bootError) return <ErrorPanel error={bootError} onRetry={() => { setProbingPublic(true); setAttempt(n => n + 1); }} />;
     return <SignIn baseUrl={config.baseUrl} notice={notice} onConnected={connected} />;
   }
 
@@ -201,7 +212,7 @@ function Console() {
             ? route.id === currentId ? 'live' : 'purchases'
             : 'live';
   const attentionCount = list?.counts.attention ?? 0;
-  const onSignOut = config.kind === 'gateway' ? () => signOut(copy.signIn.signedOut) : null;
+  const onSignOut = config.kind === 'gateway' && !publicSession ? () => signOut(copy.signIn.signedOut) : null;
 
   const isOperatorRoute = route.kind === 'treasury' || route.kind === 'connections';
   const crumb =

@@ -15,7 +15,7 @@ The console lane does not change gateway contracts. Gateway changes the console 
    records. The operator screens ([below](#operator-screens)) are also read-only: they never ask a bank or provider
    anything and never call `POST /v1/evidence/bank/refresh`.
 2. **One data boundary.** Screens never call `fetch`. They read a `ConsoleSource` (`web/src/contracts/source.ts`).
-   There are two sources: the **sample source** (local sample purchases) and the **gateway source** (authenticated HTTP).
+   There are two sources: the **sample source** (local sample purchases) and the **gateway source** (HTTP, authenticated by default).
    Both return the gateway's own contract shapes, validated with the gateway's schemas. Going live means switching the
    source (`VITE_CONSOLE_SOURCE=gateway`), not rewriting screens.
 3. **No second source of truth.** Purchase status comes from the gateway's `projectProgress`
@@ -29,7 +29,7 @@ The console lane does not change gateway contracts. Gateway changes the console 
 
 ## Access
 
-The console asks for a gateway API client token ("Password" on screen). It needs these scopes:
+By default the console asks for a gateway API client token ("Password" on screen). It needs these scopes:
 
 | Scope | Why |
 |---|---|
@@ -42,6 +42,12 @@ the purchase itself still loads.
 
 The operator screens need `operator:read` as well (the `operator` role of `npm run client:create` has `purchases:read`,
 `evidence:read` and `operator:read`). Ordinary customer keys do not have operator access. The dedicated hosted judge client (`cli_HOSTEDCONSOLE`) has exactly those three read scopes and is restricted to GET requests by HTTP authentication. Bank refresh and all purchase, quote and funding mutations are denied even though bank refresh otherwise accepts `operator:read`. Only the password SHA-256 is configured server-side (`MCP_CONSOLE_KEY_SHA256`); the plaintext remains in protected operator storage and browser memory. See [Operator screens](#operator-screens).
+
+### Public hosted demo
+
+`MCP_PUBLIC_CONSOLE_READ_ONLY=true` explicitly publishes the hosted demo console without a password. It is off by default. Anonymous requests receive a fixed hosted demo identity with exactly `purchases:read`, `evidence:read` and `operator:read`. The customer cannot be selected by a request parameter. Only GET purchase list, owned purchase status/detail/proof, Treasury and bank observation reads are allowed. Purchase responses and evidence are redacted; other customers remain inaccessible. Treasury aggregates and masked sandbox bank observations are public in this mode.
+
+The browser connects without sending a bearer credential, skips protected quote reads and continues polling live progress. MCP OAuth, quotes, payment/funding, bank refresh and every mutation retain their existing authentication. An invalid supplied bearer token is rejected instead of falling back to public access.
 
 ## Reads
 

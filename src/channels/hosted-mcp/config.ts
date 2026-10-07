@@ -23,6 +23,8 @@ export interface HostedMcpConfig {
   payerTokenSha256?: string;
   /** SHA-256 (hex) of a GET-only judge password (purchases:read + evidence:read + operator:read) for the hosted customer. Hash only. */
   consoleKeySha256?: string;
+  /** Public GET-only demo console; customer writes and MCP OAuth remain authenticated. */
+  publicConsoleReadOnly?: boolean;
   /** Test seams for slow payers (production values are set in the router). */
   bridgeTimeoutMs?: number;
   bridgeStatusTimeoutMs?: number;
@@ -91,6 +93,7 @@ export function parsePayerBridgeUrl(value: string, label: string, gatewayOrigin?
 
 export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | null {
   if (env.MCP_HOSTED_ENABLED !== 'true') return null;
+  if (env.MCP_PUBLIC_CONSOLE_READ_ONLY !== undefined && !['true', 'false'].includes(env.MCP_PUBLIC_CONSOLE_READ_ONLY)) throw new HostedConfigError('MCP_PUBLIC_CONSOLE_READ_ONLY must be true or false');
   const publicUrl = parsePublicOrigin(env.MCP_PUBLIC_URL, 'MCP_PUBLIC_URL');
   // The payer verifies the 402 challenge's resource URL against its gateway URL, which the core derives from PUBLIC_BASE_URL.
   // Both must therefore be the same origin or the hosted payer would (rightly) refuse every payment.
@@ -137,6 +140,7 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
     ...(cardanoBridge ? { cardanoBridge } : {}),
     ...(payerTokenSha256 ? { payerTokenSha256 } : {}),
     ...(consoleKeySha256 ? { consoleKeySha256 } : {}),
+    ...(env.MCP_PUBLIC_CONSOLE_READ_ONLY === 'true' ? { publicConsoleReadOnly: true } : {}),
     ...(solanaBridge ? { solanaBridge } : {}),
     ...(solanaPayerTokenSha256 ? { solanaPayerTokenSha256, solanaPayerClientId: 'cli_HOSTEDSOLANAPAYER' } : {}),
     gatewayUrl: `http://127.0.0.1:${port}`,

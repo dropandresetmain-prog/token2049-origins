@@ -289,3 +289,16 @@ describe('gateway source', () => {
     });
   });
 });
+
+describe('public demo gateway source', () => {
+  it('reads without a bearer credential and skips the protected optional quote route', async () => {
+    const g = await fakeGateway();
+    const source = createGatewaySource({baseUrl:'',accessKey:'',fetchImpl:g.fetchImpl});
+    const list = await source.listPurchases();
+    const bundle = await source.getPurchase(list.entries[0]!.item.id);
+    expect(bundle.purchase.purchaseId).toBe(list.entries[0]!.item.id);
+    expect(bundle.quote).toBeNull();
+    expect(g.calls.some(c=>new URL(c.url,'http://gateway.test').pathname.startsWith('/v1/quotes/'))).toBe(false);
+    for (const c of g.calls) { expect(c.init.method).toBe('GET'); expect(new Headers(c.init.headers).has('Authorization')).toBe(false); }
+  });
+});

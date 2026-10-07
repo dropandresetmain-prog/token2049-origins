@@ -43,16 +43,18 @@ export async function enqueueShopifyReadback(core: CommerceCore, hint: ShopifyRe
 /** Optional missing credentials report readiness and never fall back to fixtures. */
 export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unknown>)=>void): GatewayParts {
   const bankAdapters=[createOcbcAdapter(env)];
+  const hosted=loadHostedMcpConfig(env);
   const auxiliaryDbs: Db[] = [];
   let runtimeDb: Db | undefined;
   return {
+    ...(hosted?.publicConsoleReadOnly ? { publicConsoleCustomerId: hosted.customerId } : {}),
     executors:[createGlobalSandboxExecutor(env,()=>{ if(!runtimeDb) throw new Error('gateway_not_initialized'); return runtimeDb; },{sink:step=>log({component:'shopify',step})}),createAtlasExecutor(env),createNuiteeExecutor(env)],
     fundingAdapters:[createCardanoFundingAdapter(env,{log}),createSolanaFundingAdapter(env),createMasumiFundingAdapter(env)],bankAdapters,
     buildRouters:core=>{
       runtimeDb = core.deps.db;
       const routers:NonNullable<GatewayParts['extraRouters']>=[
         // Hosted MCP + its OAuth server share this process and public port. Opt-in: absent unless MCP_HOSTED_ENABLED=true.
-        ...(()=>{const hosted=loadHostedMcpConfig(env); if(!hosted) return []; provisionPayerClient(core.deps.db,hosted).catch(()=>log({component:'hosted-mcp',step:'payer_client_provisioning_failed'})); return createHostedMcp({db:core.deps.db,config:hosted}).mounts;})(),
+        ...(()=>{if(!hosted) return []; provisionPayerClient(core.deps.db,hosted).catch(()=>log({component:'hosted-mcp',step:'payer_client_provisioning_failed'})); return createHostedMcp({db:core.deps.db,config:hosted}).mounts;})(),
         {path:'/v1/evidence',router:createEvidenceRouter({db:core.deps.db,clock:core.deps.clock,bankAdapters}),auth:true},
         {path:'/inspect',router:createInspectRouter(),auth:false},
         // The console is the customer frontend; the earlier /proof page now sends people there.

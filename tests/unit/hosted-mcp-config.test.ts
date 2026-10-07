@@ -127,3 +127,12 @@ describe('shopping-behaviour instructions', () => {
     expect(INSTRUCTIONS).toMatch(/returns orderConfirmation/);
   });
 });
+
+describe('public demo console configuration',()=>{
+ it('requires an explicit valid opt-in',()=>{
+  expect(loadHostedMcpConfig(env())?.publicConsoleReadOnly).toBeUndefined();
+  expect(loadHostedMcpConfig(env({MCP_PUBLIC_CONSOLE_READ_ONLY:'false'}))?.publicConsoleReadOnly).toBeUndefined();
+  expect(loadHostedMcpConfig(env({MCP_PUBLIC_CONSOLE_READ_ONLY:'true'}))?.publicConsoleReadOnly).toBe(true);
+  expect(()=>loadHostedMcpConfig(env({MCP_PUBLIC_CONSOLE_READ_ONLY:'yes'}))).toThrow(/must be true or false/);
+ });
+});

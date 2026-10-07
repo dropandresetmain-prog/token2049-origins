@@ -114,10 +114,17 @@ Reference only: `deploy/render-payer-free.yaml` (dashboard Blueprint path for th
 
 ## Connecting ChatGPT
 
-ChatGPT → Settings → Connectors → Advanced → enable **Developer mode** → **Create** (custom connector):
+ChatGPT → **Plugins → + → Add custom MCP server** ([official connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt)):
+
+> **Judges: ask Min Htet directly for the MCP access code. The [live console](https://token2049-origins.onrender.com/console/) needs no password.**
+
 - Name: `Capsule`; MCP server URL: `https://token2049-origins.onrender.com/mcp`; Authentication: **OAuth** (leave client ID/secret empty; ChatGPT registers itself).
-- Click Connect → the Capsule consent page opens → enter the owner passcode → Approve.
-- Start a chat, enable the Capsule connector, e.g. *"Find me an international travel adapter."* ChatGPT should show 3 options with one Recommended, wait for your pick, use the saved customer profile, show exact terms and both funding options, and only call `buy` after you explicitly select a rail and approve. `buy` is declared destructive, so ChatGPT will also show its own confirmation.
+- Select Create as a plugin → the Capsule consent page opens → enter the access code from Min Htet → Approve.
+- Install Capsule, start a chat and select **@Capsule**, e.g. *"Find me an international travel adapter."* ChatGPT should show 3 options with one Recommended, wait for your pick, use the saved customer profile, show exact terms and both funding options, and only call `buy` after you explicitly select a rail and approve. `buy` is declared destructive, so ChatGPT will also show its own confirmation.
+
+## Public demo console
+
+Set `MCP_PUBLIC_CONSOLE_READ_ONLY=true` on the hosted gateway to publish the fixed demo customer's read-only console. The default is protected. This setting permits only the specific console GET routes; it grants no payment, signing, bank refresh or MCP access. The public console updates as authorized assistants transact.
 
 ## Known limits
 
