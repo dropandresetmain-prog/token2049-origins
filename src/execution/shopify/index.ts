@@ -9,7 +9,8 @@ import { loadShopifyConfig } from './config.js';
 import { StorefrontClient, QUOTE_ATTRIBUTE, cheapestSelections, readCartTotals, readCartTerms, readCartAddress, type StorefrontCart } from './storefront.js';
 import { AdminClient, type AdminOrder } from './admin.js';
 import { createPlaywrightDriver, isTrustedCheckoutUrl, type CheckoutObserver } from './browserCheckout.js';
-import { CheckoutAbort, createStepLogger, type CheckoutDriver } from './checkout.js';
+import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver } from './checkout.js';
+import { logBrowserMemory } from './memoryTelemetry.js';
 import { toMoney } from './money.js';
 import { ShopifyHttpError, toProviderError } from './http.js';
 
@@ -23,11 +24,15 @@ const Ref = z.object({
   fulfillmentHash: z.string().length(64), cartHash: z.string().length(64), createdAt: z.iso.datetime(),
   shippingTitle: z.string().min(1),
   checkoutTotals: CheckoutTotalsSchema.optional(),
+  quoteMethod: z.enum(['storefront_cart', 'browser_checkout']).optional(),
 });
 
 /** Hash private provider state without storing buyer fields in evidence or checkpoints. */
 export function cartSignature(cart: StorefrontCart, includeSelectedAddress = false): string {
-  return hash({ buyer: cart.buyerIdentity, cost: cart.cost, quantity: cart.totalQuantity, lines: cart.lines.nodes,
+  // Preserve existing signatures when querying the additional settlement flag. API quotes
+  // check that flag independently; it must not invalidate a previously frozen browser quote.
+  const { totalDutyAmountEstimated: _dutyEstimate, ...cost } = cart.cost;
+  return hash({ buyer: cart.buyerIdentity, cost, quantity: cart.totalQuantity, lines: cart.lines.nodes,
     delivery: cart.deliveryGroups.nodes.map(g => ({ address: g.deliveryAddress, selected: g.selectedDeliveryOption })),
     attributes: cart.attributes,
     ...(includeSelectedAddress && cart.delivery ? { selectedAddresses: cart.delivery.addresses } : {}) });
@@ -70,6 +75,7 @@ export class ShopifyExecutor implements CommerceExecutor {
   private readonly admin;
   private readonly driver;
   private readonly log;
+  private readonly memorySink;
   private readonly fixture: boolean;
   private readonly attempts = new Map<string, Promise<ExecutionResult>>();
 
@@ -81,6 +87,7 @@ export class ShopifyExecutor implements CommerceExecutor {
     this.admin = opts.admin ?? (this.report.adminReady ? new AdminClient(config, opts.fetchImpl ?? fetch, this.clock) : null);
     this.driver = opts.driver ?? createPlaywrightDriver({ storeDomain: config.storeDomain, executablePath: config.browserExecutable, headless: config.headless, lowMemory: config.browserLowMemory, clock: this.clock, observer: opts.checkoutObserver });
     this.log = createStepLogger(opts.sink ?? (() => undefined));
+    this.memorySink = opts.sink ?? stderrSink;
     this.fixture = Boolean(opts.storefront || opts.admin || opts.driver);
   }
 
@@ -136,7 +143,15 @@ export class ShopifyExecutor implements CommerceExecutor {
       cart = await this.sf!.selectDelivery(cart.id, selections, intent.data.shipToCountry);
       const terms = readCartTerms(cart);
       if (!isTrustedCheckoutUrl(cart.checkoutUrl, this.report.config.storeDomain)) throw new ProviderError('rejected', 'shopify_untrusted_url', 'Checkout URL is outside configured store');
-      const totals = CheckoutTotalsSchema.parse(await this.driver.quote({
+      // Cart estimates never become approval authority. Only complete, explicitly settled
+      // costs can avoid the browser; unsupported or incomplete costs retain its observation.
+      let apiTotals;
+      try { apiTotals = readCartTotals(cart); }
+      catch (e) {
+        if (!(e instanceof ProviderError) || e.providerCode !== 'shopify_total_unavailable') throw e;
+      }
+      this.log(apiTotals ? 'quote_storefront_cart' : 'quote_browser_fallback');
+      const totals = CheckoutTotalsSchema.parse(apiTotals ?? await this.driver.quote({
         checkoutUrl: cart.checkoutUrl, fulfillment: f, expectedSubtotal: terms.subtotal, expectedShipping: terms.shipping,
         shippingTitle: terms.shippingTitle, storePassword: this.report.config.storePassword, log: this.log,
       }));
@@ -151,6 +166,11 @@ export class ShopifyExecutor implements CommerceExecutor {
       const observedTerms = readCartTerms(observedCart);
       if (!same(observedTerms.subtotal, terms.subtotal) || !same(observedTerms.shipping, terms.shipping) || observedTerms.shippingTitle !== terms.shippingTitle)
         throw new ProviderError('rejected', 'shopify_cart_mismatch', 'Cart terms changed during quote observation');
+      if (apiTotals) {
+        const settled = readCartTotals(observedCart);
+        if (!(['total', 'subtotal', 'shipping', 'tax'] as const).every(k => same(settled[k], totals[k])) || settled.shippingTitle !== totals.shippingTitle)
+          throw new ProviderError('rejected', 'shopify_cart_mismatch', 'Settled API totals changed during quote observation');
+      }
       cart = observedCart;
       const actual = readCartAddress(cart);
       const expected = f.shippingAddress;
@@ -166,11 +186,12 @@ export class ShopifyExecutor implements CommerceExecutor {
       if (compareMoney(totals.total, intent.data.spendCeiling) > 0) throw new ProviderError('rejected', 'shopify_spend_limit', 'Exact total exceeds spending ceiling');
       if (cart.lines.nodes.length !== 1 || cart.lines.nodes[0]!.merchandise.id !== line.data.variantId || cart.lines.nodes[0]!.quantity !== line.data.quantity ||
           !cart.attributes.some(a => a.key === QUOTE_ATTRIBUTE && a.value === nonce)) throw new ProviderError('rejected', 'shopify_cart_mismatch', 'Cart line or quote binding mismatch');
+      if (apiTotals) logBrowserMemory('api_quote_complete', this.memorySink);
       return { title: cart.lines.nodes[0]!.merchandise.product.title, merchantTotal: totals.total,
         breakdown: [{ kind: 'item', label: 'Items', amount: totals.subtotal }, { kind: 'shipping', label: totals.shippingTitle, amount: totals.shipping }, { kind: 'tax', label: 'Tax', amount: totals.tax }],
         terms: [`Shipping: ${totals.shippingTitle}`, 'Development store; Bogus gateway simulated payment'], fulfillmentSummary: `Synthetic delivery to ${intent.data.shipToCountry}`,
         executionRef: { cartId: cart.id, checkoutUrl: cart.checkoutUrl, nonce, country: intent.data.shipToCountry, fulfillmentHash: hash(f), cartHash: cartSignature(cart, true),
-          shippingTitle: totals.shippingTitle, checkoutTotals: totals, createdAt: this.clock.now().toISOString() }, expiresAt: this.expiry() };
+          shippingTitle: totals.shippingTitle, checkoutTotals: totals, quoteMethod: apiTotals ? 'storefront_cart' : 'browser_checkout', createdAt: this.clock.now().toISOString() }, expiresAt: this.expiry() };
     } catch (e) { throw toProviderError(e, 'shopify_quote_failed'); }
   }
 
@@ -222,6 +243,7 @@ export class ShopifyExecutor implements CommerceExecutor {
       // Legacy quotes retain the original exact-cart check. New quotes use checkout evidence for
       // payable totals, while the API still binds the same buyer, line, address and delivery method.
       if (!ref.checkoutTotals) return same(readCartTotals(cart).total, expected);
+      if (ref.quoteMethod === 'storefront_cart' && !same(readCartTotals(cart).total, expected)) return false;
       const terms = readCartTerms(cart);
       return same(ref.checkoutTotals.total, expected) && same(terms.subtotal, ref.checkoutTotals.subtotal) &&
         same(terms.shipping, ref.checkoutTotals.shipping) && terms.shippingTitle === ref.checkoutTotals.shippingTitle;

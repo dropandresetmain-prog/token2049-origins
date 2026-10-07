@@ -73,8 +73,8 @@ describe('low-memory browser mode', () => {
     expect(await run('http://shop.example.test/x', 'script')).toEqual(['abort']);
   });
 
-  it('runs one browser at a time, even when a session fails', async () => {
-    const d = new PlaywrightCheckoutDriver({ storeDomain: STORE, lowMemory: true });
+  it.each([false,true])('runs one browser at a time even after failure, lowMemory=%s', async lowMemory => {
+    const d = new PlaywrightCheckoutDriver({ storeDomain: STORE, lowMemory, sink:()=>undefined });
     const internals = d as unknown as { withPage: <T>(u: string, r: (p: unknown) => Promise<T>) => Promise<T> };
     let running = 0, peak = 0;
     const slow = (ms: number, fail = false) => internals.withPage(URL_OK, async () => { running++; peak = Math.max(peak, running); await new Promise((r) => setTimeout(r, ms)); running--; if (fail) throw new Error('step failed'); return 'ok'; });

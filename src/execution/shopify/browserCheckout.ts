@@ -1,4 +1,5 @@
-import type { Page, Browser } from 'playwright-core';
+import type { Page, Browser, BrowserContext } from 'playwright-core';
+import { logBrowserMemory } from './memoryTelemetry.js';
 import { parseDecimalToMinor, type Money } from '../../contracts/money.js';
 import { systemClock, type Clock } from '../../infrastructure/clock.js';
 import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver, type CheckoutDriverInput, type CheckoutDriverResult, type CheckoutQuoteInput, type CheckoutTotals } from './checkout.js';
@@ -171,8 +172,8 @@ export interface PlaywrightCheckoutOptions {
   headless?: boolean;
   executablePath?: string | null;
   /**
-   * Fit a small instance: low-memory Chromium flags, image/media/font requests aborted (page text and totals are unaffected), and at most one
-   * browser at a time per process so overlapping quotes can never double the footprint. Off by default.
+   * Fit a small instance: low-memory Chromium flags and image/media/font requests aborted
+   * (page text and totals are unaffected). Off by default. All browser sessions are serialized.
    */
   lowMemory?: boolean;
   /** DIAGNOSTIC ONLY (rehearsal harness): extra exact hostnames allowed for sub-resources. Never set in production. */
@@ -188,7 +189,7 @@ const LOW_MEMORY_ARGS = [
   '--disable-sync', '--disable-translate', '--mute-audio', '--no-first-run', '--renderer-process-limit=1', '--js-flags=--max-old-space-size=160',
 ];
 const LOW_MEMORY_BLOCKED_TYPES = new Set(['image', 'media', 'font']);
-/** Serializes low-memory browser sessions within the process. */
+/** Serializes all quote and purchase browser sessions within the process. */
 let browserQueue: Promise<unknown> = Promise.resolve();
 
 const NAV_TIMEOUT_MS = 45_000;
@@ -215,12 +216,13 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     return this.withPage(input.checkoutUrl, async page => {
       await this.prepare(page, input, input.log);
       await this.verifyGateway(page, input.log);
-      return this.step(input.log, 'read_checkout_totals', () => this.settledTotals(page, input));
+      const totals = await this.step(input.log, 'read_checkout_totals', () => this.settledTotals(page, input));
+      logBrowserMemory('quote_complete', this.opts.sink ?? stderrSink);
+      return totals;
     });
   }
 
   private async withPage<T>(checkoutUrl: string, run: (page: Page) => Promise<T>): Promise<T> {
-    if (!this.opts.lowMemory) return this.withPageUnqueued(checkoutUrl, run);
     const turn = browserQueue.then(() => undefined, () => undefined).then(() => this.withPageUnqueued(checkoutUrl, run));
     browserQueue = turn.catch(() => undefined);
     return turn;
@@ -229,6 +231,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
   private async withPageUnqueued<T>(checkoutUrl: string, run: (page: Page) => Promise<T>): Promise<T> {
     if (!isTrustedCheckoutUrl(checkoutUrl, this.opts.storeDomain)) throw new CheckoutAbort('untrusted_checkout_url');
     let browser: Browser;
+    logBrowserMemory('before_launch', this.opts.sink ?? stderrSink);
     try {
       const { chromium } = await import('playwright-core');
       // Default resolution uses the local Playwright cache; SHOPIFY_BROWSER_EXECUTABLE overrides.
@@ -237,12 +240,15 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
         ...(this.opts.lowMemory ? { args: LOW_MEMORY_ARGS } : {}),
         ...(this.opts.executablePath ? { executablePath: this.opts.executablePath } : {}),
       });
+      logBrowserMemory('launched', this.opts.sink ?? stderrSink);
     } catch {
       throw new CheckoutAbort('browser_unavailable');
     }
+    let context: BrowserContext | undefined;
+    let page: Page | undefined;
     try {
       // No video, no trace, no HAR: nothing that could capture PII is ever enabled.
-      const context = await browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' });
+      context = await browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' });
       context.setDefaultTimeout(this.ms(STEP_TIMEOUT_MS));
       await context.route('**/*', async route => {
         const request = route.request();
@@ -259,11 +265,15 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
           await route.continue();
         } catch { await route.abort(); }
       });
-      const page = await context.newPage();
-      await observe(() => this.opts.observer?.attach?.(page));
+      page = await context.newPage();
+      const openedPage = page;
+      await observe(() => this.opts.observer?.attach?.(openedPage));
       return await run(page);
     } finally {
+      await observe(() => page?.close());
+      await observe(() => context?.close());
       await browser.close().catch(() => undefined);
+      logBrowserMemory('closed', this.opts.sink ?? stderrSink);
     }
   }
 
@@ -341,6 +351,9 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     }
     await this.assertNoChallenge(page);
 
+    // The payment section (including billing) hydrates after shipping inputs. An absent
+    // section during that transition is not evidence that no billing address is needed.
+    await this.verifyGateway(page, log);
     await this.fillBillingAddress(page, input.fulfillment, log);
     await this.step(log, 'choose_shipping', () => this.chooseQuotedShipping(page, input.shippingTitle));
   }
@@ -462,7 +475,13 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
   private async verifyGateway(page: Page, log: (s: string) => void, select = false): Promise<void> {
     await this.step(log, 'verify_test_gateway', async () => {
       const gw = page.getByText(TEST_GATEWAY_TEXT).first();
-      if (await gw.count() === 0 || !hasTestGateway(await this.bodyText(page))) throw new CheckoutAbort('test_gateway_not_active');
+      const end = this.clock.now().getTime() + this.ms(STEP_TIMEOUT_MS);
+      for (;;) {
+        await this.assertNoChallenge(page);
+        if (await gw.count() > 0 && await gw.isVisible() && hasTestGateway(await this.bodyText(page))) break;
+        if (this.clock.now().getTime() >= end) throw new CheckoutAbort('test_gateway_not_active');
+        await page.waitForTimeout(250);
+      }
       // A quote only observes the gateway; execution retains the existing payment-method selection.
       if (select) await gw.click().catch(() => undefined);
     });

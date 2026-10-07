@@ -40,6 +40,7 @@ const CartSchema = z.object({
     totalTaxAmount: MoneyV2.nullable(),
     totalTaxAmountEstimated: z.boolean(),
     totalDutyAmount: MoneyV2.nullable(),
+    totalDutyAmountEstimated: z.boolean(),
   }),
   discountAllocations: z.array(z.unknown()),
   delivery: z.object({ addresses: z.array(z.object({
@@ -75,7 +76,7 @@ fragment CartFields on Cart {
   buyerIdentity { email }
   attributes { key value }
   delivery { addresses { selected address { ... on CartDeliveryAddress { firstName lastName address1 address2 city zip countryCode provinceCode } } } }
-  cost { totalAmount { amount currencyCode } subtotalAmount { amount currencyCode } totalAmountEstimated subtotalAmountEstimated totalTaxAmount { amount currencyCode } totalTaxAmountEstimated totalDutyAmount { amount currencyCode } }
+  cost { totalAmount { amount currencyCode } subtotalAmount { amount currencyCode } totalAmountEstimated subtotalAmountEstimated totalTaxAmount { amount currencyCode } totalTaxAmountEstimated totalDutyAmount { amount currencyCode } totalDutyAmountEstimated }
   discountAllocations { discountedAmount { amount currencyCode } }
   lines(first: 10) { nodes { quantity merchandise { ... on ProductVariant { id title product { title } } } } }
   deliveryGroups(first: 5) {
@@ -324,9 +325,9 @@ export function readCartTerms(cart: StorefrontCart): Pick<CartTotals, 'subtotal'
   return { subtotal, shipping, shippingTitle: selected.title };
 }
 
-/** Legacy exact-cart quote validation; estimated or incomplete totals remain rejected. */
+/** Exact API quote validation; every amount must be settled and the explicit tax must balance. */
 export function readCartTotals(cart: StorefrontCart): CartTotals {
-  if (cart.cost.totalAmountEstimated || cart.cost.subtotalAmountEstimated || cart.cost.totalTaxAmountEstimated || !cart.cost.totalTaxAmount) throw unavailable('totals or tax are estimated/missing');
+  if (cart.cost.totalAmountEstimated || cart.cost.subtotalAmountEstimated || cart.cost.totalTaxAmountEstimated || cart.cost.totalDutyAmountEstimated || !cart.cost.totalTaxAmount) throw unavailable('totals or tax are estimated/missing');
   if (cart.discountAllocations.length || (cart.cost.totalDutyAmount && BigInt(toMoney(cart.cost.totalDutyAmount).amountMinor) !== 0n)) throw unavailable('discounts and duties are unsupported');
   const groups = cart.deliveryGroups.nodes;
   if (groups.length !== 1) throw unavailable('exactly one delivery group required');

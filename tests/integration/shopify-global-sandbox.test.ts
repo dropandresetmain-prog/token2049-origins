@@ -134,6 +134,18 @@ describe('Global discovery -> one shadow -> existing commerce core (all provider
     const changed = await h.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId, fulfillment: { ...retailFulfillment, email: 'changed@example.com' } } });
     expect(changed.status).toBe(409); h.clock.advance(300_001); expect((await quote()).status).toBe(409);
   });
+  it('a new gateway process fetches the durable live quote with identical digest and expiry', async () => {
+    const first = QuoteView.parse((await quote()).body.quote);
+    const restarted = await startHarness({ schema, clock:h.clock, settlementPolicy:{mode:'scaled_testnet',numerator:1,denominator:1000} });
+    try {
+      const providerQuote = vi.spyOn(restarted.retail,'quote').mockRejectedValue(new Error('provider must not be called after restart'));
+      const response = await restarted.call('POST','/v1/quotes',{token:h.alice.token,body:{offerId,fulfillment:retailFulfillment}});
+      expect(response.status).toBe(201); expect(response.body.quote).toEqual(first);
+      expect(providerQuote).not.toHaveBeenCalled(); expect(restarted.retail.executeCalls).toBe(0);
+      const changed = await restarted.call('POST','/v1/quotes',{token:h.alice.token,body:{offerId,fulfillment:{...retailFulfillment,email:'changed@example.com'}}});
+      expect(changed.status).toBe(409);
+    } finally { await restarted.close(); }
+  });
   it('concurrent quote calls return one quote or actionable busy conflict, then retry returns same quote', async () => {
     const results = await Promise.all([quote(), quote()]);
     expect(results.every(r => [201, 409].includes(r.status))).toBe(true); expect(results.some(r => r.status === 201)).toBe(true);

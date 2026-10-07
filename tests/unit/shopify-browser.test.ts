@@ -42,8 +42,9 @@ function fixture(observer?: CheckoutObserver, options: { billing?: boolean; fail
   const generic = { first() { return this; }, fill, selectOption: vi.fn(async () => undefined), count: vi.fn(async () => 0), isVisible: vi.fn(async () => false), click: vi.fn(async () => undefined) };
   const button = { ...generic, click: vi.fn(async ({trial}: {trial?:boolean}) => { expect(trial).toBe(true); }), elementHandle: vi.fn(async () => ({ click: pay })) };
   let routeHandler: ((route: Route) => Promise<void>) | undefined;
-  const context = { setDefaultTimeout: vi.fn(), newPage: vi.fn(async () => page), route: vi.fn(async (_pattern,handler) => { routeHandler = handler; }) } as unknown as BrowserContext;
+  const context = { close: vi.fn(async () => undefined), setDefaultTimeout: vi.fn(), newPage: vi.fn(async () => page), route: vi.fn(async (_pattern,handler) => { routeHandler = handler; }) } as unknown as BrowserContext;
   const page = {
+    close: vi.fn(async () => undefined),
     goto: vi.fn(async () => undefined), url: () => url, waitForLoadState: vi.fn(async () => undefined), waitForTimeout: vi.fn(async (ms: number) => clock.advance(ms)),
     locator: vi.fn((selector: string) => {
       if (selector === 'body') return {innerText: async () => text};
@@ -82,7 +83,7 @@ function fixture(observer?: CheckoutObserver, options: { billing?: boolean; fail
         })),
       };
     }),
-    getByText: vi.fn(() => ({...generic,count:async (): Promise<number> => 1})),
+    getByText: vi.fn(() => ({...generic,count:async (): Promise<number> => 1,isVisible:async () => true})),
     // Shopify's hosted card iframes expose eight inputs. The first is always the card number;
     // select by the intended input name so the regression catches positional selection.
     frameLocator: vi.fn((selector: string) => {
@@ -95,7 +96,7 @@ function fixture(observer?: CheckoutObserver, options: { billing?: boolean; fail
   } as unknown as Page;
   const browser = { newContext: vi.fn(async () => context), close: vi.fn(async () => undefined) } as unknown as Browser;
   mocks.launch.mockResolvedValue(browser);
-  const driver = new PlaywrightCheckoutDriver({storeDomain:'test-shop.myshopify.com',executablePath:'fixture-browser',clock,observer});
+  const driver = new PlaywrightCheckoutDriver({storeDomain:'test-shop.myshopify.com',executablePath:'fixture-browser',clock,observer,sink:()=>undefined});
   const input: CheckoutDriverInput = {
     checkoutUrl:url,expectedTotal:money('USD',3200),shippingTitle:'Standard',storePassword:null,
     fulfillment:{category:'retail',...demoData.buyer},
@@ -269,6 +270,27 @@ describe('controlled Shopify browser payment boundary', () => {
   });
 });
 describe('hosted checkout quote-only boundary', () => {
+  it('waits for the payment section to hydrate before filling billing and reading quote totals', async () => {
+    const s = fixture(undefined, { billing: true });
+    s.setText('Standard');
+    // Use the fixture clock rather than wall time for asynchronous hydration.
+    const readyAt = s.clock.now().getTime() + 500;
+    vi.mocked(s.page.waitForTimeout).mockImplementation(async ms => {
+      s.clock.advance(ms);
+      if (s.clock.now().getTime() >= readyAt) s.setText('Standard\nBogus Gateway\nSubtotal USD $25.00\nShipping USD $5.00\nTax USD $2.00\nTotal USD $32.00');
+    });
+    await expect(s.driver.quote(s.quoteInput)).resolves.toMatchObject({total:money('USD',3200)});
+    expect(s.billingFields.get('address-line1')).toBe(s.quoteInput.fulfillment.shippingAddress.address1);
+    expect(s.page.frameLocator).not.toHaveBeenCalled(); expect(s.pay).not.toHaveBeenCalled();
+    expect(s.page.close).toHaveBeenCalledOnce(); expect(s.context.close).toHaveBeenCalledOnce(); expect(s.browser.close).toHaveBeenCalledOnce();
+  });
+  it('closes context and browser even when page creation or context close fails', async () => {
+    const s=fixture();
+    vi.mocked(s.context.newPage).mockRejectedValue(new Error('fixture page failure'));
+    vi.mocked(s.context.close).mockRejectedValue(new Error('fixture close failure'));
+    await expect(s.driver.quote(s.quoteInput)).rejects.toThrow('fixture page failure');
+    expect(s.context.close).toHaveBeenCalledOnce(); expect(s.browser.close).toHaveBeenCalledOnce();
+  });
   it('quotes Singapore with no city or province controls and never fills hidden city clones or enters payment', async () => {
     const s = fixture(undefined, { billing: true, failBillingField: 'address-level2', singapore: true });
     s.quoteInput.fulfillment = { category: 'retail', email: 'buyer@example.com', shippingAddress: {

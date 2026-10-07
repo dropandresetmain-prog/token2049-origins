@@ -15,9 +15,14 @@ FROM node:24-bookworm-slim
 ENV NODE_ENV=production APP_ENV=sandbox HOST=0.0.0.0 PORT=8787
 WORKDIR /app
 COPY package.json package-lock.json ./
-# Chromium runs at the lowest CPU priority (wrapper below) so a small shared-CPU instance keeps answering health checks while it renders.
+# Use Playwright's dedicated headless shell; full Chromium exceeded the free container limit.
+# Keep the browser at low CPU priority so the gateway can answer health checks while it renders.
 ENV PLAYWRIGHT_BROWSERS_PATH=/ms-playwright SHOPIFY_BROWSER_EXECUTABLE=/usr/local/bin/shopify-chromium
-RUN npm ci --omit=dev && npx playwright-core install --with-deps chromium && chmod -R a+rX /ms-playwright && node --input-type=module -e "import {chromium} from 'playwright-core'; import {writeFileSync} from 'node:fs'; writeFileSync('/usr/local/bin/shopify-chromium','#!/bin/sh\nexec nice -n 19 '+chromium.executablePath()+' \"\$@\"\n',{mode:0o755})"
+RUN npm ci --omit=dev && npx playwright-core install --with-deps --only-shell chromium && chmod -R a+rX /ms-playwright \
+    && set -- /ms-playwright/chromium_headless_shell-*/chrome-headless-shell-linux*/chrome-headless-shell \
+    && test "$#" -eq 1 && test -x "$1" \
+    && printf '#!/bin/sh\nexec nice -n 19 "%s" "$@"\n' "$1" > /usr/local/bin/shopify-chromium \
+    && chmod 755 /usr/local/bin/shopify-chromium
 COPY --from=build /app/dist ./dist
 RUN mkdir -p /data && chown node:node /data
 USER node

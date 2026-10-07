@@ -23,14 +23,15 @@ function cart(): StorefrontCart {
   const shipping = { handle: 'standard', title: 'Standard', deliveryMethodType: 'SHIPPING', estimatedCost: amount('5.00') };
   return { id: 'gid://shopify/Cart/fixture?key=secret', checkoutUrl: 'https://test-shop.myshopify.com/checkouts/fixture?key=secret', totalQuantity: 2,
     buyerIdentity: { email: f.email }, attributes: [{ key: 't2o_quote', value: nonce }], discountAllocations: [],
-    cost: { totalAmount: amount('32.00'), subtotalAmount: amount('25.00'), totalAmountEstimated: false, subtotalAmountEstimated: false, totalTaxAmount: amount('2.00'), totalTaxAmountEstimated: false, totalDutyAmount: null },
+    cost: { totalAmount: amount('32.00'), subtotalAmount: amount('25.00'), totalAmountEstimated: false, subtotalAmountEstimated: false, totalTaxAmount: amount('2.00'), totalTaxAmountEstimated: false, totalDutyAmount: null, totalDutyAmountEstimated: false },
     lines: { nodes: [{ quantity: 2, merchandise: { id: 'gid://shopify/ProductVariant/123', title: 'Default Title', product: { title: 'Test shirt' } } }] },
     deliveryGroups: { nodes: [{ id: 'group', deliveryAddress: { ...f.shippingAddress, address2: null, countryCodeV2: f.shippingAddress.countryCode, provinceCode: f.shippingAddress.province ?? null }, deliveryOptions: [shipping], selectedDeliveryOption: shipping }] } };
 }
 function order(): AdminOrder { return { id: 'gid://shopify/Order/123', name: '#1001', test: true, displayFinancialStatus: 'PAID', totalPriceSet: { presentmentMoney: amount('32.00') },
   customAttributes: [{ key: 't2o_quote', value: nonce }], transactions: [{ kind: 'SALE', status: 'SUCCESS', test: true, gateway: 'bogus', amountSet: { presentmentMoney: amount('32.00') } }] }; }
-async function setup(driver?: Pick<CheckoutDriver, 'complete'> & Partial<Pick<CheckoutDriver, 'quote'>>) {
+async function setup(driver?: Pick<CheckoutDriver, 'complete'> & Partial<Pick<CheckoutDriver, 'quote'>>, estimated = Boolean(driver?.quote)) {
   let current = cart();
+  if (estimated) current.cost.totalAmountEstimated = true;
   let orders: AdminOrder[] = [];
   const sf = { findVariants: vi.fn(async () => [{ variantId: 'gid://shopify/ProductVariant/123', title: 'Test shirt', description: 'Fixture', unitPrice: money('USD',1250) }]),
     createCart: vi.fn(async ({ nonce: n }: { nonce: string }) => { current.attributes[0]!.value = n; return current; }),
@@ -116,6 +117,25 @@ describe('Shopify exact quote boundary', () => {
 });
 
 describe('Shopify hosted-checkout quote and execution binding', () => {
+  it('uses settled API totals and independent readback without launching a quote browser', async () => {
+    const s = await setup();
+    expect(s.quote.executionRef.quoteMethod).toBe('storefront_cart');
+    expect(s.quoteRead).not.toHaveBeenCalled();
+    expect(s.sf.getCart).toHaveBeenCalledTimes(1);
+    expect(s.complete.complete).not.toHaveBeenCalled();
+  });
+  it.each(['totalAmountEstimated', 'subtotalAmountEstimated', 'totalTaxAmountEstimated', 'totalDutyAmountEstimated'] as const)('falls back when %s is true', async flag => {
+    const s = await setup(); s.current.cost[flag] = true;
+    const q = await s.executor.quote({ executionRef: { variantId: 'gid://shopify/ProductVariant/123', quantity: 2 }, intent }, f);
+    expect(q.executionRef.quoteMethod).toBe('browser_checkout');
+    expect(s.quoteRead).toHaveBeenCalledTimes(1);
+  });
+  it('rejects API readback drift without silently launching a new browser quote', async () => {
+    const s = await setup();
+    s.sf.getCart.mockImplementation(async () => { const c = structuredClone(s.current); c.cost.totalTaxAmount=amount('3.00'); c.cost.totalAmount=amount('33.00'); return c; });
+    await expect(s.executor.quote({ executionRef: { variantId: 'gid://shopify/ProductVariant/123', quantity: 2 }, intent }, f)).rejects.toThrow('Settled API totals changed');
+    expect(s.quoteRead).not.toHaveBeenCalled();
+  });
   it('quotes estimated API costs only from independently observed checkout totals, without executing', async () => {
     const s = await setup();
     s.current.cost.totalAmountEstimated = true;
@@ -125,7 +145,8 @@ describe('Shopify hosted-checkout quote and execution binding', () => {
     const q = await s.executor.quote({ executionRef: { variantId: 'gid://shopify/ProductVariant/123', quantity: 2 }, intent }, f);
     expect(q.merchantTotal).toEqual(money('USD',3200));
     expect(q.executionRef.checkoutTotals).toMatchObject({tax:money('USD',200)});
-    expect(s.quoteRead).toHaveBeenCalledTimes(2);
+    expect(q.executionRef.quoteMethod).toBe('browser_checkout');
+    expect(s.quoteRead).toHaveBeenCalledTimes(1);
     expect(s.complete.complete).not.toHaveBeenCalled();
     expect(s.admin.searchOrders).not.toHaveBeenCalled();
   });
@@ -142,7 +163,7 @@ describe('Shopify hosted-checkout quote and execution binding', () => {
     await expect(setup({complete:vi.fn(),quote:async () => observed})).rejects.toThrow('Checkout breakdown');
   });
   it('execution revalidates estimated API cart binding while preserving the frozen checkout breakdown', async () => {
-    const s=await setup();
+    const s=await setup(undefined, true);
     s.current.cost.totalAmountEstimated=true;
     s.current.cost.subtotalAmountEstimated=true;
     s.current.cost.totalTaxAmountEstimated=true;
