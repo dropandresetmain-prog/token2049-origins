@@ -1,99 +1,62 @@
-# Active task — post-integration planning baseline
+# Active task — hosted commerce completion
 
-## Goal
+## Goal and base
+- Base: ca5519ac6abb134b81f5cc194657a55718ec4701 (review/final-astra).
+- Branch: feat/hosted-commerce-completion.
+- Worktree: C:/Dev/t2o-wt-hosted-commerce-completion.
+- Complete Atlas/Nuitée enablement, generic readiness recovery, free hosted Solana.
+- Do not modify shared checkout, main, historical E2E evidence, or unrelated lanes.
 
-Plan and execute the minimum remaining work from the integrated main baseline, including native Masumi task remuneration, to a judge-ready TOKEN2049 Origins submission.
+## Required outcomes
+- Atlas sandbox quote executable; proven guards retained; no new booking/payment.
+- Nuitée current capability traced; remove only artificial restriction if present.
+- One generic read-only readiness recovery for both rails; sanitized diagnostics.
+- No-spend smoke uses saved profile with fulfillment: { category: retail }.
+- Free public Solana HTTPS payer + bearer auth + PostgreSQL; no disk/private service.
+- Preserve payer AND sponsor identities/history; pinned import and retirement.
+- Both sources visible simultaneously; explicit fundingOptionId; no fallback.
+- Final reviewable candidate only; deployment requires explicit final authorization.
 
-## Baseline
+## Checklist
+- [x] Verify exact base and create isolated requested worktree.
+- [x] Trace provider enablement; live Atlas false/Nuit�e sandbox-key configured; candidate Atlas true.
+- [x] Inspect protected history: payer 7 entries/94220; sponsor 6 entries/25002 fees.
+- [x] Implement bounded generic status diagnostics/recovery; 56 focused tests pass.
+- [x] Fix saved-profile smoke; pending integration evidence.
+- [x] PostgreSQL ledger/import/retirement; 7 focused PostgreSQL tests pass.
+- [ ] Public Solana payer with internal sponsor and independently verified finality.
+- [ ] Free Render provisioning and dual-source config/tests.
+- [ ] Focused tests and checkpoint commits after verified phases.
+- [ ] Final gates once; secret scan, migration checksums, ancestry, clean status.
+- [ ] Completion report with honest hosted evidence limits.
 
-Repository: dropandresetmain-prog/token2049-origins
-
-Latest integration base:
-84c0aef7a7acd1851c590c54ccd8881b9dc365d5
-
-Current tip: `git rev-parse HEAD`; current Masumi integration gate is docs/work/MASUMI_INTEGRATION.md.
-
-Historical pre-Masumi integration local gate:
-- 697/697 tests, 33 files PASS
-- clean install/typecheck/build PASS
-- PostgreSQL migrations/rerun PASS
-- compiled gateway/MCP smoke PASS
-- UI design asset sanity PASS
-- bounded secret scan PASS
-
-No deployment or new provider/payment/chain action occurred during integration.
-
-## Integrated
-
-- PostgreSQL
-- progressive human orchestration
-- explicit funding selection
-- 1:1000 testnet settlement
-- Cardano Preprod rail
-- Solana Devnet rail
-- native Masumi service-fee/task runtime; independently verified fee payout
-- Shopify deterministic path
-- Shopify Global discovery/shadows
-- Atlas
-- Nuitée
-- OCBC
-- HTTP + MCP
-- proof/evidence
-- approved Capsule UI V3 reference
-
-## Pending / not proven
-
-- actual Sokosumi public listing/platform authentication/task delivery
-- runtime V3 UI
-- deployment
-- final combined E2E
-- actual ChatGPT host connection
-- final Astra review+fix
-- submission package
-
-Important external gaps:
-- old Shopify paid attempt unresolved;
-- Shopify Global exact sandbox quote partial/unresolved;
-- Atlas ambiguous-create recovery unverified.
-
-Do not retry old unresolved Shopify purchase pur_01M48PSSTDQDR4VGPAQPC2VRYZ.
-
-## Required outcomes before submission
-
-- [x] Integrate the verified native Masumi fee/task/payout lane without treating escrow as principal.
-- [ ] Run demo seed/preflight audit for chosen final flow.
-- [ ] Wire judge-facing V3 runtime enough for the canonical demo.
-- [ ] Deploy exact candidate and verify runtime/browser/database/secrets.
-- [ ] Verify host/client path used in the demo.
-- [ ] Run Astra final review+fix on exact candidate.
-- [ ] Run one final canonical E2E on that exact SHA.
-- [ ] Capture fallback recording/screenshots/evidence.
-- [ ] Reconcile track/submission requirements.
-- [ ] Final README/setup/architecture/submission artifacts.
-- [ ] Confirm no secrets committed.
-
-## Constraints
-
-- Protect known-good main.
-- No speculative provider/feature expansion unless it materially improves judging.
-- Unknown irreversible outcomes stop writes and reconcile; never blind retry.
-- Preserve payer/sponsor histories.
-- Do not overstate recorded evidence.
-- Historical planning/evidence is not rewritten.
-- Use current ROADMAP/KNOWN_ISSUES/ENVIRONMENT/architecture/demo docs.
+## Current checkpoint
+- Candidate Atlas sandbox gate enabled; no provider guard changes; Nuit�e needs no restriction edit.
+- Provider suites and 22 provisioning tests pass; live Atlas gate remains false (no deploy).
+- Generic diagnostics/recovery tested; no proven live cold failure classification yet; wake removed.
+- Solana public payer uses internal sponsor, no facilitator HTTP surface, gateway finality verification.
+- New migration 0008; all older migrations untouched.
+- Both Solana identities retained; sponsor is also treasury owner, payer remains distinct.
+- Canonical legacy files located under the older solana-funding worktree, not missing main data path.
+- Two unsigned 1050 reservations remain counted; they block migration/readiness pending reconciliation.
+- Key files inherit broad Modify access; apply must refuse until permissions are fixed.
+- Local configured caps are blank; 102000 cap is historical, no new policy silently inferred.
+- Real histories and key permissions remain unchanged; no chain spend/deploy/service write.
 
 ## Next action
+- Finish sponsor/payment/provisioning tests and hosted dual-rail integration.
+- Run no-spend live provider and payer reads where safe; clearly separate from candidate acceptance.
+- Checkpoint verified provider/readiness changes, then final candidate gate and report.
 
-Start a fresh planning chat from main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540. Inspect repository/current docs and decide the shortest path through remaining P0 work. Do not auto-start implementation before the plan is approved.
+## Critical constraints
+- No deploy, merge, merchant booking, chain spend, history reset, or new identity.
+- Existing OAuth, disclosure, retry/idempotency and Astra fixes preserved.
+- Reservation before signing; ambiguous outcomes never produce a new signature.
+- Never retry /pay as part of readiness recovery.
+- Secrets only in protected files/environment; no credentials/bodies/PII in diagnostics.
+- Read this file before each major phase, after agents/compaction, before completion.
 
-## Partner-lane integration ledger (branch integration/partner-lanes-final)
-Base 5343235ebe6c341abdda95450065950a3d1051b7. Lane merge-base was 0234d20 (ancestor of main); commits were cherry-picked, no stale history merged. Not merged to main, not deployed.
-
-| Lane | Status | Checkpoint | Conflicts | Focused tests |
-|---|---|---|---|---|
-| Chainlink CRE | PASS (code/sim evidence only) | df1a2c0 | none | bun 6/6, tsc clean |
-| Hosted Solana MCP | PARTIAL | 82df9a4 | package.json, hosted-mcp config/router/integration test, bridge.ts private-mode removed on main | 234 hosted/payer/integration tests |
-| Sokosumi | PARTIAL (no listing/job proof) | e6da869 | none | 45 Sokosumi/Masumi |
-| Coinbase CDP | PARTIAL (zero sandbox accounts) | 2319681 | package.json scripts only; lock unchanged | 10 CDP |
-
-Open decisions for Min Htet: Solana paid private service + persistent disk (or port Solana history to PostgreSQL); Sokosumi listing/live task evidence; CDP wallet/testnet proof.
+## Evidence status
+- Historical Atlas+Cardano and Nuitée+Solana E2E are pre-existing, not rerun.
+- Current hosted acceptance and actual cold restart have not yet been observed.
+- Solana hosted proof depends on deployment authorization; no claim of live proof.

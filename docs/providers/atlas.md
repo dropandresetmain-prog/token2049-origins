@@ -4,23 +4,15 @@ Code: `src/execution/atlas/` (factory `createAtlasExecutor`). Tests: `tests/unit
 
 Route `atlas`, category `flight`, environment `sandbox`. One-way, adult-only (the core's `FlightIntent` pins children/infants to 0).
 
-## Payment constraint (decision needed)
+## Hosted sandbox payment
 
-Supplier credit or prefunding is not an approved architecture. The only payment mechanism this lane could confirm for Atlas is `pay.do` with `paymentMethod: 1`, which debits the sandbox account balance/deposit (test balance). It is not card spend and must not be relabelled as such.
+The hosted-commerce completion request authorizes the already-proven sandbox test-balance path. The retained [Atlas + Cardano evidence](../evidence/atlas-cardano-combined-pass-20261007.md) records one payment, one execution, ticket issuance and independent readback. This is sandbox test balance, not card spend or production settlement.
 
-Implemented handling:
-
-- `/pay.do` is called only when `ATLAS_ALLOW_TEST_BALANCE_PAYMENT === 'true'` (exact string; `TRUE`, `1`, unset all keep it closed). Default is closed.
-- Gate closed: the hold is created (`order.do`), then `execute` returns `failed_definite` with reason `atlas_payment_mechanism_not_approved` and `providerReference = orderNo`. Nothing is charged; the hold lapses at `tktLimitTime`. It is never reported as a purchase.
-- Gate open: the result is labelled `merchantPaymentStatus: 'test_balance_paid'`. Receipts therefore say test balance, never card.
-- `readiness().detail` always states whether the gate is enabled.
-
-**Founder decision needed, one of:**
-
-1. Approve a bounded, sandbox-only exception: enable `ATLAS_ALLOW_TEST_BALANCE_PAYMENT=true` for the sandbox host only, for demo purposes, with the receipt label `test_balance_paid` and no claim of card spend; or
-2. Name another permitted payment mechanism. The candidate is a card-style pass-through (see findings below); it needs Atlas's official `pay.do` contract for that mode and a live sandbox probe before any code is written.
-
-Until one of these is decided, Atlas can quote and create holds but cannot complete a paid purchase.
+- Hosted configuration sets `ATLAS_ALLOW_TEST_BALANCE_PAYMENT=true`; other environments remain opt-in.
+- The executor still requires HTTPS on exactly `sandbox.atriptech.com`, zero verified transaction fees, exact totals, checkpoint-before-pay, one pay attempt and independent readback.
+- A closed gate rejects quoting and execution before creating an order and labels search offers search-only.
+- An enabled, configured sandbox route offers executable exact quotes and funding options; no provider/payment guard is bypassed.
+- No new booking or payment is authorized by this configuration change. Deployment remains a separate final approval.
 
 ### Payment methods found in `atlas-hackathon-lab` (HEAD `9b802e2b13aebb02bc0fb4074ac1875f329a2018`)
 

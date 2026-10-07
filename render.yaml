@@ -105,7 +105,7 @@ services:
       - key: BLOCKFROST_BASE_URL
         value: https://cardano-preprod.blockfrost.io/api/v0
       - key: ATLAS_ALLOW_TEST_BALANCE_PAYMENT
-        value: 'false'
+        value: 'true'
       # Hosted MCP at POST /mcp on this same service (one public port). Opt-in; OAuth 2.1 protects every call.
       # PUBLIC_BASE_URL above must be exactly this origin: the payer validates 402 challenges against it.
       - key: MCP_HOSTED_ENABLED

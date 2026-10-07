@@ -100,11 +100,11 @@ if (fresh.access_token) {
   check('find_offers (authenticated read)', !found.isError && offers.length > 0, `offers=${offers.length}`);
   check('find_offers returns a shortlist of at most 3 and forbids quoting before the user chooses', offers.length <= 3 && found.structuredContent?.interaction?.createQuoteAllowedNow === false);
   if (values.quote && offers[0]) {
-    process.stdout.write('NOTE  --quote creates one quote (no purchase, no payment) for the first offer using synthetic fulfillment data\n');
+    process.stdout.write('NOTE  --quote creates one quote (no purchase, no payment) for the first offer using the saved demo customer profile\n');
     // Exact quotes drive a checkout on a small instance and can take minutes; the tool answers "quote_pending" within ~45 s and the same
     // call (same arguments) collects the result, exactly as a ChatGPT conversation does. Pick the cheapest of the shortlist.
     const cheapest = offers.reduce((x, y) => (Number(x.indicativePrice?.amountMinor ?? Infinity) <= Number(y.indicativePrice?.amountMinor ?? Infinity) ? x : y), offers[0]);
-    const quoteArgs = { offerId: cheapest.offerId, fulfillment: { category: 'retail', email: 'buyer@example.com', shippingAddress: { firstName: 'Test', lastName: 'Buyer', address1: '1 Test Street', city: 'New York', province: 'NY', zip: '10001', countryCode: values.country } } };
+    const quoteArgs = { offerId: cheapest.offerId, fulfillment: { category: 'retail' } };
     let q;
     const started = Date.now();
     for (let attempt = 1; attempt <= 20; attempt++) {
