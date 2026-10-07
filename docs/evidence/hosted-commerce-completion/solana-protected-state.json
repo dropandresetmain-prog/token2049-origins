@@ -1,0 +1,48 @@
+{
+  "at": "2026-10-07T12:21:10.562Z",
+  "noSpend": true,
+  "histories": [
+    {
+      "role": "payer",
+      "owner": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+      "sourceSha256": "19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664",
+      "entries": 7,
+      "committedBaseUnits": "94220",
+      "committedFeeLamports": "0",
+      "incomplete": 2,
+      "lock": false,
+      "retired": false
+    },
+    {
+      "role": "sponsor",
+      "owner": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+      "sourceSha256": "1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4",
+      "entries": 6,
+      "committedBaseUnits": "0",
+      "committedFeeLamports": "25002",
+      "incomplete": 0,
+      "lock": false,
+      "retired": false
+    }
+  ],
+  "keys": [
+    {
+      "protected": false
+    },
+    {
+      "protected": false
+    }
+  ],
+  "balances": {
+    "unavailable": true
+  },
+  "policy": {
+    "currentLocalCaps": "missing/blank",
+    "historicalCumulativeBaseUnits": "102000",
+    "historicalRemainingBaseUnits": "7780",
+    "historicalCapNotReauthorized": true
+  },
+  "importedIntoHostedPostgres": false,
+  "legacySignersRetired": false,
+  "intendedFundingAmount": null
+}

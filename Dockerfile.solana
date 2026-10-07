@@ -1,4 +1,4 @@
-# Private Devnet signer service; never deploy this image as a public web service.
+# Public free Solana payer; durable history is PostgreSQL, no writable disk or root signer.
 FROM node:24-bookworm-slim
 WORKDIR /app
 COPY package.json package-lock.json ./
@@ -7,6 +7,6 @@ ENV NODE_ENV=production
 COPY tsconfig.json ./
 COPY src ./src
 COPY clients ./clients
-# Render's disk is root-owned. Ledger checks require 0700 directory / 0600 files.
-EXPOSE 8789 8790
+USER node
+EXPOSE 10000
 CMD ["node_modules/.bin/tsx", "clients/solana/hosted.ts"]

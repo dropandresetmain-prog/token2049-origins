@@ -38,9 +38,8 @@
     "payer:hosted": "tsx clients/payer/hosted.ts",
     "provision:hosted-mcp": "tsx scripts/provision-hosted-mcp-render.mjs",
     "payer:solana:hosted": "tsx clients/solana/hosted.ts",
-    "payer:solana:hosted:init-history": "tsx clients/solana/hosted.ts --init-history",
     "payer:solana:hosted:preflight": "node dist/scripts/solana/hosted-preflight.js",
-    "payer:solana:hosted:history": "tsx clients/solana/hosted.ts --history-fingerprint",
+    "provision:hosted-solana": "tsx scripts/provision-hosted-solana-render.mjs",
     "cdp:treasury": "tsx src/integrations/coinbase-cdp/cli.ts"
   },
   "dependencies": {

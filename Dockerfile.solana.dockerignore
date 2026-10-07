@@ -1,4 +1,4 @@
-# Private payer build accepts source code only. Gateway .dockerignore intentionally excludes this code.
+# Diskless public payer build accepts source code only. Gateway .dockerignore intentionally excludes this code.
 **
 !package.json
 !package-lock.json

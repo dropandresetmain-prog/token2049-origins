@@ -20,7 +20,7 @@ export function createSolanaFundingAdapter(env: NodeJS.ProcessEnv, opts: SolanaA
     const memo = commitment(input, cfg.tokenAccount);
     return { scheme: 'exact', network: NETWORK, asset: cfg.mint, amount: input.amount.amountBaseUnits, payTo: cfg.payee,
       maxTimeoutSeconds: 60, extra: { feePayer: cfg.sponsor, memo, tokenAccount: cfg.tokenAccount,
-        preparation: {url:cfg.facilitatorUrl+'/prepare',method:'POST',authentication:'Bearer',requiresFullySignedTransaction:true},
+        preparation: cfg.settlementMode === 'payer_broadcast' ? { mode: 'payer_broadcast', requiresFullySignedTransaction: true } : {url:cfg.facilitatorUrl+'/prepare',method:'POST',authentication:'Bearer',requiresFullySignedTransaction:true},
         funding: { purchaseId: input.purchaseId, quoteId: input.quoteId, quoteDigest: input.quoteDigest, resourceUrl: input.resourceUrl, expiresAt: input.expiresAt, ...(input.settlement ? { settlement: input.settlement } : {}) } } };
   }
   async function recover(signature: string, input: FundingRequirementInput): Promise<FundingVerification> {
@@ -58,7 +58,7 @@ export function createSolanaFundingAdapter(env: NodeJS.ProcessEnv, opts: SolanaA
     readiness: async () => {
       const base = { component: 'solana', environment: 'solana-devnet', checkedAt: clock.now().toISOString(), missing: parsed.ok ? [] : parsed.missing };
       if (!cfg || !rpc) return { ...base, status: 'MISSING_CONFIG' };
-      try { await rpc.assertNetwork(); await Promise.all([rpc.assertMint(cfg.mint), rpc.assertToken(cfg.tokenAccount, cfg.mint, cfg.payee)]); const supported = await facilitator!.getSupported();
+      try { await rpc.assertNetwork(); await Promise.all([rpc.assertMint(cfg.mint), rpc.assertToken(cfg.tokenAccount, cfg.mint, cfg.payee)]); if (cfg.settlementMode === 'payer_broadcast') return { ...base, status: 'EXTERNAL_CHECK_PASSED', detail: 'Hosted payer broadcasts Devnet funding; the gateway independently verifies finalized exact transfers' }; const supported = await facilitator!.getSupported();
         if (!supported.kinds.some(k => k.x402Version === 2 && k.scheme === 'exact' && k.network === NETWORK && k.extra?.feePayer === cfg.sponsor)) throw new Error('facilitator mismatch');
         return { ...base, status: 'EXTERNAL_CHECK_PASSED', detail: 'Official x402 v2 exact Solana; the provided payer must call authenticated /prepare before submitting the fully signed PAYMENT-SIGNATURE' };
       } catch { return { ...base, status: 'ACCESS_BLOCKED', detail: 'Devnet RPC, accounts or facilitator failed independent readiness' }; }
@@ -71,6 +71,7 @@ export function createSolanaFundingAdapter(env: NodeJS.ProcessEnv, opts: SolanaA
       try { req = requirement(input); p = readHeader(header, req, input.resourceUrl); assertTransfer(p.transfer, req); } catch { return invalid('Solana payment requirement mismatch', false); }
       const reference = p.transfer.signature!;
       const existing = await recover(reference, input); if (existing.ok) return existing;
+      if (cfg!.settlementMode === 'payer_broadcast') return { ok: false, code: 'payment_required', reason: 'Hosted Solana candidate retained for independent finality recovery', settlementAttempted: true };
       try {
         await rpc!.assertNetwork();
         const v = await facilitator!.verify(p.payload, req);

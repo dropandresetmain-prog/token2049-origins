@@ -21,7 +21,7 @@ import { existsSync, mkdirSync, readFileSync, readdirSync, statSync, writeFileSy
 import { spawn, spawnSync } from 'node:child_process';
 import os from 'node:os';
 import path from 'node:path';
-import { fileURLToPath } from 'node:url';
+import { pathToFileURL, fileURLToPath } from 'node:url';
 
 const DEFAULT_PAYER_FINGERPRINT = 'a2e66045653afe62';
 const DEFAULT_PAYER_SECRETS_ROOT = 'C:/Dev/token2049-setup/secrets';
@@ -520,9 +520,11 @@ async function lookupPayer(opts, web) {
 }
 
 async function applyPayer(opts, web, found, dryRun) {
+  const branch = opts.branch || 'main';
+  const dockerfile = opts.dockerfile || './Dockerfile.payer';
   if (!found) {
     if (dryRun) {
-      log(`Payer service "${opts.payerName}": would create (free docker web service, region ${web.region}, branch main)`);
+      log(`Payer service "${opts.payerName}": would create (free docker web service, region ${web.region}, branch ${branch})`);
       return null;
     }
     const body = {
@@ -530,14 +532,14 @@ async function applyPayer(opts, web, found, dryRun) {
       name: opts.payerName,
       ownerId: web.ownerId,
       repo: web.repo,
-      branch: 'main',
+      branch,
       autoDeployTrigger: 'off',
       serviceDetails: {
         runtime: 'docker',
         plan: 'free',
         region: web.region,
         healthCheckPath: '/health',
-        envSpecificDetails: { dockerfilePath: './Dockerfile.payer', dockerContext: '.' },
+        envSpecificDetails: { dockerfilePath: dockerfile, dockerContext: '.' },
       },
     };
     const { data } = await api('POST', '/services', body);
@@ -550,10 +552,10 @@ async function applyPayer(opts, web, found, dryRun) {
     return { id: service.id, url };
   }
   const patch = {};
-  if (found.branch !== 'main') patch.branch = 'main';
+  if (found.branch !== branch) patch.branch = branch;
   if (found.autoDeployTrigger !== 'off') patch.autoDeployTrigger = 'off';
-  if (normalizeDockerfile(found.serviceDetails?.envSpecificDetails?.dockerfilePath) !== 'Dockerfile.payer') {
-    patch.serviceDetails = { envSpecificDetails: { dockerfilePath: './Dockerfile.payer' } };
+  if (normalizeDockerfile(found.serviceDetails?.envSpecificDetails?.dockerfilePath) !== normalizeDockerfile(dockerfile)) {
+    patch.serviceDetails = { envSpecificDetails: { dockerfilePath: dockerfile } };
   }
   if (Object.keys(patch).length) {
     if (dryRun) log(`Payer service "${opts.payerName}": would patch ${Object.keys(patch).join(', ')}`);
@@ -855,6 +857,8 @@ async function main() {
       ['MCP_PAYER_GATEWAY_TOKEN_SHA256', gatewayTokenSha],
       // The gateway runs on a 512 MB free instance: Shopify's headless checkout (quotes and orders) must use the lean browser mode.
       ['SHOPIFY_BROWSER_LOW_MEMORY', 'true'],
+      // Approved hosted demo path; the executor still restricts Atlas to its exact sandbox host.
+      ['ATLAS_ALLOW_TEST_BALANCE_PAYMENT', 'true'],
     ]);
   const webFiles = new Map([
     ['mcp-owner-passcode', passcode],
@@ -959,7 +963,10 @@ async function main() {
   return smokeOk && !payerBad ? 0 : 1;
 }
 
-main().then(
+export { resolveRenderKey, discoverWeb, lookupPayer, applyPayer, getEnvVars, putEnvVars, putSecretFiles, hostedSecret, track, api };
+export function configureRenderAccess({ key, dryRun = true, base = 'https://api.render.com/v1' }) { apiKey = track(key); readOnly = dryRun; apiBase = base; }
+
+if (process.argv[1] && import.meta.url === pathToFileURL(process.argv[1]).href) main().then(
   (code) => {
     process.exitCode = code;
   },

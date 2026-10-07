@@ -1,15 +1,16 @@
-import { chmodSync, closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, lstatSync } from 'node:fs';
+import { chmodSync, closeSync, fsyncSync, mkdirSync, openSync, readFileSync, renameSync, unlinkSync, lstatSync, existsSync } from 'node:fs';
 import { writeFileSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
 import { execFileSync } from 'node:child_process';
 import { z } from 'zod';
 import { NETWORK, TEST_MINT } from '../../src/funding/solana/wire.js';
 import type { SolanaRpc } from '../../src/funding/solana/rpc.js';
-const Entry = z.object({ id: z.string(), signature: z.string().nullable(), amount: z.string().regex(/^[0-9]+$/), fee: z.string().regex(/^[0-9]+$/), header: z.string().nullable(), createdAt: z.string() }).strict();
-const Ledger = z.object({ version: z.literal(1), owner: z.string(), network: z.literal(NETWORK), mint: z.literal(TEST_MINT), entries: z.array(Entry) }).strict();
+export const SolanaEntry = z.object({ id: z.string().min(1), signature: z.string().nullable(), amount: z.string().regex(/^[0-9]+$/), fee: z.string().regex(/^[0-9]+$/), header: z.string().nullable(), createdAt: z.string() }).strict();
+export const SolanaSnapshot = z.object({ version: z.literal(1), owner: z.string(), network: z.literal(NETWORK), mint: z.literal(TEST_MINT), entries: z.array(SolanaEntry) }).strict();
+const Entry = SolanaEntry, Ledger = SolanaSnapshot;
 export type SolanaLedgerEntry = z.infer<typeof Entry>;
 /** Persist directory entries as well as file contents on the Linux hosted disk. */
-function syncDirectory(path: string): void {
+export function syncDirectory(path: string): void {
   if (process.platform === 'win32') return; // Windows cannot open directory handles through this API.
   const fd = openSync(path, 'r');
   try { fsyncSync(fd); } finally { closeSync(fd); }
@@ -31,7 +32,8 @@ export class SolanaLedger {
       try { execFileSync('powershell.exe', ['-NoProfile','-Command',script], { stdio: 'pipe' }); } catch { throw new Error('ledger access control is not protected'); }
     } else if ((lstatSync(this.path).mode & 0o077) !== 0 || (lstatSync(dirname(this.path)).mode & 0o077) !== 0) throw new Error('ledger permissions unsafe');
   }
-  read(): SolanaLedgerEntry[] {
+  read(opts: { allowRetired?: boolean } = {}): SolanaLedgerEntry[] {
+    if (!opts.allowRetired && existsSync(this.path + '.retired')) throw new Error('Solana legacy signer retired; use canonical PostgreSQL history');
     this.assertProtected();
     let parsed: z.infer<typeof Ledger>; try { parsed = Ledger.parse(JSON.parse(readFileSync(this.path,'utf8'))); } catch { throw new Error('ledger history unavailable; reconciliation required'); }
     if (parsed.owner !== this.owner || new Set(parsed.entries.map(e => e.id)).size !== parsed.entries.length || new Set(parsed.entries.filter(e => e.signature).map(e => e.signature)).size !== parsed.entries.filter(e => e.signature).length) throw new Error('ledger identity or history conflict');
@@ -50,7 +52,7 @@ export class SolanaLedger {
   upsert(entry: SolanaLedgerEntry): void { this.write([...this.read().filter(e => e.id !== entry.id),entry]); }
   async exclusive<T>(fn: () => Promise<T>): Promise<T> {
     this.read(); let fd: number; try { fd = openSync(this.path+'.lock','wx',0o600); } catch { throw new Error('ledger locked; active signer or manual crash recovery required'); }
-    try { return await fn(); } finally { closeSync(fd); unlinkSync(this.path+'.lock'); }
+    try { this.read(); return await fn(); } finally { closeSync(fd); unlinkSync(this.path+'.lock'); }
   }
   assertCaps(amount: bigint, fee: bigint, maxAmount: bigint, maxFee: bigint): void {
     const entries = this.read();

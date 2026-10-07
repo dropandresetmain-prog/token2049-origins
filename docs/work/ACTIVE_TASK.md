@@ -1,15 +1,15 @@
-# Active task — hosted commerce completion
+# Active task - hosted commerce completion
 
 ## Goal and base
 - Base: ca5519ac6abb134b81f5cc194657a55718ec4701 (review/final-astra).
 - Branch: feat/hosted-commerce-completion.
 - Worktree: C:/Dev/t2o-wt-hosted-commerce-completion.
-- Complete Atlas/Nuitée enablement, generic readiness recovery, free hosted Solana.
+- Complete Atlas/Nuitee enablement, generic readiness recovery, free hosted Solana.
 - Do not modify shared checkout, main, historical E2E evidence, or unrelated lanes.
 
 ## Required outcomes
-- Atlas sandbox quote executable; proven guards retained; no new booking/payment.
-- Nuitée current capability traced; remove only artificial restriction if present.
+- Atlas sandbox executable; proven guards retained; no new booking/payment.
+- Nuitee capability traced; remove only artificial restriction if present.
 - One generic read-only readiness recovery for both rails; sanitized diagnostics.
 - No-spend smoke uses saved profile with fulfillment: { category: retail }.
 - Free public Solana HTTPS payer + bearer auth + PostgreSQL; no disk/private service.
@@ -19,34 +19,40 @@
 
 ## Checklist
 - [x] Verify exact base and create isolated requested worktree.
-- [x] Trace provider enablement; live Atlas false/Nuit�e sandbox-key configured; candidate Atlas true.
+- [x] Provider enablement: live Atlas false; candidate true; no Nuitee restriction found.
 - [x] Inspect protected history: payer 7 entries/94220; sponsor 6 entries/25002 fees.
-- [x] Implement bounded generic status diagnostics/recovery; 56 focused tests pass.
-- [x] Fix saved-profile smoke; pending integration evidence.
-- [x] PostgreSQL ledger/import/retirement; 7 focused PostgreSQL tests pass.
-- [ ] Public Solana payer with internal sponsor and independently verified finality.
-- [ ] Free Render provisioning and dual-source config/tests.
-- [ ] Focused tests and checkpoint commits after verified phases.
+- [x] Bounded generic status diagnostics/recovery; no payment retries; wake removed.
+- [x] Saved-profile smoke; optional payer probes follow MCP; integration passes.
+- [x] PostgreSQL ledger/import/retirement and immutable reservation tests pass.
+- [x] Public Solana payer with internal sponsor and independently verified finality.
+- [x] Free Render provisioning and dual-source configuration/tests.
+- [x] Provider/readiness checkpoint 2e07802; Solana checkpoint next.
 - [ ] Final gates once; secret scan, migration checksums, ancestry, clean status.
 - [ ] Completion report with honest hosted evidence limits.
 
 ## Current checkpoint
-- Candidate Atlas sandbox gate enabled; no provider guard changes; Nuit�e needs no restriction edit.
-- Provider suites and 22 provisioning tests pass; live Atlas gate remains false (no deploy).
-- Generic diagnostics/recovery tested; no proven live cold failure classification yet; wake removed.
-- Solana public payer uses internal sponsor, no facilitator HTTP surface, gateway finality verification.
+- Candidate Atlas gate enabled; exact sandbox, zero-fee and single-pay guards preserved.
+- Provider suites and 22 existing provisioning tests pass; live Atlas remains false.
+- Generic transient-503 recovery for both rails collects the same MCP quote operation.
+- Live Cardano status connected in 33219 ms without health pre-warming.
+- A genuinely cold/restarting live state or prior fast-error root cause is not proven.
+- Solana uses internal sponsor; gateway verifies finality without signing/broadcasting.
 - New migration 0008; all older migrations untouched.
-- Both Solana identities retained; sponsor is also treasury owner, payer remains distinct.
-- Canonical legacy files located under the older solana-funding worktree, not missing main data path.
-- Two unsigned 1050 reservations remain counted; they block migration/readiness pending reconciliation.
-- Key files inherit broad Modify access; apply must refuse until permissions are fixed.
-- Local configured caps are blank; 102000 cap is historical, no new policy silently inferred.
-- Real histories and key permissions remain unchanged; no chain spend/deploy/service write.
+- Both existing Solana identities retained; sponsor is also treasury, payer distinct.
+- Canonical histories are in the older solana-funding worktree, not missing main data path.
+- Two unsigned 1050 reservations remain counted and block migration/readiness.
+- Both real key files inherit broad access; apply refuses until permissions are fixed.
+- Current caps missing/blank; historical 102000 cap is not silently reauthorized.
+- Real histories/key permissions unchanged; no chain spend/deploy/service write.
+- Solana focused suite: 33 tests pass; permission/smoke/transient: 6 pass, 47 skipped.
+- Actual service uses isolated PostgreSQL/fake RPC, retaining identical imports on restart.
+- Legacy facilitator still requires explicit URL/token; hosted mode needs neither.
 
 ## Next action
-- Finish sponsor/payment/provisioning tests and hosted dual-rail integration.
-- Run no-spend live provider and payer reads where safe; clearly separate from candidate acceptance.
-- Checkpoint verified provider/readiness changes, then final candidate gate and report.
+- Commit verified Solana milestone, then run the final repository gate once.
+- Check migration ordering/checksums, secrets, ancestry and clean status.
+- Save completion report/handoff; stop at final checkpoint for user decision.
+- Real migration/deployment/funding remain unauthorized and blocked by protected state.
 
 ## Critical constraints
 - No deploy, merge, merchant booking, chain spend, history reset, or new identity.
@@ -54,9 +60,13 @@
 - Reservation before signing; ambiguous outcomes never produce a new signature.
 - Never retry /pay as part of readiness recovery.
 - Secrets only in protected files/environment; no credentials/bodies/PII in diagnostics.
-- Read this file before each major phase, after agents/compaction, before completion.
+- Read before major phases, after agents/compaction, and before completion.
 
 ## Evidence status
-- Historical Atlas+Cardano and Nuitée+Solana E2E are pre-existing, not rerun.
-- Current hosted acceptance and actual cold restart have not yet been observed.
-- Solana hosted proof depends on deployment authorization; no claim of live proof.
+- Historical Atlas+Cardano and Nuitee+Solana E2E are pre-existing, not rerun.
+- Local candidate with hosted config: Atlas 5 offers/quote, Nuitee 10 offers/quote.
+- Provider probes use the saved profile and create no order/payment/booking.
+- Public MCP quote acceptance and actual cold restart are not yet observed.
+- Evidence: docs/evidence/hosted-commerce-completion/*.json (sanitized).
+- Both rails visible together in local MCP integration; live Solana not provisioned.
+- No live PostgreSQL import, retirement or funding proof has been performed.

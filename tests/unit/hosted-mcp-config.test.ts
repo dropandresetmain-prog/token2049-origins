@@ -40,7 +40,7 @@ describe('hosted MCP configuration', () => {
     ['missing PUBLIC_BASE_URL', { PUBLIC_BASE_URL: undefined }],
     ['credentials in the origin', { MCP_PUBLIC_URL: 'https://user:pw@token2049-origins.onrender.com' }],
     ['a half-configured Solana bridge', { SOLANA_PAYER_BRIDGE_URL: 'http://t2o-solana-payer:8789' }],
-    ['a public Solana bridge', { SOLANA_PAYER_BRIDGE_URL: 'https://payer.example.com', SOLANA_PAYER_BRIDGE_TOKEN_FILE: 'x' }],
+    ['a remote-http Solana bridge', { SOLANA_PAYER_BRIDGE_URL: 'http://payer.example.com', SOLANA_PAYER_BRIDGE_TOKEN_FILE: 'x' }],
     ['a half-configured Cardano bridge', { CARDANO_PAYER_BRIDGE_TOKEN_FILE: undefined }],
     ['a plain-http payer origin', { CARDANO_PAYER_BRIDGE_URL: 'http://t2o-cardano-payer.onrender.com' }],
     ['the gateway as its own payer', { CARDANO_PAYER_BRIDGE_URL: PUBLIC }],
@@ -75,6 +75,17 @@ describe('hosted MCP configuration', () => {
     for (const bad of ['http://payer.example.com', 'ftp://payer.example.com', 'https://payer.example.com/pay', 'https://payer.example.com#frag', 'not a url']) expect(() => parsePayerBridgeUrl(bad, 'x'), bad).toThrow(HostedConfigError);
     expect(() => parsePayerBridgeUrl(PUBLIC, 'x', PUBLIC)).toThrow(HostedConfigError);
     expect(parsePublicOrigin(PUBLIC + '/', 'x').origin).toBe(PUBLIC);
+  });
+
+  it('accepts a public HTTPS Solana bridge and a loopback HTTP development bridge', () => {
+    const root = mkdtempSync(join(tmpdir(), 'hosted-solana-bridge-')); roots.push(root);
+    const tokenFile = join(root, 'bridge-token');
+    writeFileSync(tokenFile, 'solana-bridge-token-0123456789-abcdef');
+    const base = { SOLANA_PAYER_BRIDGE_TOKEN_FILE: tokenFile };
+    expect(loadHostedMcpConfig(env({ ...base, SOLANA_PAYER_BRIDGE_URL: 'https://solana-payer.onrender.com' }))!.solanaBridge?.url)
+      .toBe('https://solana-payer.onrender.com');
+    expect(loadHostedMcpConfig(env({ ...base, SOLANA_PAYER_BRIDGE_URL: 'http://127.0.0.1:8789' }))!.solanaBridge?.url)
+      .toBe('http://127.0.0.1:8789');
   });
 });
 

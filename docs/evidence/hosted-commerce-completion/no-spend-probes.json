@@ -1,0 +1,53 @@
+{
+  "at": "2026-10-07T12:15:58.550Z",
+  "noSpend": true,
+  "liveAtlasGate": "false",
+  "liveGatewayBranch": "main",
+  "mode": "local candidate with hosted provider configuration; no deploy/order/pay/book",
+  "cardanoReadiness": {
+    "elapsedMs": 33219,
+    "connected": true,
+    "headroomBaseUnits": "5005180",
+    "diagnostics": [
+      {
+        "type": "payer_readiness",
+        "rail": "cardano",
+        "route": "status",
+        "outcome": "success",
+        "ms": 33219,
+        "timeoutMs": 60000
+      }
+    ],
+    "genuineColdStateEstablished": false
+  },
+  "providers": [
+    {
+      "provider": "atlas",
+      "readiness": "EXTERNAL_CHECK_PASSED",
+      "offers": 5,
+      "savedProfileUsed": true,
+      "quoted": true,
+      "merchantTotal": {
+        "currency": "USD",
+        "amountMinor": "2674",
+        "scale": 2
+      },
+      "expiresAt": "2026-10-07T12:26:33.323Z",
+      "noOrderPaymentOrBooking": true
+    },
+    {
+      "provider": "nuitee",
+      "readiness": "EXTERNAL_CHECK_PASSED",
+      "offers": 10,
+      "savedProfileUsed": true,
+      "quoted": true,
+      "merchantTotal": {
+        "currency": "USD",
+        "amountMinor": "9107",
+        "scale": 2
+      },
+      "expiresAt": "2026-10-07T12:26:45.208Z",
+      "noOrderPaymentOrBooking": true
+    }
+  ]
+}

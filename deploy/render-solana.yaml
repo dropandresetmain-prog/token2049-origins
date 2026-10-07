@@ -1,19 +1,19 @@
-# Solana-only Blueprint. Creates no public service and does not redeploy the canonical gateway.
-# Budget: Starter $7/month + 1 GB disk $0.25/month; verify current pricing before provision.
+# Apply only after final deployment approval. The gateway and Cardano payer remain existing free services.
 services:
-  - type: pserv
+  - type: web
     name: t2o-solana-payer
     runtime: docker
     dockerfilePath: ./Dockerfile.solana
-    branch: feat/hosted-solana-mcp
+    branch: feat/hosted-commerce-completion
     region: singapore
-    plan: starter
+    plan: free
     autoDeployTrigger: 'off'
-    disk:
-      name: solana-histories
-      mountPath: /var/data
-      sizeGB: 1
+    healthCheckPath: /health
     envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: SOLANA_SETTLEMENT_MODE
+        value: payer_broadcast
       - key: SOLANA_NETWORK
         value: devnet
       - key: SOLANA_RPC_URL
@@ -34,38 +34,35 @@ services:
         sync: false
       - key: SOLANA_PAYER_TOKEN_ACCOUNT
         sync: false
-      # Set actual Render Internal hostname plus these exact ports, identically on gateway/payer.
-      - key: SOLANA_FACILITATOR_URL
+      - key: SOLANA_MAX_PAYMENT_BASE_UNITS
         sync: false
-      - key: SOLANA_FACILITATOR_TRUSTED_PRIVATE_ORIGIN
+      - key: SOLANA_PAYER_MAX_PURCHASE_BASE_UNITS
+        sync: false
+      - key: SOLANA_PAYER_MAX_TOTAL_BASE_UNITS
+        sync: false
+      - key: SOLANA_PAYER_MAX_COMMERCIAL_USD_MINOR
+        sync: false
+      - key: SOLANA_SPONSOR_MAX_TOTAL_FEE_LAMPORTS
+        sync: false
+      - key: SOLANA_GATEWAY_URL
         sync: false
       - key: SOLANA_PAYER_BRIDGE_ALLOWED_HOSTS
         sync: false
-      - key: SOLANA_PAYER_BRIDGE_PORT
-        value: '8789'
-      - key: SOLANA_MAX_PAYMENT_BASE_UNITS
-        value: '10000'
-      - key: SOLANA_PAYER_MAX_PURCHASE_BASE_UNITS
-        value: '10000'
-      - key: SOLANA_PAYER_MAX_TOTAL_BASE_UNITS
-        value: '10000'
-      - key: SOLANA_PAYER_MAX_COMMERCIAL_USD_MINOR
-        value: '1000'
-      - key: SOLANA_SPONSOR_MAX_TOTAL_FEE_LAMPORTS
-        value: '100000'
-      - key: SOLANA_LEDGER_DIRECTORY
-        value: /var/data/solana
-      - key: SOLANA_HOSTED_DATA_DIRECTORY
-        value: /var/data/solana
       - key: SOLANA_PAYER_KEY_FILE
-        value: /etc/secrets/solana-hosted-payer.json
+        value: /etc/secrets/solana-payer-key
       - key: SOLANA_SPONSOR_KEY_FILE
-        value: /etc/secrets/solana-hosted-sponsor.json
-      - key: SOLANA_FACILITATOR_TOKEN_FILE
-        value: /etc/secrets/solana-facilitator-token
+        value: /etc/secrets/solana-sponsor-key
       - key: SOLANA_PAYER_BRIDGE_TOKEN_FILE
         value: /etc/secrets/solana-payer-bridge-token
       - key: SOLANA_GATEWAY_TOKEN_FILE
         value: /etc/secrets/solana-payer-gateway-token
-      - key: SOLANA_GATEWAY_URL
+      - key: SOLANA_LEGACY_SIGNERS_RETIRED
+        value: 'true'
+      - key: SOLANA_LEGACY_PAYER_LEDGER_FILE
+        value: /etc/secrets/solana-legacy-payer
+      - key: SOLANA_LEGACY_SPONSOR_LEDGER_FILE
+        value: /etc/secrets/solana-legacy-sponsor
+      - key: SOLANA_LEGACY_PAYER_LEDGER_SHA256
+        sync: false
+      - key: SOLANA_LEGACY_SPONSOR_LEDGER_SHA256
         sync: false
