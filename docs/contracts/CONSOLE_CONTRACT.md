@@ -29,19 +29,19 @@ The console lane does not change gateway contracts. Gateway changes the console 
 
 ## Access
 
-The console asks for a gateway API client token ("access key" on screen). It needs these scopes:
+The console asks for a gateway API client token ("Password" on screen). It needs these scopes:
 
 | Scope | Why |
 |---|---|
 | `purchases:read` | Purchase status, payment and receipt |
 | `evidence:read` | Purchase list, proof and activity |
-| `quotes:write` | Price details and title on the purchase page (today only; see G5) |
+| `quotes:write` | Optional legacy price-detail read only (see G5); never grant this to a judge |
 
 Missing optional scopes degrade gracefully: proof, activity and price details become unavailable with a plain message;
 the purchase itself still loads.
 
 The operator screens need `operator:read` as well (the `operator` role of `npm run client:create` has `purchases:read`,
-`evidence:read` and `operator:read`). A customer key never has it. See [Operator screens](#operator-screens).
+`evidence:read` and `operator:read`). Ordinary customer keys do not have operator access. The dedicated hosted judge client (`cli_HOSTEDCONSOLE`) has exactly those three read scopes and is restricted to GET requests by HTTP authentication. Bank refresh and all purchase, quote and funding mutations are denied even though bank refresh otherwise accepts `operator:read`. Only the password SHA-256 is configured server-side (`MCP_CONSOLE_KEY_SHA256`); the plaintext remains in protected operator storage and browser memory. See [Operator screens](#operator-screens).
 
 ## Reads
 

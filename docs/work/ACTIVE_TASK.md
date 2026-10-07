@@ -62,7 +62,8 @@
 - Main promotion / exact final deployment / freeze: blocked on active lane and final gates.
 
 ## Next action
-- Read-only Render service/deploy inventory.
-- Inspect auth middleware and focused tests; implement narrow read-only judge access.
-- Inspect submission docs and CRE/CDP evidence before importing approved paths.
+- Await the activation full report and explicit merge decision; do not copy partial runtime commits.
+- If safe, integrate its final SHA, preserving judge GET-only auth and the release tracker.
+- Run final candidate checks; take deployment ownership only after activation stops.
+- Install the dedicated password hash, deploy exact candidate, cold-test all four views, then promote/freeze.
 - Re-read this file before lane integration, promotion, deployment, or completion.

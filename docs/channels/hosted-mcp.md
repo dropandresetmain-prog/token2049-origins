@@ -124,7 +124,7 @@ ChatGPT → Settings → Connectors → Advanced → enable **Developer mode** �
 - A failed or ambiguous first payment attempt is not re-sent by the same `buy` (the existing "never resend unknown payments" rule); request a fresh quote.
 - `/mcp` is stateless: no server-initiated streams or sessions. Long payments (the bridge call can take up to ~100 s) depend on the client's tool timeout; if it times out, `get_purchase` shows the outcome.
 - Consent throttling is global (one owner), not per IP, because the platform proxy hides client IPs.
-- Payer container runs as root so it can write the root-owned disk mount (untested on Render; see report).
+- Historical disk-mount notes are superseded: the free hosted Cardano payer uses PostgreSQL history and Render secret files. Current deployment source and the release checkpoint establish service state.
 
 ## Saved demo customer profile (customer-facing language)
 
