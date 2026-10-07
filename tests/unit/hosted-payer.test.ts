@@ -100,7 +100,7 @@ describe('PostgreSQL payer ledger', () => {
   it('persists the per-payment cap and the daily cap from durable history', async () => {
     const f = fixture({ PAYER_MAX_PER_PAYMENT_BASE_UNITS: '300000' });
     const a = await f.boot(newTestSchema());
-    await expect(a.payer.pay(idOf(1))).rejects.toThrow('per_payment_cap');
+    await expect(a.payer.pay(idOf(1))).rejects.toMatchObject({ code: 'policy_violation', retrySafe: true });
     expect(f.signer).not.toHaveBeenCalled();
     expect(await rows(a.db)).toEqual([]);
     const g = fixture({ PAYER_MAX_DAILY_BASE_UNITS: '500000', PAYER_MAX_CUMULATIVE_BASE_UNITS: '5000000' });
@@ -125,7 +125,7 @@ describe('PostgreSQL payer ledger', () => {
     f.control.loseFirstSend();
     const a = await f.boot(schema);
     const single = new Payer({ ...f.deps, maxAttempts: 1, ledger: a.ledger }); // one attempt: the lost response ends this run
-    await expect(single.pay(idOf(1))).rejects.toThrow();
+    await expect(single.pay(idOf(1))).rejects.toMatchObject({ retrySafe: false });
     expect(f.sent.length).toBeGreaterThanOrEqual(1);
     const stored = (await rows(a.db))[0];
     expect(stored.header).toBe(f.sent[0]);
@@ -152,7 +152,7 @@ describe('PostgreSQL payer ledger', () => {
     const now = NOW.toISOString();
     await a.db.run("INSERT INTO hosted_payer_ledger(purchase_id, payer_address, network, asset, amount_base_units, pay_to, status, header, created_at, updated_at) VALUES ($1,$2,$3,$4,'400000',$5,'signing',NULL,$6,$6)",
       idOf(5), WALLET, f.config.network, f.config.allowedAsset, TO, now); // a crash left this reservation
-    await expect(a.payer.pay(idOf(5))).rejects.toThrow(/did not finish; operator reconciliation/);
+    await expect(a.payer.pay(idOf(5))).rejects.toMatchObject({ code: 'conflict', retrySafe: false });
     expect(f.signer).not.toHaveBeenCalled();
     expect(f.sent).toEqual([]);
     // Its reservation still counts against the cap, so it can never be silently exceeded.
@@ -165,7 +165,7 @@ describe('PostgreSQL payer ledger', () => {
   it('releases only the unsent reservation after an in-process signing failure, so a retry can sign once', async () => {
     const f = fixture(); const a = await f.boot(newTestSchema());
     f.control.failSigning();
-    await expect(a.payer.pay(idOf(1))).rejects.toThrow('payment could not be signed');
+    await expect(a.payer.pay(idOf(1))).rejects.toMatchObject({ retrySafe: true });
     expect(await rows(a.db)).toEqual([]);
     f.control.okSigning();
     await a.payer.pay(idOf(1));

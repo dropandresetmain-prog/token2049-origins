@@ -1,6 +1,6 @@
 import express, { type NextFunction, type Request, type Response } from 'express';
 import { randomUUID } from 'node:crypto';
-import { ZodError } from 'zod';
+import { z, ZodError } from 'zod';
 import type { CommerceCore } from '../../core/service.js';
 import { CoreError } from '../../core/errors.js';
 import { authenticate } from '../../infrastructure/auth.js';
@@ -97,7 +97,8 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
     '/v1/quotes/:id',
     auth,
     asyncH(async (req, res) => {
-      res.json({ quote: (await core.getQuote(req.actor!, String(req.params.id))) });
+      if (req.query.active !== undefined && req.query.active !== 'true') throw new CoreError('invalid_request', 'active must be true when supplied');
+      res.json({ quote: (await core.getQuote(req.actor!, String(req.params.id), req.query.active === 'true')) });
     }),
   );
 
@@ -113,6 +114,14 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
 
   app.get('/v1/quotes/:id/purchase', auth, asyncH(async (req, res) => {
     res.json(await core.quotePurchase(req.actor!, String(req.params.id)));
+  }));
+
+  app.post('/v1/purchases/:id/payment-attempt', auth, asyncH(async (req, res) => {
+    z.object({}).strict().parse(req.body);
+    res.json(await core.claimPaymentAttempt(req.actor!, String(req.params.id)));
+  }));
+  app.post('/v1/purchases/:id/payment-attempt/complete', auth, asyncH(async (req, res) => {
+    res.json(await core.completePaymentAttempt(req.actor!, String(req.params.id), req.body));
   }));
 
   app.post(

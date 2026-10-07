@@ -18,9 +18,8 @@ export interface ToolDeps {
   /** Secret strings (gateway token, bridge tokens) that must never appear in any output. */
   secrets: string[];
   /**
-   * Hosted only: ChatGPT abandons a tool call after about a minute, but an exact quote on a small free instance and the payer's settlement can
-   * take longer. With this set, those operations keep running in this (persistent) process; the tool answers after `waitMs` with a "still
-   * running" result and the same call (same arguments) is safe to repeat: it joins the running job instead of starting another.
+   * Hosted calls can outlast the host's response window. Search, quoting and purchase handoffs keep running in this process;
+   * repeat calls join the operation. Payment handoffs also have a durable gateway claim, so restarts cannot start a second attempt.
    */
   background?: BackgroundJobs;
   /** Present on the hosted endpoint: tools declare OAuth security schemes and enforce the token's scopes. */
@@ -38,8 +37,8 @@ export class BackgroundJobs {
     return new Promise((resolve) => { const t = setTimeout(() => resolve('timeout'), ms); t.unref?.(); });
   }
 
-  /** Start (or join) the job for `key`; resolve with its value, or `{ pending: true }` if it is still running after waitMs. Failures are rethrown once and forgotten. */
-  async run<T>(key: string, start: () => Promise<T>): Promise<{ pending: false; value: T } | { pending: true }> {
+  /** Join one job per key. Completed quote results may be retained; other operations are consumed after collection. */
+  async run<T>(key: string, start: () => Promise<T>, retain = true): Promise<{ pending: false; value: T } | { pending: true }> {
     for (const [k, j] of this.jobs) if (j.state !== 'running' && j.expires <= this.now()) this.jobs.delete(k);
     let job = this.jobs.get(key);
     if (!job) {
@@ -54,6 +53,7 @@ export class BackgroundJobs {
     await Promise.race([job.promise, this.wait(this.waitMs)]);
     if (job.state === 'running') return { pending: true };
     if (job.state === 'failed') { this.jobs.delete(key); throw job.error; }
+    if (!retain) this.jobs.delete(key);
     return { pending: false, value: job.value as T };
   }
 
@@ -71,6 +71,7 @@ const stableKey = (value: unknown): string => JSON.stringify(value, (_k, v) => (
 /** OAuth scope each tool needs (same names as the gateway's customer scopes). */
 const TOOL_SCOPE = { find_offers: 'offers:read', create_quote: 'quotes:write', buy: 'purchases:write', get_purchase: 'purchases:read' } as const;
 type ToolName = keyof typeof TOOL_SCOPE;
+type ToolContext = { authInfo?: { scopes: string[]; extra?: Record<string, unknown> } };
 
 /** `securitySchemes` is how ChatGPT learns a tool needs OAuth (and which scopes) before it links an account. */
 function securityMeta(deps: ToolDeps, tool: ToolName): { _meta: Record<string, unknown> } | Record<string, never> {
@@ -184,6 +185,7 @@ export function shortlistOf(offers: OfferView[]) {
     terms: o.terms.slice(0, 5),
     expiresAt: o.expiresAt,
     observedAt: o.sourceObservedAt,
+    ...(o.checkout ? { checkout: o.checkout } : {}),
   }));
 }
 
@@ -205,7 +207,8 @@ export function offerSelectionGuide(count: number) {
 
 function describeOffers(offers: OfferView[], totalFound: number): string {
   if (offers.length === 0) return 'No offers found. Ask the user to refine the request or raise the spend ceiling. Nothing was bought.';
-  const lines = offers.map((o, i) => `${i + 1}. ${o.title} | ${o.category}/${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)}${o.sourceOffer ? ' | merchant ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl : ''} | offerId ${o.offerId} | expires ${o.expiresAt}`);
+  const lines = offers.map((o, i) => `${i + 1}. ${o.title} | ${o.category}/${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)}${o.sourceOffer ? ' | merchant ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl : ''} | offerId ${o.offerId} | expires ${o.expiresAt}${o.checkout ? ' | SEARCH ONLY: ' + o.checkout.reason : ''}`);
+  if (offers.every(o => o.checkout?.status === 'search_only')) return [...lines, 'Checkout is unavailable for these results. Explain the limitation now. Do not collect fulfillment or passenger details and do not call create_quote.'].join('\n');
   return [
     `Shortlist: ${offers.length} option(s)${totalFound > offers.length ? ` (the top ${offers.length} of ${totalFound} found)` : ''}. Offers are indicative and NOT executable. Nothing is bought or reserved.`,
     ...lines,
@@ -307,7 +310,25 @@ function confirmationText(c: Record<string, unknown>): string {
 /* ---------------- tool registration ---------------- */
 
 export function registerTools(server: McpServer, deps: ToolDeps): void {
-  const paymentAttempts = new Set<string>();
+  // Wrap the complete operation, including payer readiness, so every hosted reply is bounded.
+  const bounded = <T extends Record<string, unknown>>(name: ToolName, handler: (args: T, extra: ToolContext) => Promise<CallToolResult>) => async (args: T, extra: ToolContext) => {
+    const denied = missingScope(deps, name, extra);
+    if (denied) return denied;
+    if (!deps.background) return handler(args, extra);
+    const customer = String(extra.authInfo?.extra?.customerId ?? 'anonymous');
+    const key = createHash('sha256').update(stableKey({ customer, name, args })).digest('hex');
+    const r = await deps.background.run(key, () => handler(args, extra), name === 'create_quote');
+    if (!r.pending) {
+      const quote = r.value.structuredContent?.quote as QuoteView | undefined;
+      if (quote && name === 'create_quote') {
+        try { await deps.gateway.getQuote(quote.quoteId, true); }
+        catch (e) { return gatewayFailure(deps, e); }
+      }
+      return r.value;
+    }
+    return success(deps, 'The operation is still in progress. Wait about 20 seconds, then repeat ' + name + ' with EXACTLY the same arguments to collect the outcome. Do not start another search, order or payment.',
+      { status: name === 'create_quote' ? 'quote_pending' : name === 'buy' ? 'purchase_pending' : 'search_pending', retryAfterSeconds: 20, ...('quoteId' in args ? { quoteId: args.quoteId } : {}), ...('offerId' in args ? { offerId: args.offerId } : {}) });
+  };
   server.registerTool(
     'find_offers',
     {
@@ -318,7 +339,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       ...securityMeta(deps, 'find_offers'),
     },
-    async ({ intent }, extra) => {
+    bounded('find_offers', async ({ intent }, extra) => {
       const denied = missingScope(deps, 'find_offers', extra);
       if (denied) return denied;
       try {
@@ -332,11 +353,14 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         if (found.length === 0 && wanted.category === 'retail' && wanted.discovery === undefined) found = (await deps.gateway.searchOffers({ ...wanted, discovery: 'controlled_catalog' })).offers;
         // Gateway order is preserved; the host model recommends from these real fields and the user chooses.
         const offers = found.slice(0, SHORTLIST_SIZE);
-        return success(deps, describeOffers(offers, found.length), { offers, shortlist: shortlistOf(offers), totalFound: found.length, interaction: offerSelectionGuide(offers.length) });
+        const interaction = offers.length && offers.every(o => o.checkout?.status === 'search_only')
+          ? { step: 'search_only', nextAction: 'explain_checkout_unavailable', createQuoteAllowedNow: false }
+          : offerSelectionGuide(offers.length);
+        return success(deps, describeOffers(offers, found.length), { offers, shortlist: shortlistOf(offers), totalFound: found.length, interaction });
       } catch (e) {
         return gatewayFailure(deps, e);
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -349,25 +373,13 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       annotations: { readOnlyHint: false, destructiveHint: false, openWorldHint: true },
       ...securityMeta(deps, 'create_quote'),
     },
-    async ({ offerId, fulfillment }, extra) => {
+    bounded('create_quote', async ({ offerId, fulfillment }, extra) => {
       const denied = missingScope(deps, 'create_quote', extra);
       if (denied) return denied;
       try {
         const assessment = assessFulfillment(fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
-        const ask = () => deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
-        let created: Awaited<ReturnType<typeof ask>>;
-        if (deps.background) {
-          const customer = String((extra as { authInfo?: { extra?: Record<string, unknown> } }).authInfo?.extra?.customerId ?? 'anonymous');
-          const key = createHash('sha256').update(stableKey({ customer, offerId, fulfillment: assessment.value })).digest('hex');
-          const r = await deps.background.run(key, ask);
-          if (r.pending) {
-            return success(deps, 'The exact quote is still being prepared (the merchant checkout is slow). Nothing has been purchased. Tell the user it is in progress, wait about 20 seconds, then call create_quote again with EXACTLY the same offerId and fulfillment to collect it. Do not change the arguments and do not start another search.',
-              { status: 'quote_pending', retryAfterSeconds: 20, offerId });
-          }
-          created = r.value;
-        } else created = await ask();
-        const { quote } = created;
+        const { quote } = await deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
         const payers = await connectedPayers(deps);
         const fundingSources = payers.map(p => p.source);
         const headrooms = new Map(payers.flatMap(p => (p.headroom !== undefined ? [[p.source.sourceId, p.headroom] as [string, bigint]] : [])));
@@ -375,7 +387,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       } catch (e) {
         return gatewayFailure(deps, e);
       }
-    },
+    }),
   );
 
   server.registerTool(
@@ -394,7 +406,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
       ...securityMeta(deps, 'buy'),
     },
-    async ({ quoteId, maxTotal, quoteDigest, selectedFundingOptionId, idempotencyKey }, extra) => {
+    bounded('buy', async ({ quoteId, maxTotal, quoteDigest, selectedFundingOptionId, idempotencyKey }, extra) => {
       const denied = missingScope(deps, 'buy', extra);
       if (denied) return denied;
       try {
@@ -420,10 +432,10 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
             : `Purchase ${purchase.purchaseId} already has payment or merchant activity. Follow it with get_purchase. Do not create another purchase.`;
           return failure(deps, message, { error: { code: 'conflict' }, purchase, progress: projectProgress(purchase) });
         }
-        let newlyCreated = false;
         // The one payer allowed to act for the selected option. Never another rail, never a fallback.
         let payer: BridgeClient | undefined;
-        if (!purchase) {
+        const canAttempt = !purchase || (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && purchase.paymentAttempt?.status === 'failed' && purchase.paymentAttempt.retrySafe);
+        if (canAttempt) {
           if (deps.bridges?.length) {
             const matching = (await connectedPayers(deps)).filter(p => sourceMatches(p.source, option));
             if (matching.length > 1) {
@@ -438,37 +450,40 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
             }
             payer = matching[0].bridge;
           }
-          const key = idempotencyKey ?? 'mcp:' + createHash('sha256').update(quoteId + ':' + selectedFundingOptionId).digest('hex');
-          try {
-            purchase = (await deps.gateway.createPurchase({ quoteId, approval }, key)).purchase;
-            newlyCreated = true;
-          } catch (e) {
-            if (!(e instanceof GatewayError) || e.code !== 'conflict') throw e;
-            const raced = await deps.gateway.quotePurchase(quoteId);
-            if (!raced.purchase || !sameApproval(raced.approval)) throw e;
-            purchase = raced.purchase;
+          if (!purchase) {
+            const key = idempotencyKey ?? 'mcp:' + createHash('sha256').update(quoteId + ':' + selectedFundingOptionId).digest('hex');
+            try {
+              purchase = (await deps.gateway.createPurchase({ quoteId, approval }, key)).purchase;
+            } catch (e) {
+              if (!(e instanceof GatewayError) || e.code !== 'conflict') throw e;
+              const raced = await deps.gateway.quotePurchase(quoteId);
+              if (!raced.purchase || !sameApproval(raced.approval)) throw e;
+              purchase = raced.purchase;
+            }
           }
         }
         let payment: Record<string, unknown> | undefined;
         let paymentFailed = false;
-        // A repeated interaction follows durable truth. Submitted/unknown payments are never sent again.
-        if (newlyCreated && purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && payer && !paymentAttempts.has(purchase.purchaseId)) {
-          paymentAttempts.add(purchase.purchaseId);
-          const attempt = payer.pay(purchase.purchaseId);
-          const first = deps.background ? await deps.background.within(attempt) : { pending: false as const, value: await attempt };
-          purchase = (await deps.gateway.getPurchase(purchase.purchaseId)).purchase;
-          if (first.pending) {
-            // The payer keeps working (its own durable history makes a repeat impossible); we simply stop waiting.
-            payment = { attempted: true, ok: null, inProgress: true };
-          } else if (first.value.ok) payment = { attempted: true, ok: true, transferReference: first.value.transferReference };
-          else {
-            payment = { attempted: true, ok: false, code: first.value.code, message: first.value.message };
-            paymentFailed = purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received';
+        // A durable claim precedes network I/O. Unknown/lost handoffs cannot silently initiate another payment.
+        if (purchase && canAttempt && payer && purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received') {
+          const claim = await deps.gateway.claimPaymentAttempt(purchase.purchaseId);
+          if (claim.claimed && claim.attempt) {
+            const result = await payer.pay(purchase.purchaseId);
+            await deps.gateway.completePaymentAttempt(purchase.purchaseId, {
+              attemptId: claim.attempt.attemptId, status: result.ok ? 'succeeded' : 'failed',
+              retrySafe: !result.ok && result.retrySafe === true,
+              errorCode: result.ok ? null : (/^[a-z_]{3,40}$/.test(result.code) ? result.code : 'bridge_error'),
+            });
+            payment = result.ok ? { attempted: true, ok: true, transferReference: result.transferReference }
+              : { attempted: true, ok: false, code: result.code, retrySafe: result.retrySafe === true };
           }
+          purchase = (await deps.gateway.getPurchase(purchase.purchaseId)).purchase;
         }
+        if (!purchase) throw new GatewayError('internal', 'purchase handoff did not return a purchase', null, null);
+        paymentFailed = purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && purchase.paymentAttempt?.status === 'failed';
 
         const status =
-          purchase.state === 'awaiting_funding' ? (purchase.paymentState !== 'not_received' ? 'confirmation_pending' : payment?.inProgress ? 'payment_in_progress' : paymentFailed ? 'payment_failed' : 'action_required') : purchase.state === 'funded_queued' || purchase.state === 'executing' ? 'execution_pending' : purchase.state;
+          purchase.state === 'awaiting_funding' ? (purchase.paymentState !== 'not_received' ? 'confirmation_pending' : purchase.paymentAttempt?.status === 'running' ? 'payment_in_progress' : paymentFailed ? 'payment_failed' : 'action_required') : purchase.state === 'funded_queued' || purchase.state === 'executing' ? 'execution_pending' : purchase.state;
         const structured: Record<string, unknown> = { status, purchase, progress: projectProgress(purchase), ...(payment ? { payment } : {}) };
         let text = describePurchase(purchase);
         const confirmation = orderConfirmation(purchase);
@@ -479,12 +494,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
 
         if (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received') {
           structured.fundingInstructions = purchase.fundingInstructions;
-          structured.message =
-            payment?.inProgress
-              ? 'The payer is submitting the payment (this can take a minute or more). Do NOT call buy again and do not retry. Tell the user it is in progress and call get_purchase with this purchaseId every ~20 seconds until it reports the outcome.'
-            : paymentFailed && payment
-              ? `Payment attempt failed [${String(payment.code)}]: ${String(payment.message)}. No purchase has been made yet.`
-              : 'Payment required: fund via a bounded payer client; no purchase has been made yet.';
+          structured.message = purchase.paymentAttempt ? projectProgress(purchase).message : 'Payment required: fund via a bounded payer client; no purchase has been made yet.';
           text = `${structured.message as string}\n${text}`;
         } else if (purchase.state === 'funded_queued' || purchase.state === 'executing') {
           text = `Execution is pending. Call get_purchase with purchaseId ${purchase.purchaseId} to check progress.\n${text}`;
@@ -493,7 +503,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
       } catch (e) {
         return gatewayFailure(deps, e);
       }
-    },
+    }),
   );
 
   server.registerTool(

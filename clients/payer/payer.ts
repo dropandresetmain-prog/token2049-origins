@@ -40,6 +40,8 @@ export type PayerErrorCode =
 
 /** Safe-to-return failure: messages are written here, never copied from gateway bodies or wallet code. */
 export class PayerError extends Error {
+  /** Set only while holding the durable ledger lock, after confirming no reservation exists. */
+  retrySafe = false;
   constructor(
     readonly code: PayerErrorCode,
     message: string,
@@ -243,7 +245,17 @@ export class Payer {
   /* ---------------- main flow ---------------- */
 
   async pay(purchaseId: string): Promise<PayResult> {
-    return this.ledger.exclusive(() => this.payLocked(purchaseId));
+    return this.ledger.exclusive(async () => {
+      try { return await this.payLocked(purchaseId); }
+      catch (e) {
+        if (e instanceof PayerError && PURCHASE_ID.test(purchaseId)) {
+          // Signed, accepted and unfinished signing records all remain ambiguous or committed.
+          // Read failures also fail closed. Never infer safety from the gateway's paymentState alone.
+          try { e.retrySafe = !(await this.ledger.find(purchaseId)); } catch { e.retrySafe = false; }
+        }
+        throw e;
+      }
+    });
   }
 
   private async payLocked(purchaseId: string): Promise<PayResult> {

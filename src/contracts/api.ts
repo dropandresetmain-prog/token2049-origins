@@ -23,6 +23,13 @@ export const PurchaseResponse = z.object({ purchase: PurchaseView }).strict();
 
 export const PurchaseEventsResponse = z.object({ events: z.array(PurchaseEventView) }).strict();
 
+export const CompletePaymentAttempt = z.object({
+  attemptId: z.string().regex(/^pat_[0-9A-Za-z]{10,40}$/),
+  status: z.enum(['succeeded', 'failed']),
+  retrySafe: z.boolean(),
+  errorCode: z.string().regex(/^[a-z_]{3,40}$/).nullable(),
+}).strict().refine(v => v.status === 'failed' || (!v.retrySafe && v.errorCode === null), { message: 'successful handoffs cannot authorize a retry' });
+
 export const CapabilitiesResponse = z
   .object({
     contractVersion: z.literal(CONTRACT_VERSION),

@@ -67,8 +67,8 @@ function send(res: ServerResponse, status: number, body: unknown): void {
   res.end(s);
 }
 
-function fail(res: ServerResponse, code: PayerErrorCode, message: string): void {
-  send(res, STATUS[code], { ok: false, error: { code, message } });
+function fail(res: ServerResponse, code: PayerErrorCode, message: string, retrySafe = false): void {
+  send(res, STATUS[code], { ok: false, error: { code, message }, retrySafe });
 }
 
 async function readBody(req: IncomingMessage, limit = 4096): Promise<string> {
@@ -159,7 +159,7 @@ export function createBridge(deps: BridgeDeps): Server {
       } catch (e) {
         if (e instanceof PayerError) {
           log({ type: 'bridge.refused', code: e.code });
-          return fail(res, e.code, e.message);
+          return fail(res, e.code, e.message, e.retrySafe);
         }
         log({ type: 'bridge.error' });
         return fail(res, 'internal', 'payer error');

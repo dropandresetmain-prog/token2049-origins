@@ -778,7 +778,7 @@ describe('hosted MCP: tool calls that outlast ChatGPT\'s ~60 s patience', () => 
       expect(Date.now() - t0).toBeLessThan(600);
       expect(first.isError).toBeFalsy();
       expect(first.structuredContent).toMatchObject({ status: 'quote_pending', retryAfterSeconds: 20 });
-      expect(first.content[0].text).toMatch(/call create_quote again with EXACTLY the same offerId and fulfillment/);
+      expect(first.content[0].text).toMatch(/repeat create_quote with EXACTLY the same arguments/);
       expect((await client.callTool({ name: 'create_quote', arguments: args }) as any).structuredContent.status).toBe('quote_pending');
       await sleep(800);
       const done = await client.callTool({ name: 'create_quote', arguments: args }) as any;
@@ -791,9 +791,9 @@ describe('hosted MCP: tool calls that outlast ChatGPT\'s ~60 s patience', () => 
     } finally { await client.close(); }
   });
 
-  for (const [name, delays, expectedStatus] of [
-    ['a payer that is slow before it has paid', { payStartDelayMs: 900 }, 'payment_in_progress'],
-    ['a payer that has paid but is slow to answer', { payResponseDelayMs: 900 }, 'execution_pending'],
+  for (const [name, delays] of [
+    ['a payer that is slow before it has paid', { payStartDelayMs: 900 }],
+    ['a payer that has paid but is slow to answer', { payResponseDelayMs: 900 }],
   ] as const) {
     it(`buy returns promptly with ${name}, never repeats the payment, and get_purchase follows it`, async () => {
       const f = await start({ withBridge: true, backgroundWaitMs: 150, ...delays });
@@ -806,14 +806,16 @@ describe('hosted MCP: tool calls that outlast ChatGPT\'s ~60 s patience', () => 
         const first = await client.callTool({ name: 'buy', arguments: args }) as any;
         expect(Date.now() - t0).toBeLessThan(700);
         expect(first.isError).toBeFalsy();
-        expect(first.structuredContent.status).toBe(expectedStatus);
-        expect(first.structuredContent.payment).toMatchObject({ attempted: true, inProgress: true });
-        if (expectedStatus === 'payment_in_progress') expect(first.content[0].text).toMatch(/Do NOT call buy again/);
+        expect(first.structuredContent.status).toBe('purchase_pending');
+        expect(first.content[0].text).toMatch(/repeat buy with EXACTLY the same arguments/);
         expect(first.content[0].text).not.toMatch(/ORDER CONFIRMED/);
-        const pid = first.structuredContent.purchase.purchaseId;
+        const pid = (await f.h.gw.db.get<{ id: string }>('SELECT id FROM purchases WHERE quote_id=$1', q.quoteId))!.id;
         const again = await client.callTool({ name: 'buy', arguments: args }) as any;
-        expect(again.structuredContent.purchase.purchaseId).toBe(pid);
+        expect(again.structuredContent.status).toBe('purchase_pending');
         await sleep(1300);
+        const collected = await client.callTool({ name: 'buy', arguments: args }) as any;
+        expect(collected.structuredContent.purchase.purchaseId).toBe(pid);
+        expect(collected.structuredContent.status).toBe('execution_pending');
         const polled = await client.callTool({ name: 'get_purchase', arguments: { purchaseId: pid } }) as any;
         expect(polled.structuredContent.purchase.paymentState).not.toBe('not_received');
         expect(f.bridge!.calls).toEqual([pid]);

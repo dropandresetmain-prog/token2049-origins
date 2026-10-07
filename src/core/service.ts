@@ -30,6 +30,8 @@ import { buildPurchaseView } from './views.js';
 import type { CreatePurchaseRequest } from '../contracts/api.js';
 
 import { demoData } from '../demo/config.js';
+import { CompletePaymentAttempt } from '../contracts/api.js';
+import { paymentAttempt } from './handoffs.js';
 import { SettlementPolicy, settlementBaseUnits, validateSettlement } from '../contracts/settlement.js';
 
 export const DEFAULT_ROUTE: Record<Category, ProviderRoute> = { retail: 'shopify', hotel: 'nuitee', flight: 'atlas' };
@@ -121,6 +123,12 @@ export class CommerceCore {
     await this.assertRouteReady(ex);
     await this.assessProvider(ex, intent);
     const found = await ex.search(intent);
+    let checkout: OfferView['checkout'];
+    try { ex.assertPaymentAvailable?.(); }
+    catch (e) {
+      if (!(e instanceof CoreError) || e.code !== 'route_unavailable') throw e;
+      checkout = { status: 'search_only', reason: e.message };
+    }
     const now = this.d.clock.now();
     const views: OfferView[] = [];
     await this.d.db.tx(async () => {
@@ -141,6 +149,7 @@ export class CommerceCore {
           sourceObservedAt: o.sourceObservedAt,
           expiresAt,
           executable: false,
+          ...(checkout ? { checkout } : {}),
         };
         await this.d.db.run(
           `INSERT INTO offers(id, customer_id, category, route, provider_environment, intent_json, public_json, execution_ref_json, expires_at, created_at)
@@ -322,10 +331,11 @@ export class CommerceCore {
     return out;
   }
 
-  async getQuote(actor: ActorContext, quoteId: string): Promise<QuoteView> {
+  async getQuote(actor: ActorContext, quoteId: string, requireActive = false): Promise<QuoteView> {
     this.requireScope(actor, 'quotes:write');
     const q = await getQuoteRow(this.d.db, quoteId);
     if (!q || q.customer_id !== actor.customerId) throw new CoreError('not_found', 'quote not found');
+    if (requireActive && Date.parse(q.expires_at) <= this.d.clock.now().getTime()) throw new CoreError('quote_expired', 'Exact quote expired; search and select again');
     return JSON.parse(q.public_json) as QuoteView;
   }
 
@@ -489,8 +499,39 @@ export class CommerceCore {
       .map((e) => ({ eventId: e.id, sequence: e.sequence, purchaseId: e.purchase_id, type: e.type, data: JSON.parse(e.data_json), at: e.created_at }));
   }
 
+  /** Claim before contacting a payer. A lost response stays ambiguous across process restarts. */
+  async claimPaymentAttempt(actor: ActorContext, id: string) {
+    this.requireScope(actor, 'purchases:write');
+    return this.d.db.tx(async () => {
+      await this.ownedPurchase(actor, id);
+      const p = (await this.d.db.get<PurchaseRow>('SELECT * FROM purchases WHERE id = $1 FOR UPDATE', id))!;
+      const current = await paymentAttempt(this.d.db, id);
+      if (p.state !== 'awaiting_funding' || p.payment_state !== 'not_received') return { claimed: false, attempt: current ?? null };
+      if (current && !(current.status === 'failed' && current.retrySafe)) return { claimed: false, attempt: current };
+      const quote = (await getQuoteRow(this.d.db, p.quote_id))!;
+      if (Date.parse(quote.expires_at) <= this.d.clock.now().getTime()) throw new CoreError('quote_expired', 'quote expired; no payment handoff was started');
+      const attemptId = newId('pat');
+      await this.d.db.run(`INSERT INTO payment_handoffs(purchase_id,attempt_id,api_client_id,status,retry_safe,error_code,updated_at)
+        VALUES ($1,$2,$3,'running',FALSE,NULL,$4) ON CONFLICT(purchase_id) DO UPDATE SET
+        attempt_id=EXCLUDED.attempt_id,api_client_id=EXCLUDED.api_client_id,status='running',retry_safe=FALSE,error_code=NULL,updated_at=EXCLUDED.updated_at`, id, attemptId, actor.clientId, this.now());
+      return { claimed: true, attempt: (await paymentAttempt(this.d.db, id))! };
+    });
+  }
+
+  /** Diagnostic completion never changes funding truth or merchant state. */
+  async completePaymentAttempt(actor: ActorContext, id: string, raw: unknown) {
+    this.requireScope(actor, 'purchases:write');
+    const body = CompletePaymentAttempt.parse(raw);
+    await this.ownedPurchase(actor, id);
+    const updated = await this.d.db.run(`UPDATE payment_handoffs SET status=$1,retry_safe=$2,error_code=$3,updated_at=$4
+      WHERE purchase_id=$5 AND attempt_id=$6 AND api_client_id=$7 AND status='running'`,
+      body.status, body.retrySafe, body.errorCode, this.now(), id, body.attemptId, actor.clientId);
+    if (!updated.changes) throw new CoreError('conflict', 'payment handoff already completed or owned by another client');
+    return { attempt: (await paymentAttempt(this.d.db, id))! };
+  }
+
   private async viewOf(p: PurchaseRow): Promise<PurchaseView> {
-    return await buildPurchaseView(this.d.db, p, this.d.config.publicBaseUrl);
+    return await buildPurchaseView(this.d.db, p, this.d.config.publicBaseUrl, this.d.clock.now().getTime());
   }
 
   requirementInput(p: PurchaseRow): FundingRequirementInput {

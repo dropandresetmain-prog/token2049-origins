@@ -35,6 +35,7 @@ export const OfferView = z
     sourceObservedAt: IsoTimestamp,
     expiresAt: IsoTimestamp,
     executable: z.literal(false),
+    checkout: z.object({ status: z.literal('search_only'), reason: z.string() }).strict().optional(),
   })
   .strict();
 export type OfferView = z.infer<typeof OfferView>;
@@ -240,6 +241,15 @@ export const FundingInstructions = z
   })
   .strict();
 
+export const PaymentAttempt = z.object({
+  attemptId: z.string().regex(/^pat_[0-9A-Za-z]{10,40}$/),
+  status: z.enum(['running', 'succeeded', 'failed']),
+  retrySafe: z.boolean(),
+  errorCode: z.string().regex(/^[a-z_]{3,40}$/).nullable(),
+  updatedAt: IsoTimestamp,
+  reviewRequired: z.boolean().optional(),
+}).strict();
+
 export const PurchaseView = z
   .object({
     purchaseId: PurchaseId,
@@ -264,6 +274,9 @@ export const PurchaseView = z
     providerReference: z.string().nullable(),
     receipt: ReceiptView.nullable(),
     statusReason: z.string().nullable(),
+    /** Channel diagnostics only; confirmed funding remains authoritative. */
+    paymentAttempt: PaymentAttempt.optional(),
+    operatorAttention: z.boolean().optional(),
     createdAt: IsoTimestamp,
     updatedAt: IsoTimestamp,
   })

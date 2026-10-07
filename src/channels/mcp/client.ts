@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { Approval, PurchaseView } from '../../contracts/commerce.js';
+import { Approval, PurchaseView, PaymentAttempt } from '../../contracts/commerce.js';
+import { CompletePaymentAttempt } from '../../contracts/api.js';
 import { ErrorBody } from '../../contracts/common.js';
 import { SearchOffersResponse, CreateQuoteResponse, PurchaseResponse, PurchaseEventsResponse } from '../../contracts/api.js';
 import type { McpConfig } from './config.js';
@@ -33,7 +34,7 @@ export class GatewayClient {
     this.f = cfg.fetch ?? fetch;
   }
 
-  private async call(method: 'GET' | 'POST', path: string, opts: { body?: unknown; headers?: Record<string, string> } = {}): Promise<unknown> {
+  private async call(method: 'GET' | 'POST', path: string, opts: { body?: unknown; headers?: Record<string, string>; timeoutMs?: number } = {}): Promise<unknown> {
     const headers: Record<string, string> = { accept: 'application/json', authorization: `Bearer ${this.cfg.gatewayToken}`, ...(opts.headers ?? {}) };
     if (opts.body !== undefined) headers['content-type'] = 'application/json';
     let res: Response;
@@ -44,7 +45,7 @@ export class GatewayClient {
         ...(opts.body !== undefined ? { body: JSON.stringify(opts.body) } : {}),
         // Never follow redirects: that would forward the bearer token to another origin.
         redirect: 'error',
-        signal: AbortSignal.timeout(this.cfg.gatewayTimeoutMs ?? DEFAULT_TIMEOUT_MS),
+        signal: AbortSignal.timeout(opts.timeoutMs ?? (method === 'GET' ? Math.min(this.cfg.gatewayTimeoutMs ?? DEFAULT_TIMEOUT_MS, 15_000) : this.cfg.gatewayTimeoutMs ?? DEFAULT_TIMEOUT_MS)),
       });
     } catch (e) {
       // Do not include e.message verbatim: some runtimes echo request details.
@@ -82,6 +83,15 @@ export class GatewayClient {
     return GatewayClient.parse(SearchOffersResponse, await this.call('POST', '/v1/offers/search', { body: { intent } }));
   }
 
+  async claimPaymentAttempt(purchaseId: string) {
+    return GatewayClient.parse(z.object({ claimed: z.boolean(), attempt: PaymentAttempt.nullable() }).strict(),
+      await this.call('POST', `/v1/purchases/${encodeURIComponent(purchaseId)}/payment-attempt`, { body: {} }));
+  }
+  async completePaymentAttempt(purchaseId: string, body: z.infer<typeof CompletePaymentAttempt>) {
+    return GatewayClient.parse(z.object({ attempt: PaymentAttempt }).strict(),
+      await this.call('POST', `/v1/purchases/${encodeURIComponent(purchaseId)}/payment-attempt/complete`, { body }));
+  }
+
   async createQuote(offerId: string, fulfillment: unknown) {
     return GatewayClient.parse(CreateQuoteResponse, await this.call('POST', '/v1/quotes', { body: { offerId, fulfillment } }));
   }
@@ -90,8 +100,8 @@ export class GatewayClient {
     return GatewayClient.parse(PurchaseResponse, await this.call('POST', '/v1/purchases', { body, headers: { 'idempotency-key': idempotencyKey } }));
   }
 
-  async getQuote(quoteId: string) {
-    return GatewayClient.parse(CreateQuoteResponse, await this.call('GET', `/v1/quotes/${encodeURIComponent(quoteId)}`));
+  async getQuote(quoteId: string, requireActive = false) {
+    return GatewayClient.parse(CreateQuoteResponse, await this.call('GET', `/v1/quotes/${encodeURIComponent(quoteId)}${requireActive ? '?active=true' : ''}`, requireActive ? { timeoutMs: 5000 } : {}));
   }
 
   async quotePurchase(quoteId: string) {

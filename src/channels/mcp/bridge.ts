@@ -3,9 +3,9 @@ import { PAYER_RAILS, type McpConfig, type PayerRail } from './config.js';
 import { FundingSource } from '../../contracts/presentation.js';
 
 /** Outcome of asking the payer bridge to fund a purchase. Never throws; failures are values. */
-export type BridgeResult = { ok: true; transferReference: string | null } | { ok: false; code: string; message: string };
+export type BridgeResult = { ok: true; transferReference: string | null } | { ok: false; code: string; message: string; retrySafe?: boolean };
 
-const BridgeFailure = z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }) });
+const BridgeFailure = z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }), retrySafe: z.boolean().optional() });
 const BridgeSuccess = z.object({
   ok: z.literal(true),
   payment: z.object({ transferReference: z.string() }).partial().optional(),
@@ -89,7 +89,7 @@ export class BridgeClient {
       return { ok: false, code: 'bridge_bad_response', message: 'payer bridge returned an unexpected response' };
     }
     const f = BridgeFailure.safeParse(json);
-    if (f.success) return { ok: false, code: f.data.error.code, message: f.data.error.message.slice(0, 300) };
+    if (f.success) return { ok: false, code: f.data.error.code, message: f.data.error.message.slice(0, 300), retrySafe: f.data.retrySafe === true };
     return { ok: false, code: 'bridge_error', message: `payer bridge returned HTTP ${res.status}` };
   }
 }

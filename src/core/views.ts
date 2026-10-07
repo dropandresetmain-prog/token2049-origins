@@ -1,4 +1,5 @@
 import type { Db } from '../infrastructure/db.js';
+import { paymentAttempt } from './handoffs.js';
 import type { PurchaseView, QuoteView, FundingSummary, ReceiptView } from '../contracts/commerce.js';
 import { getQuoteRow, getReservation, type PurchaseRow, type FundingEvidenceRow, type FundingRequirementRecord } from './store.js';
 
@@ -29,12 +30,15 @@ export async function fundingSummaries(db: Db, purchaseId: string): Promise<Fund
     }));
 }
 
-export async function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: string): Promise<PurchaseView> {
+export async function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: string, now = Date.now()): Promise<PurchaseView> {
   const q = (await getQuoteRow(db, p.quote_id))!;
   const qv = JSON.parse(q.public_json) as QuoteView;
   const req = JSON.parse(p.funding_requirement_json) as FundingRequirementRecord;
   const res = await getReservation(db, p.id);
   const awaiting = p.state === 'awaiting_funding' && p.payment_state === 'not_received';
+  const handoff = await paymentAttempt(db, p.id);
+  if (handoff?.status === 'running' && now - Date.parse(handoff.updatedAt) > 10 * 60_000) handoff.reviewRequired = true;
+  const manual = await db.get("SELECT id FROM purchase_events WHERE purchase_id = $1 AND type IN ('reconciliation.manual_required','funding.manual_required','outcome.manual_required') LIMIT 1", p.id);
   return {
     purchaseId: p.id,
     customerId: p.customer_id,
@@ -64,6 +68,8 @@ export async function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: s
     providerReference: p.provider_reference,
     receipt: p.receipt_json ? (JSON.parse(p.receipt_json) as ReceiptView) : null,
     statusReason: p.status_reason,
+    ...(handoff ? { paymentAttempt: handoff } : {}),
+    ...(manual && ['awaiting_funding', 'executing', 'unresolved', 'succeeded'].includes(p.state) && !(p.state === 'succeeded' && p.commerce_status !== 'ticketing') ? { operatorAttention: true } : {}),
     createdAt: p.created_at,
     updatedAt: p.updated_at,
   };

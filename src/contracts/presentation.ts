@@ -33,6 +33,18 @@ export function projectProgress(p: PurchaseView): HumanProgress {
   const merchantAction = p.commerceStatus === 'unknown' || p.state === 'unresolved' ? 'unknown' :
     p.commerceStatus !== 'not_started' ? 'reported' : p.state === 'executing' ? 'in_progress' : 'not_started';
   const base = { paymentConfirmed, merchantAction } as const;
+  if (p.operatorAttention) return { ...base, stage: 'needs_attention', label: 'Operator review required',
+    message: 'Automatic recovery needs operator review. Follow this purchase; do not submit another payment or order.', outcomeFinal: false, nextAction: 'Ask the operator to reconcile this purchase.' };
+  if (p.state === 'awaiting_funding' && p.paymentState === 'not_received' && p.paymentAttempt) {
+    const attempt = p.paymentAttempt;
+    if (attempt.status === 'failed') return { ...base, stage: 'needs_attention', label: 'Payment handoff failed',
+      message: `No purchase has been made yet. Payment handoff failed (${attempt.errorCode ?? 'payer_error'}). ${attempt.retrySafe ? 'The payer confirmed nothing was signed or submitted; retry the same approved purchase once the cause is resolved.' : 'The payment outcome requires reconciliation; do not submit another payment.'}`,
+      outcomeFinal: false, nextAction: attempt.retrySafe ? 'Retry buy with the same quote and approval after resolving the failure.' : 'Ask the operator to reconcile the existing payment attempt.' };
+    const overdue = attempt.reviewRequired === true;
+    return { ...base, stage: overdue ? 'needs_attention' : 'confirming_payment', label: overdue ? 'Payment handoff needs review' : 'Payment handoff pending',
+      message: overdue ? 'The payment handoff has not reported an outcome. Ask the operator to reconcile it; do not pay again.' : 'The payer handoff is pending. Follow this purchase; do not pay again.',
+      outcomeFinal: false, nextAction: overdue ? 'Ask the operator to reconcile the payment handoff.' : 'Call get_purchase again in about 20 seconds.' };
+  }
   if (p.state === 'unresolved' || (p.state === 'succeeded' && (!completeCommerce.has(p.commerceStatus) || !paidMerchant.has(p.merchantPaymentStatus) || !p.receipt))) {
     return { ...base, stage: 'verifying_result', label: 'Verifying result',
       message: "We're verifying whether the merchant completed the purchase. No further action is needed right now.", outcomeFinal: false, nextAction: null };
