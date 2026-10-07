@@ -4,9 +4,9 @@
 
 | Document | Owns |
 | --- | --- |
-| [README](../README.md) | Short introduction, public-unavailable status, restricted judge quick-start and navigation. Not an engineering handoff. |
-| [PROJECT_SUBMISSION](../PROJECT_SUBMISSION.md) | Problem, solution, user experience, full stack/connections, Main/Cardano/Solana/Chainlink write-ups, selected evidence and submission gaps. |
-| [ARCHITECTURE](../ARCHITECTURE.md) | Technical boundaries, lifecycle, funding, providers, persistence, recovery and evidence. |
+| [README](../README.md) | Product introduction, judge access and MCP quick-start, with navigation to the submission and technical documents. |
+| [PROJECT_SUBMISSION](../PROJECT_SUBMISSION.md) | Written pitch: agentic-commerce opportunity, buyer-side Web3-to-commerce thesis, product experience, Cardano/Solana/Chainlink contributions, demonstrated results and full stack. |
+| [ARCHITECTURE](../ARCHITECTURE.md) | Engineering explanation: how and why the common transaction layer connects agents, funding, providers, recovery and proof. |
 | [DESIGN](../DESIGN.md) | Approved visual system and console design rules. |
 
 Track judges should use the [Cardano](../PROJECT_SUBMISSION.md#cardano), [Solana](../PROJECT_SUBMISSION.md#solana) and [Chainlink](../PROJECT_SUBMISSION.md#chainlink) anchors. Do not create duplicate per-track narrative documents.
@@ -26,7 +26,7 @@ Track judges should use the [Cardano](../PROJECT_SUBMISSION.md#cardano), [Solana
 | [Known issues](KNOWN_ISSUES.md) | Issue ledger; older UI/deployment/FX status entries can lag code and newer evidence. |
 | [Roadmap](ROADMAP.md) | Working backlog, not an implementation or acceptance certificate. |
 | [Handoff](HANDOFF.md) | Earlier integration handoff; reconcile its status with newer code and evidence before acting. |
-| [Active task](work/ACTIVE_TASK.md) | Branch-scoped work checkpoint and verified next action. |
+| [Active task](work/ACTIVE_TASK.md) | Internal branch checkpoint, release inputs, compliance questions and next action. |
 
 The root architecture is canonical. The old `docs/architecture/CURRENT_ARCHITECTURE.md` path is only a short compatibility pointer for historical links, not a second architecture source.
 
@@ -56,6 +56,6 @@ Additional material remains in [evidence](evidence/), [work](work/), [providers]
 
 ## Authority and maintenance
 
-Current code/runtime establish implementation. A retained run proves only the path, environment and revision recorded. Root submission prose summarises those sources; it cannot overrule them. Narrative source for slide preparation is PROJECT_SUBMISSION, technical support is ARCHITECTURE, and visual authority is DESIGN.
+Current code/runtime establish implementation. A retained run proves only the path, environment and revision recorded. The public documents explain the product and engineering to judges; source-revision bookkeeping, submission administration and unresolved release inputs belong in internal records. Narrative source for slide preparation is PROJECT_SUBMISSION, technical support is ARCHITECTURE, and visual authority is DESIGN.
 
-Update each fact in its owning document, then update links/evidence pointers. Do not expand README into a project essay, copy full incident logs into the submission, merge another lane to make documentation claims true, or describe proposed work as delivered. Recheck branch, current source and this lane's ledger before further edits.
+Update each fact in its owning document, then update links/evidence pointers. Keep the macro thesis central: agentic commerce and Web3 should reach existing commerce through buyer-side infrastructure. Examples demonstrate the thesis; they do not define it. Keep prize pools, grading tables, task classifications, review notes and branch bookkeeping out of the three root judge documents. Do not merge another lane to make documentation claims true, or describe proposed work as delivered. Recheck branch, current source and this lane's ledger before further edits.
