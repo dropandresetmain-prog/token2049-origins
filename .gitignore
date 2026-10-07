@@ -38,3 +38,6 @@ coverage/
 .DS_Store
 
 .runtime/
+
+# Curated public CDP transaction evidence contains no wallet secrets.
+!docs/evidence/coinbase-cdp/server-wallet-proof.json

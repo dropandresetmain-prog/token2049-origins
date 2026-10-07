@@ -1,67 +1,63 @@
 # Capsule documentation index
 
-This index separates current sources of truth from historical plans and evidence.
+## Public and judge entry points
 
-## Current sources of truth
-
-Read these first for new work:
-
-| Document | Authority |
+| Document | Owns |
 | --- | --- |
-| README.md | Product summary and current implementation baseline |
-| docs/HANDOFF.md | Complete current handoff |
-| docs/DECISIONS_LOG.md | Settled current decisions |
-| docs/ROADMAP.md | Remaining work and priority order |
-| docs/ENVIRONMENT.md | Runtime, external services and config groups |
-| docs/architecture/CURRENT_ARCHITECTURE.md | Current architecture and boundaries |
-| docs/demo/CANONICAL_DEMO.md | Target judge demo |
-| docs/demo/SEED_DATA.md | Demo seed/preflight policy |
-| docs/KNOWN_ISSUES.md | Current issue triage |
-| docs/RUNBOOK.md | Operational procedures |
-| docs/TEST_CHECKLIST.md | Current gates |
-| docs/contracts/CHANNEL_CONTRACT.md | Executable channel/core contract summary |
-| docs/channels/hosted-mcp.md | Hosted `/mcp` endpoint, OAuth, hosted Cardano payer, ChatGPT setup |
-| docs/work/ACTIVE_TASK.md | Working-memory checkpoint |
+| [README](../README.md) | Product introduction, judge access and MCP quick-start, with navigation to the submission and technical documents. |
+| [PROJECT_SUBMISSION](../PROJECT_SUBMISSION.md) | Written pitch: agentic-commerce opportunity, buyer-side Web3-to-commerce thesis, product experience, Cardano/Solana/Chainlink contributions, Coinbase CDP/OCBC treasury story, demonstrated results and full stack. |
+| [ARCHITECTURE](../ARCHITECTURE.md) | Engineering explanation: how the transaction layer connects agents, customer funding, commerce, operational treasury, fiat observation, recovery and proof. |
+| [DESIGN](../DESIGN.md) | Approved visual system and console design rules. |
 
-Runtime/code remains authoritative when docs disagree.
+Track judges should use the [Cardano](../PROJECT_SUBMISSION.md#cardano), [Solana](../PROJECT_SUBMISSION.md#solana) and [Chainlink](../PROJECT_SUBMISSION.md#chainlink) anchors. Do not create duplicate per-track narrative documents.
 
-## Product/design authority
+## Engineering and operations
 
-- DESIGN.md — approved Capsule UI rules.
-- docs/design/ui-v3/ — approved V3 visual reference.
-- assets/brand/ — approved logo assets.
+| Document | Purpose |
+| --- | --- |
+| [Channel contract](contracts/CHANNEL_CONTRACT.md) | Shared HTTP/MCP/channel semantics; executable schemas in [src/contracts](../src/contracts/) win. |
+| [Console contract](contracts/CONSOLE_CONTRACT.md) | Read-only UI, authenticated reads and presentation boundaries. |
+| [Hosted MCP](channels/hosted-mcp.md) | Hosted OAuth, Cardano payer and provisioning/connection detail. Consult current source for client UI/configuration differences. |
+| [FX](FX.md) | Implemented Frankfurter SGD-budget/reference conversion; distinct from execution FX. |
+| [Environment](ENVIRONMENT.md) | Runtime and service configuration groups; historical readiness statements need current verification. |
+| [Runbook](RUNBOOK.md) | Developer and operator procedures, not judge onboarding. |
+| [Test checklist](TEST_CHECKLIST.md) | Verification procedures; an unchecked procedure is not proof. |
+| [Decisions](DECISIONS_LOG.md) | Settled decisions and dated integration history. |
+| [Known issues](KNOWN_ISSUES.md) | Issue ledger; older UI/deployment/FX status entries can lag code and newer evidence. |
+| [Roadmap](ROADMAP.md) | Working backlog, not an implementation or acceptance certificate. |
+| [Handoff](HANDOFF.md) | Earlier integration handoff; reconcile its status with newer code and evidence before acting. |
+| [Active task](work/ACTIVE_TASK.md) | Internal branch checkpoint, release inputs, compliance questions and next action. |
 
-V2 is retained only as design history.
+The root architecture is canonical. The old `docs/architecture/CURRENT_ARCHITECTURE.md` path is only a short compatibility pointer for historical links, not a second architecture source.
 
-## Current decision records
+## Demo and design references
 
-- docs/decisions/scaled-testnet-settlement.md
-- docs/decisions/shopify-real-discovery-sandbox-execution.md
-- docs/DECISIONS_LOG.md
+- [Canonical demo](demo/CANONICAL_DEMO.md) — target narrative; not proof of a completed final run.
+- [Seed and preflight policy](demo/SEED_DATA.md) — configuration is not proof of external availability.
+- [Demo directory](demo/) — scenario and recording guidance.
+- [Approved UI V3](design/ui-v3/) and [brand assets](../assets/brand/) — visual references.
+- [Design vocabulary](design/VOCABULARY.md) — user-facing wording.
 
-## Historical planning snapshots
+## Retained evidence
 
-docs/planning/ is the launch planning snapshot imported before implementation. It is historical context, not the current execution plan. Do not silently edit it to match later implementation decisions.
+Evidence records keep their original branch/SHA, date, environment and failed/partial outcomes. Never rewrite an old result to make the submission greener.
 
-## Evidence and lane history
+| Record | What it covers |
+| --- | --- |
+| [Human ChatGPT + Cardano + Shopify](evidence/human-cardano-shopify-20261007.md) | Confirmed backend order/payment/proof; human approval transcript and budget-change acceptance remain partial. |
+| [Atlas + Cardano](evidence/atlas-cardano-combined-pass-20261007.md) | Combined historical payment, sandbox ticketing and receipt. |
+| [Nuitée + Solana](evidence/nuitee-solana-combined-pass-20261007.md) | Combined historical Devnet payment, sandbox booking and receipt. |
+| [Shopify Global](evidence/shopify-global-sandbox-e2e.md) | Append-only discovery/shadow/quote execution history and limits. |
+| [Shopify acceptance log](evidence/e2e-acceptance-log.md) | Historical attempts and reconciliation; do not blindly retry old purchases. |
+| [Masumi integration](work/MASUMI_INTEGRATION.md) | Native fee/task/payout evidence and separate marketplace boundary. |
+| [Render rehearsal](evidence/render-rehearsal.md) | Point-in-time deployment verification, not current health. |
+| [Chainlink implementation and evidence](work/CHAINLINK_CRE.md) | Included SDK workflow, official simulation and fresh Koios verification of a retained purchase. |
+| [Coinbase CDP proof](evidence/coinbase-cdp/server-wallet-proof.json) | Server Wallet / Base Sepolia transfer via official CLI and independent public RPC; [implementation note](work/COINBASE_CDP.md). |
 
-docs/evidence/ and docs/work/*_FIX.md / COMPLETED_LANES.md preserve what actually happened in earlier lanes. Do not rewrite failed or partial evidence to make the project look greener.
+Additional material remains in [evidence](evidence/), [work](work/), [providers](providers/), [contracts](contracts/) and [decisions](decisions/). [Planning](planning/) is historical context; do not silently rewrite it as a current plan.
 
-Important retained evidence:
-- pre-masumi-integration.md — exact verification of main baseline before promotion.
-- e2e-acceptance-log.md — append-only Shopify E2E issue history.
-- shopify-global-sandbox-e2e.md — live Global Catalog/shadow evidence.
-- cardano-protocol.md — Cardano funding design/evidence.
-- CARDANO_FIX.md / SOLANA_FIX.md / SOLANA_LIVE.json — rail-specific evidence.
-- COMPLETED_LANES.md — crypto/provider consolidation source report.
-- MASUMI_INTEGRATION.md — native Masumi merge onto latest main and combined validation.
-- MASUMI_SOKOSUMI_FIX.md / masumi-live.json / sokosumi-runtime-live.json — native fee/task/payout evidence and explicit marketplace limits.
+## Authority and maintenance
 
-## Rule for future agents
+Current code/runtime establish implementation. A retained run proves only the path, environment and revision recorded. The public documents explain the product and engineering to judges; source-revision bookkeeping, submission administration and unresolved release inputs belong in internal records. Narrative source for slide preparation is PROJECT_SUBMISSION, technical support is ARCHITECTURE, and visual authority is DESIGN.
 
-Before major work:
-1. inspect current main and recent commits;
-2. read ACTIVE_TASK, ROADMAP, KNOWN_ISSUES and the relevant current decision/architecture docs;
-3. use historical evidence only to understand what was actually tested;
-4. never infer external PASS from local fixtures;
-5. update current docs after meaningful verified integration; preserve historical evidence.
+Update each fact in its owning document, then update links/evidence pointers. Keep the macro thesis central: agentic commerce and Web3 should reach existing commerce through buyer-side infrastructure. Examples demonstrate the thesis; they do not define it. Keep prize pools, grading tables, task classifications, review notes and branch bookkeeping out of the three root judge documents. Do not merge another lane to make documentation claims true, or describe proposed work as delivered. Recheck branch, current source and this lane's ledger before further edits.
