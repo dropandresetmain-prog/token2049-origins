@@ -1,7 +1,7 @@
 {
-  "at": "2026-10-07T15:08:07.013Z",
-  "status": "PARTIAL_ATLAS_GATE_APPROVAL_REQUIRED",
-  "recordingCheckpointReached": false,
+  "at": "2026-10-07T15:17:11.907Z",
+  "status": "READY FOR FINAL SOLANA + NUITEE E2E",
+  "recordingCheckpointReached": true,
   "runtimeSha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c",
   "deployedSha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c",
   "chainClassification": "unknown",
@@ -71,6 +71,7 @@
       "code": "policy_violation",
       "message": "Historical unresolved Solana purchase is permanently blocked",
       "classification": "historical_unresolved",
+      "chainClassification": "unknown",
       "replayPolicy": "permanently_blocked",
       "amountBaseUnits": "1050",
       "exposureReleased": false
@@ -81,6 +82,7 @@
       "code": "policy_violation",
       "message": "Historical unresolved Solana purchase is permanently blocked",
       "classification": "historical_unresolved",
+      "chainClassification": "unknown",
       "replayPolicy": "permanently_blocked",
       "amountBaseUnits": "1050",
       "exposureReleased": false
@@ -133,17 +135,17 @@
       },
       "balances": {
         "verified": true,
-        "at": "2026-10-07T15:05:54.033Z",
+        "at": "2026-10-07T15:17:09.347Z",
         "commitment": "finalized",
         "payerLamports": "10000000000",
         "sponsorLamports": "4999974998",
         "payerUsdcBaseUnits": "19907880",
         "treasuryUsdcBaseUnits": "20092120",
         "slots": {
-          "payer": 508494239,
-          "sponsor": 508494239,
-          "source": 508494239,
-          "treasury": 508494239
+          "payer": 508497065,
+          "sponsor": 508497065,
+          "source": 508497065,
+          "treasury": 508497065
         }
       },
       "cumulativeRemainingBaseUnits": "405780",
@@ -215,31 +217,67 @@
     "idlePlatformColdStart": "NOT EXERCISED; controlled process restart accepted"
   },
   "dualRailMcp": {
-    "nuiteeQuoteId": "quo_01M4BECGQ6XDBJZ609Q6H3XHD8",
-    "bothOptionsVisible": true,
-    "bothSourcesConfigured": true,
-    "missingRailRefused": {
-      "status": "needs_input",
-      "phase": "funding_selection",
-      "hasPurchase": false
+    "providers": {
+      "nuitee": {
+        "quoteId": "quo_01M4BEY9D6VENT99VVX0RBK9HS",
+        "bothOptionsVisible": true,
+        "bothSourcesConfigured": true,
+        "missingRailRefused": {
+          "status": "needs_input",
+          "phase": "funding_selection",
+          "hasPurchase": false
+        },
+        "invalidRailRefused": {
+          "isError": true,
+          "code": "invalid_request",
+          "hasPurchase": false
+        }
+      },
+      "atlas": {
+        "quoteId": "quo_01M4BEYBDBR9Y1NQJ79TSCDXJE",
+        "bothOptionsVisible": true,
+        "bothSourcesConfigured": true,
+        "missingRailRefused": {
+          "status": "needs_input",
+          "phase": "funding_selection",
+          "hasPurchase": false
+        },
+        "invalidRailRefused": {
+          "isError": true,
+          "code": "invalid_request",
+          "hasPurchase": false
+        }
+      }
     },
-    "invalidRailRefused": {
-      "isError": true,
-      "code": "invalid_request",
-      "hasPurchase": false
-    },
-    "noFallback": "PASS: public missing/invalid selection refusals and existing dual-rail tests"
+    "noFallback": "PASS: both providers refuse missing or invalid explicit selection without creating a purchase"
   },
   "providers": {
     "nuitee": {
       "executableQuoteAccepted": true,
+      "quoteId": "quo_01M4BEY9D6VENT99VVX0RBK9HS",
       "bookingPerformed": false
     },
     "atlas": {
       "searchAccepted": true,
-      "executableQuoteAccepted": false,
-      "gate": "false",
-      "blocker": "Automatic approval review requires explicit approval for ATLAS_ALLOW_TEST_BALANCE_PAYMENT=true; pending user question"
+      "executableQuoteAccepted": true,
+      "quoteId": "quo_01M4BEYBDBR9Y1NQJ79TSCDXJE",
+      "gate": "true",
+      "exactGateExplicitlyApproved": true,
+      "approvedDeployment": {
+        "at": "2026-10-07T15:14:00.910Z",
+        "gate": "ATLAS_ALLOW_TEST_BALANCE_PAYMENT",
+        "value": "true",
+        "explicitUserApproval": true,
+        "unrelatedConfigUnchanged": true,
+        "serviceId": "srv-db2jgqnavr4c73e9blrg",
+        "deployId": "dep-db363e3ncjis73ej0sg0",
+        "status": "build_in_progress",
+        "sha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c",
+        "noOrder": true,
+        "noPayment": true
+      },
+      "orderPerformed": false,
+      "paymentPerformed": false
     }
   },
   "checks": {
@@ -276,5 +314,29 @@
   "activeSolanaIncomplete": 0,
   "activeCardanoSigning": 0,
   "activeCardanoSigned": 0,
-  "nextSafeAction": "Approve the exact guarded Atlas sandbox gateway setting; deploy config, verify executable Atlas quote without order/payment, then stop at recording approval. Continue in the same chat."
+  "nextSafeAction": "STOP. Min Htet begins recording and explicitly approves the live Solana + Nuitee E2E. No valid buy, payment, order or booking is authorized by this readiness checkpoint.",
+  "verificationBranchSha": "20f985123f614e3d07963779f7c354ce68736457",
+  "deployments": [
+    {
+      "role": "gateway",
+      "id": "srv-db2jgqnavr4c73e9blrg",
+      "deployId": "dep-db363e3ncjis73ej0sg0",
+      "status": "live",
+      "sha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c"
+    },
+    {
+      "role": "cardano",
+      "id": "srv-db2mnk1srm7s73c1f5c0",
+      "deployId": "dep-db35thbncjis73eijfbg",
+      "status": "live",
+      "sha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c"
+    },
+    {
+      "role": "solana",
+      "id": "srv-db35psid0e5s73f7ltng",
+      "deployId": "dep-db35thks728c73bes150",
+      "status": "live",
+      "sha": "afa59b1459aec6fad545ab5eeec1b2b37a15445c"
+    }
+  ]
 }

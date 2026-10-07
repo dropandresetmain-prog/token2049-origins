@@ -1,5 +1,5 @@
 {
-  "at": "2026-10-07T15:05:54.261Z",
+  "at": "2026-10-07T15:17:09.429Z",
   "noSigning": true,
   "noSubmission": true,
   "noBooking": true,
@@ -7,7 +7,7 @@
     "solana": {
       "health": 200,
       "status": 200,
-      "elapsedMs": 379,
+      "elapsedMs": 619,
       "body": {
         "ok": true,
         "source": {
@@ -55,17 +55,17 @@
           },
           "balances": {
             "verified": true,
-            "at": "2026-10-07T15:05:54.033Z",
+            "at": "2026-10-07T15:17:09.347Z",
             "commitment": "finalized",
             "payerLamports": "10000000000",
             "sponsorLamports": "4999974998",
             "payerUsdcBaseUnits": "19907880",
             "treasuryUsdcBaseUnits": "20092120",
             "slots": {
-              "payer": 508494239,
-              "sponsor": 508494239,
-              "source": 508494239,
-              "treasury": 508494239
+              "payer": 508497065,
+              "sponsor": 508497065,
+              "source": 508497065,
+              "treasury": 508497065
             }
           },
           "cumulativeRemainingBaseUnits": "405780",
@@ -83,7 +83,7 @@
     "cardano": {
       "health": 200,
       "status": 200,
-      "elapsedMs": 410,
+      "elapsedMs": 498,
       "body": {
         "ok": true,
         "source": {
