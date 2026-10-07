@@ -17,6 +17,7 @@ export interface GatewayParts {
   fx?: FxReferenceSource;
   extraRouters?: Array<{ path: string; router: Router; auth: boolean; beforeJson?: boolean }>;
   buildRouters?: (core: CommerceCore) => NonNullable<GatewayParts['extraRouters']>;
+  close?: () => Promise<void>;
 }
 
 export interface Gateway {
@@ -25,6 +26,7 @@ export interface Gateway {
   core: CommerceCore;
   worker: Worker;
   app: ReturnType<typeof createHttpApp>;
+  close: () => Promise<void>;
 }
 
 /**
@@ -50,5 +52,5 @@ export async function buildGateway(parts: GatewayParts, opts: { env?: NodeJS.Pro
   const worker = new Worker(core, opts.log);
   const extraRouters = [...(parts.extraRouters ?? []), ...(parts.buildRouters?.(core) ?? [])];
   const app = createHttpApp({ core, extraRouters, ...(opts.log ? { log: opts.log } : {}) });
-  return { env, db, core, worker, app };
+  return { env, db, core, worker, app, close: async () => { try { await parts.close?.(); } finally { await db.close(); } } };
 }

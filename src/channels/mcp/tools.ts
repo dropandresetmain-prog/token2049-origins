@@ -295,7 +295,8 @@ export function orderConfirmation(p: PurchaseView): Record<string, unknown> | nu
     commerceType: p.category,
     environment: r.providerEnvironment,
     merchant: r.sourceOffer?.merchantName ?? null,
-    product: r.sourceOffer?.productUrl ?? null,
+    product: r.sourceOffer?.productTitle ?? null,
+    productUrl: r.sourceOffer?.productUrl ?? null,
     orderReference: p.providerReference,
     reference: { label: final.referenceLabel, value: displayReference(p.providerReference) },
     receiptId: r.receiptId,
@@ -321,6 +322,7 @@ function confirmationText(c: Record<string, unknown>): string {
   return [
     c.headline as string,
     ...(c.merchant ? [`Merchant: ${c.merchant as string}`] : []),
+    ...(c.product ? [`Product: ${c.product as string}`] : []),
     `${ref.label}: ${ref.value}`,
     `Receipt: ${String(c.receiptId)}`,
     `Payment verified (${pay.rail}): ${pay.transferReference}`,
@@ -368,7 +370,6 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     bounded('find_offers', async ({ intent }, extra) => {
       const denied = missingScope(deps, 'find_offers', extra);
       if (denied) return denied;
-      for (const bridge of deps.bridges ?? []) bridge.wake();
       try {
         const assessment = assessPurchaseIntent(intent);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
@@ -403,7 +404,6 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     bounded('create_quote', async ({ offerId, fulfillment }, extra) => {
       const denied = missingScope(deps, 'create_quote', extra);
       if (denied) return denied;
-      for (const bridge of deps.bridges ?? []) bridge.wake();
       try {
         const assessment = assessFulfillment(deps.profile ? applyDemoProfile(fulfillment, deps.profile) : fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);

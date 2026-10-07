@@ -44,6 +44,9 @@ export function createGatewaySource(opts: GatewaySourceOptions): ConsoleSource {
   const baseUrl = opts.baseUrl.replace(/\/+$/, '');
   const accessKey = opts.accessKey;
   const doFetch: typeof fetch = opts.fetchImpl ?? ((input, init) => globalThis.fetch(input, init));
+  // Quote scope is constant for this credential. Reconnecting creates a new source and retries.
+  // A forbidden optional read must not be repeated on every purchase poll.
+  let quoteForbidden = false;
 
   async function request<S extends z.ZodType>(path: string, schema: S, init: { auth: boolean } = { auth: true }): Promise<{ data: z.output<S>; raw: unknown }> {
     const headers: Record<string, string> = { Accept: 'application/json' };
@@ -137,7 +140,13 @@ export function createGatewaySource(opts: GatewaySourceOptions): ConsoleSource {
       // The quote read needs the purchase's quoteId, so it follows the purchase but overlaps the other reads.
       const quote = optional(async () => {
         const p = await purchase;
-        return request(`/v1/quotes/${enc(p.data.purchase.quoteId)}`, QuoteResponse);
+        if (quoteForbidden) return null;
+        try {
+          return await request(`/v1/quotes/${enc(p.data.purchase.quoteId)}`, QuoteResponse);
+        } catch (e) {
+          if (e instanceof ConsoleError && e.status === 403) { quoteForbidden = true; return null; }
+          throw e;
+        }
       });
 
       const results = await Promise.allSettled([purchase, proof, evidence, quote]);

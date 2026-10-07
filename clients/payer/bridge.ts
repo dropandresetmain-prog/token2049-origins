@@ -41,6 +41,8 @@ export interface BridgePayer {
 /** Where a bridge may be reached from. Loopback is the default; `hosted` is for the public HTTPS free web service. */
 export type BridgeAccess =
   | { mode: 'loopback' }
+  /** Private-network service (Solana lane): private-range peers, exact Host allowlist, no browser Origin. */
+  | { mode: 'private'; allowedHosts: string[] }
   | { mode: 'hosted'; allowedHosts: string[]; maxRequestsPerMinute?: number; maxFailuresPerMinute?: number; now?: () => number };
 
 export interface BridgeDeps {
@@ -52,6 +54,19 @@ export interface BridgeDeps {
   /** Bearer token callers must present. */
   token: string;
   log?: (e: Record<string, unknown>) => void;
+}
+
+/** Loopback or RFC 1918 / ULA peers only; used in private mode as defence in depth behind the platform's network isolation. */
+export function isPrivatePeer(address: string | undefined): boolean {
+  if (!address) return false;
+  const a = address.replace(/^::ffff:/i, '').toLowerCase();
+  if (a === '127.0.0.1' || a === '::1') return true;
+  const v4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/.exec(a);
+  if (v4) {
+    const [x, y] = [Number(v4[1]), Number(v4[2])];
+    return x === 10 || (x === 172 && y >= 16 && y <= 31) || (x === 192 && y === 168);
+  }
+  return /^f[cd][0-9a-f]{2}:/.test(a);
 }
 
 function sameToken(presented: string, expected: string): boolean {
@@ -117,6 +132,11 @@ export function createBridge(deps: BridgeDeps): Server {
             failures.push(now);
             return fail(res, 'unauthenticated', 'bridge requires an https non-browser caller for the configured host');
           }
+        } else if (access.mode === 'private') {
+          if (!isPrivatePeer(remote)) return fail(res, 'unauthenticated', 'bridge is private-network only');
+          if (!access.allowedHosts.includes((req.headers.host ?? '').toLowerCase()) || req.headers.origin) {
+            return fail(res, 'unauthenticated', 'bridge requires a private non-browser caller');
+          }
         } else {
           if (remote !== '127.0.0.1' && remote !== '::1' && remote !== '::ffff:127.0.0.1') return fail(res, 'unauthenticated', 'bridge is local only');
           if (!/^(?:localhost|127\.0\.0\.1|\[::1\])(?::[0-9]+)?$/i.test(req.headers.host ?? '') || req.headers.origin) {
@@ -170,6 +190,14 @@ export function createBridge(deps: BridgeDeps): Server {
   server.headersTimeout = 10_000;
   server.maxHeadersCount = 32;
   return server;
+}
+
+/** Bind a private-network bridge on all interfaces; reachability is restricted by the platform plus isPrivatePeer/Host checks. */
+export async function listenPrivate(server: Server, port: number): Promise<void> {
+  await new Promise<void>((resolve, reject) => {
+    server.once('error', reject);
+    server.listen(port, '0.0.0.0', resolve);
+  });
 }
 
 /** Bind the hosted bridge on all interfaces (the platform proxy terminates TLS); access is enforced per request in hosted mode. */

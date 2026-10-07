@@ -59,6 +59,7 @@ export type CheckoutAbortCode =
   | 'password_gate_failed'
   | 'test_gateway_not_active'
   | 'total_mismatch'
+  | 'quote_expired'
   | 'untrusted_checkout_url'
   | 'browser_unavailable'
   | 'payment_fields_invalid'

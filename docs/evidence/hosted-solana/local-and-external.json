@@ -1,0 +1,49 @@
+{
+  "baseSha": "0234d20a11e80285318c88511195c5f2d51c0df8",
+  "lane": "hosted-solana-mcp",
+  "status": "PARTIAL",
+  "local": {
+    "affectedTests": 102,
+    "affectedPassed": 102,
+    "oauthAddedTests": 2,
+    "oauthAddedPassed": 2,
+    "fullSuiteFiles": 51,
+    "fullSuiteTests": 978,
+    "fullSuitePassed": 978,
+    "typecheck": "PASS",
+    "build": "PASS",
+    "finalCliTypecheck": "PASS",
+    "unconfiguredPreflight": "Expected sanitized failure, exit 1; no spend",
+    "finalAffectedFiles": 3,
+    "finalAffectedTests": 70,
+    "finalAffectedPassed": 70,
+    "compiledGatewayPreflight": "Expected sanitized failure, no configuration; no spend",
+    "finalBuild": "PASS",
+    "privateContainerBuild": "PASS; source-only Dockerfile-specific context",
+    "unconfiguredPrivateContainer": "Expected sanitized failure, exit 1; no ports, credentials or volumes; no spend"
+  },
+  "external": {
+    "renderApi": "authenticated read-only HTTP 200",
+    "gatewayServiceId": "srv-db2jgqnavr4c73e9blrg",
+    "liveDeployId": "dep-db2luemgekts73ff3g4g",
+    "liveCommit": "0234d20a11e80285318c88511195c5f2d51c0df8",
+    "solanaPrivateServiceExists": false,
+    "renderBilling": "No card on file",
+    "hostedSupported": false,
+    "hostedReadiness": false,
+    "hostedRestartEvidence": false,
+    "hostedMcpSmoke": false,
+    "newPayment": false
+  },
+  "costUsdMonthly": {
+    "starterPrivateService": 7,
+    "disk1Gb": 0.25,
+    "total": 7.25
+  },
+  "manualBlockers": [
+    "Render billing/provisioning",
+    "Dedicated hosted Devnet identities/secrets/config",
+    "Deployed private connectivity/readiness/restart/no-spend MCP evidence",
+    "Explicit authorization before bounded hosted Devnet payment"
+  ]
+}

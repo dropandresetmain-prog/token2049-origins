@@ -16,6 +16,7 @@
  * Secrets: the Blockfrost project id and raw facilitator bodies never enter logs, reasons or
  * evidence details. Reasons contain only whitelisted SDK error codes or fixed phrases.
  */
+import { timedOperation } from '../../infrastructure/timing.js';
 import {
   CANONICAL_CARDANO_ASSET_REGEX,
   CARDANO_ADDRESS_REGEX,
@@ -183,6 +184,10 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
     }
   }
 
+  private timed<T>(step: string, run: () => Promise<T>): Promise<T> {
+    return timedOperation('cardano', step, run, event => this.log(event));
+  }
+
   /* ---------------- asset / requirements ---------------- */
 
   acceptedAsset() {
@@ -339,7 +344,7 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
     // 4. Facilitator verify (read-only). Settle is never reached when this fails.
     let verifyRes: VerifyResponse;
     try {
-      verifyRes = await this.facilitator.verify(payload, requirement);
+      verifyRes = await this.timed('facilitator_verify', () => this.facilitator!.verify(payload, requirement));
     } catch (e) {
       if (e instanceof VerifyError) {
         verifyRes = { isValid: false, ...(e.invalidReason ? { invalidReason: e.invalidReason } : {}), ...(e.payer ? { payer: e.payer } : {}) };
@@ -358,7 +363,7 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
     // 5. Settle. The facilitator broadcasts and waits for l1Confirmations (may return settlement_pending).
     let receipt: SettleResponse | null = null;
     try {
-      receipt = await this.facilitator.settle(payload, requirement);
+      receipt = await this.timed('facilitator_settle', () => this.facilitator!.settle(payload, requirement));
     } catch (e) {
       if (e instanceof SettleError) {
         receipt = {
@@ -403,7 +408,7 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
     const facilitatorConfirmed = receipt.success === true && status === 'confirmed';
 
     // 6. Blockfrost independently proves outputs, commitment, network and confirmation depth.
-    const chain = await this.checkChain(localTx, input);
+    const chain = await this.timed('independent_chain_readback', () => this.checkChain(localTx, input));
     if (chain.state === 'mismatch') {
       this.event('chain.mismatch', { tx: localTx, detail: chain.detail });
       return invalid('on-chain outputs do not pay the treasury the required amount');

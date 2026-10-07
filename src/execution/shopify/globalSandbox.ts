@@ -61,6 +61,6 @@ export function createGlobalSandboxExecutor(env: NodeJS.ProcessEnv, db: () => Db
   const shadow = config.buyerReady && config.adminReady && config.config.devStoreConfirmed && config.config.bogusGatewayEnabled && publication
     ? new ShadowPreparer({ db, storeDomain: config.config.storeDomain,
       admin: new ShadowAdminClient(config.config, options.fetchImpl ?? fetch, clock, publication),
-      storefront: new StorefrontClient(config.config, options.fetchImpl ?? fetch), catalog: new GlobalCatalogClient({ clock, fetchImpl: options.fetchImpl }), clock }) : null;
+      storefront: new StorefrontClient(config.config, options.fetchImpl ?? fetch), catalog: new GlobalCatalogClient({ clock, fetchImpl: options.fetchImpl }), clock, sink: options.sink }) : null;
   return new GlobalSandboxExecutor(base, new GlobalCatalogClient({ clock, fetchImpl: options.fetchImpl }), shadow);
 }

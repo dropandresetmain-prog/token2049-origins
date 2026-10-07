@@ -1,14 +1,14 @@
 import { z } from 'zod';
 import { resolve, isAbsolute, join } from 'node:path';
 import { parseSolanaConfig, trustedRpc } from '../../src/funding/solana/config.js';
-export function loadSolanaPayerConfig(env: NodeJS.ProcessEnv) {
+export function loadSolanaPayerConfig(env: NodeJS.ProcessEnv, opts: { ledger?: 'file' | 'external' } = {}) {
   const gateway = parseSolanaConfig(env); if (!gateway.ok) throw new Error('invalid Solana configuration: ' + gateway.missing.join(','));
   const p = z.object({ SOLANA_PAYER_RPC_URL: z.string().refine(trustedRpc), SOLANA_PAYER_ADDRESS: z.string(), SOLANA_PAYER_TOKEN_ACCOUNT: z.string(),
     SOLANA_PAYER_KEY_FILE: z.string(), SOLANA_LEDGER_DIRECTORY: z.string().refine(isAbsolute),
     SOLANA_PAYER_MAX_PURCHASE_BASE_UNITS: z.string().regex(/^[1-9][0-9]*$/), SOLANA_PAYER_MAX_TOTAL_BASE_UNITS: z.string().regex(/^[1-9][0-9]*$/),
     SOLANA_PAYER_MAX_COMMERCIAL_USD_MINOR: z.string().regex(/^[1-9][0-9]*$/), SOLANA_SPONSOR_MAX_TOTAL_FEE_LAMPORTS: z.string().regex(/^[1-9][0-9]*$/),
     SOLANA_SPONSOR_KEY_FILE: z.string(), SOLANA_GATEWAY_URL: z.string(), SOLANA_GATEWAY_TOKEN_FILE: z.string(),
-  }).safeParse(env);
+  }).safeParse(opts.ledger === 'external' ? { ...env, SOLANA_LEDGER_DIRECTORY: resolve('.runtime/unused-external-ledger') } : env);
   if (!p.success) throw new Error('invalid Solana payer configuration: ' + [...new Set(p.error.issues.map(i => String(i.path[0])))].join(','));
   const e = p.data, cfg = gateway.config;
   const maxPerPayment = BigInt(e.SOLANA_PAYER_MAX_PURCHASE_BASE_UNITS), maxTotal = BigInt(e.SOLANA_PAYER_MAX_TOTAL_BASE_UNITS), maxFees = BigInt(e.SOLANA_SPONSOR_MAX_TOTAL_FEE_LAMPORTS);

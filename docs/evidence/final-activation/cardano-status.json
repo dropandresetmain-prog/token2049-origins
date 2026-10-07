@@ -1,0 +1,22 @@
+{
+  "at": "2026-10-07T13:10:54.328Z",
+  "noSpend": true,
+  "readOnly": true,
+  "controlledRestart": false,
+  "publicMcpRecoveryAcceptance": false,
+  "connected": true,
+  "network": "cardano:preprod",
+  "asset": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+  "headroomBaseUnits": "5005180",
+  "elapsedMs": 32961,
+  "diagnostics": [
+    {
+      "type": "payer_readiness",
+      "rail": "cardano",
+      "route": "status",
+      "outcome": "success",
+      "ms": 32952,
+      "timeoutMs": 60000
+    }
+  ]
+}

@@ -1,0 +1,14 @@
+# Diskless public payer build accepts source code only. Gateway .dockerignore intentionally excludes this code.
+**
+!package.json
+!package-lock.json
+!tsconfig.json
+!src/
+!src/**/
+!src/**/*.ts
+!src/**/*.sql
+!clients/
+!clients/payer/
+!clients/payer/**/*.ts
+!clients/solana/
+!clients/solana/**/*.ts

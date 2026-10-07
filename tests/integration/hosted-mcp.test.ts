@@ -32,7 +32,7 @@ const freePort = () => new Promise<number>((resolve) => {
 const b64url = (b: Buffer) => b.toString('base64url');
 const pkce = () => { const verifier = b64url(randomBytes(32)); return { verifier, challenge: b64url(createHash('sha256').update(verifier).digest()) }; };
 
-interface Fixture { h: Harness; base: string; mcpUrl: string; cleanup: Array<() => Promise<void>>; bridge?: { calls: string[] }; bridgeUrl?: string }
+interface Fixture { h: Harness; base: string; mcpUrl: string; cleanup: Array<() => Promise<void>>; bridge?: { calls: string[] }; bridgeUrl?: string; solanaCalls?: string[]; readinessCalls: { cardanoHealth: number; cardanoStatus: number; solanaHealth: number; solanaStatus: number } }
 
 let current: Fixture | undefined;
 afterEach(async () => {
@@ -63,12 +63,13 @@ function retailReportsPaid(h: Harness): void {
 }
 
 /** Gateway + hosted MCP on one listener, with an optional fake Cardano payer on the "private network". */
-async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; statusDelayMs?: number; headroomBaseUnits?: string; backgroundWaitMs?: number; payStartDelayMs?: number; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
+async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; withSolanaBridge?: boolean; statusDelayMs?: number; status503Count?: number; headroomBaseUnits?: string; backgroundWaitMs?: number; payStartDelayMs?: number; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const cleanup: Array<() => Promise<void>> = [];
   let bridgeUrl: string | undefined;
   const bridge = { calls: [] as string[] };
+  const readinessCalls = { cardanoHealth: 0, cardanoStatus: 0, solanaHealth: 0, solanaStatus: 0 };
   // The fake bridge pays through the gateway fixture rail using a payer-scoped token of the hosted customer.
   let payerToken = '';
   let h: Harness;
@@ -78,9 +79,10 @@ async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; wi
       req.on('data', (c) => (raw += c));
       req.on('end', async () => {
         const send = (status: number, body: unknown) => res.writeHead(status, { 'content-type': 'application/json' }).end(JSON.stringify(body));
-        if (req.url === '/health') return send(200, { ok: true });
+        if (req.url === '/health') { readinessCalls.cardanoHealth++; return send(200, { ok: true }); }
         if (req.headers.authorization !== `Bearer ${BRIDGE_TOKEN}`) return send(401, { ok: false, error: { code: 'unauthenticated', message: 'bad token' } });
-        if (req.url === '/status') await new Promise((r) => setTimeout(r, opts.statusDelayMs ?? 0)); // a free payer waking from sleep
+        if (req.url === '/status') { readinessCalls.cardanoStatus++; await new Promise((r) => setTimeout(r, opts.statusDelayMs ?? 0)); } // a free payer waking from sleep
+        if (req.url === '/status' && readinessCalls.cardanoStatus <= (opts.status503Count ?? 0)) return send(503, { error: 'fixture temporarily unavailable' });
         if (req.url === '/status') return send(200, { ok: true, source: FundingSource.parse({ sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano', network: 'cardano:preprod', publicAddress: PAYER_ADDRESS, displayAddress: PAYER_ADDRESS.slice(0, 14) + '…' + PAYER_ADDRESS.slice(-6), assetId: h.funding.acceptedAsset().assetId, readiness: 'configured' }), ...(opts.headroomBaseUnits ? { ledger: { headroomBaseUnits: opts.headroomBaseUnits, committedBaseUnits: '66830' } } : {}) });
         const { purchaseId } = JSON.parse(raw) as { purchaseId: string };
         bridge.calls.push(purchaseId);
@@ -97,16 +99,38 @@ async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; wi
     bridgeUrl = `http://127.0.0.1:${(server.address() as AddressInfo).port}`;
     cleanup.push(() => new Promise<void>((r) => server.close(() => r())));
   }
+  const solanaCalls: string[] = [];
+  let solanaBridgeUrl: string | undefined;
+  if (opts.withSolanaBridge) {
+    const server = createServer((req,res)=>{
+      let raw=''; req.on('data',c=>raw+=c);req.on('end',()=>{
+        const send=(status:number,body:unknown)=>res.writeHead(status,{'content-type':'application/json'}).end(JSON.stringify(body));
+        if(req.url==='/health'){readinessCalls.solanaHealth++;return send(200,{ok:true});}
+        if(req.headers.authorization!== 'Bearer '+BRIDGE_TOKEN) return send(401,{ok:false});
+        if(req.url==='/status'){
+          readinessCalls.solanaStatus++;
+          if(readinessCalls.solanaStatus <= (opts.status503Count ?? 0)) return send(503,{error:'fixture temporarily unavailable'});
+          return send(200,{ok:true,source:FundingSource.parse({sourceId:'src_'+'b'.repeat(32),rail:'solana',network:SOLANA_DEVNET_NETWORK,publicAddress:SOLANA_PAYEE,displayAddress:SOLANA_PAYEE.slice(0,12)+"…"+SOLANA_PAYEE.slice(-6),assetId:SOLANA_DEVNET_USDC_MINT,readiness:'configured'})});
+        }
+        solanaCalls.push((JSON.parse(raw) as {purchaseId:string}).purchaseId);
+        return send(422,{ok:false,error:{code:'payment_rejected',message:'fixture: no spending'}});
+      });
+    });
+    await new Promise<void>(r=>server.listen(0,'127.0.0.1',r));
+    solanaBridgeUrl='http://127.0.0.1:'+ (server.address() as AddressInfo).port;
+    cleanup.push(()=>new Promise<void>(r=>server.close(()=>r())));
+  }
   const config: HostedMcpConfig = {
     publicUrl: new URL(base), allowedOrigins: opts.allowedOrigins ?? ['https://chatgpt.com'], ownerPasscode: PASSCODE,
     customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO', payerClientId: 'cli_HOSTEDTESTPAYER', extraRedirectUris: [], gatewayUrl: base,
     ...(opts.bridgeTimeoutMs ? { bridgeTimeoutMs: opts.bridgeTimeoutMs } : {}), ...(opts.backgroundWaitMs ? { backgroundWaitMs: opts.backgroundWaitMs } : {}), ...(opts.bridgeStatusTimeoutMs ? { bridgeStatusTimeoutMs: opts.bridgeStatusTimeoutMs } : {}),
+    ...(solanaBridgeUrl ? { solanaBridge: { url: solanaBridgeUrl, token: BRIDGE_TOKEN } } : {}),
     ...(bridgeUrl ? { cardanoBridge: { url: bridgeUrl, token: BRIDGE_TOKEN } } : {}),
   };
   h = await startHarness({ port, extraRouters: (core) => createHostedMcp({ db: core.deps.db, config }).mounts });
   if (opts.withSolana) h.gw.core.deps.fundingAdapters.set('solana', solanaFixtureAdapter(h));
   payerToken = (await createClient(h.gw.db, { customerId: config.customerId, displayName: 'payer', channel: 'test', label: 'hosted-payer', scopes: ['purchases:read', 'purchases:fund'] }, new Date().toISOString())).token;
-  return (current = { h, base, mcpUrl: `${base}/mcp`, cleanup, bridge, ...(bridgeUrl ? { bridgeUrl } : {}) });
+  return (current = { h, base, mcpUrl: `${base}/mcp`, cleanup, bridge, solanaCalls, readinessCalls, ...(bridgeUrl ? { bridgeUrl } : {}) });
 }
 
 /** Run the whole OAuth dance the way ChatGPT does and return the tokens. */
@@ -162,9 +186,11 @@ describe('hosted MCP: transport, host/origin and discovery', () => {
     const f = await start();
     const prm = await (await fetch(`${f.base}/.well-known/oauth-protected-resource/mcp`)).json() as any;
     expect(prm.resource).toBe(f.mcpUrl);
+    expect(prm.resource_name).toBe('Capsule commerce gateway');
     expect(prm.authorization_servers).toEqual([`${f.base}/`]);
     const root = await (await fetch(`${f.base}/.well-known/oauth-protected-resource`)).json() as any;
     expect(root.resource).toBe(f.mcpUrl);
+    expect(root.resource_name).toBe('Capsule commerce gateway');
     const as = await (await fetch(`${f.base}/.well-known/oauth-authorization-server`)).json() as any;
     expect(as.code_challenge_methods_supported).toEqual(['S256']);
     expect(as.registration_endpoint).toBe(`${f.base}/register`);
@@ -599,7 +625,7 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
     expect(text).toMatch(/Receipt: rcp_/);
     expect(text).toMatch(/Payment verified \(cardano\): /);
     // The customer-facing confirmation carries no environment suffix or demo caveat; the environment stays in the structured result.
-    expect(text).not.toMatch(/environment\)|sandbox|test environment|Demo transaction/i);
+    expect(text).not.toMatch(/environment|sandbox|testnet|Demo transaction|proof limitations/i);
     expect(res.structuredContent.orderConfirmation.environment).toBeTruthy();
     expect(res.structuredContent.orderConfirmation).toMatchObject({ headline, commerceType: category, paymentVerified: true });
     // The other commerce types' labels never appear.
@@ -686,6 +712,39 @@ describe('hosted MCP: free payer cold starts', () => {
       const quoted = await quoteOnce(client);
       expect(quoted.structuredContent.fundingSources[0]).toMatchObject({ rail: 'cardano', readiness: 'configured' });
       expect(quoted.content[0].text).toMatch(/Connected wallet/);
+    } finally { await client.close(); }
+  });
+
+  it('recovers both rails from a transient 503 while repeated create_quote collects the same no-spend operation', async () => {
+    const f = await start({ withBridge: true, withSolana: true, withSolanaBridge: true, status503Count: 1, backgroundWaitMs: 80 });
+    let quoteCalls = 0;
+    const quote = f.h.retail.quote.bind(f.h.retail);
+    f.h.retail.quote = async (...args: Parameters<typeof quote>) => { quoteCalls++; return quote(...args); };
+    const client = await mcp(f, (await fullGrant(f)).tokens.access_token);
+    try {
+      let found: any;
+      // The short background deadline also applies to search; collect it before testing quote recovery.
+      await expect.poll(async () => {
+        found = await client.callTool({ name: 'find_offers', arguments: { intent: retailIntent() } });
+        return found.structuredContent?.offers?.length;
+      }, { timeout: 5000 }).toBeGreaterThan(0);
+      const args = { offerId: found.structuredContent.offers[0].offerId, fulfillment: retailFulfillment };
+      const first = await client.callTool({ name: 'create_quote', arguments: args }) as any;
+      expect(first.structuredContent.status).toBe('quote_pending');
+      expect((await client.callTool({ name: 'create_quote', arguments: args }) as any).structuredContent.status).toBe('quote_pending');
+      await new Promise((resolve) => setTimeout(resolve, 700));
+      const collected = await client.callTool({ name: 'create_quote', arguments: args }) as any;
+
+      expect(collected.isError).toBeFalsy();
+      expect(collected.structuredContent.fundingSources.map((source: any) => source.rail)).toEqual(['cardano', 'solana']);
+      expect(f.readinessCalls).toEqual({ cardanoHealth: 1, cardanoStatus: 2, solanaHealth: 1, solanaStatus: 2 });
+      expect(quoteCalls).toBe(1);
+      expect((await client.callTool({ name: 'create_quote', arguments: args }) as any).structuredContent.quote.quoteId)
+        .toBe(collected.structuredContent.quote.quoteId);
+      expect(f.bridge?.calls).toEqual([]);
+      expect(f.solanaCalls).toEqual([]);
+      expect(await f.h.gw.db.all('SELECT id FROM purchases')).toEqual([]);
+      expect(await f.h.gw.db.all('SELECT id FROM funding_evidence')).toEqual([]);
     } finally { await client.close(); }
   });
 
@@ -883,5 +942,31 @@ describe('hosted console access key (hash only, read only)', () => {
     await f.h.gw.db.run("UPDATE api_clients SET revoked_at = $1 WHERE id = 'cli_HOSTEDCONSOLE'", new Date().toISOString());
     await provisionPayerClient(f.h.gw.db, config);
     expect((await f.h.call('GET', '/v1/evidence/purchases', { token: rotated })).status).toBe(401);
+  });
+});
+
+describe('hosted Solana MCP isolation',()=>{
+  it('shows both connected sources over OAuth without buying or paying',async()=>{
+    const f=await start({withBridge:true,withSolana:true,withSolanaBridge:true}),g=await fullGrant(f),client=await mcp(f,g.tokens.access_token);
+    try {
+      const found=await client.callTool({name:'find_offers',arguments:{intent:retailIntent()}}) as any;
+      const q=await client.callTool({name:'create_quote',arguments:{offerId:found.structuredContent.offers[0].offerId,fulfillment:retailFulfillment}}) as any;
+      expect(q.structuredContent.fundingSources.map((s:any)=>s.rail)).toEqual(['cardano','solana']);
+      expect(q.content[0].text).toMatch(/- solana .*Connected wallet/);
+      expect(f.solanaCalls).toEqual([]);expect(f.bridge?.calls).toEqual([]);
+      expect(await f.h.gw.db.all('SELECT id FROM purchases')).toEqual([]);
+    }finally{await client.close();}
+  });
+  it('uses only the selected Solana payer and never falls back after rejection or repeated buy',async()=>{
+    const f=await start({withBridge:true,withSolana:true,withSolanaBridge:true}),g=await fullGrant(f),client=await mcp(f,g.tokens.access_token);
+    try {
+      const found=await client.callTool({name:'find_offers',arguments:{intent:retailIntent()}}) as any;
+      const quoted=await client.callTool({name:'create_quote',arguments:{offerId:found.structuredContent.offers[0].offerId,fulfillment:retailFulfillment}}) as any;
+      const q=quoted.structuredContent.quote;
+      const args={quoteId:q.quoteId,selectedFundingOptionId:q.fundingOptions.find((o:any)=>o.rail==='solana').fundingOptionId,maxTotal:q.payablePrincipal,quoteDigest:q.digest};
+      await client.callTool({name:'buy',arguments:args});await client.callTool({name:'buy',arguments:args});
+      expect(f.solanaCalls).toHaveLength(1);expect(f.bridge?.calls).toEqual([]);
+      expect(await f.h.gw.db.all('SELECT id FROM funding_evidence')).toEqual([]);
+    }finally{await client.close();}
   });
 });

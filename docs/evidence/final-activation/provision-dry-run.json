@@ -1,0 +1,41 @@
+{
+  "noSpend": true,
+  "mode": "dry-run",
+  "payer": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+  "sponsor": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+  "histories": [
+    {
+      "role": "payer",
+      "entries": 7,
+      "sourceSha256": "19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664"
+    },
+    {
+      "role": "sponsor",
+      "entries": 6,
+      "sourceSha256": "1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4"
+    }
+  ],
+  "committedBaseUnits": "94220",
+  "sponsorFeeLamports": "25002",
+  "incomplete": 2,
+  "keysProtected": true,
+  "caps": {
+    "perPayment": "250000",
+    "cumulative": "500000",
+    "sponsorFee": "100000"
+  },
+  "remainingBaseUnits": "405780",
+  "legacyRetired": false,
+  "readOnlyRender": true,
+  "serviceWrites": false,
+  "retirement": false,
+  "deploy": false,
+  "plannedService": {
+    "name": "t2o-solana-payer",
+    "plan": "free",
+    "region": "singapore",
+    "branch": "integration/final-activation",
+    "url": "https://t2o-solana-payer.onrender.com",
+    "urlIsPlannedOnly": true
+  }
+}

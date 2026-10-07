@@ -1,0 +1,12 @@
+# Public free Solana payer; durable history is PostgreSQL, no writable disk or root signer.
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+ENV NODE_ENV=production
+COPY tsconfig.json ./
+COPY src ./src
+COPY clients ./clients
+USER node
+EXPOSE 10000
+CMD ["node_modules/.bin/tsx", "clients/solana/hosted.ts"]

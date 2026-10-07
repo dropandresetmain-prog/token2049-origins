@@ -1,7 +1,7 @@
 import { Router } from 'express';
 import type { GatewayParts } from './composition.js';
 import { createGlobalSandboxExecutor } from './execution/shopify/globalSandbox.js';
-import type { Db } from './infrastructure/db.js';
+import { Db } from './infrastructure/db.js';
 import { loadShopifyConfig } from './execution/shopify/config.js';
 import { createShopifyWebhookRouter, type ShopifyReconcileHint } from './execution/shopify/webhook.js';
 import { createAtlasExecutor } from './execution/atlas/index.js';
@@ -17,6 +17,8 @@ import type { CommerceCore } from './core/service.js';
 import { loadHostedMcpConfig } from './channels/hosted-mcp/config.js';
 import { createHostedMcp, provisionPayerClient } from './channels/hosted-mcp/router.js';
 import { createConsoleRedirect, createConsoleRouter } from './console/router.js';
+import { loadSokosumiMarketplaceConfig } from './channels/sokosumi/config.js';
+import { SokosumiRuntime } from './channels/sokosumi/runtime.js';
 
 /** A verified webhook provides a lookup hint, never payment truth. Admin readback binds the quote again. */
 export async function enqueueShopifyReadback(core: CommerceCore, hint: ShopifyReconcileHint): Promise<void> {
@@ -41,6 +43,7 @@ export async function enqueueShopifyReadback(core: CommerceCore, hint: ShopifyRe
 /** Optional missing credentials report readiness and never fall back to fixtures. */
 export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unknown>)=>void): GatewayParts {
   const bankAdapters=[createOcbcAdapter(env)];
+  const auxiliaryDbs: Db[] = [];
   let runtimeDb: Db | undefined;
   return {
     executors:[createGlobalSandboxExecutor(env,()=>{ if(!runtimeDb) throw new Error('gateway_not_initialized'); return runtimeDb; },{sink:step=>log({component:'shopify',step})}),createAtlasExecutor(env),createNuiteeExecutor(env)],
@@ -56,6 +59,25 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
         {path:'/console',router:createConsoleRouter(),auth:false},
         {path:'/proof',router:createConsoleRedirect(),auth:false},
       ];
+      const marketplace = loadSokosumiMarketplaceConfig(env);
+      if (marketplace) {
+        const taskDb = new Db(marketplace.databaseUrl, marketplace.databaseSchema);
+        auxiliaryDbs.push(taskDb);
+        const runtime = new SokosumiRuntime({ db: taskDb, masumi: marketplace.masumi, gatewayUrl: marketplace.gatewayUrl,
+          identities: [marketplace.identity], taskMode: 'commerce_search' });
+        const initialized = runtime.initialize().then(() => true, () => false);
+        const router = Router();
+        router.use((req,res,next)=>{
+          if (req.path === '/input_schema') return next();
+          void initialized.then(ready=>{
+            if (ready) return next();
+            if (req.path === '/availability') return res.status(503).json({status:'unavailable',readinessScope:'task_store_only',externalDependenciesChecked:false});
+            return res.status(503).json({error:{code:'task_store_unavailable'}});
+          });
+        });
+        router.use(runtime.router());
+        routers.push({path:'/marketplace/mip003',router,auth:false});
+      }
       const report=loadShopifyConfig(env), cfg=report.config;
       const webhook=cfg.storeDomain && cfg.clientSecret && report.invalid.length===0
         ? createShopifyWebhookRouter({storeDomain:cfg.storeDomain,secret:cfg.clientSecret,onReconcile:async hint=>(await enqueueShopifyReadback(core,hint))})
@@ -64,6 +86,7 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
       routers.push({path:'/',router:createConsoleRedirect(),auth:false});
       return routers;
     },
+    close: async () => { await Promise.all(auxiliaryDbs.map(db => db.close())); },
   };
 }
 

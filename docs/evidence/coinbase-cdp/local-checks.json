@@ -1,0 +1,28 @@
+{
+  "baseSha": "0234d20a11e80285318c88511195c5f2d51c0df8",
+  "branch": "feat/coinbase-cdp-treasury",
+  "sdk": "@coinbase/cdp-sdk@1.57.0",
+  "walletProvisioned": false,
+  "faucetRequested": false,
+  "testTransferSent": false,
+  "credentialNamesPresent": false,
+  "trackEligibilityConfirmed": false,
+  "checks": [
+    {
+      "name": "focused Coinbase CDP contract tests",
+      "command": "node_modules/.bin/vitest.cmd run tests/unit/coinbase-cdp.test.ts",
+      "result": "PASS",
+      "testsPassed": 10
+    },
+    {
+      "name": "TypeScript typecheck",
+      "command": "node_modules/.bin/tsc.cmd -p tsconfig.json --noEmit",
+      "result": "PASS"
+    }
+  ],
+  "externalEvidence": "A read-only authenticated CDP payment-sandbox Accounts API list call via the existing CLI succeeded and returned zero accounts (see sandbox-account-list.json). This is not an API Key Wallet call. No wallet credentials were found in the inspected environment/config name inventories; no API Key Wallet wallet creation, faucet request, or transaction was attempted.",
+  "walletApiAttempted": false,
+  "sandboxApiReadAttempted": true,
+  "sandboxApiReadResult": "success_empty_account_list",
+  "sandboxCliVersion": "2.0.102"
+}

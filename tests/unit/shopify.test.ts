@@ -48,6 +48,24 @@ async function setup(driver?: Pick<CheckoutDriver, 'complete'> & Partial<Pick<Ch
 }
 
 describe('Shopify exact quote boundary', () => {
+  it.each(['browser', 'prepay_readback'])('refuses Pay when the quote expires during %s', async stage => {
+    let clicks = 0;
+    let beforePay: () => void = () => undefined;
+    const s = await setup({ complete: async input => {
+      beforePay();
+      await input.checkpoint('pay_click', {});
+      clicks++;
+      return {};
+    } });
+    const expire = () => { s.opts.clock.advance(11 * 60_000); };
+    beforePay = stage === 'browser' ? expire : () => {
+      s.sf.getCart.mockImplementationOnce(async () => { expire(); return s.current; });
+    };
+    expect((await s.executor.execute(s.ctx)).kind).toBe('terms_changed');
+    expect(clicks).toBe(0);
+    expect(s.ctx.checkpoints.pay_click).toBeUndefined();
+    expect(s.admin.searchOrders).not.toHaveBeenCalled();
+  });
   it('reads required codes from the selected address when the delivery-group projection omits them', () => {
     const c=cart(); const group=c.deliveryGroups.nodes[0]!.deliveryAddress;
     c.delivery={addresses:[{selected:true,address:{...group,countryCode:group.countryCodeV2}}]};

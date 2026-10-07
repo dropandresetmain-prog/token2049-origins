@@ -162,6 +162,32 @@ describe('gateway source', () => {
       expect([bundle.proof, bundle.evidence, bundle.quote, bundle.technicalRecord]).toEqual([null, null, null, null]);
     });
 
+    it('stops forbidden quote polls for this credential and retries after reconnect', async () => {
+      const g = await fakeGateway((p) => p.startsWith('/v1/quotes/') ? forbidden() : undefined);
+      const options = { baseUrl: '', accessKey: KEY, fetchImpl: g.fetchImpl };
+      const source = createGatewaySource(options);
+      const ids = [...g.bundles.keys()];
+      for (const id of [ids[0]!, ids[0]!, ids[1]!]) {
+        const bundle = await source.getPurchase(id);
+        expect(bundle.quote).toBeNull();
+        expect(bundle.purchase).toEqual(g.bundles.get(id)!.purchase);
+        expect(bundle.proof).toEqual(g.bundles.get(id)!.proof);
+      }
+      expect(g.calls.filter(c => c.url.startsWith('/v1/quotes/'))).toHaveLength(1);
+      await createGatewaySource(options).getPurchase(ids[0]!);
+      expect(g.calls.filter(c => c.url.startsWith('/v1/quotes/'))).toHaveLength(2);
+    });
+
+    it('does not suppress subsequent quote reads after a transient failure', async () => {
+      let unavailable = true;
+      const g = await fakeGateway(p => p.startsWith('/v1/quotes/') && unavailable ? json(503, errorBody('internal', 'unavailable')) : undefined);
+      const source = createGatewaySource({ baseUrl: '', accessKey: KEY, fetchImpl: g.fetchImpl });
+      const id = [...g.bundles.keys()][0]!;
+      expect((await rejection(source.getPurchase(id))).status).toBe(503);
+      unavailable = false;
+      expect((await source.getPurchase(id)).quote).toEqual(g.bundles.get(id)!.quote);
+    });
+
     it('a forbidden purchase read is not degraded', async () => {
       const g = await fakeGateway((p) => (p.startsWith('/v1/purchases/') ? forbidden() : undefined));
       const source = createGatewaySource({ baseUrl: '', accessKey: KEY, fetchImpl: g.fetchImpl });

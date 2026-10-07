@@ -1,0 +1,170 @@
+{
+  "at": "2026-10-07T13:13:37.262Z",
+  "finalActivationStatus": "PARTIAL",
+  "stoppedAt": "Phase 2 protected-state gate",
+  "branch": "integration/final-activation",
+  "worktree": "C:/Dev/t2o-wt-final-activation",
+  "runtimeCheckpointSha": "db62f82ae8fc583850f4dfd4c70d76107b3480e0",
+  "exactFinalCandidateSha": "Resolve git rev-parse integration/final-activation; final evidence commit SHA is supplied in chat completion.",
+  "deployedSha": "974a39bfb59adb0a317d0db05a12268bbbb6242d",
+  "candidateDeployed": false,
+  "cdpEvidence": "PASS",
+  "astraPreserved": true,
+  "cardano": {
+    "at": "2026-10-07T13:10:54.328Z",
+    "noSpend": true,
+    "readOnly": true,
+    "controlledRestart": false,
+    "publicMcpRecoveryAcceptance": false,
+    "connected": true,
+    "network": "cardano:preprod",
+    "asset": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+    "headroomBaseUnits": "5005180",
+    "elapsedMs": 32961,
+    "diagnostics": [
+      {
+        "type": "payer_readiness",
+        "rail": "cardano",
+        "route": "status",
+        "outcome": "success",
+        "ms": 32952,
+        "timeoutMs": 60000
+      }
+    ]
+  },
+  "solana": {
+    "payer": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+    "sponsorAndTreasury": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+    "network": "Solana Devnet",
+    "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+    "payerTokenAccount": "2dWzL6j5sxpcfrqmuQdhbj22A4WXz2JwDNdbwa9wheMs",
+    "treasuryTokenAccount": "6imvBRJazCiUyJ96nBfFnFBBrKaJjZvALzyLCW8nkpJF",
+    "histories": [
+      {
+        "role": "payer",
+        "owner": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+        "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        "sourceSha256": "19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664",
+        "entries": 7,
+        "committedBaseUnits": "94220",
+        "committedFeeLamports": "0"
+      },
+      {
+        "role": "sponsor",
+        "owner": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+        "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+        "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+        "sourceSha256": "1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4",
+        "entries": 6,
+        "committedBaseUnits": "0",
+        "committedFeeLamports": "25002"
+      }
+    ],
+    "reservations": [
+      {
+        "purchaseId": "pur_01M48S9JMWEXMS34EEYCZ0YYKP",
+        "amountBaseUnits": "1050",
+        "classification": "unknown",
+        "payerSignatureValid": true,
+        "sponsorSignaturePresent": false,
+        "matchingSponsorReservations": 0
+      },
+      {
+        "purchaseId": "pur_01M48SB32BXEZGS9KPC74NNGM5",
+        "amountBaseUnits": "1050",
+        "classification": "unknown",
+        "payerSignatureValid": true,
+        "sponsorSignaturePresent": false,
+        "matchingSponsorReservations": 0
+      }
+    ],
+    "acl": "PASS: operator-only, key bytes unchanged, checker passes",
+    "caps": {
+      "at": "2026-10-07T13:11:11.149Z",
+      "noSpend": true,
+      "policyPath": "C:/Dev/token2049-setup/secrets/hosted-demo-solana/final-activation.env",
+      "authorization": "Operator explicitly approved these exact limits in current activation chat after automatic-review rejection.",
+      "scale": "USD 1 commercial notional = 0.001 valueless Devnet USDC = 1000 base units",
+      "identities": [
+        {
+          "address": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+          "aclVerified": true,
+          "identityVerified": true,
+          "noSigning": true
+        },
+        {
+          "address": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+          "aclVerified": true,
+          "identityVerified": true,
+          "noSigning": true
+        }
+      ],
+      "network": "Solana Devnet",
+      "mint": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "payee": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+      "sourceTokenAccount": "2dWzL6j5sxpcfrqmuQdhbj22A4WXz2JwDNdbwa9wheMs",
+      "treasuryTokenAccount": "6imvBRJazCiUyJ96nBfFnFBBrKaJjZvALzyLCW8nkpJF",
+      "perPaymentBaseUnits": "250000",
+      "cumulativeBaseUnits": "500000",
+      "commercialCeilingUsdMinor": "25000",
+      "sponsorFeeCapLamports": "100000",
+      "committedBaseUnits": "94220",
+      "cumulativeRemainingBaseUnits": "405780",
+      "perPaymentHeadroomBaseUnits": "250000",
+      "sponsorCommittedFeeLamports": "25002",
+      "sponsorFeeRemainingLamports": "74998",
+      "balancesVerified": false,
+      "usableHeadroomVerified": false,
+      "canonicalHistoriesUnchanged": true
+    },
+    "balances": "UNVERIFIED: public RPC persistent HTTP 429",
+    "hostedService": "NOT PROVISIONED",
+    "postgresImport": "NOT PERFORMED",
+    "legacyRetirement": "NOT PERFORMED"
+  },
+  "atlas": {
+    "hostedExecutableAccepted": false,
+    "liveGate": "false",
+    "candidateGateEnabled": true,
+    "guardsReviewed": true,
+    "historicalE2eRetained": true
+  },
+  "nuitee": {
+    "hostedExecutableAccepted": false,
+    "configurationPresent": true,
+    "historicalE2eRetained": true,
+    "finalSolanaE2e": "NOT STARTED"
+  },
+  "dualRailMcp": {
+    "cardanoPublicVisibility": "NOT RETESTED",
+    "solanaPublicVisibility": false,
+    "simultaneousAcceptance": false,
+    "explicitSelection": "Preserved candidate behavior; public acceptance deferred",
+    "fallback": "Absent in preserved candidate behavior; public acceptance deferred"
+  },
+  "finalSolanaNuiteeE2e": {
+    "quote": null,
+    "purchase": null,
+    "transaction": null,
+    "booking": null,
+    "receipt": null,
+    "proof": null,
+    "bookingConfirmed": false,
+    "recordingCheckpointReached": false
+  },
+  "latency": {
+    "cardanoReadOnlyStatusMs": 32961,
+    "e2e": null
+  },
+  "memory": {
+    "e2ePeak": null
+  },
+  "safeToMerge": false,
+  "safeToDeployCandidate": false,
+  "safeToKeepCandidateDeployed": false,
+  "existingDeploymentChanged": false,
+  "providerWrites": false,
+  "chainWrites": false,
+  "nextSafeAction": "When read-only Devnet RPC works, verify complete payer/sponsor histories, current balances and both blockhashes; classify retained candidates without clearing liabilities or re-signing. Only then design audited status preservation if needed, migrate/retire and continue activation. No cap question remains."
+}

@@ -65,5 +65,10 @@ describe('presenters over sample purchases', () => {
     const bundle = await source.getPurchase(source.idFor('found-elsewhere')!);
     expect(presentDetail({ ...bundle, quote: null }, ctx).route.to.name).toBe('Harbor and Pine');
     expect(presentDetail({ ...bundle, quote: null, proof: null }, ctx).route.to.name).toBe('Harbor and Pine');
+    for (const partial of [bundle, { ...bundle, quote: null }, { ...bundle, quote: null, proof: null }]) {
+      const vm = presentDetail(partial, ctx);
+      expect(vm.title).toBe(bundle.purchase.receipt!.sourceOffer!.productTitle);
+      expect(vm.summary.item.title).toBe(bundle.purchase.receipt!.sourceOffer!.productTitle);
+    }
   });
 });

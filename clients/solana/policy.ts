@@ -7,7 +7,9 @@ export function validateRequirement(payload: Pick<PaymentPayload,'x402Version'|'
   if (!payload || !req || payload.x402Version !== 2 || !deepEqual(payload.accepted,req) || req.scheme !== 'exact' || req.network !== NETWORK || req.asset !== cfg.mint || req.payTo !== cfg.payee || req.extra?.feePayer !== cfg.sponsor || req.extra?.tokenAccount !== cfg.tokenAccount ||
       !/^[1-9][0-9]*$/.test(req.amount) || BigInt(req.amount) > cfg.maxPerPayment || req.maxTimeoutSeconds !== 60) throw new Error('Solana payment outside approved policy');
   const preparation=req.extra.preparation as {url?:unknown;method?:unknown;authentication?:unknown;requiresFullySignedTransaction?:unknown};
-  if(!preparation||preparation.url!==cfg.facilitatorUrl+'/prepare'||preparation.method!=='POST'||preparation.authentication!=='Bearer'||preparation.requiresFullySignedTransaction!==true)throw new Error('Solana preparation prerequisite mismatch');
+  if (cfg.settlementMode === 'payer_broadcast') {
+    if (!preparation || (preparation as { mode?: unknown }).mode !== 'payer_broadcast' || preparation.requiresFullySignedTransaction !== true) throw new Error('Solana hosted preparation prerequisite mismatch');
+  } else if(!preparation||preparation.url!==cfg.facilitatorUrl+'/prepare'||preparation.method!=='POST'||preparation.authentication!=='Bearer'||preparation.requiresFullySignedTransaction!==true)throw new Error('Solana preparation prerequisite mismatch');
   const f = req.extra.funding as Omit<FundingRequirementInput,'amount'|'payTo'|'description'>;
   if (!f || payload.resource?.url !== f.resourceUrl || !f.resourceUrl.startsWith(cfg.gatewayUrl+'/v1/purchases/') || Date.parse(f.expiresAt) <= Date.now() || Date.parse(f.expiresAt) > Date.now()+3600000) throw new Error('Solana quote resource or expiry mismatch');
   const input: FundingRequirementInput = { ...f, description:'Solana funding', payTo:req.payTo, amount:{network:req.network,assetId:req.asset,decimals:6,amountBaseUnits:req.amount} };
