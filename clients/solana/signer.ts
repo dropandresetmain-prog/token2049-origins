@@ -8,7 +8,8 @@ export function assertPrivateKeyFile(path: string): void {
     if ((lstatSync(path).mode & 0o077) !== 0) throw new Error('Solana signer permissions unsafe');
     return;
   }
-  const script = "$ErrorActionPreference='Stop';$p='" + path.replaceAll("'", "''") + "';" + ' $a=Get-Acl -LiteralPath $p; $me=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; $bad=@($a.Access | Where-Object { $_.AccessControlType -eq "Allow" -and $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -notin @($me,"S-1-5-18","S-1-5-32-544") }); if ($bad.Count -gt 0) { exit 1 }; Write-Output "protected"';
+  // Node may inherit PowerShell 7 module paths; load the security module belonging to this Windows PowerShell process.
+  const script = "$ErrorActionPreference='Stop';Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1') -ErrorAction Stop;$p='" + path.replaceAll("'", "''") + "';" + ' $a=Get-Acl -LiteralPath $p; $me=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; $bad=@($a.Access | Where-Object { $_.AccessControlType -eq "Allow" -and $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -notin @($me,"S-1-5-18","S-1-5-32-544") }); if ($bad.Count -gt 0) { exit 1 }; Write-Output "protected"';
   try {
     if (execFileSync('powershell.exe', ['-NoProfile', '-Command', script], { encoding: 'utf8', stdio: 'pipe' }).trim() !== 'protected') throw new Error('permission check did not complete');
   }

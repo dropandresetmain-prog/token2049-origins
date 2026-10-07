@@ -28,8 +28,10 @@ export class SolanaLedger {
   assertProtected(): void {
     if (lstatSync(dirname(this.path)).isSymbolicLink() || lstatSync(this.path).isSymbolicLink()) throw new Error('ledger links forbidden');
     if (process.platform === 'win32') {
-      const script = "$p='" + this.path.replaceAll("'", "''") + "';" + ' $a=Get-Acl -LiteralPath $p; $me=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; $bad=@($a.Access | Where-Object { $_.AccessControlType -eq "Allow" -and $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -notin @($me,"S-1-5-18","S-1-5-32-544") }); if ($bad.Count -gt 0) { exit 1 }';
-      try { execFileSync('powershell.exe', ['-NoProfile','-Command',script], { stdio: 'pipe' }); } catch { throw new Error('ledger access control is not protected'); }
+      const script = "$ErrorActionPreference='Stop';Import-Module (Join-Path $PSHOME 'Modules/Microsoft.PowerShell.Security/Microsoft.PowerShell.Security.psd1') -ErrorAction Stop;$p='" + this.path.replaceAll("'", "''") + "';" + ' $a=Get-Acl -LiteralPath $p; $me=[System.Security.Principal.WindowsIdentity]::GetCurrent().User.Value; $bad=@($a.Access | Where-Object { $_.AccessControlType -eq "Allow" -and $_.IdentityReference.Translate([System.Security.Principal.SecurityIdentifier]).Value -notin @($me,"S-1-5-18","S-1-5-32-544") }); if ($bad.Count -gt 0) { exit 1 }; Write-Output "protected"';
+      try {
+        if (execFileSync('powershell.exe', ['-NoProfile','-Command',script], { encoding: 'utf8', stdio: 'pipe' }).trim() !== 'protected') throw new Error('permission check did not complete');
+      } catch { throw new Error('ledger access control is not protected'); }
     } else if ((lstatSync(this.path).mode & 0o077) !== 0 || (lstatSync(dirname(this.path)).mode & 0o077) !== 0) throw new Error('ledger permissions unsafe');
   }
   read(opts: { allowRetired?: boolean } = {}): SolanaLedgerEntry[] {
