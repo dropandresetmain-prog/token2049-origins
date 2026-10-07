@@ -57,3 +57,12 @@ Shared files: package.json scripts, tsconfig.build.json preflight entry, hosted 
 Origin/main advanced during this parallel build to 57fde8a64e3a3065c9db938e2b7c2e07b51309fa. All four lanes keep their exact common base; none was rebased or merged. New main introduces a public HTTPS free Cardano payer and PostgreSQL history. It changes hosted MCP config/router/tests and removes private BridgeAccess, isPrivatePeer and listenPrivate from clients/payer/bridge.ts. This Solana lane deliberately requires a private signer service and imports those older private helpers, so a direct merge into newer main will need code reconciliation, not just conflict resolution. Preserve new main Cardano behavior while restoring isolated Solana private access or moving the private bridge into a separate Solana module. Do not switch Solana to a public signer to avoid billing. Integration risk is HIGH until that adaptation and affected security tests pass.
 
 A further independent main promotion reached c0f937570249b2be3ebbf0922514c9ae9216e044 before final coordination. It adds canonical Cardano file-ledger import into PostgreSQL and permanent file-signer retirement. These are Cardano-specific changes; preserve them during later integration. Solana uses its own histories and fresh dedicated hosted identities. The private bridge helper and hosted MCP reconciliation above remains required.
+
+## Reconciliation onto current main (integration/partner-lanes-final)
+
+Replayed onto 5343235. Status stays PARTIAL. Reconciled deliberately, not by overwrite:
+- clients/payer/bridge.ts: added `private` BridgeAccess mode, `isPrivatePeer`, `listenPrivate` beside main's `hosted` mode. Cardano hosted path and rate limits untouched.
+- src/channels/hosted-mcp/config.ts: added `parsePrivateBridgeUrl` (Solana only); Cardano still uses `parsePayerBridgeUrl` (public HTTPS free web service).
+- router.ts: Solana payer client provisioned next to Cardano payer and console key; main's cold-start/background timeouts kept; `bridges` merges both rails.
+- package.json: dropped retired `payer:hosted:init-ledger`; kept `provision:hosted-mcp`.
+- Solana still uses its own file histories on a persistent disk (paid private service, deploy/render-solana.yaml). Not ported to PostgreSQL; no paid resource provisioned.

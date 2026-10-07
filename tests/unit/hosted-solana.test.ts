@@ -26,10 +26,10 @@ describe('hosted Solana boundaries',()=>{
   });
   it('configures independent hosted payer bridges and credentials without altering Cardano',()=>{
     const d=temp(),pass=join(d,'pass'),token=join(d,'token'),solanaToken=join(d,'solana-token');writeFileSync(solanaToken,'solana-bridge-0123456789012345');writeFileSync(pass,'owner-passcode-01234567890');writeFileSync(token,'bridge-token-0123456789012345');
-    const env={MCP_HOSTED_ENABLED:'true',MCP_PUBLIC_URL:'https://capsule.example',PUBLIC_BASE_URL:'https://capsule.example',MCP_OAUTH_OWNER_PASSCODE_FILE:pass,CARDANO_PAYER_BRIDGE_URL:'http://cardano:8788',CARDANO_PAYER_BRIDGE_TOKEN_FILE:token,SOLANA_PAYER_BRIDGE_URL:'http://solana:8789',SOLANA_PAYER_BRIDGE_TOKEN_FILE:solanaToken,MCP_PAYER_GATEWAY_TOKEN_SHA256:'a'.repeat(64),MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256:'b'.repeat(64)};
-    expect(loadHostedMcpConfig(env)).toMatchObject({cardanoBridge:{url:'http://cardano:8788'},solanaBridge:{url:'http://solana:8789'},solanaPayerClientId:'cli_HOSTEDSOLANAPAYER'});
+    const env={MCP_HOSTED_ENABLED:'true',MCP_PUBLIC_URL:'https://capsule.example',PUBLIC_BASE_URL:'https://capsule.example',MCP_OAUTH_OWNER_PASSCODE_FILE:pass,CARDANO_PAYER_BRIDGE_URL:'https://cardano-payer.example',CARDANO_PAYER_BRIDGE_TOKEN_FILE:token,SOLANA_PAYER_BRIDGE_URL:'http://solana:8789',SOLANA_PAYER_BRIDGE_TOKEN_FILE:solanaToken,MCP_PAYER_GATEWAY_TOKEN_SHA256:'a'.repeat(64),MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256:'b'.repeat(64)};
+    expect(loadHostedMcpConfig(env)).toMatchObject({cardanoBridge:{url:'https://cardano-payer.example'},solanaBridge:{url:'http://solana:8789'},solanaPayerClientId:'cli_HOSTEDSOLANAPAYER'});
     expect(()=>loadHostedMcpConfig({...env,SOLANA_PAYER_BRIDGE_TOKEN_FILE:token})).toThrow(/distinct/);
-    expect(()=>loadHostedMcpConfig({...env,SOLANA_PAYER_BRIDGE_URL:env.CARDANO_PAYER_BRIDGE_URL})).toThrow(/distinct/);
+    expect(()=>loadHostedMcpConfig({...env,SOLANA_PAYER_BRIDGE_URL:env.CARDANO_PAYER_BRIDGE_URL})).toThrow(/private-network/);
     expect(()=>loadHostedMcpConfig({...env,MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256:env.MCP_PAYER_GATEWAY_TOKEN_SHA256})).toThrow(/distinct/);
   });
   it('retains both histories across restart and fails closed for reservations, locks, missing or corrupt files',()=>{

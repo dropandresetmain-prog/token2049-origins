@@ -73,6 +73,24 @@ export function parsePublicOrigin(value: string | undefined, label: string): URL
  * The one hosted payer origin the gateway may call: https (loopback http only for local development), a bare origin, no
  * credentials, and never the gateway's own origin. It is configured, never discovered, and there is no fallback.
  */
+/** Private-network payer bridge (Solana lane): a single-label host (Render service name) or loopback. Never a public name. */
+export function parsePrivateBridgeUrl(value: string, label: string): string {
+  let u: URL;
+  try {
+    u = new URL(value.trim());
+  } catch {
+    throw new HostedConfigError(`${label} is not a valid URL`);
+  }
+  if (u.protocol !== 'http:' && u.protocol !== 'https:') throw new HostedConfigError(`${label} must be http(s)`);
+  if (u.username || u.password || u.search || u.hash || (u.pathname !== '/' && u.pathname !== '') || /[\s\\]/.test(value.trim())) {
+    throw new HostedConfigError(`${label} must be a bare origin without credentials`);
+  }
+  const loopback = ['localhost', '127.0.0.1', '[::1]'].includes(u.hostname);
+  const privateName = /^[a-z0-9][a-z0-9-]{0,62}$/.test(u.hostname); // single label: resolvable only inside the private network
+  if (!loopback && !privateName) throw new HostedConfigError(`${label} must name a private-network service (single-label host) or loopback`);
+  return u.origin;
+}
+
 export function parsePayerBridgeUrl(value: string, label: string, gatewayOrigin?: string): string {
   let u: URL;
   try {
