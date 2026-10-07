@@ -8,11 +8,13 @@ import { createHttpApp } from './channels/http/app.js';
 import type { CommerceExecutor, FundingAdapter, BankObservationAdapter } from './contracts/ports.js';
 import type { FundingRail, ProviderRoute } from './contracts/common.js';
 import type { Router } from 'express';
+import type { FxReferenceSource } from './contracts/fx.js';
 
 export interface GatewayParts {
   executors: CommerceExecutor[];
   fundingAdapters: FundingAdapter[];
   bankAdapters: BankObservationAdapter[];
+  fx?: FxReferenceSource;
   extraRouters?: Array<{ path: string; router: Router; auth: boolean; beforeJson?: boolean }>;
   buildRouters?: (core: CommerceCore) => NonNullable<GatewayParts['extraRouters']>;
 }
@@ -43,6 +45,7 @@ export async function buildGateway(parts: GatewayParts, opts: { env?: NodeJS.Pro
     executors: new Map<ProviderRoute, CommerceExecutor>(parts.executors.map((e) => [e.route, e])),
     fundingAdapters: new Map<FundingRail, FundingAdapter>(parts.fundingAdapters.map((a) => [a.rail, a])),
     bankAdapters: parts.bankAdapters,
+    fx: parts.fx,
   });
   const worker = new Worker(core, opts.log);
   const extraRouters = [...(parts.extraRouters ?? []), ...(parts.buildRouters?.(core) ?? [])];

@@ -575,6 +575,7 @@ export class Worker {
       providerEnvironment: qv.providerEnvironment,
       evidenceMode,
       principal: qv.merchantTotal,
+      ...(qv.displayConversion ? { displayConversion: qv.displayConversion } : {}),
       fundingRequirement: fundingRequirementView(JSON.parse(p.funding_requirement_json) as FundingRequirementRecord),
       serviceFee: qv.serviceFee,
       funding,

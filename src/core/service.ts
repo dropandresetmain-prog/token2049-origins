@@ -33,6 +33,8 @@ import { demoData } from '../demo/config.js';
 import { CompletePaymentAttempt } from '../contracts/api.js';
 import { paymentAttempt } from './handoffs.js';
 import { SettlementPolicy, settlementBaseUnits, validateSettlement } from '../contracts/settlement.js';
+import { SearchConversion, convertReference, type DisplayConversion, type FxReferenceSource } from '../contracts/fx.js';
+import { FrankfurterClient } from '../integrations/frankfurter/client.js';
 
 export const DEFAULT_ROUTE: Record<Category, ProviderRoute> = { retail: 'shopify', hotel: 'nuitee', flight: 'atlas' };
 
@@ -55,6 +57,7 @@ export interface CoreDeps {
   executors: Map<ProviderRoute, CommerceExecutor>;
   fundingAdapters: Map<FundingRail, FundingAdapter>;
   bankAdapters: BankObservationAdapter[];
+  fx?: FxReferenceSource;
 }
 
 export type FundResult =
@@ -122,7 +125,21 @@ export class CommerceCore {
     if (ex.category !== intent.category) throw new CoreError('invalid_request', `route ${route} does not serve ${intent.category}`);
     await this.assertRouteReady(ex);
     await this.assessProvider(ex, intent);
-    const found = await ex.search(intent);
+    let searchConversion: SearchConversion | undefined;
+    let providerIntent = intent;
+    if (intent.spendCeiling.currency === 'SGD' && ex.budgetConversionCurrency === 'USD') {
+      if (intent.spendCeiling.scale !== 2) throw new CoreError('invalid_request', 'SGD budgets must use scale 2 (cents)');
+      const snapshot = await (this.d.fx ?? new FrankfurterClient({ now: () => this.d.clock.now() })).latest('USD', 'SGD');
+      const providerSearchCeiling = convertReference(intent.spendCeiling, snapshot, 'USD', 2, 'floor');
+      searchConversion = SearchConversion.parse({ snapshot, userBudget: intent.spendCeiling, providerSearchCeiling });
+      providerIntent = { ...intent, spendCeiling: providerSearchCeiling };
+    }
+    const providerOffers = await ex.search(providerIntent);
+    // Controlled-store fallback does not filter prices itself. Enforce the converted bound there too.
+    const found = searchConversion ? providerOffers.filter(o =>
+      o.indicativePrice.currency === searchConversion.providerSearchCeiling.currency &&
+      o.indicativePrice.scale === searchConversion.providerSearchCeiling.scale &&
+      compareMoney(o.indicativePrice, searchConversion.providerSearchCeiling) <= 0) : providerOffers;
     let checkout: OfferView['checkout'];
     try { ex.assertPaymentAvailable?.(); }
     catch (e) {
@@ -145,6 +162,7 @@ export class CommerceCore {
           title: o.title,
           description: o.description,
           indicativePrice: o.indicativePrice,
+          ...(searchConversion ? { searchConversion } : {}),
           terms: o.terms,
           sourceObservedAt: o.sourceObservedAt,
           expiresAt,
@@ -210,6 +228,7 @@ export class CommerceCore {
       category: Category;
       route: ProviderRoute;
       intent_json: string;
+      public_json: string;
       execution_ref_json: string;
       expires_at: string;
     }>('SELECT * FROM offers WHERE id = $1', offerId);
@@ -217,22 +236,35 @@ export class CommerceCore {
     if (Date.parse(offer.expires_at) <= this.d.clock.now().getTime()) throw new CoreError('quote_expired', 'offer expired; search again');
     if (fulfillment.category !== offer.category) throw new CoreError('invalid_request', 'fulfillment category does not match offer');
     const intent = JSON.parse(offer.intent_json) as PurchaseIntent;
+    const searchConversion = SearchConversion.optional().parse(JSON.parse(offer.public_json).searchConversion);
+    // Provider validation and shadow refresh use the frozen inventory bound, never the user's SGD budget as USD.
+    const providerIntent = searchConversion ? { ...intent, spendCeiling: searchConversion.providerSearchCeiling } : intent;
     const ex = this.executorFor(offer.route);
     await this.assertRouteReady(ex);
 
-    await this.assessProvider(ex, intent, fulfillment);
-    const pq = await ex.quote({ offerId, executionRef: JSON.parse(offer.execution_ref_json), intent }, fulfillment);
+    await this.assessProvider(ex, providerIntent, fulfillment);
+    const pq = await ex.quote({ offerId, executionRef: JSON.parse(offer.execution_ref_json), intent: providerIntent }, fulfillment);
 
     // Spend ceiling from intent applies to the exact payable principal.
     const fee = this.serviceFee(pq.merchantTotal);
     const payable = addMoney(pq.merchantTotal, fee);
-    if (intent.spendCeiling.currency !== payable.currency || intent.spendCeiling.scale !== payable.scale) {
+    let displayConversion: DisplayConversion | undefined;
+    let budgetPayable = payable;
+    if (searchConversion) {
+      if (searchConversion.snapshot.from !== 'USD' || searchConversion.snapshot.to !== 'SGD' || payable.currency !== 'USD' || payable.scale !== 2 ||
+          digestOf(searchConversion.userBudget) !== digestOf(intent.spendCeiling) ||
+          digestOf(searchConversion.providerSearchCeiling) !== digestOf(convertReference(intent.spendCeiling, searchConversion.snapshot, 'USD', 2, 'floor')))
+        throw new CoreError('invalid_request', 'frozen FX evidence does not match the user budget or merchant quote');
+      budgetPayable = convertReference(payable, searchConversion.snapshot, 'SGD', 2, 'ceil');
+      displayConversion = { ...searchConversion, convertedPayable: budgetPayable };
+    }
+    if (intent.spendCeiling.currency !== budgetPayable.currency || intent.spendCeiling.scale !== budgetPayable.scale) {
       throw new CoreError('invalid_request', 'spend ceiling currency/scale does not match the provider quote', {
         quoteCurrency: payable.currency,
       });
     }
-    if (compareMoney(payable, intent.spendCeiling) > 0) {
-      throw new CoreError('spend_limit_exceeded', 'quoted total exceeds the intent spend ceiling', { payable });
+    if (compareMoney(budgetPayable, intent.spendCeiling) > 0) {
+      throw new CoreError('spend_limit_exceeded', 'quoted total exceeds the intent spend ceiling', { payable, ...(displayConversion ? { displayConversion } : {}) });
     }
 
     const now = this.d.clock.now();
@@ -249,6 +281,7 @@ export class CommerceCore {
       merchantTotal: pq.merchantTotal,
       serviceFee: fee,
       payable,
+      ...(displayConversion ? { displayConversion } : {}),
       fundingOptions,
       fulfillment,
       executionRef: pq.executionRef,
@@ -270,6 +303,7 @@ export class CommerceCore {
       merchantTotal: pq.merchantTotal,
       serviceFee: fee,
       payablePrincipal: payable,
+      ...(displayConversion ? { displayConversion } : {}),
       fundingOptions,
       fulfillmentSummary: pq.fulfillmentSummary,
       terms: pq.terms,

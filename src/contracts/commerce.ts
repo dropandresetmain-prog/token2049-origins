@@ -2,6 +2,7 @@ import { z } from 'zod';
 import { SourceOffer, SandboxRepresentation, SandboxExecution } from './provenance.js';
 import { SettlementBreakdown, validateSettlement } from './settlement.js';
 import { CryptoAmount, Money } from './money.js';
+import { SearchConversion, DisplayConversion } from './fx.js';
 import {
   Category,
   CustomerId,
@@ -31,6 +32,7 @@ export const OfferView = z
     title: z.string(),
     description: z.string(),
     indicativePrice: Money,
+    searchConversion: SearchConversion.optional(),
     terms: z.array(z.string()).default([]),
     sourceObservedAt: IsoTimestamp,
     expiresAt: IsoTimestamp,
@@ -101,6 +103,7 @@ export const QuoteView = z
     serviceFee: Money,
     /** merchantTotal + serviceFee: the amount purchase funding must cover. */
     payablePrincipal: Money,
+    displayConversion: DisplayConversion.optional(),
     fundingOptions: z.array(FundingOption),
     fulfillmentSummary: z.string(),
     terms: z.array(z.string()),
@@ -211,6 +214,7 @@ export const ReceiptView = z
     providerEnvironment: ProviderEnvironment,
     evidenceMode: EvidenceMode,
     principal: Money,
+    displayConversion: DisplayConversion.optional(),
     serviceFee: Money,
     funding: z.array(FundingSummary),
     /** Frozen selected requirement, retained after funding and completion. */
@@ -263,6 +267,7 @@ export const PurchaseView = z
     commerceStatus: CommerceStatus,
     merchantPaymentStatus: MerchantPaymentStatus,
     payablePrincipal: Money,
+    displayConversion: DisplayConversion.optional(),
     fundingInstructions: FundingInstructions.nullable(),
     funding: z.array(FundingSummary),
     /** Frozen selected requirement, retained after funding and completion. */

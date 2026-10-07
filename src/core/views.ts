@@ -51,6 +51,7 @@ export async function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: s
     commerceStatus: p.commerce_status as PurchaseView['commerceStatus'],
     merchantPaymentStatus: p.merchant_payment_status as PurchaseView['merchantPaymentStatus'],
     payablePrincipal: qv.payablePrincipal,
+    ...(qv.displayConversion ? { displayConversion: qv.displayConversion } : {}),
     fundingRequirement: fundingRequirementView(req),
     fundingInstructions: awaiting
       ? {

@@ -10,7 +10,8 @@ export const IntegerString = z
 
 export const SignedIntegerString = z.string().regex(/^-?(0|[1-9][0-9]*)$/, 'must be an integer string');
 
-export const CurrencyCode = z.string().regex(/^[A-Z]{3}$/, 'ISO-4217 code');
+export const CurrencyCode = z.string().regex(/^[A-Z]{3}$/, 'ISO-4217 code')
+  .describe('Canonical uppercase ISO currency code. S$, SGD, Singapore dollar and Singapore dollars mean SGD; use scale 2 for SGD cents.');
 
 export const Money = z
   .object({

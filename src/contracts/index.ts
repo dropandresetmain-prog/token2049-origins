@@ -1,4 +1,5 @@
 export * from './money.js';
+export * from './fx.js';
 export * from './settlement.js';
 export * from './common.js';
 export * from './intent.js';

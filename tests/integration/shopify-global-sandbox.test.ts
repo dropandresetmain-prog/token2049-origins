@@ -55,6 +55,24 @@ describe('Global discovery -> one shadow -> existing commerce core (all provider
   });
   afterEach(async () => { await h.close(); });
   const quote = () => h.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId, fulfillment: retailFulfillment } });
+  it('uses USD throughout live discovery, source refresh and shadow preparation for an original SGD budget', async () => {
+    const latest = vi.fn().mockResolvedValue({ source: 'frankfurter', from: 'USD', to: 'SGD', rate: '1.3',
+      referenceDate: h.clock.now().toISOString().slice(0, 10), fetchedAt: h.clock.now().toISOString() });
+    h.gw.core.deps.fx = { latest };
+    const search = await h.call('POST', '/v1/offers/search', { token: h.alice.token,
+      body: { intent: { ...intent, spendCeiling: money('SGD', '8000') } } });
+    expect(search.status).toBe(200); offerId = search.body.offers[0].offerId;
+    expect(catalog.search.mock.lastCall?.[0].spendCeiling).toEqual(money('USD', '6153'));
+    const first = QuoteView.parse((await quote()).body.quote);
+    expect(catalog.refresh.mock.lastCall?.[1].spendCeiling).toEqual(money('USD', '6153'));
+    expect(first.merchantTotal).toEqual(money('USD', '5700'));
+    expect(first.displayConversion?.convertedPayable).toEqual(money('SGD', '7410'));
+    expect(first.displayConversion?.userBudget).toEqual(money('SGD', '8000'));
+    expect(first.fundingOptions[0]?.amount.amountBaseUnits).toBe('57000');
+    latest.mockRejectedValue(new Error('FX offline after search'));
+    expect((await quote()).body.quote).toEqual(first); expect(latest).toHaveBeenCalledTimes(1);
+    expect(admin.create).toHaveBeenCalledTimes(1);
+  });
   it('durably prepares once on repeated calls and checks publication plus Storefront before ready', async () => {
     const first = await preparer().prepare(offerId, selected, intent);
     expect(first.sandboxRepresentation.shadowVariantId).toBe('gid://shopify/ProductVariant/500');

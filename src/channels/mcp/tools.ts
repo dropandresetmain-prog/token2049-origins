@@ -181,6 +181,7 @@ export function shortlistOf(offers: OfferView[]) {
     route: o.route,
     providerEnvironment: o.providerEnvironment,
     indicativePrice: formatMinor(o.indicativePrice),
+    ...(o.searchConversion ? { searchConversion: o.searchConversion } : {}),
     ...(o.sourceOffer ? { merchant: o.sourceOffer.merchantName, productUrl: o.sourceOffer.productUrl, variant: o.sourceOffer.variantTitle, availability: o.sourceOffer.availability } : {}),
     terms: o.terms.slice(0, 5),
     expiresAt: o.expiresAt,
@@ -209,9 +210,11 @@ function describeOffers(offers: OfferView[], totalFound: number): string {
   if (offers.length === 0) return 'No offers found. Ask the user to refine the request or raise the spend ceiling. Nothing was bought.';
   const lines = offers.map((o, i) => `${i + 1}. ${o.title} | ${o.category}/${o.route} (${o.providerEnvironment}) | indicative ${formatMinor(o.indicativePrice)}${o.sourceOffer ? ' | merchant ' + o.sourceOffer.merchantName + ' | ' + o.sourceOffer.productUrl : ''} | offerId ${o.offerId} | expires ${o.expiresAt}${o.checkout ? ' | SEARCH ONLY: ' + o.checkout.reason : ''}`);
   if (offers.every(o => o.checkout?.status === 'search_only')) return [...lines, 'Checkout is unavailable for these results. Explain the limitation now. Do not collect fulfillment or passenger details and do not call create_quote.'].join('\n');
+  const conversion = offers[0]?.searchConversion;
   return [
     `Shortlist: ${offers.length} option(s)${totalFound > offers.length ? ` (the top ${offers.length} of ${totalFound} found)` : ''}. Offers are indicative and NOT executable. Nothing is bought or reserved.`,
     ...lines,
+    ...(conversion ? [`Original user budget: ${formatMinor(conversion.userBudget)}. Indicative merchant prices remain USD; the converted inventory bound is not an approval amount. FX reference: Frankfurter, ${conversion.snapshot.referenceDate}. Exact payable including shipping, tax and service fee must still pass this SGD budget.`] : []),
     'NEXT STEP FOR YOU: present these options to the user (no more than 3), mark exactly ONE as "Recommended" with a short, concrete reason that uses only the facts above and the request of the user (never invent attributes), and ask which option they want. Do NOT call create_quote yet. Call it only after the user explicitly chooses one option, using that offerId.',
   ].join('\n');
 }
@@ -234,6 +237,11 @@ export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms:
   return [
     'Exact quote for "' + q.title + '" via ' + q.route + ' (' + q.providerEnvironment + ').',
     'Merchant total ' + formatMinor(q.merchantTotal) + ' + service fee ' + formatMinor(q.serviceFee) + ' = payable ' + formatMinor(q.payablePrincipal) + '.',
+    ...(q.displayConversion ? [
+      'Reference equivalent of payable: about ' + formatMinor(q.displayConversion.convertedPayable) + ' (user budget ' + formatMinor(q.displayConversion.userBudget) + ').',
+      'FX reference: Frankfurter, ' + q.displayConversion.snapshot.referenceDate + '; 1 ' + q.displayConversion.snapshot.from + ' = ' + q.displayConversion.snapshot.rate + ' ' + q.displayConversion.snapshot.to + '.',
+      'Approve the exact USD merchant quote and an explicit funding option. Funding uses the USD payable under its stated testnet policy; SGD is a budget/display reference only. Pass payablePrincipal as maxTotal. This FX reference is frozen.',
+    ] : []),
     'Fulfillment: ' + q.fulfillmentSummary,
     ...q.terms.map(t => 'Terms: ' + t),
     'Expires ' + q.expiresAt + '.',
@@ -285,6 +293,7 @@ export function orderConfirmation(p: PurchaseView): Record<string, unknown> | nu
     paymentVerified: true,
     principal: formatMinor(r.principal),
     serviceFee: formatMinor(r.serviceFee),
+    ...(r.displayConversion ? { displayConversion: r.displayConversion } : {}),
     payments: verified.map((f) => ({ rail: f.rail, network: f.network, transferReference: f.transferReference, verifiedAt: f.verifiedAt })),
     evidenceRefs: r.evidenceRefs,
     limitations: r.limitations,
@@ -303,6 +312,10 @@ function confirmationText(c: Record<string, unknown>): string {
     `Receipt: ${String(c.receiptId)}`,
     `Payment verified (${pay.rail}): ${pay.transferReference}`,
     `Amount ${String(c.principal)} + service fee ${String(c.serviceFee)} (${String(c.environment)} environment)`,
+    ...(c.displayConversion ? [
+      'Your reference budget equivalent (including service fee): about ' + formatMinor((c.displayConversion as NonNullable<QuoteView['displayConversion']>).convertedPayable) +
+      ' · Frankfurter, ' + (c.displayConversion as NonNullable<QuoteView['displayConversion']>).snapshot.referenceDate,
+    ] : []),
     `End your reply with "${c.headline as string}" followed by these references.`,
   ].join('\n');
 }
@@ -334,7 +347,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       title: 'Find offers',
       description:
-        'Search supported retail, hotel and flight offers from a structured purchase intent (retail searches the live product catalog by default). Results are indicative and NOT executable. Nothing is bought or reserved. Afterwards present the best 3 options to the user, mark one "Recommended" with a short reason, and let the user choose before calling create_quote.',
+        'Search supported retail, hotel and flight offers from a structured purchase intent (retail searches the live product catalog by default). Interpret S$, SGD, Singapore dollar and Singapore dollars as spendCeiling.currency="SGD", scale=2; preserve the user budget. Retail provider prices remain USD; FX reference is for search/budget/display only. Results are indicative and NOT executable. Nothing is bought or reserved. Afterwards present the best 3 options to the user, mark one "Recommended" with a short reason, and let the user choose before calling create_quote.',
       inputSchema: { intent: PurchaseIntentDraft },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       ...securityMeta(deps, 'find_offers'),

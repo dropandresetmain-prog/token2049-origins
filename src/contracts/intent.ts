@@ -7,7 +7,7 @@ const IsoDate = z.string().regex(/^\d{4}-\d{2}-\d{2}$/, 'YYYY-MM-DD');
 const Iata = z.string().regex(/^[A-Z]{3}$/, 'IATA code');
 
 const common = {
-  /** Spending ceiling in the merchant currency; quotes above it are rejected. */
+  /** Original user budget; supported FX paths check exact payable against it using frozen reference evidence. */
   spendCeiling: Money,
   /** Optional route pin; otherwise the category default route is used. */
   route: ProviderRoute.optional(),

@@ -16,6 +16,7 @@ export class GlobalSandboxExecutor implements CommerceExecutor {
   readonly route = 'shopify' as const;
   readonly category = 'retail' as const;
   readonly environment = 'test' as const;
+  readonly budgetConversionCurrency = 'USD';
   constructor(private readonly base: CommerceExecutor, private readonly catalog: Pick<GlobalCatalogClient, 'search'>,
     private readonly shadow: Pick<ShadowPreparer, 'prepare'> | null) {}
   readiness() { return this.base.readiness(); }

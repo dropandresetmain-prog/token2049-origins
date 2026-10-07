@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
-import { createMcpServer } from '../../src/channels/mcp/server.js';
+import { createMcpServer, INSTRUCTIONS } from '../../src/channels/mcp/server.js';
 import { offerSelectionGuide, shortlistOf, SHORTLIST_SIZE } from '../../src/channels/mcp/tools.js';
 import type { OfferView } from '../../src/contracts/commerce.js';
 import { retailIntent } from '../support/harness.js';
@@ -46,6 +46,16 @@ async function findOffers(offers: OfferView[], opts: { liveOffers?: OfferView[];
 }
 
 describe('find_offers shortlist and explicit selection', () => {
+  it('guides Singapore-dollar wording to canonical SGD and preserves structured SGD budgets', async () => {
+    const { intents, tools } = await findOffers([offer(1)], { intent: { ...retailIntent(), spendCeiling: { currency: 'SGD', amountMinor: '5000', scale: 2 } } });
+    expect(intents[0].spendCeiling).toEqual({ currency: 'SGD', amountMinor: '5000', scale: 2 });
+    const description = tools.find(t => t.name === 'find_offers')!.description!;
+    for (const wording of ['S$', 'SGD', 'Singapore dollar', 'Singapore dollars']) {
+      expect(INSTRUCTIONS).toContain(wording); expect(description).toContain(wording);
+    }
+    expect(INSTRUCTIONS).toContain('Funding remains based on the USD quote');
+    expect(description).toContain('spendCeiling.currency="SGD"');
+  });
   it('returns at most 3 offers however many the gateway found, and says how many were omitted', async () => {
     const { res } = await findOffers([1, 2, 3, 4, 5].map((n) => offer(n)));
     expect(res.structuredContent.shortlist).toHaveLength(SHORTLIST_SIZE);

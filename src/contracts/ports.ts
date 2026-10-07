@@ -107,6 +107,8 @@ export interface CommerceExecutor {
   readonly route: ProviderRoute;
   readonly category: Category;
   readonly environment: ProviderEnvironment;
+  /** Optional budget/display conversion capability. Merchant money remains in this currency. */
+  readonly budgetConversionCurrency?: string;
   readiness(): Promise<Readiness>;
   /** Local payment gate; must run before creating a funding obligation. */
   assertPaymentAvailable?(): void;
