@@ -323,7 +323,8 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     await this.step(log, 'fill_address', async () => {
       await page.locator('input[name="address1"], input[autocomplete~="address-line1"]').first().fill(a.address1);
       if (a.address2) await page.locator('input[name="address2"], input[autocomplete~="address-line2"]').first().fill(a.address2);
-      await page.locator('input[name="city"], input[autocomplete~="address-level2"]').first().fill(a.city);
+      // Singapore checkout has no city control; its hidden autofill clone is not an address field.
+      if (a.countryCode !== 'SG') await page.locator('input[name="city"], input[autocomplete~="address-level2"]').first().fill(a.city);
       await page.locator('input[name="postalCode"], input[autocomplete~="postal-code"]').first().fill(a.zip);
     });
     if (a.province) {
@@ -356,6 +357,9 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       const values = { 'given-name': a.firstName, 'family-name': a.lastName, 'address-line1': a.address1,
         'address-line2': a.address2 ?? '', 'address-level2': a.city, 'postal-code': a.zip };
       for (const [field, value] of Object.entries(values)) {
+        // Shopify omits city for Singapore billing as well as shipping. Other countries still
+        // require the existing city input, and failures in their visible controls remain fatal.
+        if (field === 'address-level2' && a.countryCode === 'SG') continue;
         // Autofill clones can have nonzero bounds despite being aria-hidden. Use accessible
         // controls as well as the billing scope; address autocomplete exposes a combobox.
         await page.getByRole('textbox').or(page.getByRole('combobox'))

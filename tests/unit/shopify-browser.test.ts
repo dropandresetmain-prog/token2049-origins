@@ -9,7 +9,7 @@ import type { CheckoutDriverInput, CheckoutQuoteInput } from '../../src/executio
 const mocks = vi.hoisted(() => ({ launch: vi.fn() }));
 vi.mock('playwright-core', () => ({ chromium: { launch: mocks.launch } }));
 
-function fixture(observer?: CheckoutObserver, options: { billing?: boolean; failBillingField?: string } = {}) {
+function fixture(observer?: CheckoutObserver, options: { billing?: boolean; failBillingField?: string; singapore?: boolean } = {}) {
   const clock = new ManualClock();
   const events: string[] = [];
   let url = 'https://test-shop.myshopify.com/checkouts/fixture';
@@ -47,6 +47,9 @@ function fixture(observer?: CheckoutObserver, options: { billing?: boolean; fail
     goto: vi.fn(async () => undefined), url: () => url, waitForLoadState: vi.fn(async () => undefined), waitForTimeout: vi.fn(async (ms: number) => clock.advance(ms)),
     locator: vi.fn((selector: string) => {
       if (selector === 'body') return {innerText: async () => text};
+      if (options.singapore && selector === 'input[name="city"], input[autocomplete~="address-level2"]') return {
+        ...generic, first: () => ({ fill: async () => { throw new Error('Singapore city is only an autofill clone'); } }),
+      };
       const billingSelect = /select\[autocomplete="billing ([^"]+)"\]:visible/.exec(selector)?.[1];
       if (billingSelect) return {
         count: vi.fn(async () => options.billing ? 1 : 0),
@@ -266,6 +269,22 @@ describe('controlled Shopify browser payment boundary', () => {
   });
 });
 describe('hosted checkout quote-only boundary', () => {
+  it('quotes Singapore with no city or province controls and never fills hidden city clones or enters payment', async () => {
+    const s = fixture(undefined, { billing: true, failBillingField: 'address-level2', singapore: true });
+    s.quoteInput.fulfillment = { category: 'retail', email: 'buyer@example.com', shippingAddress: {
+      firstName: 'Test', lastName: 'Buyer', address1: '1 Test Street', city: 'Singapore', zip: '018956', countryCode: 'SG',
+    } };
+    s.setText('Standard\nBogus Gateway\nSubtotal USD $25.00\nShipping USD $5.00\nTotal tax USD $2.00\nTotal USD $32.00');
+    await expect(s.driver.quote(s.quoteInput)).resolves.toMatchObject({ total: money('USD', 3200) });
+    expect(s.billingSelects.get('country-name')).toBe('SG');
+    expect(s.billingSelects.has('address-level1')).toBe(false);
+    expect(s.billingFields).toEqual(new Map([
+      ['given-name', 'Test'], ['family-name', 'Buyer'], ['address-line1', '1 Test Street'], ['address-line2', ''], ['postal-code', '018956'],
+    ]));
+    expect(s.page.frameLocator).not.toHaveBeenCalled();
+    expect(s.button.click).not.toHaveBeenCalled();
+    expect(s.pay).not.toHaveBeenCalled();
+  });
   it('reads a settled quote without card entry, checkpoint, or pay action', async () => {
     const s = fixture();
     s.setText('Standard\nBogus Gateway\nSubtotal USD $25.00\nShipping USD $5.00\nTotal tax USD $2.00\nTotal USD $32.00');

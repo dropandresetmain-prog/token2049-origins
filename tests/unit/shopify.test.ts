@@ -270,6 +270,23 @@ describe('Storefront retained sandbox shadow isolation', () => {
     return kind === 'Product' ? productNode(title) : { ...variantNode(), product:{ id:'gid://shopify/Product/456', title, description:'Synthetic fixture' } };
   }
 
+  it('requires SG contextual availability even when the same untracked shadow has a USD price and is available in US', async () => {
+    let sgShippingConfigured = false;
+    const fetchImpl = vi.fn<typeof fetch>(async (_url, request) => {
+      const { query, variables } = JSON.parse(String(request?.body));
+      expect(query).toContain('@inContext(country: $country)');
+      const variant = node('ProductVariant', shadowTitle);
+      return Response.json({ data: { node: { ...variant, availableForSale: variables.country === 'US' || sgShippingConfigured } } });
+    });
+    const sf = new StorefrontClient(loadShopifyConfig(env).config, fetchImpl);
+    const args = { productRef: 'gid://shopify/ProductVariant/123', includeSandboxShadows: true };
+    expect(await sf.findVariants({ ...args, country: 'US' })).toHaveLength(1);
+    expect(await sf.findVariants({ ...args, country: 'SG' })).toEqual([]);
+    sgShippingConfigured = true;
+    expect((await sf.findVariants({ ...args, country: 'SG' }))[0]!.unitPrice).toEqual(money('USD', 1250));
+    expect(fetchImpl.mock.calls.map(([, request]) => JSON.parse(String(request?.body)).variables.country)).toEqual(['US', 'SG', 'SG']);
+  });
+
   it('excludes reserved shadow titles from ordinary search while retaining the canonical catalog product', async () => {
     const { sf,fetchImpl } = client({ products:{ nodes:[productNode(shadowTitle), productNode(canonicalTitle)] } });
     expect(await sf.findVariants({ query:'shirt', country:'US' })).toEqual([
