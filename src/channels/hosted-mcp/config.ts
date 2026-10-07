@@ -21,7 +21,7 @@ export interface HostedMcpConfig {
   cardanoBridge?: { url: string; token: string };
   /** SHA-256 (hex) of the hosted payer's gateway token. Only the hash is configured; it registers the payer's gateway client. */
   payerTokenSha256?: string;
-  /** SHA-256 (hex) of a read-only console access key (purchases:read + evidence:read) for the hosted customer. Hash only. */
+  /** SHA-256 (hex) of a GET-only judge password (purchases:read + evidence:read + operator:read) for the hosted customer. Hash only. */
   consoleKeySha256?: string;
   /** Test seams for slow payers (production values are set in the router). */
   bridgeTimeoutMs?: number;

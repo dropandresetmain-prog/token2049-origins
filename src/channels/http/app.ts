@@ -60,6 +60,11 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
   const auth = async (req: Request, _res: Response, next: NextFunction) => {
     try {
       req.actor = (await authenticate(core.deps.db, req.header('authorization'), req.requestId));
+      // The judge reader can inspect treasury data, but operator:read also guards a bank-refresh write.
+      // Reject every non-GET request before routing so this credential cannot acquire mutation authority.
+      if (req.actor.clientId === 'cli_HOSTEDCONSOLE' && req.method !== 'GET') {
+        throw new CoreError('forbidden', 'judge console password permits GET requests only');
+      }
       next();
     } catch (e) {
       next(e);

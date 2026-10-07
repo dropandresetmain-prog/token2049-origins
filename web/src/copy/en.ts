@@ -341,7 +341,7 @@ export const proof = {
   technicalDetails: 'Technical details for support',
   download: 'Download proof',
   downloaded: 'Proof downloaded.',
-  unavailable: "Proof isn't available with this access key.",
+  unavailable: "Proof isn't available with this password.",
 };
 
 /** Purchase activity, keyed by gateway event type. Unknown types fall back to `fallback`. */
@@ -422,7 +422,7 @@ export const quoteDialog = {
   rowQuoteNumber: 'Quote number',
   termsHeading: 'Merchant terms',
   noTerms: 'The merchant listed no extra terms.',
-  unavailable: "Price details aren't available with this access key.",
+  unavailable: "Price details aren't available with this password.",
   close: 'Close',
 };
 
@@ -461,13 +461,13 @@ export const list = {
 
 export const signIn = {
   title: 'Connect to Capsule',
-  intro: 'Paste the access key for your workspace to see your purchases.',
-  label: 'Access key',
-  help: 'The key stays in this browser tab and is cleared when you close it or sign out.',
+  intro: 'Enter your judge password to view purchases, proof, Treasury and Connections.',
+  label: 'Password',
+  help: 'The password stays in this browser tab and is cleared when you close it or sign out.',
   submit: 'Connect',
   connecting: 'Connecting',
   signOut: 'Sign out',
-  signedOut: 'Signed out. Your access key was cleared.',
+  signedOut: 'Signed out. Your password was cleared.',
 };
 
 export const loading = {
@@ -476,8 +476,8 @@ export const loading = {
 };
 
 export const errors = {
-  unauthenticated: "That access key wasn't accepted. Check it and try again.",
-  forbidden: "This access key can't view purchases. Ask for a key that can view purchases and proof.",
+  unauthenticated: "That password wasn't accepted. Check it and try again.",
+  forbidden: "This password can't view purchases. Ask the Capsule team for a judge password.",
   not_found: "This purchase doesn't exist or isn't in your workspace.",
   network: "Capsule couldn't be reached. Check your connection and try again.",
   invalid_response: 'Capsule sent a response this page doesn\'t understand. Try again, or contact support.',

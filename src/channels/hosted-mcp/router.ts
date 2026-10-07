@@ -50,8 +50,13 @@ export async function provisionPayerClient(db: Db, config: HostedMcpConfig, nowI
        ON CONFLICT(id) DO UPDATE SET token_hash = EXCLUDED.token_hash WHERE api_clients.revoked_at IS NULL AND api_clients.customer_id = EXCLUDED.customer_id`,
       id, config.customerId, channel, label, sha, JSON.stringify(scopes), nowIso);
     if (config.payerTokenSha256) await upsert(config.payerClientId, 'http', 'Hosted Cardano payer', config.payerTokenSha256, ['purchases:read', 'purchases:fund']);
-    // Read-only key for the console: sees this customer's purchases and evidence, can neither buy nor fund.
-    if (config.consoleKeySha256) await upsert('cli_HOSTEDCONSOLE', 'console', 'Hosted console (read only)', config.consoleKeySha256, ['purchases:read', 'evidence:read']);
+    // Judge console: customer purchases/proof and redacted treasury reads; HTTP middleware enforces GET only.
+    if (config.consoleKeySha256) {
+      await upsert('cli_HOSTEDCONSOLE', 'console', 'Hosted console (read only)', config.consoleKeySha256, ['purchases:read', 'evidence:read', 'operator:read']);
+      // Existing installations need the same read scopes; preserve revocation and customer ownership.
+      await db.run("UPDATE api_clients SET scopes_json = $1 WHERE id = 'cli_HOSTEDCONSOLE' AND customer_id = $2 AND revoked_at IS NULL",
+        JSON.stringify(['purchases:read', 'evidence:read', 'operator:read']), config.customerId);
+    }
   });
 }
 

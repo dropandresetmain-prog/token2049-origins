@@ -839,7 +839,7 @@ describe('hosted console access key (hash only, read only)', () => {
     });
     const row = (await f.h.gw.db.all<any>("SELECT customer_id, channel, scopes_json FROM api_clients WHERE id = 'cli_HOSTEDCONSOLE'"))[0];
     expect(row).toMatchObject({ customer_id: 'cus_HOSTEDTESTDEMO', channel: 'console' });
-    expect(JSON.parse(row.scopes_json)).toEqual(['purchases:read', 'evidence:read']);
+    expect(JSON.parse(row.scopes_json)).toEqual(['purchases:read', 'evidence:read', 'operator:read']);
     expect(JSON.stringify(await f.h.gw.db.all('SELECT * FROM api_clients'))).not.toContain(key);
 
     // A purchase made through the MCP shows up for the console key immediately, and another customer's does not.
@@ -857,9 +857,31 @@ describe('hosted console access key (hash only, read only)', () => {
       expect(JSON.stringify(mine.body)).not.toContain(pid);
     } finally { await client.close(); }
 
-    // Read-only: it cannot search, quote, buy, fund, or read operator data.
+    // GET-only: treasury and bank reads work; bank refresh and all commerce mutations stay forbidden.
     expect((await f.h.call('POST', '/v1/offers/search', { token: key, body: { intent: retailIntent() } })).status).toBe(403);
     expect((await f.h.call('POST', '/v1/purchases/pur_0000000000000/fund', { token: key })).status).toBe(403);
-    expect((await f.h.call('GET', '/v1/evidence/treasury', { token: key })).status).toBe(403);
+    expect((await f.h.call('GET', '/v1/evidence/treasury', { token: key })).status).toBe(200);
+    expect((await f.h.call('GET', '/v1/evidence/bank', { token: key })).status).toBe(200);
+    const observationsBefore = await f.h.gw.db.all('SELECT * FROM bank_observations');
+    for (const method of ['POST', 'PUT', 'PATCH', 'DELETE']) {
+      expect((await f.h.call(method, '/v1/evidence/bank/refresh', { token: key })).status).toBe(403);
+    }
+    expect(await f.h.gw.db.all('SELECT * FROM bank_observations')).toEqual(observationsBefore);
+    for (const path of ['/v1/quotes', '/v1/purchases']) {
+      expect((await f.h.call('POST', path, { token: key, body: {} })).status).toBe(403);
+    }
+
+    // Upgrade the legacy scope row idempotently and rotate the password without retaining plaintext.
+    await f.h.gw.db.run("UPDATE api_clients SET scopes_json = $1 WHERE id = 'cli_HOSTEDCONSOLE'", JSON.stringify(['purchases:read', 'evidence:read']));
+    const rotated = 'judge_' + randomBytes(24).toString('base64url');
+    const config = { publicUrl: new URL(f.base), allowedOrigins: [], ownerPasscode: PASSCODE, customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO', payerClientId: 'cli_HOSTEDTESTPAYER', extraRedirectUris: [], gatewayUrl: f.base, consoleKeySha256: sha256Hex(rotated) };
+    await provisionPayerClient(f.h.gw.db, config);
+    await provisionPayerClient(f.h.gw.db, config);
+    expect((await f.h.call('GET', '/v1/evidence/treasury', { token: rotated })).status).toBe(200);
+    expect((await f.h.call('GET', '/v1/evidence/purchases', { token: key })).status).toBe(401);
+    expect(JSON.stringify(await f.h.gw.db.all('SELECT * FROM api_clients'))).not.toContain(rotated);
+    await f.h.gw.db.run("UPDATE api_clients SET revoked_at = $1 WHERE id = 'cli_HOSTEDCONSOLE'", new Date().toISOString());
+    await provisionPayerClient(f.h.gw.db, config);
+    expect((await f.h.call('GET', '/v1/evidence/purchases', { token: rotated })).status).toBe(401);
   });
 });
