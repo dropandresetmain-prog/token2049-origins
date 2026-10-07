@@ -295,7 +295,8 @@ export function orderConfirmation(p: PurchaseView): Record<string, unknown> | nu
     commerceType: p.category,
     environment: r.providerEnvironment,
     merchant: r.sourceOffer?.merchantName ?? null,
-    product: r.sourceOffer?.productUrl ?? null,
+    product: r.sourceOffer?.productTitle ?? null,
+    productUrl: r.sourceOffer?.productUrl ?? null,
     orderReference: p.providerReference,
     reference: { label: final.referenceLabel, value: displayReference(p.providerReference) },
     receiptId: r.receiptId,
@@ -321,6 +322,7 @@ function confirmationText(c: Record<string, unknown>): string {
   return [
     c.headline as string,
     ...(c.merchant ? [`Merchant: ${c.merchant as string}`] : []),
+    ...(c.product ? [`Product: ${c.product as string}`] : []),
     `${ref.label}: ${ref.value}`,
     `Receipt: ${String(c.receiptId)}`,
     `Payment verified (${pay.rail}): ${pay.transferReference}`,

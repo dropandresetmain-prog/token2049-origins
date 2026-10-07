@@ -25,6 +25,7 @@ import { readSecretFile, type PayerConfig } from './config.js';
 import { SettlementBreakdown, validateSettlement } from '../../src/contracts/settlement.js';
 import { fundingCommitment } from '../../src/funding/cardano/binding.js';
 import { createBoundSigner } from './signer.js';
+import { timedOperation } from '../../src/infrastructure/timing.js';
 import { PayerLedger, type LedgerPort } from './ledger.js';
 
 export type PayerErrorCode =
@@ -317,7 +318,7 @@ export class Payer {
       // Reserve first: if we crash after signing, the cap already reflects it.
       await this.ledger.upsert({ purchaseId, network: c.network, asset: c.allowedAsset, amountBaseUnits: entry.amount, payTo: entry.payTo, status: 'signing', header: null, transferReference: null, createdAt: ts, updatedAt: ts });
       try {
-        header = await this.sign(challenge, entry);
+        header = await timedOperation('payer', 'build_and_sign', () => this.sign(challenge, entry), event => this.log(event));
       } catch (e) {
         // Signing failed in this process, so nothing was signed or sent: free the unsent reservation (ledgers without release keep it).
         await this.ledger.release?.(purchaseId);

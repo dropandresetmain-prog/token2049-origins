@@ -1,5 +1,6 @@
 import type { Page, Browser, BrowserContext } from 'playwright-core';
 import { logBrowserMemory } from './memoryTelemetry.js';
+import { timedOperation } from '../../infrastructure/timing.js';
 import { parseDecimalToMinor, type Money } from '../../contracts/money.js';
 import { systemClock, type Clock } from '../../infrastructure/clock.js';
 import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver, type CheckoutDriverInput, type CheckoutDriverResult, type CheckoutQuoteInput, type CheckoutTotals } from './checkout.js';
@@ -223,7 +224,8 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
   }
 
   private async withPage<T>(checkoutUrl: string, run: (page: Page) => Promise<T>): Promise<T> {
-    const turn = browserQueue.then(() => undefined, () => undefined).then(() => this.withPageUnqueued(checkoutUrl, run));
+    const previous = browserQueue;
+    const turn = this.timed('browser_queue', () => previous.then(() => undefined, () => undefined)).then(() => this.withPageUnqueued(checkoutUrl, run));
     browserQueue = turn.catch(() => undefined);
     return turn;
   }
@@ -235,11 +237,11 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     try {
       const { chromium } = await import('playwright-core');
       // Default resolution uses the local Playwright cache; SHOPIFY_BROWSER_EXECUTABLE overrides.
-      browser = await chromium.launch({
+      browser = await this.timed('browser_launch', () => chromium.launch({
         headless: this.opts.headless ?? true,
         ...(this.opts.lowMemory ? { args: LOW_MEMORY_ARGS } : {}),
         ...(this.opts.executablePath ? { executablePath: this.opts.executablePath } : {}),
-      });
+      }));
       logBrowserMemory('launched', this.opts.sink ?? stderrSink);
     } catch {
       throw new CheckoutAbort('browser_unavailable');
@@ -248,7 +250,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     let page: Page | undefined;
     try {
       // No video, no trace, no HAR: nothing that could capture PII is ever enabled.
-      context = await browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' });
+      context = await this.timed('browser_context', () => browser.newContext({ acceptDownloads: false, serviceWorkers: 'block' }));
       context.setDefaultTimeout(this.ms(STEP_TIMEOUT_MS));
       await context.route('**/*', async route => {
         const request = route.request();
@@ -270,18 +272,24 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       await observe(() => this.opts.observer?.attach?.(openedPage));
       return await run(page);
     } finally {
-      await observe(() => page?.close());
-      await observe(() => context?.close());
-      await browser.close().catch(() => undefined);
+      await this.timed('browser_shutdown', async () => {
+        await observe(() => page?.close());
+        await observe(() => context?.close());
+        await browser.close().catch(() => undefined);
+      });
       logBrowserMemory('closed', this.opts.sink ?? stderrSink);
     }
+  }
+
+  private timed<T>(name: string, run: () => Promise<T>): Promise<T> {
+    return timedOperation('shopify.browser', name, run, event => (this.opts.sink ?? stderrSink)(JSON.stringify(event)));
   }
 
   /** Run one named step; any non-abort failure becomes a content-free `step_failed`. */
   private async step<T>(log: (s: string) => void, name: string, fn: () => Promise<T>): Promise<T> {
     log(name);
     try {
-      return await fn();
+      return await this.timed(name, fn);
     } catch (e) {
       await observe(() => this.opts.observer?.stepFailed?.(name));
       if (e instanceof CheckoutAbort) throw e;
@@ -413,12 +421,13 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     const payElement = await payButton.elementHandle();
     if (!payElement) throw new CheckoutAbort('step_failed');
     await observe(() => this.opts.observer?.beforePay?.());
-    await input.checkpoint('pay_click', { at: this.clock.now().toISOString() });
+    logBrowserMemory('before_pay', this.opts.sink ?? stderrSink);
+    await this.timed('pay_checkpoint', () => input.checkpoint('pay_click', { at: this.clock.now().toISOString() }));
     log('pay_click');
     // Everything below is post-click: the executor treats any failure as an unknown outcome.
     try {
       // No `force`: live rehearsal showed the pay button passes Playwright's normal actionability checks.
-      await payElement.click({ timeout: 5000, noWaitAfter: true });
+      await this.timed('pay_click', () => payElement.click({ timeout: 5000, noWaitAfter: true }));
     } catch {
       await observe(() => this.opts.observer?.stepFailed?.('pay_click'));
       throw new CheckoutAbort('step_failed', 'step pay_click failed');

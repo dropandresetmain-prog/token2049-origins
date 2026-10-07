@@ -158,7 +158,7 @@ function facts(b: PurchaseBundle, ctx: PresentContext): Facts {
   const source = sandboxed ? (b.quote?.sourceOffer ?? b.proof?.sourceOffer ?? p.receipt?.sourceOffer ?? null) : null;
   return {
     b, p, ctx, cat, key, progress,
-    title: b.quote?.title ?? b.context.title ?? copy.category[cat].title,
+    title: source?.productTitle ?? b.quote?.title ?? b.context.title ?? copy.category[cat].title,
     ref: displayId(p.purchaseId),
     agent,
     // Lead with the source store; the execution disclosure separately identifies where checkout occurred.

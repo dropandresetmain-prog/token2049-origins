@@ -59,7 +59,7 @@ export function projectProgress(p: PurchaseView): HumanProgress {
       const label = successLabel(p);
       const reference = completionReference(p);
       return { ...base, stage: 'complete', label,
-        message: `${label}.${reference ? ` ${reference.label}: ${reference.value}.` : ''} Read the receipt for the environment and proof limitations.`,
+        message: `${label}.${reference ? ` ${reference.label}: ${reference.value}.` : ''} View the receipt for purchase details.`,
         outcomeFinal: true, nextAction: null };
     }
     case 'requires_reauthorization': return { ...base, stage: 'needs_attention', label: 'Terms changed', message: 'Terms changed before purchase. Nothing was bought; fresh approval is required.', outcomeFinal: true, nextAction: 'Request a fresh quote, select a funding option and approve the new terms.' };

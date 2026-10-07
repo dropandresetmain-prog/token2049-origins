@@ -27,4 +27,15 @@ describe('browser memory telemetry', () => {
     expect(capture().container.currentBytes).toBeNull();
     expect(()=>logBrowserMemory('closed',()=>{throw new Error('sink unavailable');})).not.toThrow();
   });
+  it('records only allowlisted pressure counters and distinguishes missing counters from zero', () => {
+    files.set('/sys/fs/cgroup/memory.events', 'high 2\nmax 4\noom 0\noom_kill 0\nprivate secret');
+    files.set('/sys/fs/cgroup/cpu.stat', 'nr_throttled 3\nthrottled_usec 1200\nusage_usec 4000');
+    files.set('/sys/fs/cgroup/memory.swap.current', '0');
+    const sink = vi.fn();
+    logBrowserMemory('before_pay', sink);
+    const pressure = JSON.parse(sink.mock.calls[1]![0]);
+    expect(pressure).toEqual({ type: 'shopify.browser_pressure', event: 'before_pay', swapBytes: 0,
+      memory: { high: 2, max: 4, oom: 0, oom_kill: 0 },
+      cpu: { usage_usec: 4000, nr_periods: null, nr_throttled: 3, throttled_usec: 1200 } });
+  });
 });

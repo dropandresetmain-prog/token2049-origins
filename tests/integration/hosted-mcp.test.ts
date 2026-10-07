@@ -179,9 +179,11 @@ describe('hosted MCP: transport, host/origin and discovery', () => {
     const f = await start();
     const prm = await (await fetch(`${f.base}/.well-known/oauth-protected-resource/mcp`)).json() as any;
     expect(prm.resource).toBe(f.mcpUrl);
+    expect(prm.resource_name).toBe('Capsule commerce gateway');
     expect(prm.authorization_servers).toEqual([`${f.base}/`]);
     const root = await (await fetch(`${f.base}/.well-known/oauth-protected-resource`)).json() as any;
     expect(root.resource).toBe(f.mcpUrl);
+    expect(root.resource_name).toBe('Capsule commerce gateway');
     const as = await (await fetch(`${f.base}/.well-known/oauth-authorization-server`)).json() as any;
     expect(as.code_challenge_methods_supported).toEqual(['S256']);
     expect(as.registration_endpoint).toBe(`${f.base}/register`);
@@ -616,7 +618,7 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
     expect(text).toMatch(/Receipt: rcp_/);
     expect(text).toMatch(/Payment verified \(cardano\): /);
     // The customer-facing confirmation carries no environment suffix or demo caveat; the environment stays in the structured result.
-    expect(text).not.toMatch(/environment\)|sandbox|test environment|Demo transaction/i);
+    expect(text).not.toMatch(/environment|sandbox|testnet|Demo transaction|proof limitations/i);
     expect(res.structuredContent.orderConfirmation.environment).toBeTruthy();
     expect(res.structuredContent.orderConfirmation).toMatchObject({ headline, commerceType: category, paymentVerified: true });
     // The other commerce types' labels never appear.

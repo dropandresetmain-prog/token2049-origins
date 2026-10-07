@@ -12,6 +12,7 @@ import { AdminClient, type AdminOrder } from './admin.js';
 import { createPlaywrightDriver, isTrustedCheckoutUrl, type CheckoutObserver } from './browserCheckout.js';
 import { CheckoutAbort, createStepLogger, stderrSink, type CheckoutDriver } from './checkout.js';
 import { logBrowserMemory } from './memoryTelemetry.js';
+import { timedOperation } from '../../infrastructure/timing.js';
 import { toMoney } from './money.js';
 import { ShopifyHttpError, toProviderError } from './http.js';
 
@@ -106,6 +107,9 @@ export class ShopifyExecutor implements CommerceExecutor {
     if (!this.sf || !this.admin || !this.report.config.devStoreConfirmed || !this.report.config.bogusGatewayEnabled || this.report.invalid.length)
       throw new ProviderError('not_sent', 'shopify_not_configured', 'Shopify development checkout or independent readback is not configured');
   }
+  private timed<T>(name: string, run: () => Promise<T>): Promise<T> {
+    return timedOperation('shopify.api', name, run, event => this.memorySink(JSON.stringify(event)));
+  }
   private fulfillment(value: Fulfillment) {
     const f = RetailFulfillment.safeParse(value);
     // Only known demo identities may reach the development store: the legacy Test Buyer (no phone) or the saved demo customer (its own phone).
@@ -142,10 +146,10 @@ export class ShopifyExecutor implements CommerceExecutor {
       throw new ProviderError('rejected', 'shopify_fulfillment_mismatch', 'Retail line and fulfillment must match intent');
     try {
       const nonce = randomUUID();
-      let cart = await this.sf!.createCart({ ...line.data, nonce, fulfillment: f });
+      let cart = await this.timed('create_cart', () => this.sf!.createCart({ ...line.data, nonce, fulfillment: f }));
       const selections = cheapestSelections(cart);
       if (!selections.length) throw new ProviderError('rejected', 'shopify_shipping_unavailable', 'Shipping unavailable for this buyer');
-      cart = await this.sf!.selectDelivery(cart.id, selections, intent.data.shipToCountry);
+      cart = await this.timed('select_delivery', () => this.sf!.selectDelivery(cart.id, selections, intent.data.shipToCountry));
       const terms = readCartTerms(cart);
       if (!isTrustedCheckoutUrl(cart.checkoutUrl, this.report.config.storeDomain)) throw new ProviderError('rejected', 'shopify_untrusted_url', 'Checkout URL is outside configured store');
       // Cart estimates never become approval authority. Only complete, explicitly settled
@@ -166,7 +170,7 @@ export class ShopifyExecutor implements CommerceExecutor {
         throw new ProviderError('rejected', 'shopify_total_unavailable', 'Checkout breakdown does not match cart terms');
       // The browser may update cart costs. Freeze the cart AFTER quote observation, and verify the
       // requested identity/line/address below before exposing any approvable commercial terms.
-      const observedCart = await this.sf!.getCart(cart.id, intent.data.shipToCountry);
+      const observedCart = await this.timed('freeze_cart', () => this.sf!.getCart(cart.id, intent.data.shipToCountry));
       if (!observedCart || observedCart.id !== cart.id) throw new ProviderError('rejected', 'shopify_cart_mismatch', 'Quoted cart is unavailable');
       const observedTerms = readCartTerms(observedCart);
       if (!same(observedTerms.subtotal, terms.subtotal) || !same(observedTerms.shipping, terms.shipping) || observedTerms.shippingTitle !== terms.shippingTitle)
@@ -217,7 +221,7 @@ export class ShopifyExecutor implements CommerceExecutor {
       const f = this.fulfillment(ctx.fulfillment);
       if (hash(f) !== ref.fulfillmentHash || this.clock.now().getTime() >= Date.parse(ctx.quote.expiresAt))
         return { kind: 'terms_changed', reason: 'Quote expired or fulfillment changed', evidence: [] };
-      const cart = await this.sf!.getCart(ref.cartId, ref.country);
+      const cart = await this.timed('execution_cart', () => this.sf!.getCart(ref.cartId, ref.country));
       if (!cart || !this.matchesFrozenCart(cart, ref, ctx.quote.merchantTotal))
         return { kind: 'terms_changed', reason: 'Cart contents, delivery or total changed', evidence: [] };
       await ctx.checkpoint('shopify_started', { at: this.clock.now().toISOString() });
@@ -226,8 +230,11 @@ export class ShopifyExecutor implements CommerceExecutor {
         checkpoint: async (step, data) => {
           if (step !== 'pay_click' && step !== 'order') throw new CheckoutAbort('step_failed');
           if (step === 'pay_click') {
-            const current = await this.sf!.getCart(ref.cartId, ref.country);
+            const current = await this.timed('prepay_cart', () => this.sf!.getCart(ref.cartId, ref.country));
             if (!current || !this.matchesFrozenCart(current, ref, ctx.quote.merchantTotal)) throw new CheckoutAbort('total_mismatch');
+            // Browser preparation can outlive the quote. Recheck after the final provider read,
+            // before recording permission to click Pay; an expired approval cannot authorize a new order.
+            if (this.clock.now().getTime() >= Date.parse(ctx.quote.expiresAt)) throw new CheckoutAbort('quote_expired');
           }
           await ctx.checkpoint(step, data);
           ctx.checkpoints[step] = data;
@@ -238,7 +245,7 @@ export class ShopifyExecutor implements CommerceExecutor {
     } catch (e) {
       const reason = e instanceof CheckoutAbort ? `Checkout stopped: ${e.code}` : 'Shopify operation failed';
       if (payCommitted || ctx.checkpoints.pay_click) return { kind: 'unknown', reason, providerReference: this.reference(ctx), evidence: [] };
-      if (e instanceof CheckoutAbort && e.code === 'total_mismatch') return { kind: 'terms_changed', reason, evidence: [] };
+      if (e instanceof CheckoutAbort && (e.code === 'total_mismatch' || e.code === 'quote_expired')) return { kind: 'terms_changed', reason, evidence: [] };
       return { kind: 'failed_definite', reason, providerReference: null, evidence: [] };
     }
   }
@@ -265,8 +272,8 @@ export class ShopifyExecutor implements CommerceExecutor {
       this.enabled();
       const ref = Ref.parse(ctx.quote.executionRef);
       const hint = this.reference(ctx);
-      const orders = await this.admin!.searchOrders({ createdAfter: ref.createdAt,
-        ...(hint?.startsWith('gid:') ? { orderId: hint } : hint?.startsWith('#') ? { name: hint } : hint && !hint.startsWith('gid:') ? { confirmationNumber: hint } : {}) });
+      const orders = await this.timed('admin_readback', () => this.admin!.searchOrders({ createdAfter: ref.createdAt,
+        ...(hint?.startsWith('gid:') ? { orderId: hint } : hint?.startsWith('#') ? { name: hint } : hint && !hint.startsWith('gid:') ? { confirmationNumber: hint } : {}) }));
       const matches = orders.filter(o => o.customAttributes.some(a => a.key === QUOTE_ATTRIBUTE && a.value === ref.nonce));
       if (matches.length !== 1) return unknown(matches.length ? 'Multiple orders share quote binding; operator review required' : 'No independently bound order visible; reconciliation required');
       const order = matches[0]!;

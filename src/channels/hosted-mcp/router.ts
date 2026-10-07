@@ -72,7 +72,7 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
   const root = express.Router();
   // Authorization server + protected-resource metadata (RFC 8414 / RFC 9728), authorize, token, register, revoke.
   root.use(mcpAuthRouter({
-    provider: oauth, issuerUrl: issuer, resourceServerUrl: resource, scopesSupported, resourceName: 'Capsule commerce gateway (sandbox)',
+    provider: oauth, issuerUrl: issuer, resourceServerUrl: resource, scopesSupported, resourceName: 'Capsule commerce gateway',
     authorizationOptions: { rateLimit: limiter(60, 15 * 60_000) },
     tokenOptions: { rateLimit: limiter(60, 15 * 60_000) },
     clientRegistrationOptions: { rateLimit: limiter(30, 60 * 60_000) },
@@ -81,7 +81,7 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
   // Clients that probe the unsuffixed well-known URL get the same document.
   root.get('/.well-known/oauth-protected-resource', (_req, res) => {
     res.set('cache-control', 'no-store').json({
-      resource: resource.href, authorization_servers: [issuer.href], scopes_supported: scopesSupported, resource_name: 'Capsule commerce gateway (sandbox)',
+      resource: resource.href, authorization_servers: [issuer.href], scopes_supported: scopesSupported, resource_name: 'Capsule commerce gateway',
     });
   });
   root.use(oauth.consentRouter());

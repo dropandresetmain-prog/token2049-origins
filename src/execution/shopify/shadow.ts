@@ -9,6 +9,8 @@ import { ShadowAdminClient, type ShadowProduct, SANDBOX_STORE } from './shadowAd
 import { GlobalCatalogClient, SANDBOX_BOUNDARY, assertLiveIntent, MAX_SOURCE_ITEM_MINOR } from './globalCatalog.js';
 import { systemClock, type Clock } from '../../infrastructure/clock.js';
 import { toMoney } from './money.js';
+import { timedOperation } from '../../infrastructure/timing.js';
+import { stderrSink } from './checkout.js';
 
 export const sourceDigest = (source: Source) => createHash('sha256').update(JSON.stringify(SourceOffer.parse(source))).digest('hex');
 interface Mapping { source_digest: string; source_json: string; state: string; representation_json: string | null; created_at: string }
@@ -16,8 +18,11 @@ export class ShadowPreparer {
   constructor(private readonly deps: {
     db: () => Db; admin: Pick<ShadowAdminClient, 'assertSandbox' | 'find' | 'create' | 'publish' | 'publicationId'>;
     storefront: Pick<StorefrontClient, 'findVariants'>; catalog: Pick<GlobalCatalogClient, 'refresh'>;
-    storeDomain: string; clock?: Clock;
+    storeDomain: string; clock?: Clock; sink?: (line: string) => void;
   }) {}
+  private timed<T>(name: string, run: () => Promise<T>): Promise<T> {
+    return timedOperation('shopify.shadow', name, run, event => (this.deps.sink ?? stderrSink)(JSON.stringify(event)));
+  }
   async prepare(offerId: string, rawSource: unknown, intent: PurchaseIntent): Promise<{ sourceOffer: Source; sandboxRepresentation: SandboxRepresentation }> {
     const source = SourceOffer.parse(rawSource);
     const retail = assertLiveIntent(intent);
@@ -35,23 +40,26 @@ export class ShadowPreparer {
         const now = (this.deps.clock ?? systemClock).now().toISOString();
         const row = await db.get<Mapping>('SELECT * FROM shopify_shadow_mappings WHERE offer_id=$1 AND store_domain=$2', offerId, this.deps.storeDomain);
         if (row && row.source_digest !== digest) throw new ProviderError('rejected', 'shadow_source_changed', 'Source snapshot is frozen; search again');
-        await this.deps.admin.assertSandbox();
+        await this.timed('assert_store', () => this.deps.admin.assertSandbox());
         if (row?.state === 'ready') return { sourceOffer: SourceOffer.parse(JSON.parse(row.source_json)), sandboxRepresentation: SandboxRepresentation.parse(JSON.parse(row.representation_json!)) };
         if (!row) {
-          await this.deps.catalog.refresh(source, intent);
+          await this.timed('refresh_source', () => this.deps.catalog.refresh(source, intent));
           await db.run(`INSERT INTO shopify_shadow_mappings(offer_id,store_domain,source_digest,source_json,state,created_at,updated_at) VALUES($1,$2,$3,$4,'preparing',$5,$5)`,
             offerId, this.deps.storeDomain, digest, JSON.stringify(source), now);
         }
         // Readback by Shopify's unique custom ID closes crash/timeout gaps before the DB mapping.
-        let product = await this.deps.admin.find(offerId);
-        if (!product) product = await this.deps.admin.create(offerId, source, digest, row?.created_at ?? now);
+        let product = await this.timed('find_shadow', () => this.deps.admin.find(offerId));
+        if (!product) product = await this.timed('create_shadow', () => this.deps.admin.create(offerId, source, digest, row?.created_at ?? now));
         this.verify(product, offerId, digest, source);
-        if (!product.publishedOnPublication) await this.deps.admin.publish(product.id);
-        product = await this.deps.admin.find(offerId);
+        if (!product.publishedOnPublication) {
+          const productId = product.id;
+          await this.timed('publish_shadow', () => this.deps.admin.publish(productId));
+        }
+        product = await this.timed('verify_publication', () => this.deps.admin.find(offerId));
         if (!product || !product.publishedOnPublication) throw new ProviderError('not_sent', 'shadow_not_published', 'Shadow publication not independently visible');
         this.verify(product, offerId, digest, source);
         const variantId = product.variants.nodes[0]!.id;
-        const visible = await this.deps.storefront.findVariants({ productRef: variantId, includeSandboxShadows: true, country: retail.shipToCountry });
+        const visible = await this.timed('verify_storefront', () => this.deps.storefront.findVariants({ productRef: variantId, includeSandboxShadows: true, country: retail.shipToCountry }));
         if (visible.length !== 1 || visible[0]!.variantId !== variantId || visible[0]!.unitPrice.currency !== source.observedPrice.currency ||
             visible[0]!.unitPrice.amountMinor !== source.observedPrice.amountMinor || visible[0]!.unitPrice.scale !== source.observedPrice.scale)
           throw new ProviderError('not_sent', 'shadow_not_visible', `Sandbox product is unavailable for ${retail.shipToCountry} at its frozen USD price. Operator must verify market publication, inventory and shipping setup; nothing was purchased.`);
