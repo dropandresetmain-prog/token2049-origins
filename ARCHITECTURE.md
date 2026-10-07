@@ -9,31 +9,44 @@ The architecture puts a common transaction core between them. Agent integrations
 That separation is what makes buyer-side integration possible: a provider adapter can serve purchases funded through different supported networks, while the agent keeps the same interface.
 
 ```text
-                         User and AI assistant
-                                 |
-                              MCP / HTTP
-                                 |
-                    +------------v-------------+
-                    |      Capsule core        |
-                    | Quote, approval, purchase|
-                    | execution and recovery   |
-                    +-----+--------------+-----+
-                          |              |
-                  Funding adapters   Commerce adapters
-                          |              |
-                  Separate payers    Shopify / Atlas /
-                  Cardano / Solana   Nuitee / LiteAPI
-                          |              |
-                          +------+-------+
-                                 |
-                      Purchase record and proof
-                         |                |
-                      Console       CRE verification
-                                        + Koios
+                          USER / AI AGENT
+                                |
+                             MCP / HTTP
+                                |
+                   +------------v-------------+
+                   |  CAPSULE COMMERCE GATEWAY|
+                   | quote / approval / state |
+                   +------+-----------+--------+
+                          |           |
+                CUSTOMER PURCHASE     |        COMMERCE
+                    FUNDING            |        PROVIDERS
+                 Cardano Preprod       |     Shopify / Atlas /
+                 Solana Devnet         |     Nuitee / LiteAPI
+                          \            |            /
+                           \           |           /
+                            +----------v----------+
+                            | Capsule Journal /  |
+                            | Evidence / Proof   |
+                            +-----+---------+----+
+                                  |         |
+                             Console     Chainlink CRE
+                                          + Koios
 
-PostgreSQL holds transaction state, jobs, accounting and evidence.
+                    TREASURY / OPERATIONS
+                    +-------------------------------+
+                    | Coinbase CDP                  |
+                    | Base Sepolia Server Wallet    |
+                    | operational crypto treasury   |
+                    |                               |
+                    | OCBC                          |
+                    | read-only fiat observations   |
+                    +---------------+---------------+
+                                    |
+                         manual reconciliation /
+                              rebalancing view
+
+Frankfurter supplies SGD/USD reference rates for search and display.
 Masumi coordinates paid agent tasks linked to the transaction core.
-Frankfurter supplies currency references; OCBC supplies bank observations.
 ```
 
 CRE's demonstrated verification runs in the CLI simulator against a retained purchase record and a public-chain read. The purchasing flow itself runs through Capsule's core and provider adapters.
@@ -96,6 +109,22 @@ The price of the agent service and the price of the goods are separate obligatio
 
 [Native task runtime](src/channels/sokosumi/) · [Masumi integration](docs/work/MASUMI_INTEGRATION.md)
 
+## Separate customer purchase funding from operational treasury
+
+Capsule treats customer settlement, company treasury and fiat observation as different financial domains because they answer different questions.
+
+**Customer purchase funding** is transaction-specific. Cardano Preprod and Solana Devnet prove that the approved customer obligation was funded before merchant execution.
+
+**Operational crypto treasury** is company-side. Coinbase CDP Server Wallets give Capsule a programmable treasury on Base Sepolia that is not used as a substitute for Cardano/Solana purchase principal. In the completed external proof, the named treasury wallet received 0.0001 ETH from the CDP faucet and sent 0.000001 ETH to the named recipient. The transaction and resulting balances were independently verified through public Base Sepolia RPC.
+
+That proof was executed with Coinbase's official `cdp` CLI. It establishes the external Server Wallet capability; Capsule's runtime adapter did not execute that exact transfer. The retained proof is recorded in the proof-closure lane as `docs/evidence/coinbase-cdp/server-wallet-proof.json` with the accompanying `docs/work/COINBASE_CDP.md`.
+
+**Fiat observation** is read-only. OCBC sandbox data gives the operator visibility into fiat account/card state and activity. It is not a purchase-funding rail and does not prove that a Capsule purchase settled through the bank.
+
+**Reconciliation** happens in Capsule's own accounting and evidence layer. PostgreSQL journal entries, funding evidence, receipts and the Treasury/Connections views keep observed crypto movements, simulated merchant capacity, fiat observations and customer obligations attributable. An operator can use those views to decide whether fiat and crypto liquidity need to be manually topped up, reconciled or rebalanced.
+
+There is intentionally no automatic `OCBC → Coinbase CDP` transfer path in this prototype. The architecture provides the information needed for manual treasury decisions without collapsing bank observations and blockchain balances into one number.
+
 ## Let providers keep their own workflows
 
 The commerce adapters translate the common purchase contract into the operation each provider expects. They share authority, funding and recovery rules, but keep provider-specific meanings of completion.
@@ -140,7 +169,7 @@ For a Shopify search with an SGD budget, the gateway obtains a USD/SGD reference
 
 Commercial amounts and blockchain asset quantities also have distinct units. The hackathon uses a 1:1000 test notional: USD 91.07 corresponds to 0.091070 six-decimal test tokens, while the provider sandbox uses USD 91.07. The Frankfurter reference explains the user's budget; the test scale determines the demonstration payment quantity. Production currency conversion and merchant settlement are the next integration layer described in the [project's development path](PROJECT_SUBMISSION.md#the-opportunity-beyond-the-prototype).
 
-OCBC supplies another kind of financial context: read-only sandbox observations of accounts, cards and transaction history. Those observations appear in the operator view alongside, but separately from, Capsule's transaction accounting and simulated purchasing capacity.
+OCBC supplies read-only sandbox observations of accounts, cards and transaction history. Those observations feed the operator-side treasury view described above, where they remain separate from customer funding, Coinbase CDP crypto treasury and simulated purchasing capacity.
 
 [FX design](docs/FX.md) · [Frankfurter client](src/integrations/frankfurter/client.ts) · [OCBC adapter](src/banking/ocbc/adapter.ts)
 

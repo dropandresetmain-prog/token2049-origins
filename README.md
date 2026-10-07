@@ -46,6 +46,6 @@ The demonstration uses public-testnet funds and provider sandboxes. Shopify list
 
 ## Read more
 
-**[PROJECT_SUBMISSION.md](PROJECT_SUBMISSION.md)** is the written pitch: the problem, why now, our approach, the complete stack and the partner contributions. Cardano, Solana and Chainlink judges can jump directly to their sections: [Cardano](PROJECT_SUBMISSION.md#cardano) · [Solana](PROJECT_SUBMISSION.md#solana) · [Chainlink](PROJECT_SUBMISSION.md#chainlink).
+**[PROJECT_SUBMISSION.md](PROJECT_SUBMISSION.md)** is the written pitch: the problem, why now, our approach, the complete stack and the partner contributions. Cardano, Solana and Chainlink judges can jump directly to their sections: [Cardano](PROJECT_SUBMISSION.md#cardano) · [Solana](PROJECT_SUBMISSION.md#solana) · [Chainlink](PROJECT_SUBMISSION.md#chainlink). The operator-side financial model is in [Treasury and reconciliation](PROJECT_SUBMISSION.md#treasury).
 
 **[ARCHITECTURE.md](ARCHITECTURE.md)** explains how the transaction engine connects agents, funding and commerce. **[DESIGN.md](DESIGN.md)** covers the visual system. The **[documentation index](docs/DOCS_INDEX.md)** leads to developer setup, contracts, runbooks and technical evidence.

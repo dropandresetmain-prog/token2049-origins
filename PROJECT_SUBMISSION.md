@@ -96,6 +96,18 @@ Masumi handles a complementary transaction: remuneration for an agent service. C
 
 Together, these paths show why Cardano is a strong fit for this project. Its role extends from a verifiable payment into the economics of agents working for one another. Capsule brings that foundation to ordinary purchasing workflows—the kind of practical utility that can help an agent economy grow beyond crypto-native services.
 
+### Cardano track fit at a glance
+
+The [BuilderBase Cardano track][builderbase-cardano] asks for a working Cardano prototype, documented source, a product demo of no more than three minutes, and a short explanation of the problem, technical approach and real-world path. Capsule answers those requirements directly:
+
+| BuilderBase asks for | Capsule provides |
+| --- | --- |
+| Working prototype on Cardano | Cardano Preprod is a purchase-funding rail in Capsule. The completed Atlas run links a real Preprod transfer to provider execution, ticket issuance and a final receipt. |
+| Repository with documentation | The submission repository contains the implementation plus this written pitch, [README](README.md), [ARCHITECTURE](ARCHITECTURE.md) and the retained Cardano/Masumi evidence. Judges receive repository access through the submission. |
+| Demo video, maximum 3 minutes | The end-to-end Capsule Shopify recording is the product demo. The same ≤3-minute cut is embedded in the shared deck and linked directly in the Cardano submission. |
+| Short write-up covering the problem, technical approach, Cardano infrastructure and real-world deployment/access | The shared problem/solution narrative, this Cardano section, the technology stack and [ARCHITECTURE](ARCHITECTURE.md) together form that write-up. |
+| GitHub repository, live project/demo and presentation slides | Capsule uses the shared repository, hosted MCP/console and shared stage deck for the Main and partner-track submissions. |
+
 <a id="solana"></a>
 ## Solana — making onchain payments useful in everyday commerce
 
@@ -109,6 +121,19 @@ We demonstrated the complete path with a Nuitée sandbox reservation at Jyu Caps
 
 The significance is the connection, not simply the transfer: Solana payment infrastructure becomes part of a recognisable consumer outcome. For agent and wallet builders, Capsule's common contract offers a way to bring that capability into purchasing experiences without rebuilding the merchant integration for each funding network. The [Solana adapter](src/funding/solana/) and [payer implementation](clients/solana/) show how the two sides connect.
 
+### Solana track fit at a glance
+
+The [BuilderBase Solana track][builderbase-solana] asks for meaningful Solana interaction on Devnet or Mainnet Beta, a working product, and transaction proof. Capsule's Solana path is an active funding rail rather than a read-only blockchain display:
+
+| BuilderBase asks for | Capsule provides |
+| --- | --- |
+| Meaningful interaction with Solana | Capsule uses Solana as purchase-principal funding through x402 SVM and existing token-program transfers. The payment gates the commerce operation. |
+| Functional on Devnet or Mainnet Beta | The demonstrated flow runs on **Solana Devnet** and reached finalized commitment before the hotel purchase completed. |
+| Solana Explorer or Solscan transaction | [Finalized Devnet transaction](https://explorer.solana.com/tx/66jSAnq9eywGKGULpyRWYpskjTneFGcy9VJbNwg6xkHBPYiXt2Ni5HQPzW9hGur6AB4qDNDFt1TfnKMVdgemsV8L?cluster=devnet). |
+| Program ID and cluster when deploying a custom program | Capsule integrates existing Solana token-program functionality rather than deploying a custom program; the demonstrated cluster is Devnet. |
+| Working demo, repository and presentation | The shared Capsule app/console demonstrates the same purchasing contract, while the completed Solana-funded Nuitée booking provides the retained end-to-end proof. The shared repository and deck carry the implementation and presentation. |
+| Hackathon-built code / disclose pre-existing work | Capsule's application and submitted integrations are the hackathon build; third-party SDKs, public APIs and developer tooling are dependencies rather than claimed original work. |
+
 <a id="chainlink"></a>
 ## Chainlink — connecting payment facts to commerce outcomes
 
@@ -121,6 +146,56 @@ We built an HTTP-triggered TypeScript CRE workflow for commerce verification. It
 The successful CRE CLI simulation compiled the workflow to WebAssembly and returned **`status: verified`**. It combined retained proof from the completed Cardano/Atlas purchase with a fresh Koios chain read during execution. The blockchain payment was checked independently; the merchant and receipt facts came from Capsule's purchase record. [View the simulation result][cre-evidence] · [Workflow source][cre-source] · [Reproduce the simulation][cre-report].
 
 CRE's contribution is an orchestration layer for verifiable commerce: a repeatable check connecting onchain value movement with an offchain purchase record. It runs alongside purchase execution, so verification can be examined without initiating another payment or order. This is a concrete application of Chainlink's ability to connect blockchain systems to the outside world—and a useful foundation for agents that must show their work when they spend.
+
+### Chainlink track fit at a glance
+
+The [BuilderBase Chainlink track][builderbase-chainlink] asks for CRE to orchestrate a workflow that connects blockchain state to an external system, plus successful simulation or deployment evidence. Capsule uses CRE in its verification layer:
+
+| BuilderBase asks for | Capsule provides |
+| --- | --- |
+| CRE Workflow used as an orchestration layer | Capsule's HTTP-triggered CRE commerce-verification workflow coordinates the proof checks that connect a Capsule purchase record with its public-chain payment. |
+| At least one blockchain connected to an external API, system, data source, LLM or agent | The workflow combines a Cardano Preprod transaction read through Koios with Capsule's purchase-proof data. |
+| Successful CRE CLI simulation or live CRE deployment | The CRE CLI simulation compiled the workflow to WebAssembly and returned **`status: verified`**. |
+| Evidence of the successful simulation/deployment | [Simulation result][cre-evidence] · [Workflow source][cre-source] · [Reproduction guide][cre-report]. |
+| GitHub repository, live project/demo and presentation slides | The shared Capsule repository, hosted project and deck carry the product; CRE evidence is linked directly from this section. |
+
+<a id="treasury"></a>
+## Keep customer settlement and company treasury separate
+
+Agentic commerce creates two different financial jobs. A customer purchase needs an approved payment attached to one transaction. The company operating the gateway also needs its own treasury view across crypto liquidity, fiat observations and outstanding obligations. Capsule keeps those jobs separate.
+
+| Financial domain | Capsule uses | Role |
+| --- | --- | --- |
+| Customer purchase funding | Cardano Preprod and Solana Devnet | Funds individual approved customer purchase obligations. |
+| Operational crypto treasury | Coinbase CDP Server Wallets on Base Sepolia | Gives Capsule a programmable company-side crypto treasury, separate from customer purchase principal. |
+| Fiat observation | OCBC sandbox APIs | Gives the operator a read-only view of fiat account/card state and activity. |
+| Accounting, proof and reconciliation | Capsule's PostgreSQL journal, funding evidence, receipts, Treasury and Connections views | Keeps crypto movements, fiat observations, simulated merchant capacity and customer obligations attributable instead of collapsing them into one balance. |
+
+### Coinbase CDP as the operational crypto treasury
+
+Coinbase CDP gives Capsule a programmable treasury that is independent of the customer payment rails. In the completed Server Wallet proof, Capsule created the named test treasury **`capsule-treasury-test`** on Base Sepolia at **`0xa4ce927fdA1d30EfBC0CE81877e53036A75fD486`**. The CDP faucet funded it with **0.0001 ETH**, and the treasury sent **0.000001 ETH** to the named test recipient **`0x708FCca1Ff481D47782fadF6814fF61Fcc2E4570`**.
+
+Transaction **`0xb0348248fa5166944be2db148f8d05e7d76b0f5f8e9746dcdcc8b2596a9cdb2d`** succeeded on Base Sepolia. Sender, recipient, value and resulting balances were independently read back through public RPC, and both accounts were visible through CDP.
+
+The external proof was executed with Coinbase's official **`cdp` CLI**. That establishes the Server Wallet capability and treasury role; it does not claim that Capsule's runtime adapter executed this exact transfer. Submission evidence is recorded in the proof-closure lane at **`c74ff8b`**, with **`docs/work/COINBASE_CDP.md`** and **`docs/evidence/coinbase-cdp/server-wallet-proof.json`**.
+
+### Fiat ↔ crypto reconciliation without pretending they are one balance
+
+OCBC observes fiat. Coinbase CDP manages operational crypto treasury. Cardano and Solana record customer-funding positions. Capsule's journal and proof layer bring those facts into one operator view without treating them as interchangeable money.
+
+That gives an operator enough information to decide when liquidity needs to be topped up, reconciled or manually rebalanced between fiat and crypto. The prototype does **not** automate an OCBC-to-CDP transfer or fiat conversion; the reconciliation decision remains manual.
+
+**Customer payments and company treasury are intentionally separate: Capsule can reconcile its crypto treasury against fiat observations without pretending testnet crypto is bank cash.**
+
+## Partner and infrastructure proof at a glance
+
+| Integration | Status | Product role | Demonstrated proof |
+| --- | --- | --- | --- |
+| Cardano | **PASS** | Customer purchase funding + agent remuneration | Preprod x402-funded Atlas flight; Masumi task/escrow/result/payout evidence. |
+| Solana | **PASS** | Customer purchase funding | Finalized Devnet test-USDC payment followed by confirmed Nuitée sandbox booking and receipt. |
+| Chainlink CRE | **PASS** | Cross-system commerce verification | CRE CLI simulation returned `status: verified` using Capsule proof data plus a fresh Cardano chain read through Koios. |
+| Coinbase CDP | **PASS** | Operational crypto treasury | Server Wallet created/funded on Base Sepolia; 0.000001 ETH treasury transfer; independent public-RPC readback. Evidence: `c74ff8b`, `server-wallet-proof.json`. The official `cdp` CLI executed this proof. |
+| OCBC | **PASS — read-only** | Fiat observation | Sandbox account/card/history observations exposed to Capsule's operator-side financial view; not used as purchase-settlement proof. |
 
 ## The opportunity beyond the prototype
 
@@ -150,17 +225,21 @@ The stack follows the product: an agent interface, a transaction engine, funding
 | Hotels | Nuitée / LiteAPI provides hotel rates, prebooking, sandbox reservations and booking confirmation. |
 | Cardano funding | Cardano Preprod, x402 Cardano and Evolution SDK provide the native-asset payment path; Blockfrost and the Cardano facilitator support chain verification and submission. |
 | Solana funding | Solana Devnet, Solana Kit, x402 SVM and RPC provide token transfers, sponsor preparation and finalized transaction checks. |
+| Operational crypto treasury | Coinbase CDP Server Wallets provide a programmable company-side treasury on Base Sepolia, separate from customer purchase funding. The completed external proof used the official `cdp` CLI and was independently read back through public RPC. |
 | Payment protocol | x402 v2 and the x402 SDKs supply the shared HTTP payment requirement and signed-payment exchange used by the funding integrations. |
 | Agent remuneration | Masumi Payment Service and registry, with the native Sokosumi/MIP-003 task adapter, support paid agent tasks, escrow, result submission and seller payout. |
 | Commerce verification | Chainlink CRE SDK and CLI orchestrate proof verification; Bun and Javy compile the TypeScript workflow to WebAssembly. Koios supplies the independent Cardano chain read. |
 | Currency reference | Frankfurter v2 translates an SGD shopping budget into a USD search ceiling and preserves the reference rate used to display the final quote. |
-| Banking context | OCBC sandbox APIs supply read-only account, card and transaction-history observations to operator views. |
+| Fiat observation | OCBC sandbox APIs supply read-only account, card and transaction-history observations to operator views, giving the treasury side visibility into fiat state without turning those observations into purchase-settlement evidence. |
 | Console | React, React DOM and Vite provide the purchase-progress, confirmation and proof interface. |
 | Hosting and packaging | Render hosts the gateway and separate Cardano payer. Docker and Docker Compose package services and provide local PostgreSQL. |
 | Development and verification | Vitest, TypeScript checks and tsx support contract, integration and component testing. |
 
 Implementation details and source links are in [ARCHITECTURE.md](ARCHITECTURE.md), [package.json](package.json), the [FX reference](docs/FX.md) and the [technical documentation index](docs/DOCS_INDEX.md).
 
+[builderbase-cardano]: https://builderbase.com/track/cardano-agentic-commerce
+[builderbase-solana]: https://builderbase.com/track/solana-best-use-of-solana
+[builderbase-chainlink]: https://builderbase.com/track/chainlink-best-workflow-with-cre
 [market-acp]: https://openai.com/index/buy-it-in-chatgpt/
 [market-ucp]: https://blog.google/products/ads-commerce/agentic-commerce-ai-tools-protocol-retailers-platforms/
 [market-visa]: https://corporate.visa.com/en/sites/visa-perspectives/newsroom/visa-intelligent-commerce-connect-ai-shopping-for-businesses.html

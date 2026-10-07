@@ -5,8 +5,8 @@
 | Document | Owns |
 | --- | --- |
 | [README](../README.md) | Product introduction, judge access and MCP quick-start, with navigation to the submission and technical documents. |
-| [PROJECT_SUBMISSION](../PROJECT_SUBMISSION.md) | Written pitch: agentic-commerce opportunity, buyer-side Web3-to-commerce thesis, product experience, Cardano/Solana/Chainlink contributions, demonstrated results and full stack. |
-| [ARCHITECTURE](../ARCHITECTURE.md) | Engineering explanation: how and why the common transaction layer connects agents, funding, providers, recovery and proof. |
+| [PROJECT_SUBMISSION](../PROJECT_SUBMISSION.md) | Written pitch: agentic-commerce opportunity, buyer-side Web3-to-commerce thesis, product experience, Cardano/Solana/Chainlink contributions, Coinbase CDP/OCBC treasury story, demonstrated results and full stack. |
+| [ARCHITECTURE](../ARCHITECTURE.md) | Engineering explanation: how the transaction layer connects agents, customer funding, commerce, operational treasury, fiat observation, recovery and proof. |
 | [DESIGN](../DESIGN.md) | Approved visual system and console design rules. |
 
 Track judges should use the [Cardano](../PROJECT_SUBMISSION.md#cardano), [Solana](../PROJECT_SUBMISSION.md#solana) and [Chainlink](../PROJECT_SUBMISSION.md#chainlink) anchors. Do not create duplicate per-track narrative documents.
@@ -51,6 +51,7 @@ Evidence records keep their original branch/SHA, date, environment and failed/pa
 | [Masumi integration](work/MASUMI_INTEGRATION.md) | Native fee/task/payout evidence and separate marketplace boundary. |
 | [Render rehearsal](evidence/render-rehearsal.md) | Point-in-time deployment verification, not current health. |
 | [Chainlink section](../PROJECT_SUBMISSION.md#chainlink) | Pinned separate-branch workflow and successful simulation; not merged evidence. |
+| Coinbase CDP proof | Server Wallet / Base Sepolia operational-treasury proof supplied from the proof-closure lane: `docs/evidence/coinbase-cdp/server-wallet-proof.json` and `docs/work/COINBASE_CDP.md` (`c74ff8b`). |
 
 Additional material remains in [evidence](evidence/), [work](work/), [providers](providers/), [contracts](contracts/) and [decisions](decisions/). [Planning](planning/) is historical context; do not silently rewrite it as a current plan.
 
