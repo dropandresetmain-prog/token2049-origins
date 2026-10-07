@@ -161,8 +161,9 @@ function facts(b: PurchaseBundle, ctx: PresentContext): Facts {
     title: b.quote?.title ?? b.context.title ?? copy.category[cat].title,
     ref: displayId(p.purchaseId),
     agent,
-    // The order goes to Capsule's test store, never to the store where the product was found.
-    merchant: sandboxed ? { name: copy.sourceStore.testStoreName, kind: copy.sourceStore.testStoreKind } : merchantOf(p.route),
+    // Lead with the source store; the execution disclosure separately identifies where checkout occurred.
+    merchant: source ? { name: source.merchantName, kind: copy.sourceStore.sourceStoreKind }
+      : sandboxed ? { name: copy.sourceStore.testStoreName, kind: copy.sourceStore.testStoreKind } : merchantOf(p.route),
     merchantIsTest: sandboxed || isTestEnvironment(env),
     method: rail ? methodOf(rail) : '',
     network: networkRaw,
@@ -197,7 +198,8 @@ function buildSteps(f: Facts): StepVM[] {
   const paidAt = timelineTime(f, 'funded', ['funding.confirmed']);
   const orderAt = timelineTime(f, 'merchant_execution', ['execution.started']);
   const confirmedAt = timelineTime(f, 'result_verified', ['execution.succeeded', 'receipt.issued']);
-  const m = f.merchant.name;
+  // The source store receives no order in this flow, so activity describes Capsule's checkout instead.
+  const m = f.source ? copy.sourceStore.checkoutName : f.merchant.name;
 
   // Approval: a purchase cannot exist without a submitted approval; older purchases may lack the record.
   const approvedDetail = approvedAt ? copy.steps.approved.done(f.agent.name) : copy.steps.approved.noRecord;
@@ -264,7 +266,7 @@ function buildRoute(f: Facts): RouteVM {
     capsule: { label: copy.detail.capsule, action: copy.routeAction[f.key](f.cat), stopped },
     to: {
       label: copy.detail.merchantLabel, name: f.merchant.name,
-      detail: f.source ? copy.sourceStore.foundAt(f.source.merchantName) : copy.merchantDetail(f.merchant.kind, f.merchantIsTest),
+      detail: f.source ? copy.sourceStore.checkoutVia : copy.merchantDetail(f.merchant.kind, f.merchantIsTest),
       icon: categoryIcon(f.cat), result, resultIcon, done,
     },
     flowIn: f.progress.paymentConfirmed ? 'done' : f.key === 'awaiting_payment' || f.key === 'confirming_payment' ? 'active' : 'idle',
