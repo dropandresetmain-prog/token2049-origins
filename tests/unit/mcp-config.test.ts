@@ -107,3 +107,39 @@ describe('MCP bearer redirect protection', () => {
     }
   });
 });
+
+describe('payer status diagnostics', () => {
+  const SOURCE = { sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano', network: 'cardano:preprod', publicAddress: 'addr_test1' + 'q'.repeat(50), displayAddress: 'addr_test1qqqq…qqqqqq', assetId: 'unit-fixture', readiness: 'configured' };
+  const json = (status: number, body: unknown, headers: Record<string, string> = {}) => new Response(typeof body === 'string' ? body : JSON.stringify(body), { status, headers: { 'content-type': 'application/json', ...headers } });
+  const probe = async (respond: () => Promise<Response>, statusTimeoutMs = 1000) => {
+    const events: Array<Record<string, unknown>> = [];
+    const bridge = new BridgeClient('cardano', { url: 'https://payer.example', token: TOKEN, fetch: (async () => respond()) as typeof fetch, statusTimeoutMs, diag: (e) => events.push(e) });
+    const result = await bridge.status();
+    expect(events).toHaveLength(1);
+    expect(JSON.stringify(events)).not.toContain(TOKEN);
+    return { result, event: events[0]! };
+  };
+
+  it.each([
+    ['ok', () => json(200, { ok: true, source: SOURCE, ledger: { headroomBaseUnits: '500' } }), { outcome: 'ok', headroom: true }],
+    ['http_error', () => json(503, '<html>waking</html>', { 'x-render-routing': 'hibernate-wake-error' }), { outcome: 'http_error', status: 503, routing: 'hibernate-wake-error' }],
+    ['http_error 401', () => json(401, { ok: false, error: { code: 'unauthenticated', message: 'x' } }), { outcome: 'http_error', status: 401 }],
+    ['invalid_json', () => json(200, 'not json'), { outcome: 'invalid_json', status: 200 }],
+    ['schema_mismatch', () => json(200, { ok: true, source: SOURCE, extra: 1 }), { outcome: 'schema_mismatch' }],
+    ['missing_source', () => json(200, { ok: true, source: null }), { outcome: 'missing_source' }],
+    ['rail_mismatch', () => json(200, { ok: true, source: { ...SOURCE, sourceId: 'src_' + 'b'.repeat(32), rail: 'solana', network: 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1', publicAddress: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU', assetId: '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU' } }), { outcome: 'rail_mismatch' }],
+  ] as const)('reports %s as a sanitized outcome code', async (_name, respond, expected) => {
+    const { result, event } = await probe(async () => respond());
+    expect(event).toMatchObject({ type: 'payer_status', rail: 'cardano', ...expected });
+    expect(typeof event.ms).toBe('number');
+    expect(result === null).toBe(expected.outcome !== 'ok');
+  });
+
+  it('distinguishes a timeout from a connection failure', async () => {
+    const timedOut = await probe(() => new Promise<Response>((_r, reject) => setTimeout(() => reject(new DOMException('timed out', 'TimeoutError')), 5)));
+    expect(timedOut.event).toMatchObject({ outcome: 'timeout', timeoutMs: 1000 });
+    const refused = await probe(async () => { throw new TypeError('fetch failed', { cause: Object.assign(new Error('connect ECONNREFUSED'), { code: 'ECONNREFUSED' }) }); });
+    expect(refused.event).toMatchObject({ outcome: 'connect_error', code: 'ECONNREFUSED' });
+    expect(refused.result).toBeNull();
+  });
+});

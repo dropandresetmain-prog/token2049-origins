@@ -13,6 +13,27 @@ const BridgeSuccess = z.object({
 
 const DEFAULT_TIMEOUT_MS = 60_000;
 
+/** Sanitized operator diagnostic: outcome codes, HTTP status and timings only. Never tokens, headers or bodies. */
+export type BridgeDiag = (event: Record<string, unknown>) => void;
+// stderr, not stdout: in stdio mode stdout is the MCP protocol channel.
+const stderrDiag: BridgeDiag = (e) => { process.stderr.write(`${JSON.stringify({ t: new Date().toISOString(), ...e })}\n`); };
+
+/** Classify a rejected fetch without echoing anything that could carry a URL, header or body. */
+function fetchFailure(e: unknown): { outcome: string; code?: string } {
+  const err = e as { name?: string; cause?: { code?: unknown; message?: unknown } };
+  if (err?.name === 'TimeoutError') return { outcome: 'timeout' };
+  if (err?.name === 'AbortError') return { outcome: 'aborted' };
+  const code = typeof err?.cause?.code === 'string' && /^[A-Z0-9_]{1,40}$/.test(err.cause.code) ? err.cause.code : undefined;
+  if (/redirect/i.test(String(err?.cause?.message ?? ''))) return { outcome: 'redirect_refused' };
+  return { outcome: code ? 'connect_error' : 'fetch_error', ...(code ? { code } : {}) };
+}
+
+/** Platform routing hint on a non-2xx (e.g. a sleeping free instance); a short opaque value, never secret. */
+function routingHint(r: Response): Record<string, string> {
+  const v = r.headers.get('x-render-routing');
+  return v && /^[A-Za-z0-9._-]{1,60}$/.test(v) ? { routing: v } : {};
+}
+
 /**
  * Client for one separate bounded payer process (`POST {bridge url}/pay`), bound to exactly one rail. This process holds
  * no payer keys: it only asks the bridge to fund a purchase id. The bridge's own `purchase` echo is
@@ -20,9 +41,11 @@ const DEFAULT_TIMEOUT_MS = 60_000;
  */
 export class BridgeClient {
   private readonly f: typeof fetch;
+  private readonly diag: BridgeDiag;
 
-  constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; fetch?: typeof fetch; timeoutMs?: number; statusTimeoutMs?: number }) {
+  constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; fetch?: typeof fetch; timeoutMs?: number; statusTimeoutMs?: number; diag?: BridgeDiag }) {
     this.f = cfg.fetch ?? fetch;
+    this.diag = cfg.diag ?? stderrDiag;
   }
 
   /** One client per configured rail, in a fixed order. */
@@ -39,9 +62,13 @@ export class BridgeClient {
     });
   }
 
-  /** Fire-and-forget wake-up: a sleeping free-tier payer needs ~35s to start, far longer than the 5s status probe, so it is pinged early in the flow. */
+  /** Fire-and-forget wake-up: a sleeping free-tier payer needs ~35s to start, so it is pinged early in the flow. Its outcome is logged. */
   wake(): void {
-    this.f(`${this.cfg.url}/health`, { redirect: 'error', signal: AbortSignal.timeout(90_000) }).then((r) => r.arrayBuffer()).catch(() => undefined);
+    const started = Date.now();
+    const report = (e: Record<string, unknown>) => this.diag({ type: 'payer_wake', rail: this.rail, ...e, ms: Date.now() - started });
+    this.f(`${this.cfg.url}/health`, { redirect: 'error', signal: AbortSignal.timeout(90_000) })
+      .then(async (r) => { await r.arrayBuffer(); report({ outcome: r.ok ? 'ok' : 'http_error', status: r.status, ...(r.ok ? {} : routingHint(r)) }); })
+      .catch((e) => report(fetchFailure(e)));
   }
 
   /**
@@ -50,18 +77,30 @@ export class BridgeClient {
    * client's rail.
    */
   async status(): Promise<{ source: FundingSource; headroomBaseUnits?: bigint } | null> {
+    const timeoutMs = this.cfg.statusTimeoutMs ?? Math.min(this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5000);
+    const started = Date.now();
+    // Every exit reports exactly one sanitized outcome, so "never started", "timed out" and "rejected" are distinguishable in logs.
+    const report = (e: Record<string, unknown>) => this.diag({ type: 'payer_status', rail: this.rail, ...e, ms: Date.now() - started, timeoutMs });
+    let response: Response;
     try {
-      const response = await this.f(`${this.cfg.url}/status`, {
+      response = await this.f(`${this.cfg.url}/status`, {
         headers: { accept: 'application/json', authorization: `Bearer ${this.cfg.token}` },
-        redirect: 'error', signal: AbortSignal.timeout(this.cfg.statusTimeoutMs ?? Math.min(this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5000)),
+        redirect: 'error', signal: AbortSignal.timeout(timeoutMs),
       });
-      if (!response.ok) return null;
-      const body = z.object({ ok: z.literal(true), source: FundingSource.nullable(), ledger: z.record(z.string(), z.unknown()).optional() }).strict().safeParse(await response.json());
-      // A bridge configured for one rail must never be accepted as another rail's payer.
-      if (!body.success || body.data.source?.rail !== this.rail) return null;
-      const raw = body.data.ledger?.headroomBaseUnits;
-      return { source: body.data.source, ...(typeof raw === 'string' && /^[0-9]+$/.test(raw) ? { headroomBaseUnits: BigInt(raw) } : {}) };
-    } catch { return null; }
+    } catch (e) { report(fetchFailure(e)); return null; }
+    if (!response.ok) { await response.arrayBuffer().catch(() => undefined); report({ outcome: 'http_error', status: response.status, ...routingHint(response) }); return null; }
+    let json: unknown;
+    try { json = await response.json(); }
+    catch (e) { report({ ...(fetchFailure(e).outcome === 'timeout' ? { outcome: 'timeout' } : { outcome: 'invalid_json' }), status: response.status }); return null; }
+    const body = z.object({ ok: z.literal(true), source: FundingSource.nullable(), ledger: z.record(z.string(), z.unknown()).optional() }).strict().safeParse(json);
+    if (!body.success) { report({ outcome: 'schema_mismatch' }); return null; }
+    if (!body.data.source) { report({ outcome: 'missing_source' }); return null; }
+    // A bridge configured for one rail must never be accepted as another rail's payer.
+    if (body.data.source.rail !== this.rail) { report({ outcome: 'rail_mismatch' }); return null; }
+    const raw = body.data.ledger?.headroomBaseUnits;
+    const headroom = typeof raw === 'string' && /^[0-9]+$/.test(raw);
+    report({ outcome: 'ok', headroom });
+    return { source: body.data.source, ...(headroom ? { headroomBaseUnits: BigInt(raw as string) } : {}) };
   }
 
   async source(): Promise<FundingSource | null> {
