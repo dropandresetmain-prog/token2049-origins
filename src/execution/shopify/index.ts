@@ -194,7 +194,7 @@ export class ShopifyExecutor implements CommerceExecutor {
       if (apiTotals) logBrowserMemory('api_quote_complete', this.memorySink);
       return { title: cart.lines.nodes[0]!.merchandise.product.title, merchantTotal: totals.total,
         breakdown: [{ kind: 'item', label: 'Items', amount: totals.subtotal }, { kind: 'shipping', label: totals.shippingTitle, amount: totals.shipping }, { kind: 'tax', label: 'Tax', amount: totals.tax }],
-        terms: [`Shipping: ${totals.shippingTitle}`, 'Development store; Bogus gateway simulated payment'], fulfillmentSummary: `Synthetic delivery to ${intent.data.shipToCountry}`,
+        terms: [`Shipping: ${totals.shippingTitle}`, 'Development store; Bogus gateway simulated payment'], fulfillmentSummary: `Delivery to ${intent.data.shipToCountry}`,
         executionRef: { cartId: cart.id, checkoutUrl: cart.checkoutUrl, nonce, country: intent.data.shipToCountry, fulfillmentHash: hash(f), cartHash: cartSignature(cart, true),
           shippingTitle: totals.shippingTitle, checkoutTotals: totals, quoteMethod: apiTotals ? 'storefront_cart' : 'browser_checkout', createdAt: this.clock.now().toISOString() }, expiresAt: this.expiry() };
     } catch (e) { throw toProviderError(e, 'shopify_quote_failed'); }

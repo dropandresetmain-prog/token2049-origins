@@ -82,7 +82,7 @@ describe('Shopify exact quote boundary', () => {
     expect(s.sf.createCart.mock.calls[0]![0]).toMatchObject({ fulfillment: f });
     expect(JSON.stringify(s.quote.executionRef)).not.toContain('test@example.com');
     expect(JSON.stringify(s.quote)).not.toContain('1 Test Street');
-    expect(s.quote.fulfillmentSummary).toBe(`Synthetic delivery to ${demoData.retail.shipToCountry}`);
+    expect(s.quote.fulfillmentSummary).toBe(`Delivery to ${demoData.retail.shipToCountry}`);
   });
   it.each(['estimated','tax','duty','discount','delivery','currency'])('rejects inexact %s carts', key => {
     const c = cart();

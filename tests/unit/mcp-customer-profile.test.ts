@@ -4,7 +4,7 @@ import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { startHarness, retailIntent, type Harness } from '../support/harness.js';
 import { createClient } from '../../src/infrastructure/auth.js';
 import { createMcpServer } from '../../src/channels/mcp/server.js';
-import { DEMO_DISCLOSURE, SOURCE_STORE_NOTE, demoDisclosure } from '../../src/channels/mcp/tools.js';
+import { DEMO_DISCLOSURE, demoDisclosure } from '../../src/channels/mcp/tools.js';
 import { demoData } from '../../src/demo/config.js';
 import { providerRequirements } from '../../src/contracts/input.js';
 import type { McpConfig } from '../../src/channels/mcp/config.js';
@@ -111,10 +111,9 @@ describe('hosted MCP saved customer profile', () => {
     await m.close();
   });
 
-  it('adds the source-store note only for Shopify Global source offers', () => {
-    expect(demoDisclosure({})).toBe(DEMO_DISCLOSURE);
-    expect(demoDisclosure({ sourceOffer: {} as never })).toBe(`${DEMO_DISCLOSURE} ${SOURCE_STORE_NOTE}`);
-    expect(count(demoDisclosure({ sourceOffer: {} as never }), /Demo transaction/g)).toBe(1);
+  it('uses one concise disclosure for every quote', () => {
+    expect(demoDisclosure()).toBe(DEMO_DISCLOSURE);
+    expect(count(demoDisclosure(), /Demo transaction/g)).toBe(1);
   });
 
   it('never emits profile PII in tool output (text or structured) or in logs', async () => {

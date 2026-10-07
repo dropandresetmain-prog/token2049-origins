@@ -1,0 +1,266 @@
+{
+  "observedSha": "561824b9ef378b498ff58baf5dd2dd87f4b0319a",
+  "quotes": [
+    {
+      "quoteId": "quo_01M4A544FX0JEQ4FB8DKDJ0MYC",
+      "version": 1,
+      "supersedesQuoteId": null,
+      "customerId": "cus_HOSTEDMCPDEMO",
+      "offerId": "off_01M4A50Y656X2WX905Z45N493Z",
+      "sourceOffer": {
+        "source": "shopify_global_catalog",
+        "productId": "gid://shopify/p/5DzdMdWq8AxfHnaF9koA9U",
+        "variantId": "gid://shopify/ProductVariant/40474248380518",
+        "merchantId": "gid://shopify/Shop/6621364277",
+        "merchantName": "Kikkerland INC WS",
+        "merchantUrl": "https://shopkikkerland.com/",
+        "productTitle": "Travel Adapter",
+        "variantTitle": "Travel Adapter",
+        "productUrl": "https://shopkikkerland.com/products/travel-adapter?variant=[REDACTED_NUMBER]",
+        "observedPrice": {
+          "currency": "USD",
+          "amountMinor": "1600",
+          "scale": 2
+        },
+        "availability": "available",
+        "observedAt": "2026-10-07T03:03:00.541Z",
+        "schemaVersion": "2026-08-25",
+        "evidenceMode": "fresh_external"
+      },
+      "category": "retail",
+      "route": "shopify",
+      "providerEnvironment": "test",
+      "title": "[CAPSULE SANDBOX] Travel Adapter",
+      "breakdown": [
+        {
+          "kind": "item",
+          "label": "Items",
+          "amount": {
+            "currency": "USD",
+            "amountMinor": "1600",
+            "scale": 2
+          }
+        },
+        {
+          "kind": "shipping",
+          "label": "Standard",
+          "amount": {
+            "currency": "USD",
+            "amountMinor": "800",
+            "scale": 2
+          }
+        },
+        {
+          "kind": "tax",
+          "label": "Tax",
+          "amount": {
+            "currency": "USD",
+            "amountMinor": "0",
+            "scale": 2
+          }
+        }
+      ],
+      "merchantTotal": {
+        "currency": "USD",
+        "amountMinor": "2400",
+        "scale": 2
+      },
+      "sandboxRepresentation": {
+        "provider": "shopify",
+        "environment": "test",
+        "boundary": "Source merchant receives no order or payment; equivalent transaction executes in Capsule Shopify Sandbox.",
+        "shadowProductId": "gid://shopify/Product/10356668039225",
+        "shadowVariantId": "gid://shopify/ProductVariant/50681057902649",
+        "publicationId": "gid://shopify/Publication/230951092281",
+        "sourceDigest": "7d8967f2df37a385ae3cf1d4c2e1d24abb8c811e6571390a71ead723efd83e9e"
+      },
+      "serviceFee": {
+        "currency": "USD",
+        "amountMinor": "0",
+        "scale": 2
+      },
+      "payablePrincipal": {
+        "currency": "USD",
+        "amountMinor": "2400",
+        "scale": 2
+      },
+      "displayConversion": {
+        "snapshot": {
+          "source": "frankfurter",
+          "from": "USD",
+          "to": "SGD",
+          "rate": "1.2787",
+          "referenceDate": "2026-10-07",
+          "fetchedAt": "2026-10-07T03:02:59.908Z"
+        },
+        "userBudget": {
+          "currency": "SGD",
+          "amountMinor": "3500",
+          "scale": 2
+        },
+        "providerSearchCeiling": {
+          "currency": "USD",
+          "amountMinor": "2737",
+          "scale": 2
+        },
+        "convertedPayable": {
+          "currency": "SGD",
+          "amountMinor": "3069",
+          "scale": 2
+        }
+      },
+      "fundingOptions": [
+        {
+          "fundingOptionId": "fop_01M4A544FWFP481XAPJF4X8PVW",
+          "rail": "cardano",
+          "amount": {
+            "network": "cardano:preprod",
+            "assetId": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "symbol": "tUSDM",
+            "decimals": 6,
+            "amountBaseUnits": "24000"
+          },
+          "payTo": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py",
+          "settlement": {
+            "policy": {
+              "mode": "scaled_testnet",
+              "numerator": 1,
+              "denominator": 1000
+            },
+            "commercialPrincipal": {
+              "currency": "USD",
+              "amountMinor": "2400",
+              "scale": 2
+            },
+            "commercialServiceFee": {
+              "currency": "USD",
+              "amountMinor": "0",
+              "scale": 2
+            },
+            "commercialTotal": {
+              "currency": "USD",
+              "amountMinor": "2400",
+              "scale": 2
+            },
+            "principalBaseUnits": "24000",
+            "feeBaseUnits": "0",
+            "totalBaseUnits": "24000"
+          }
+        }
+      ],
+      "fulfillmentSummary": "Synthetic delivery to SG",
+      "terms": [
+        "Shipping: Standard",
+        "Development store; Bogus gateway simulated payment",
+        "Source merchant receives no order or payment; equivalent transaction executes in Capsule Shopify Sandbox.",
+        "Shipping, tax and total are Capsule sandbox charges, not source merchant charges."
+      ],
+      "expiresAt": "2026-10-07T03:14:44.771Z",
+      "digest": "sha256:a48a43acb56cba3c2f7d57df6ac99631161458bdfb49c880e6a180cdd3604135",
+      "createdAt": "2026-10-07T03:04:44.774Z"
+    },
+    {
+      "quoteId": "quo_01M4A54HB0EEAA8ZJ858JQKMYV",
+      "version": 1,
+      "supersedesQuoteId": null,
+      "customerId": "cus_HOSTEDMCPDEMO",
+      "offerId": "off_01M4A54EBY31XNDPR2T8AWWY78",
+      "category": "hotel",
+      "route": "nuitee",
+      "providerEnvironment": "sandbox",
+      "title": "Jyu Capsule Hotel - Upper Single Capsule - Mixed",
+      "breakdown": [
+        {
+          "kind": "item",
+          "label": "Upper Single Capsule - Mixed, 2026-11-16 to 2026-11-18",
+          "amount": {
+            "currency": "USD",
+            "amountMinor": "7867",
+            "scale": 2
+          }
+        },
+        {
+          "kind": "tax",
+          "label": "Sales tax",
+          "amount": {
+            "currency": "USD",
+            "amountMinor": "360",
+            "scale": 2
+          }
+        },
+        {
+          "kind": "tax",
+          "label": "Service charge (taxable)",
+          "amount": {
+            "currency": "USD",
+            "amountMinor": "345",
+            "scale": 2
+          }
+        }
+      ],
+      "merchantTotal": {
+        "currency": "USD",
+        "amountMinor": "8572",
+        "scale": 2
+      },
+      "serviceFee": {
+        "currency": "USD",
+        "amountMinor": "0",
+        "scale": 2
+      },
+      "payablePrincipal": {
+        "currency": "USD",
+        "amountMinor": "8572",
+        "scale": 2
+      },
+      "fundingOptions": [
+        {
+          "fundingOptionId": "fop_01M4A54HB0BPR71KAP9SCB4WCD",
+          "rail": "cardano",
+          "amount": {
+            "network": "cardano:preprod",
+            "assetId": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+            "symbol": "tUSDM",
+            "decimals": 6,
+            "amountBaseUnits": "85720"
+          },
+          "payTo": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py",
+          "settlement": {
+            "policy": {
+              "mode": "scaled_testnet",
+              "numerator": 1,
+              "denominator": 1000
+            },
+            "commercialPrincipal": {
+              "currency": "USD",
+              "amountMinor": "8572",
+              "scale": 2
+            },
+            "commercialServiceFee": {
+              "currency": "USD",
+              "amountMinor": "0",
+              "scale": 2
+            },
+            "commercialTotal": {
+              "currency": "USD",
+              "amountMinor": "8572",
+              "scale": 2
+            },
+            "principalBaseUnits": "85720",
+            "feeBaseUnits": "0",
+            "totalBaseUnits": "85720"
+          }
+        }
+      ],
+      "fulfillmentSummary": "1 guest in 1 room, 2026-11-16 to 2026-11-18",
+      "terms": [
+        "Non-refundable",
+        "Board: Room Only",
+        "Nuitee sandbox: this booking is simulated; no real payment is taken and no real room is reserved."
+      ],
+      "expiresAt": "2026-10-07T03:14:58.463Z",
+      "digest": "sha256:d222824be12bf8e5285c701d695999f0612debda0d892ff0ceca37336b4aad27",
+      "createdAt": "2026-10-07T03:04:58.463Z"
+    }
+  ]
+}

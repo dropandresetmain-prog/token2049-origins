@@ -227,21 +227,18 @@ function describeOffers(offers: OfferView[], totalFound: number): string {
  * offers, quotes, progress and confirmations stay in normal commerce language. Environment facts remain in structured results.
  */
 export const DEMO_DISCLOSURE = 'Demo transaction: payment uses testnet funds and the merchant checkout runs in a sandbox. No real money will be charged.';
-export const SOURCE_STORE_NOTE = "The source store receives no order or payment; the demo checkout is completed in Capsule's sandbox store.";
-export function demoDisclosure(q: Pick<QuoteView, 'sourceOffer'>): string {
-  return q.sourceOffer ? `${DEMO_DISCLOSURE} ${SOURCE_STORE_NOTE}` : DEMO_DISCLOSURE;
+export function demoDisclosure(): string {
+  return DEMO_DISCLOSURE;
 }
 /** Terms that only restate the demo environment stay in structured output; the one disclosure covers them in text. */
-const ENVIRONMENT_TERM = /(sandbox|development store|bogus|simulated|testnet|test)/i;
+const ENVIRONMENT_TERM = /\b(sandbox|development store|bogus|simulated|testnet|test)\b/i;
 
 export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms: Map<string, bigint> = new Map(), delivery: string | null = null): string {
   const fund = q.fundingOptions.map(f => {
     const digits = f.amount.amountBaseUnits.padStart(f.amount.decimals + 1, '0');
     const amount = f.amount.decimals ? digits.slice(0, -f.amount.decimals) + '.' + digits.slice(-f.amount.decimals) : digits;
     const connected = sources.find(s => sourceMatches(s, f));
-    const scale = f.settlement?.policy;
     return '- ' + f.rail + ' / ' + f.amount.network + ': ' + amount + ' ' + (f.amount.symbol ?? f.amount.assetId) +
-      (scale ? ' · testnet notional ' + scale.numerator + ':' + scale.denominator : '') +
       ' · ' + (connected
         ? (exceedsHeadroom(f, headrooms.get(connected.sourceId))
           ? 'Connected wallet ' + connected.displayAddress + ' BUT its remaining spend cap (' + String(headrooms.get(connected.sourceId)) + ' base units) is below this payment: it would be refused, nothing can be bought with it'
@@ -250,18 +247,19 @@ export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms:
       ' · selection ' + f.fundingOptionId;
   });
   return [
-    'Exact quote for "' + q.title + '" via ' + q.route + '.',
+    // The controlled-store product label is operational metadata; present the frozen source product title.
+    'Exact quote for "' + (q.sourceOffer?.productTitle ?? q.title) + '" via ' + q.route + '.',
     'Merchant total ' + formatMinor(q.merchantTotal) + ' + service fee ' + formatMinor(q.serviceFee) + ' = payable ' + formatMinor(q.payablePrincipal) + '.',
     ...(q.displayConversion ? [
       'Reference equivalent of payable: about ' + formatMinor(q.displayConversion.convertedPayable) + ' (user budget ' + formatMinor(q.displayConversion.userBudget) + ').',
       'FX reference: Frankfurter, ' + q.displayConversion.snapshot.referenceDate + '; 1 ' + q.displayConversion.snapshot.from + ' = ' + q.displayConversion.snapshot.rate + ' ' + q.displayConversion.snapshot.to + '.',
-      'Approve the exact USD merchant quote and an explicit funding option. Funding uses the USD payable under its stated testnet policy; SGD is a budget/display reference only. Pass payablePrincipal as maxTotal. This FX reference is frozen.',
+      'Approve the exact USD merchant quote and an explicit funding option. SGD is a budget/display reference only. Pass payablePrincipal as maxTotal. This FX reference is frozen.',
     ] : []),
     delivery ?? 'Fulfillment: ' + q.fulfillmentSummary,
     ...q.terms.filter(t => !ENVIRONMENT_TERM.test(t)).map(t => 'Terms: ' + t),
     'Expires ' + q.expiresAt + '.',
     ...(fund.length ? ['Available funding options:', ...fund] : ['No payment source is currently available. Purchase creation is unavailable.']),
-    'Nothing has been purchased yet. Show these exact terms to the user, ask them to select one available funding option, then ask for explicit approval of the terms and that payment choice. Only then call buy with selectedFundingOptionId, quoteId, maxTotal and quoteDigest from this quote. Never infer a choice or fabricate customer information. Do not ask for name, email, phone, address or traveller details: the saved customer profile already covers them. Immediately before asking for that final approval, state this once, verbatim: "' + demoDisclosure(q) + '" Do not repeat it elsewhere.',
+    'Nothing has been purchased yet. Show these exact terms to the user, ask them to select one available funding option, then ask for explicit approval of the terms and that payment choice. Only then call buy with selectedFundingOptionId, quoteId, maxTotal and quoteDigest from this quote. Never infer a choice or fabricate customer information. Do not ask for name, email, phone, address or traveller details: the saved customer profile already covers them. Immediately before asking for that final approval, state this once, verbatim: "' + demoDisclosure() + '" Do not repeat it elsewhere.',
   ].join('\n');
 }
 
@@ -411,7 +409,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const payers = await connectedPayers(deps);
         const fundingSources = payers.map(p => p.source);
         const headrooms = new Map(payers.flatMap(p => (p.headroom !== undefined ? [[p.source.sourceId, p.headroom] as [string, bigint]] : [])));
-        return success(deps, describeQuote(quote, fundingSources, headrooms, deliveryLabel(assessment.value)), { quote, fundingSources, demoDisclosure: demoDisclosure(quote) });
+        return success(deps, describeQuote(quote, fundingSources, headrooms, deliveryLabel(assessment.value)), { quote, fundingSources, demoDisclosure: demoDisclosure() });
       } catch (e) {
         return gatewayFailure(deps, e);
       }
