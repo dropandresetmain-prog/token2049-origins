@@ -8,9 +8,9 @@
 
 ## Active lanes
 - Activate final Capsule candidate completed PARTIAL at fa9d688cd068348ea409d402563bec6c239b8efb.
-- Original full report: SAFE TO MERGE = NO. Later Option B checkpoint read in full; no new SAFE TO MERGE = YES handover.
-- Reconcile Solana candidates completed PARTIAL at local 20f9851; deployed/runtime and remote branch afa59b1459aec6fad545ab5eeec1b2b37a15445c.
-- Activation stopped before recording readiness: exact Atlas flag approval is pending. Do not integrate its partial runtime or deploy the release.
+- Original partial report had SAFE TO MERGE = NO; superseded by completed Option B activation and founder acceptance of existing proof. Final runtime review/tests are required before integration.
+- Reconcile Solana candidates CLOSED COMPLETE at a02216ccb69e78e6800a45c81cd349021fd834ef (pushed); runtime/deployed afa59b1459aec6fad545ab5eeec1b2b37a15445c. Full latest approval and closure reports read.
+- Atlas exact setting approved and deployed; Atlas/Nuitee executable dual-rail quotes PASS. Founder cancelled recording/new live E2E and accepted existing slides/videos/proof; no booking remains pending.
 - Completed activation: hosted import retains 7 payer / 6 sponsor rows; exact hashes/identities/totals verified; original IDs reject replay (403); active incomplete count zero; restart PASS.
 - No new payment/booking in activation; full backend and final E2E deferred. Three sanitized Option B evidence JSON files and detailed report retained, without importing runtime.
 - Submission docs remote tip: 835de08; narrative rewrite complete with track/CDP/OCBC update.
@@ -60,13 +60,13 @@
 - Current public /health HTTP 200; fresh console tab woke free gateway and reached old Access key prompt. Final Password prompt and authenticated cold test pending.
 - Auth/evidence regressions: 51 tests PASS; console: 85 tests PASS; backend/console typechecks and production build PASS.
 - No real payment/order initiated by release lane.
-- Main promotion / exact final deployment / freeze: BLOCKED on Atlas exact gate approval, final recording/E2E checkpoint and safe runtime handover.
+- Main promotion / exact final deployment / freeze: pending completed candidate integration, security/tests, judge-access installation and cold acceptance. No Atlas approval or recording blocker remains.
 - GitHub receive-pack returned HTTP 500 repeatedly for both lanes latest documentation/evidence pushes. Scoped Git Data API recovery also returned HTTP 500 with empty body (confirmed headers); no ref changed.
 - Release code/evidence checkpoint is pushed through 1f5700d; later docs retained locally until publication recovers.
 
 ## Next action
-- Founder: approve ATLAS_ALLOW_TEST_BALANCE_PAYMENT=true in Reconcile Solana candidates, then authorize recording/live E2E at that lane checkpoint.
-- Release: obtain explicit safe handover; do not copy partial runtime commits.
+- No founder Atlas/recording approval remains. Activation idle/completed; release may assume deployment ownership after final integration checks.
+- Release: review the completed a02216c candidate and merge only after verifying retained protection and safe completed state.
 - If safe, integrate its final SHA, preserving judge GET-only auth and the release tracker.
 - Run final candidate checks; take deployment ownership only after activation stops.
 - Install the dedicated password hash, deploy exact candidate, cold-test all four views, then promote/freeze.
