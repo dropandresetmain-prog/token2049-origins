@@ -368,6 +368,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     bounded('find_offers', async ({ intent }, extra) => {
       const denied = missingScope(deps, 'find_offers', extra);
       if (denied) return denied;
+      for (const bridge of deps.bridges ?? []) bridge.wake();
       try {
         const assessment = assessPurchaseIntent(intent);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
@@ -402,6 +403,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     bounded('create_quote', async ({ offerId, fulfillment }, extra) => {
       const denied = missingScope(deps, 'create_quote', extra);
       if (denied) return denied;
+      for (const bridge of deps.bridges ?? []) bridge.wake();
       try {
         const assessment = assessFulfillment(deps.profile ? applyDemoProfile(fulfillment, deps.profile) : fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);

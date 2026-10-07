@@ -39,6 +39,11 @@ export class BridgeClient {
     });
   }
 
+  /** Fire-and-forget wake-up: a sleeping free-tier payer needs ~35s to start, far longer than the 5s status probe, so it is pinged early in the flow. */
+  wake(): void {
+    this.f(`${this.cfg.url}/health`, { redirect: 'error', signal: AbortSignal.timeout(90_000) }).then((r) => r.arrayBuffer()).catch(() => undefined);
+  }
+
   /**
    * Sanitized identity of the payer behind this bridge, plus how much it may still spend when it reports that (hosted payers do:
    * `ledger.headroomBaseUnits`, the largest single payment its caps still allow). Null if unreachable or if it is not a source of this

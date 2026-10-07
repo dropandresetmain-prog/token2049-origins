@@ -1,4 +1,4 @@
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, writeFileSync, unlinkSync, rmdirSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -72,6 +72,19 @@ async function listen(server: Server): Promise<string> {
 const close = (server: Server) => new Promise<void>((resolve, reject) => server.close((error) => error ? reject(error) : resolve()));
 
 describe('MCP bearer redirect protection', () => {
+  it('wake pings the unauthenticated payer /health without sending the bridge token and never throws', async () => {
+    const seen: Array<{ url?: string; authorization?: string }> = [];
+    const payer = createServer((req, res) => { seen.push({ url: req.url, authorization: req.headers.authorization }); res.writeHead(200).end('{"ok":true}'); });
+    try {
+      const url = await listen(payer);
+      BridgeClient.fromConfig(config(url, url))[0]!.wake();
+      await vi.waitFor(() => expect(seen).toEqual([{ url: '/health', authorization: undefined }]));
+      expect(() => new BridgeClient('cardano', { url: 'http://127.0.0.1:1', token: TOKEN }).wake()).not.toThrow();
+    } finally {
+      await close(payer);
+    }
+  });
+
   it.each([301, 302, 303, 307, 308])('gateway and bridge refuse HTTP %i redirects without reaching the destination', async (status) => {
     let redirectedCalls = 0;
     const destination = createServer((_req, res) => { redirectedCalls++; res.writeHead(200).end('{}'); });
