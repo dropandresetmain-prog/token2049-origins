@@ -1,0 +1,83 @@
+{
+  "at": "2026-10-07T15:05:45.085Z",
+  "noPurchase": true,
+  "noPayment": true,
+  "noBooking": true,
+  "providers": {
+    "nuitee": {
+      "searchSucceeded": true,
+      "offerCount": 3,
+      "elapsedMs": 2894,
+      "errorCode": null,
+      "executableQuote": true,
+      "quoteMs": 4776,
+      "quoteId": "quo_01M4BECGQ6XDBJZ609Q6H3XHD8",
+      "quoteDigest": "sha256:ce58125818d6b049347149fa4ef3d133d1be12b6baef663f69ba0753feaa80e5",
+      "fundingOptions": [
+        {
+          "rail": "cardano",
+          "network": "cardano:preprod",
+          "amountBaseUnits": "91070",
+          "fundingOptionId": "fop_01M4BECGKE3RJFT6T8V2VJV0NR"
+        },
+        {
+          "rail": "solana",
+          "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+          "amountBaseUnits": "91070",
+          "fundingOptionId": "fop_01M4BECGQ5YZHP7CFYY4WVH930"
+        }
+      ],
+      "fundingSources": [
+        {
+          "sourceId": "src_21f098873f368133fc671af8b3716703",
+          "displayAddress": "addr_test1qrwg…tthyxm",
+          "readiness": "configured",
+          "rail": "cardano",
+          "network": "cardano:preprod",
+          "publicAddress": "addr_test1qrwghp45ywnyn6vvm6utfk3xmjxap97mve5gql2cj2fq6wnqdqnepvemxymt7h4f4hteytznvy5n9kte95vtvufetnqqtthyxm",
+          "assetId": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d"
+        },
+        {
+          "sourceId": "src_5f44db62376459a75a564e4d3bc8099a",
+          "displayAddress": "5iSWoZSucVSaNj…2X5MZ6",
+          "readiness": "configured",
+          "rail": "solana",
+          "network": "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+          "publicAddress": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+          "assetId": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU"
+        }
+      ],
+      "commercialTotal": {
+        "currency": "USD",
+        "amountMinor": "9107",
+        "scale": 2
+      },
+      "missingRailRefusal": {
+        "status": "needs_input",
+        "phase": "funding_selection",
+        "hasPurchase": false
+      },
+      "invalidRailRefusal": {
+        "isError": true,
+        "code": "invalid_request",
+        "hasPurchase": false
+      }
+    },
+    "atlas": {
+      "searchSucceeded": true,
+      "offerCount": 3,
+      "elapsedMs": 294,
+      "errorCode": "route_unavailable",
+      "executableQuote": false,
+      "quoteMs": 86
+    }
+  },
+  "tools": [
+    "find_offers",
+    "create_quote",
+    "buy",
+    "get_purchase"
+  ],
+  "explicitRailInstruction": true,
+  "selectionOptionalInSchema": true
+}

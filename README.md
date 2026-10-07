@@ -65,4 +65,4 @@ The demonstration uses public-testnet funds and provider sandboxes. Shopify list
 | Coinbase CDP | Server Wallet transfer on Base Sepolia via official CLI | [Public-RPC proof](docs/evidence/coinbase-cdp/server-wallet-proof.json) |
 | OCBC | Read-only fiat observation and history | [Observation evidence](docs/evidence/ocbc-protocol.md) |
 
-Hosted Solana activation is a separate release gate; the retained Solana booking result does not establish current hosted readiness. Customer funding, operational crypto treasury and observed fiat state are distinct; operator fiat/crypto reconciliation remains manual.
+The [latest hosted activation checkpoint](docs/work/FINAL_ACTIVATION.md) proves Solana migration, permanently blocked historical attempts, dual-rail Nuitée quoting and controlled restart recovery. Atlas executable acceptance and the final recorded Solana/Nuitée booking remain pending. Customer funding, operational crypto treasury and observed fiat state are distinct; operator fiat/crypto reconciliation remains manual.

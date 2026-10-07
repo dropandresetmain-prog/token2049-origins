@@ -8,10 +8,11 @@
 
 ## Active lanes
 - Activate final Capsule candidate completed PARTIAL at fa9d688cd068348ea409d402563bec6c239b8efb.
-- Full final report read: SAFE TO MERGE = NO; candidate not deployed.
-- Reconcile Solana candidates is active in the activation worktree, implementing approved Option B historical quarantine.
-- Do not integrate activation, deploy, modify protected Solana state, or retire any signer until that lane completes.
-- Latest activation progress: hosted import retains 7 payer / 6 sponsor rows; original IDs reject replay (403); active incomplete count zero. No final merge report yet.
+- Original full report: SAFE TO MERGE = NO. Later Option B checkpoint read in full; no new SAFE TO MERGE = YES handover.
+- Reconcile Solana candidates completed PARTIAL at local 20f9851; deployed/runtime and remote branch afa59b1459aec6fad545ab5eeec1b2b37a15445c.
+- Activation stopped before recording readiness: exact Atlas flag approval is pending. Do not integrate its partial runtime or deploy the release.
+- Completed activation: hosted import retains 7 payer / 6 sponsor rows; exact hashes/identities/totals verified; original IDs reject replay (403); active incomplete count zero; restart PASS.
+- No new payment/booking in activation; full backend and final E2E deferred. Three sanitized Option B evidence JSON files and detailed report retained, without importing runtime.
 - Submission docs remote tip: 835de08; narrative rewrite complete with track/CDP/OCBC update.
 - Remote docs incorporated for release review per founder request; its tracker is excluded. No independent narrative rewrite.
 
@@ -20,8 +21,8 @@
 - Initial worktrees and all local/remote branch heads inventoried.
 - Local main is behind origin/main; do not switch shared checkout.
 - Initial gateway deployed SHA independently verified: 974a39bfb59adb0a317d0db05a12268bbbb6242d.
-- Live Render inventory: gateway branch main, SHA 974a39bfb59adb0a317d0db05a12268bbbb6242d, auto-deploy yes, free plan.
-- Cardano branch main, SHA d7ae869a358410e20b47e23901d6879fb8e348fc, auto-deploy no, free plan.
+- Latest live Render inventory: gateway, Cardano payer and Solana payer all branch integration/final-activation, SHA afa59b1459aec6fad545ab5eeec1b2b37a15445c, auto-deploy no, free plan.
+- All three live deploy statuses independently verified through Render GET API. Release lane changed no Render setting.
 - Activation remains the sole deployment owner while active; settings unchanged by release lane.
 - Initial hosted DB PASS: purchase list/detail/proof all HTTP 200; exact human-run transaction and receipt re-read. Treasury/bank HTTP 403 as expected before access fix deploy. Final candidate recheck required.
 - Final deployed SHA: NOT FROZEN.
@@ -59,10 +60,13 @@
 - Current public /health HTTP 200; fresh console tab woke free gateway and reached old Access key prompt. Final Password prompt and authenticated cold test pending.
 - Auth/evidence regressions: 51 tests PASS; console: 85 tests PASS; backend/console typechecks and production build PASS.
 - No real payment/order initiated by release lane.
-- Main promotion / exact final deployment / freeze: blocked on active lane and final gates.
+- Main promotion / exact final deployment / freeze: BLOCKED on Atlas exact gate approval, final recording/E2E checkpoint and safe runtime handover.
+- GitHub receive-pack returned HTTP 500 repeatedly for both lanes latest documentation/evidence pushes; attempt Git Data API for this release branch only.
+- Release code/evidence checkpoint is pushed through 1f5700d; later docs retained locally until publication recovers.
 
 ## Next action
-- Await the activation full report and explicit merge decision; do not copy partial runtime commits.
+- Founder: approve ATLAS_ALLOW_TEST_BALANCE_PAYMENT=true in Reconcile Solana candidates, then authorize recording/live E2E at that lane checkpoint.
+- Release: obtain explicit safe handover; do not copy partial runtime commits.
 - If safe, integrate its final SHA, preserving judge GET-only auth and the release tracker.
 - Run final candidate checks; take deployment ownership only after activation stops.
 - Install the dedicated password hash, deploy exact candidate, cold-test all four views, then promote/freeze.
