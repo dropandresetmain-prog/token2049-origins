@@ -83,7 +83,7 @@ describe('Sui Testnet funding adapter', () => {
     expect(s.counts().executed).toBe(0);
   });
 
-  it('accepts the exact sender USDC address-balance path with a chain, expiry and nonce in the signed validity window', async () => {
+  it('accepts the exact sender USDC address-balance path with chain, epoch window and nonce', async () => {
     const s = await suiScenario({}, {}, { commands: 'balance', validity: { nonce: 23 } });
     const prepared = await s.adapter.prepare(s.candidate.header, s.input);
     expect(prepared).toMatchObject({ ok: true, recoveryPayload: { header: s.candidate.header } });
@@ -95,7 +95,7 @@ describe('Sui Testnet funding adapter', () => {
     const expiration = Transaction.from(s.candidate.bytes).getData().expiration?.ValidDuring;
     expect(expiration).toMatchObject({
       chain: TESTNET_GENESIS,
-      maxTimestamp: String(Date.parse(s.input.expiresAt)),
+      maxTimestamp: null,
       nonce: 23,
     });
   });

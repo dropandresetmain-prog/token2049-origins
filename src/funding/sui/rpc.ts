@@ -1,5 +1,5 @@
 import { SuiGrpcClient } from '@mysten/sui/grpc';
-import type { SuiClientTypes } from '@mysten/sui/client';
+import { TransactionError, type SuiClientTypes } from '@mysten/sui/client';
 import { normalizeStructTag } from '@mysten/sui/utils';
 import { Transaction } from '@mysten/sui/transactions';
 import { NETWORK, RPC_URL, TESTNET_GENESIS, USDC_TYPE, SUI_TYPE } from './config.js';
@@ -36,12 +36,18 @@ export class SuiRpc implements SuiRpcPort {
       const result = await this.client.getTransaction({ digest, include, signal: AbortSignal.timeout(15000) });
       return result.Transaction ?? result.FailedTransaction;
     } catch (error) {
-      if ((error as { code?: string }).code === 'NOT_FOUND') return null;
+      if (error instanceof TransactionError && error.reason === 'notFound' && error.digest === digest) return null;
       throw new Error('Sui transaction read unavailable');
     }
   }
   async assertPaymentObjects(bytes: Uint8Array) {
     const d = Transaction.from(bytes).getData();
+    const { systemState } = await this.client.getCurrentSystemState({ signal: AbortSignal.timeout(15000) });
+    const epoch = BigInt(systemState.epoch), validity = d.expiration?.ValidDuring;
+    if (validity && (validity.minTimestamp !== null || validity.maxTimestamp !== null)) throw new Error('Sui Testnet timestamp expiration unsupported');
+    // A signed future/expired window is not executable; reject before an ambiguous submission exists.
+    if (validity ? epoch < BigInt(validity.minEpoch!) || epoch > BigInt(validity.maxEpoch!)
+      : d.expiration?.Epoch === undefined || epoch > BigInt(d.expiration.Epoch)) throw new Error('Sui current epoch outside signed validity window');
     const refs = [...d.inputs.flatMap(i => i.Object?.ImmOrOwnedObject ? [{ ...i.Object.ImmOrOwnedObject, asset: USDC_TYPE }] : []),
       ...d.gasData.payment!.map(g => ({ ...g, asset: SUI_TYPE }))];
     const objects = refs.length ? (await this.client.getObjects({ objectIds: refs.map(r => r.objectId), signal: AbortSignal.timeout(15000) })).objects : [];

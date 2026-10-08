@@ -1,5 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 import type { SuiGrpcClient } from '@mysten/sui/grpc';
+import { TransactionError } from '@mysten/sui/client';
 import { Transaction } from '@mysten/sui/transactions';
 import { SuiRpc } from '../../src/funding/sui/rpc.js';
 import { SUI_TYPE, USDC_TYPE, TESTNET_GENESIS } from '../../src/funding/sui/config.js';
@@ -12,7 +13,7 @@ async function objectsFixture() {
   const objects = refs.map((ref, index) => ({ ...ref, owner: { $kind: 'AddressOwner', AddressOwner: candidate.payer },
     type: `0x2::coin::Coin<${index === 0 ? USDC_TYPE : SUI_TYPE}>` }));
   const getObjects = vi.fn(async () => ({ objects }));
-  return { candidate, objects, getObjects, rpc: new SuiRpc({ getObjects } as unknown as SuiGrpcClient) };
+  return { candidate, objects, getObjects, rpc: new SuiRpc({ getObjects, getCurrentSystemState: async () => ({ systemState: { epoch: '1' } }) } as unknown as SuiGrpcClient) };
 }
 
 describe('Sui independent RPC validation', () => {
@@ -38,9 +39,33 @@ describe('Sui independent RPC validation', () => {
     const candidate = await makeSuiCandidate(suiInput(), { commands: 'balance', gasAddressBalance: true, validity: {} });
     const getObjects = vi.fn(async () => { throw new Error('empty object request forbidden'); });
     const getBalance = vi.fn(async ({ coinType }: { coinType: string }) => ({ balance: { addressBalance: coinType === USDC_TYPE ? token : gas } }));
-    const rpc = new SuiRpc({ getObjects, getBalance } as unknown as SuiGrpcClient);
+    const rpc = new SuiRpc({ getObjects, getBalance, getCurrentSystemState: async () => ({ systemState: { epoch: '42' } }) } as unknown as SuiGrpcClient);
     if (valid) await expect(rpc.assertPaymentObjects(candidate.bytes)).resolves.toBeUndefined();
     else await expect(rpc.assertPaymentObjects(candidate.bytes)).rejects.toThrow(/address balance insufficient/);
+    expect(getObjects).not.toHaveBeenCalled();
+  });
+
+  it.each(['41', '44'])('rejects a signed validity window outside current epoch %s before object reads', async epoch => {
+    const candidate = await makeSuiCandidate(suiInput(), { commands: 'balance', gasAddressBalance: true, validity: {} });
+    const getObjects = vi.fn();
+    const rpc = new SuiRpc({ getObjects, getCurrentSystemState: async () => ({ systemState: { epoch } }) } as unknown as SuiGrpcClient);
+    await expect(rpc.assertPaymentObjects(candidate.bytes)).rejects.toThrow(/outside signed validity window/);
+    expect(getObjects).not.toHaveBeenCalled();
+  });
+
+  it('rejects an expired legacy epoch before object reads', async () => {
+    const candidate = await makeSuiCandidate(suiInput());
+    const getObjects = vi.fn();
+    const rpc = new SuiRpc({ getObjects, getCurrentSystemState: async () => ({ systemState: { epoch: '2' } }) } as unknown as SuiGrpcClient);
+    await expect(rpc.assertPaymentObjects(candidate.bytes)).rejects.toThrow(/outside signed validity window/);
+    expect(getObjects).not.toHaveBeenCalled();
+  });
+
+  it('rejects unsupported timestamp expiry before any submission or object read', async () => {
+    const candidate = await makeSuiCandidate(suiInput(), { commands: 'balance', gasAddressBalance: true, validity: { expiryMs: Date.parse(suiInput().expiresAt) } });
+    const getObjects = vi.fn();
+    const rpc = new SuiRpc({ getObjects, getCurrentSystemState: async () => ({ systemState: { epoch: '42' } }) } as unknown as SuiGrpcClient);
+    await expect(rpc.assertPaymentObjects(candidate.bytes)).rejects.toThrow(/timestamp expiration unsupported/);
     expect(getObjects).not.toHaveBeenCalled();
   });
 
@@ -55,9 +80,17 @@ describe('Sui independent RPC validation', () => {
   });
 
   it('keeps read timeouts distinct from authoritative transaction absence', async () => {
-    const getTransaction = vi.fn().mockRejectedValueOnce({ code: 'NOT_FOUND' }).mockRejectedValueOnce(new Error('timeout'));
+    const getTransaction = vi.fn().mockRejectedValueOnce(new TransactionError('notFound', 'digest')).mockRejectedValueOnce(new Error('timeout'));
     const rpc = new SuiRpc({ getTransaction } as unknown as SuiGrpcClient);
     await expect(rpc.transaction('digest')).resolves.toBeNull();
+    await expect(rpc.transaction('digest')).rejects.toThrow(/read unavailable/);
+  });
+
+  it('does not infer absence from an unrelated digest or an untyped transport label', async () => {
+    const getTransaction = vi.fn().mockRejectedValueOnce(new TransactionError('notFound', 'another-digest'))
+      .mockRejectedValueOnce({ code: 'NOT_FOUND' });
+    const rpc = new SuiRpc({ getTransaction } as unknown as SuiGrpcClient);
+    await expect(rpc.transaction('digest')).rejects.toThrow(/read unavailable/);
     await expect(rpc.transaction('digest')).rejects.toThrow(/read unavailable/);
   });
 

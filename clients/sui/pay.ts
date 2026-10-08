@@ -52,9 +52,10 @@ export async function buildPayment(cfg: SuiPayerConfig, input: FundingRequiremen
   ]);
   const tx = new Transaction(); tx.setSender(cfg.payer); tx.setGasOwner(cfg.payer);
   tx.setGasBudget(cfg.maxGasBudget); tx.setGasPrice(referenceGasPrice); tx.setGasPayment(useGasBalance ? [] : gasCoins);
-  // Nonce is the durable reservation sequence, unique across restarts; chain and expiry are also signed on-chain.
+  // Testnet supports epoch windows, not timestamp expiration. Exact quote expiry remains in the signed application binding.
+  // Nonce is the durable reservation sequence, unique across restarts; never rebuild an existing authorization.
   tx.setExpiration({ ValidDuring: { minEpoch: systemState.epoch, maxEpoch: String(BigInt(systemState.epoch) + 1n),
-    minTimestamp: null, maxTimestamp: String(Date.parse(input.expiresAt)), chain: TESTNET_GENESIS, nonce } });
+    minTimestamp: null, maxTimestamp: null, chain: TESTNET_GENESIS, nonce } });
   if (useTokenBalance) {
     const payment = tx.moveCall({ target: '0x2::coin::redeem_funds', typeArguments: [USDC_TYPE], arguments: [tx.withdrawal({ amount, type: USDC_TYPE })] });
     tx.transferObjects([payment], tx.pure.address(cfg.payee));

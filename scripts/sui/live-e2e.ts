@@ -1,7 +1,7 @@
 /** Explicit one-purchase acceptance. Keeps its private run manifest/schema for same-purchase recovery. */
 import { loadEnvFile } from 'node:process';
 import { existsSync, readFileSync, writeFileSync, openSync, fsyncSync, closeSync, renameSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, isAbsolute, join, resolve } from 'node:path';
 import { randomUUID } from 'node:crypto';
 import { execFile } from 'node:child_process';
 import { promisify } from 'node:util';
@@ -37,7 +37,7 @@ const client = suiClient(), rpc = new SuiRpc(client);
 // The isolated signer receives its own rail configuration, never merchant/admin credentials.
 const payerEnv: NodeJS.ProcessEnv = {};
 for (const [key, value] of Object.entries(process.env)) {
-  if (key.startsWith('SUI_') || ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR'].includes(key)) payerEnv[key] = value;
+  if ((key.startsWith('SUI_') && !key.startsWith('SUI_E2E_')) || ['PATH', 'Path', 'SystemRoot', 'SYSTEMROOT', 'WINDIR', 'TEMP', 'TMP', 'TMPDIR'].includes(key)) payerEnv[key] = value;
 }
 const intent = { category: 'retail' as const, query: demoData.retail.query, quantity: 1, shipToCountry: 'US',
   spendCeiling: { currency: 'USD', amountMinor: cfg.maxCommercial.toString(), scale: 2 } };
@@ -49,7 +49,8 @@ if (mode === '--preflight') {
     payer: cfg.payer, treasury: cfg.payee, purchaseExecuted: false }));
   process.exit(0);
 }
-const directory = dirname(cfg.ledger), manifestPath = join(directory, 'live-run.json');
+const directory = dirname(cfg.ledger), manifestPath = process.env.SUI_E2E_RUN_MANIFEST ?? join(directory, 'live-run.json');
+if (!isAbsolute(manifestPath) || resolve(dirname(manifestPath)) !== resolve(directory)) throw new Error('acceptance manifest must stay in protected payer directory');
 type Manifest = { version: 1; schema: string; clientId?: string; customerId?: string; purchaseId?: string; phase: string; createdAt: string };
 const persist = (value: Manifest) => {
   const tmp = manifestPath + '.tmp', fd = openSync(tmp, 'wx', 0o600);
@@ -93,7 +94,8 @@ const call = async (method: string, path: string, body?: unknown, extra: Record<
   return data;
 };
 const evidence: Record<string, unknown> = { timestamp: new Date().toISOString(), schema: manifest.schema, status: 'PARTIAL',
-  provider: 'shopify', providerEnvironment: shopify.environment, settlementPolicy: demoData.settlementPolicy, onChainPurchaseCommitment: false };
+    provider: 'shopify', providerEnvironment: shopify.environment, settlementPolicy: demoData.settlementPolicy, onChainPurchaseCommitment: false,
+    onChainQuoteExpiry: false, quoteExpiryEnforcement: 'payer_signed_application_binding_and_gateway_preflight' };
 try {
   if (!manifest.purchaseId) {
     if (manifest.phase === 'purchase_creation_started') throw new Error('purchase creation interrupted; reconcile durable quote/purchase before another create');

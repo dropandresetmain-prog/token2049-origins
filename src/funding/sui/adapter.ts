@@ -36,7 +36,8 @@ export function createSuiFundingAdapter(env: NodeJS.ProcessEnv, opts: { clock?: 
         paymentState: 'confirmed', confirmations: null, purpose: input.settlement && BigInt(input.settlement.feeBaseUnits) > 0n ? 'principal_and_fee' : 'purchase_principal',
         evidenceMode: 'fresh_external', observedAt: clock.now().toISOString(), details: { source: 'sui_testnet_grpc',
           checkpoint: chain.checkpoint, timestampMs: chain.timestampMs, transactionDigest: digest, quoteDigest: input.quoteDigest,
-          binding: 'payer_signed_application_candidate', onChainPurchaseCommitment: false, receivedAfterExpiry: chain.timestampMs > Date.parse(input.expiresAt) } } };
+          binding: 'payer_signed_application_candidate', onChainPurchaseCommitment: false, onChainQuoteExpiry: false,
+          quoteExpiryEnforcement: 'application', receivedAfterExpiry: chain.timestampMs > Date.parse(input.expiresAt) } } };
     } catch { return pending(); }
   }
   const adapter: FundingAdapter & {

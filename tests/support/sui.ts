@@ -57,7 +57,7 @@ export async function makeSuiCandidate(
   if (options.validity) {
     tx.setExpiration({ ValidDuring: {
       minEpoch: '42', maxEpoch: '43', minTimestamp: null,
-      maxTimestamp: String(options.validity.expiryMs ?? Date.parse(input.expiresAt)),
+      maxTimestamp: options.validity.expiryMs === undefined ? null : String(options.validity.expiryMs),
       chain: options.validity.chain ?? '69WiPg3DAQiwdxfncX6wYQ2siKwAe6L9BZthQea3JNMD',
       nonce: options.validity.nonce ?? 7,
     } });

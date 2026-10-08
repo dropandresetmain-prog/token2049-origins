@@ -108,7 +108,7 @@ describe('Sui payer transaction builder', () => {
     expect(result.data.gasData.payment).toHaveLength(1);
     expect(result.decoded.transfer.objects).toHaveLength(1);
     expect(result.data.expiration?.ValidDuring).toMatchObject({
-      minEpoch: '42', maxEpoch: '43', maxTimestamp: String(Date.parse(s.input.expiresAt)), chain: TESTNET_GENESIS, nonce: 7,
+      minEpoch: '42', maxEpoch: '43', maxTimestamp: null, chain: TESTNET_GENESIS, nonce: 7,
     });
     expect(s.calls.lists.map(x => x.coinType)).toEqual([USDC_TYPE, SUI_TYPE]);
     expect(s.calls.balances.map(x => x.coinType)).toEqual([USDC_TYPE, SUI_TYPE]);
@@ -125,11 +125,11 @@ describe('Sui payer transaction builder', () => {
     expect(s.calls.lists[0]).toMatchObject({ coinType: USDC_TYPE, limit: 32, owner });
   });
 
-  it('uses address balance for gas without attaching gas objects and signs a chain/expiry-bound nonce', async () => {
+  it('uses address balance gas with a signed chain/epoch-bound nonce and application quote expiry', async () => {
     const s = setup({ gasAddressBalance: '20000000', gasCoinBalance: '0' });
     const result = await build(s, 19);
     expect(result.data.gasData.payment).toEqual([]);
-    expect(result.data.expiration?.ValidDuring).toMatchObject({ chain: TESTNET_GENESIS, nonce: 19, maxTimestamp: String(Date.parse(s.input.expiresAt)) });
+    expect(result.data.expiration?.ValidDuring).toMatchObject({ chain: TESTNET_GENESIS, nonce: 19, maxTimestamp: null });
     expect(result.decoded.transfer.payer).toBe(s.payer);
   });
 

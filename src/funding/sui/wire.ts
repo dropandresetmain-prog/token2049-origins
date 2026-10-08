@@ -47,7 +47,7 @@ export function assertTransaction(bytes: Uint8Array, input: FundingRequirementIn
   if (validity) {
     if (validity.chain !== TESTNET_GENESIS || validity.minEpoch === null || validity.maxEpoch === null ||
         BigInt(validity.maxEpoch) < BigInt(validity.minEpoch) || BigInt(validity.maxEpoch) - BigInt(validity.minEpoch) > 1n ||
-        validity.minTimestamp !== null || validity.maxTimestamp !== String(Date.parse(input.expiresAt))) throw new Error('Sui validity window mismatch');
+        validity.minTimestamp !== null || (validity.maxTimestamp !== null && validity.maxTimestamp !== String(Date.parse(input.expiresAt)))) throw new Error('Sui validity window mismatch');
   } else if (d.expiration?.$kind !== 'Epoch' || !d.gasData.payment.length) throw new Error('Sui gas balance requires chain-bound replay protection');
   const redemption = d.commands[0]?.MoveCall;
   if (redemption) {
