@@ -1,0 +1,23 @@
+{
+  "status": "RECONCILED_NO_SPEND",
+  "at": "2026-10-08T08:09:42.091Z",
+  "purchaseId": "pur_01M4D82GQ7K2QPZR6GY8WP4D15",
+  "digest": "6HeWnXBNzXATV9BVv54pzPR5QCMnhKcNS4KVfHhRJC5H",
+  "signedExpiryMs": "1791446641000",
+  "independentCheckpoint": "392467883",
+  "checkpointTimestampMs": 1791446978213,
+  "transactionReadback": "not_found",
+  "simulationRejection": "Error checking transaction input objects: Feature is not supported: Timestamp-based transaction expiration is not yet supported",
+  "payerUsdcBaseUnits": "20000000",
+  "treasuryUsdcBaseUnits": "0",
+  "payerSuiMist": "1000000000",
+  "oldPurchase": {
+    "state": "expired",
+    "payment_state": "unknown",
+    "commerce_status": "not_started",
+    "merchant_payment_status": "none",
+    "provider_reference": null
+  },
+  "reservation": "released",
+  "originalManifestAndLedgerRetained": true
+}

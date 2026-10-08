@@ -119,7 +119,8 @@ try {
   for (let n = 0; n < 40; n++) {
     await gateway.core.recoverPendingFunding(id); await gateway.worker.tick();
     purchase = (await call('GET', `/v1/purchases/${id}`)).purchase;
-    if (['succeeded', 'failed', 'expired', 'requires_reauthorization', 'unresolved'].includes(purchase.state)) break;
+    // Unknown merchant readback follows scheduled retrieve() reconciliation; it must never start another checkout.
+    if (['succeeded', 'failed', 'expired', 'requires_reauthorization'].includes(purchase.state)) break;
     await new Promise(r => setTimeout(r, 1500));
   }
   const validated = PurchaseView.parse(purchase); evidence.purchase = { purchaseId: id, state: validated.state, paymentState: validated.paymentState,

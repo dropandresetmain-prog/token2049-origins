@@ -1,0 +1,86 @@
+{
+  "timestamp": "2026-10-08T08:12:59.017Z",
+  "schema": "sui_e2e_ebafd63a6fb249999eee811b77366560",
+  "status": "PASS",
+  "provider": "shopify",
+  "providerEnvironment": "test",
+  "settlementPolicy": {
+    "mode": "scaled_testnet",
+    "numerator": 1,
+    "denominator": 1000
+  },
+  "onChainPurchaseCommitment": false,
+  "onChainQuoteExpiry": false,
+  "quoteExpiryEnforcement": "payer_signed_application_binding_and_gateway_preflight",
+  "purchase": {
+    "purchaseId": "pur_01M4D90G7JCB4Z117QVTE97CB0",
+    "state": "succeeded",
+    "paymentState": "confirmed",
+    "merchantPaymentStatus": "simulated_paid",
+    "commerceStatus": "paid",
+    "providerReference": "gid://shopify/Order/18936481546297",
+    "receiptId": "rcp_01M4D958N1VR5W17K3RV8PEYTC",
+    "funding": [
+      {
+        "rail": "sui",
+        "network": "sui:testnet",
+        "asset": "0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC",
+        "amountBaseUnits": "17950",
+        "decimals": 6,
+        "transferReference": "H8uj3q9sgfuJVS7Hp1DsSDSSSBem1DQEg8rNqbnJY9iD",
+        "paymentState": "confirmed",
+        "purpose": "purchase_principal",
+        "verifiedAt": "2026-10-08T08:10:37.156Z",
+        "evidenceMode": "fresh_external"
+      }
+    ]
+  },
+  "chain": {
+    "digest": "H8uj3q9sgfuJVS7Hp1DsSDSSSBem1DQEg8rNqbnJY9iD",
+    "checkpoint": "392468134",
+    "timestampMs": 1791447032819,
+    "balanceChanges": [
+      {
+        "coinType": "0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC",
+        "address": "0x450e23b2c8d3d6b6103c878b67fa7687b09422ee2f874851b87f1dba87d05f56",
+        "amount": "17950"
+      },
+      {
+        "coinType": "0x0000000000000000000000000000000000000000000000000000000000000002::sui::SUI",
+        "address": "0x99eb4437d493fae3b8c43830e18b2710cd285f9cdd40264e0056d275eb86d20b",
+        "amount": "-2335624"
+      },
+      {
+        "coinType": "0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC",
+        "address": "0x99eb4437d493fae3b8c43830e18b2710cd285f9cdd40264e0056d275eb86d20b",
+        "amount": "-17950"
+      }
+    ],
+    "explorer": "https://suiscan.xyz/testnet/tx/H8uj3q9sgfuJVS7Hp1DsSDSSSBem1DQEg8rNqbnJY9iD"
+  },
+  "evidenceCount": 1,
+  "providerReadback": {
+    "orderId": "gid://shopify/Order/18936481546297",
+    "name": "#1005",
+    "test": true,
+    "financialStatus": "PAID",
+    "paidTestEvidence": true
+  },
+  "proofReadback": {
+    "purchaseId": "pur_01M4D90G7JCB4Z117QVTE97CB0",
+    "digest": "H8uj3q9sgfuJVS7Hp1DsSDSSSBem1DQEg8rNqbnJY9iD",
+    "receiptId": "rcp_01M4D958N1VR5W17K3RV8PEYTC"
+  },
+  "fundingJournalCount": 1,
+  "duplicate": {
+    "status": 202,
+    "digest": "H8uj3q9sgfuJVS7Hp1DsSDSSSBem1DQEg8rNqbnJY9iD",
+    "resumed": true
+  },
+  "afterRepeatBalances": {
+    "payerUsdcBaseUnits": "19982050",
+    "treasuryUsdcBaseUnits": "17950",
+    "payerSuiMist": "997664376",
+    "expectedSinglePayment": true
+  }
+}
