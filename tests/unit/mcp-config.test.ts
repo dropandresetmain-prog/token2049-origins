@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { createServer, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
-import { ConfigError, loadConfigFromEnv } from '../../src/channels/mcp/config.js';
+import { ConfigError, loadConfigFromEnv, secretsOf } from '../../src/channels/mcp/config.js';
 import { GatewayClient } from '../../src/channels/mcp/client.js';
 import { BridgeClient } from '../../src/channels/mcp/bridge.js';
 
@@ -59,6 +59,48 @@ describe('MCP credential destination configuration', () => {
     'http://localhost:8080?', 'http://localhost:8080#section', 'http://localhost:8080#', 'http://localhost:8080\\path',
   ])('refuses unsafe loopback bridge base %s', (url) => {
     expect(() => config('https://gateway.example', url)).toThrow(ConfigError);
+  });
+});
+
+describe('Sui local payer bridge configuration', () => {
+  const suiEnv = (extra: NodeJS.ProcessEnv = {}) => loadConfigFromEnv({
+    GATEWAY_URL: 'https://gateway.example',
+    GATEWAY_TOKEN_FILE: tokenFile,
+    ...extra,
+  });
+
+  it('loads the optional Sui bridge and exposes it through the generic bridge client list', () => {
+    const cfg = suiEnv({ SUI_PAYER_BRIDGE_URL: 'http://127.0.0.1:8791/', SUI_PAYER_BRIDGE_TOKEN_FILE: tokenFile });
+    expect(cfg.bridges?.sui).toEqual({ url: 'http://127.0.0.1:8791', token: TOKEN });
+    expect(BridgeClient.fromConfig(cfg).map((bridge) => bridge.rail)).toEqual(['sui']);
+    expect(secretsOf(cfg)).toContain(TOKEN);
+  });
+
+  it('requires the Sui URL and token file together', () => {
+    expect(() => suiEnv({ SUI_PAYER_BRIDGE_URL: 'http://127.0.0.1:8791' })).toThrow(ConfigError);
+    expect(() => suiEnv({ SUI_PAYER_BRIDGE_TOKEN_FILE: tokenFile })).toThrow(ConfigError);
+  });
+
+  it.each(['https://payer.example', 'http://192.168.1.5:8791'])('requires a loopback Sui bridge URL: %s', (url) => {
+    expect(() => suiEnv({ SUI_PAYER_BRIDGE_URL: url, SUI_PAYER_BRIDGE_TOKEN_FILE: tokenFile })).toThrow(ConfigError);
+  });
+
+  it('rejects a Sui URL that aliases the Cardano bridge after normalization', () => {
+    expect(() => suiEnv({
+      PAYER_BRIDGE_URL: 'http://127.0.0.1:8791',
+      PAYER_BRIDGE_TOKEN_FILE: tokenFile,
+      SUI_PAYER_BRIDGE_URL: 'http://127.0.0.1:8791/',
+      SUI_PAYER_BRIDGE_TOKEN_FILE: tokenFile,
+    })).toThrow(/cardano and sui payer bridges must use different URLs/i);
+  });
+
+  it('rejects a Sui URL that aliases the Solana bridge', () => {
+    expect(() => suiEnv({
+      SOLANA_PAYER_BRIDGE_URL: 'http://127.0.0.1:8792',
+      SOLANA_PAYER_BRIDGE_TOKEN_FILE: tokenFile,
+      SUI_PAYER_BRIDGE_URL: 'http://127.0.0.1:8792',
+      SUI_PAYER_BRIDGE_TOKEN_FILE: tokenFile,
+    })).toThrow(/solana and sui payer bridges must use different URLs/i);
   });
 });
 

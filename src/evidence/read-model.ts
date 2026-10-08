@@ -42,6 +42,7 @@ export function fundingEnvironment(network: string, mode: string): string {
   const n = network.toLowerCase();
   if (n.includes('preprod')) return 'cardano-preprod';
   if (n.includes('solana') && (n.includes('devnet') || n.includes('etwzsax'))) return 'solana-devnet';
+  if (n.includes('sui') && n.includes('testnet')) return 'sui-testnet';
   return network;
 }
 

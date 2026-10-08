@@ -22,14 +22,14 @@ export type Category = z.infer<typeof Category>;
 export const ProviderRoute = z.enum(['shopify', 'atlas', 'nuitee']);
 export type ProviderRoute = z.infer<typeof ProviderRoute>;
 
-export const FundingRail = z.enum(['cardano', 'solana', 'masumi']);
+export const FundingRail = z.enum(['cardano', 'solana', 'sui', 'masumi']);
 export type FundingRail = z.infer<typeof FundingRail>;
 
 export const Channel = z.enum(['http', 'mcp', 'chatgpt', 'sokosumi', 'console', 'test']);
 export type Channel = z.infer<typeof Channel>;
 
 /** Separate dimensions, never collapsed into one "mode" flag. */
-export const ChainEnvironment = z.enum(['cardano-preprod', 'solana-devnet', 'none']);
+export const ChainEnvironment = z.enum(['cardano-preprod', 'solana-devnet', 'sui-testnet', 'none']);
 export const ProviderEnvironment = z.enum(['sandbox', 'test', 'production', 'fixture']);
 export const EvidenceMode = z.enum(['fresh_external', 'replay', 'local_fixture']);
 export const LedgerMode = z.enum(['observed', 'simulated']);

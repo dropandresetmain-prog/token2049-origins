@@ -18,7 +18,7 @@ import { ConfigError, loadConfigFromEnv, secretsOf, type McpConfig, type PayerRa
 import { FundingSource, SOLANA_DEVNET_NETWORK, SOLANA_DEVNET_USDC_MINT, maskAddress } from '../../src/contracts/presentation.js';
 import type { FundingAdapter } from '../../src/contracts/ports.js';
 
-const TOKENS: Record<PayerRail, string> = { cardano: 'cardano-bridge-secret-0123456789', solana: 'solana-bridge-secret-0123456789' };
+const TOKENS: Record<PayerRail, string> = { cardano: 'cardano-bridge-secret-0123456789', solana: 'solana-bridge-secret-0123456789', sui: 'sui-bridge-secret-0123456789' };
 const SOLANA_PAYER = '9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin';
 const SOLANA_PAYEE = 'So11111111111111111111111111111111111111112';
 const CARDANO_PAYER = 'addr_test1qz2fxv2umyhttkxyxp8x0dlpdt3k6cwng5pxj3jhsydzer3jcu5d8ps7zex2k2xt3uqxgjqnnj83ws8lhrn648jjxtwq2ytjqp';

@@ -8,7 +8,10 @@ import { NETWORK, commitment, readHeader, assertTransfer, decodeTransaction } fr
 import { SolanaRpc, type ChainTransaction } from './rpc.js';
 export interface SolanaAdapterOptions { clock?: Clock; fetchImpl?: typeof fetch; facilitator?: Pick<HTTPFacilitatorClient,'verify'|'settle'|'getSupported'>; }
 const invalid = (reason: string, settlementAttempted?: boolean): Extract<FundingVerification,{ok:false}> => ({ ok: false, code: 'payment_invalid', reason, ...(settlementAttempted === undefined ? {} : { settlementAttempted }) });
-export function createSolanaFundingAdapter(env: NodeJS.ProcessEnv, opts: SolanaAdapterOptions = {}): FundingAdapter & Required<Pick<FundingAdapter, 'prepare' | 'recover'>> {
+export function createSolanaFundingAdapter(env: NodeJS.ProcessEnv, opts: SolanaAdapterOptions = {}): Omit<FundingAdapter, 'prepare' | 'recover'> & {
+  prepare(paymentHeaderValue: string, input: FundingRequirementInput): FundingPreparation;
+  recover(transferReference: string, input: FundingRequirementInput): Promise<FundingVerification>;
+} {
   const parsed = parseSolanaConfig(env), clock = opts.clock ?? systemClock;
   const cfg = parsed.ok ? parsed.config : null;
   const rpc = cfg ? new SolanaRpc(cfg.rpcUrl, opts.fetchImpl) : null;
