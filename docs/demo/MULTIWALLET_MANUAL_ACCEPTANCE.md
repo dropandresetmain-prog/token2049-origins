@@ -1,6 +1,6 @@
 # Multiwallet owner acceptance
 
-**REPAIR IN PROGRESS.** The owner-authorized candidate has local verification; hosted readiness is pending. All nine live rows are NOT RUN on the repaired candidate.
+**REPAIR IN PROGRESS.** The replacement gateway is deployed; cold payer retest and activation remain pending. All nine live rows are NOT RUN on the repaired candidate.
 
 Use the existing `https://token2049-origins.onrender.com/mcp` with its existing OAuth implementation. Consult [current official connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt); account/workspace controls and UI wording may differ. Copy the exact redirect URI from the host's MCP/OAuth setup interface into the allowed configuration when needed. Retrieve the existing access code through its protected owner method; do not paste it into chat, logs or proof artifacts. No new OAuth provider is required. Console: [Capsule](https://token2049-origins.onrender.com/console/).
 
@@ -32,7 +32,7 @@ Say explicitly: “I approve quote [ID/digest], total at most [amount/currency],
 
 The existing testnet scale is **1:1000**, not exchange-rate or production-money settlement. Keep per-rail policies separate:
 
-| Source | Owner-authorized target policy; retained exposure (hosted amendment verification pending) |
+| Source | Verified hosted policy; retained exposure |
 |---|---|
 | Cardano Preprod demo wallet | Per-payment/daily/cumulative 5,100,000 token base units; fee cap 2,500,000,000 lovelace; ADA output cap 10,000,000,000 lovelace. Retained 5 entries/94,820 committed; cumulative headroom 5,005,180. Balance/fee availability is not established by those counters. |
 | Solana Devnet demo wallet | 5,100,000 base units per-payment/daily/cumulative; USD5,100 commercial cap; shared sponsor fee cap 100,000 lamports. Retained 7 entries/2 blocked,94,220 committed; cumulative headroom 5,005,780 and sponsor headroom 74,998 lamports. Read-only finalized balance check passed at 19:27 UTC 10 Oct; balances can change. Payer token funds and sponsor fees are separate. |

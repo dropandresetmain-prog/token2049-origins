@@ -13,10 +13,10 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Remote: https://github.com/dropandresetmain-prog/token2049-origins.git.
 - Main verified unchanged: 7c09b37eaaeda2bf3eec94fc1e3456118962f636.
 - Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
-- Both deployed services: 3945f9c52cf76e1960569d53416361bcd42de175, pushed; normal signing/grants currently disabled pending cold/activation gate.
-- Canonical Git source fingerprint: addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46 (sorted tracked path NUL blob bytes NUL).
+- Gateway deployed 966b5a486ff821bca0a7a280d59f15a8c77cdb74; retained payer 3945f9c52cf76e1960569d53416361bcd42de175, pushed; signing/grants disabled pending cold retest/activation.
+- Canonical gateway Git fingerprint: d836493de1f102222f5e3a9381e8dcd91bcd1bd7e8c8800e22b6b301f066f7ed; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
 - Later documentation-only HEAD: resolve git rev-parse HEAD. It is not another deployed artifact.
-- Repair gateway: dep-db5avnvlot8c73eat9j0; normal disabled payer: dep-db5b0o5ckfvc739j3l60. Activation pending.
+- Replacement gateway dep-db5bd2qd0e5s73es5ejg live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation pending.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
@@ -40,7 +40,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
 - [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
 - [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: repair3945f9c live disabled. Actual978.981s idle check restarted gateway but payer GET429 failed safely before claim. Follow-up GET-only429/Retry-After90s readiness correction:85affectedtests/typecheck/build PASS; independent diff review no blocker. Next: pin/deploy gateway-only replacement; payer3945andinstance retained; repeat real cold gate before activation.
+- Current checkpoint: repair3945f9c live disabled. Actual978.981s idle check restarted gateway but payer GET429 failed safely before claim. Follow-up GET-only429/Retry-After90s readiness correction:85affectedtests/typecheck/build PASS; independent diff review no blocker. Gateway966b5a4 live; OAuth16/44-table history PASS. Payer3945andinstance retained. Next cold payer retest after22:16:02UTC, then gated activation.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
