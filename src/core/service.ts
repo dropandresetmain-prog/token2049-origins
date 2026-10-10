@@ -67,6 +67,14 @@ export type FundResult =
 const READY_FOR_USE = new Set(['CONFIGURED_UNVERIFIED', 'EXTERNAL_CHECK_PASSED', 'LOCAL_TESTS_ONLY']);
 
 export class CommerceCore {
+  private readonly workListeners = new Set<() => void>();
+  private notifyWorkAfterCommit(): void {
+    this.d.db.afterCommit(() => { for (const listener of this.workListeners) listener(); });
+  }
+  onWorkCommitted(listener: () => void): () => void {
+    this.workListeners.add(listener);
+    return () => { this.workListeners.delete(listener); };
+  }
   /** Purchases with a payment verification/settlement in flight (single gateway process). */
   private readonly fundingInFlight = new Set<string>();
 
@@ -512,6 +520,7 @@ export class CommerceCore {
         JSON.stringify({ purchaseId }),
         nowIso,
       );
+      this.notifyWorkAfterCommit(); // Schedule the new reservation expiry even before funding creates a job.
       return { status: 201, purchase: (await this.viewOf((await getPurchaseRow(this.d.db, purchaseId))!)) };
     });
   }
@@ -847,7 +856,7 @@ export class CommerceCore {
   }
 
   async enqueueJob(kind: string, purchaseId: string, dedupeKey: string, runAfterIso: string): Promise<void> {
-    await this.d.db.run(
+    const inserted = await this.d.db.run(
       `INSERT INTO jobs(id, kind, purchase_id, dedupe_key, status, run_after, attempts, created_at, updated_at)
        VALUES ($1,$2,$3,$4, 'pending', $5, 0, $6, $7) ON CONFLICT(dedupe_key) DO NOTHING`,
       newId('job'),
@@ -858,6 +867,7 @@ export class CommerceCore {
       runAfterIso,
       runAfterIso,
     );
+    if (inserted.changes) this.notifyWorkAfterCommit();
   }
 
   async expirePurchase(purchaseId: string, reason: string): Promise<void> {
