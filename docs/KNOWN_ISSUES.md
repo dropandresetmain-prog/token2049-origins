@@ -4,11 +4,12 @@
 
 | Classification | Finding / recommended action | Risk of deferral / blocker |
 |---|---|---|
-| Act Now | Existing PostgreSQL 18 expires 5 Nov 2026 at 14:55:54 Singapore; establish approved internal consistent backup/export and restore evidence. No managed Free backup. | Financial history may become inaccessible; backup method/status is unresolved before cutover. |
+| Act Now | Existing PostgreSQL 18 expires 5 Nov 2026 at 14:55:54 Singapore; establish approved internal consistent backup/export and restore evidence. No managed Free backup. | Financial history may become inaccessible; Render export list is empty, external CLI access is denied, and Free has no shell/jobs; a permitted internal executor and restore proof are required before mutation/replacement. |
 | Act Now | Stop old commerce/signing processes and revoke old credentials before granting consolidated authority. Legacy images do not obey new database grants. | Concurrent signers/divergent history; mandatory owner-approved cutover gate. |
 | Investigate Now | Measure exact candidate on Render Free, selected-rail initialization, memory and host behavior. | Local tests/builds cannot establish hosted readiness; pending approved deployment. |
-| Investigate Now | Verify remaining workspace hours/build/bandwidth and spend settings; same quota serves unrelated projects. | Cannot certify no-spend capacity from published limits; account evidence pending. |
+| Investigate Now | Verify remaining workspace hours/build/bandwidth and spend settings; same quota serves unrelated projects. | Cannot certify no-spend capacity from published limits; Documented CLI/API do not expose these balances; browser helper failed to initialize, so owner dashboard evidence is pending. |
 | Investigate Now | Verify final Solana exposure and complete Sui migration/old receipt access from protected retained history. | Lost caps/proof/recovery authority; final import and history reconciliation gated. |
+| Investigate Now | Sui partial/truncated permanent retirement locks remain fail-closed for manual reconciliation; never automatically repair/remove them. | Interrupted retirement may block import/activation; existing signer retirement remains pending backup gate. |
 | Park for Later | Consumer wallet onboarding, advanced orchestration and infrastructure replacement. | Outside current demo scope; synthetic isolation covers ownership contracts. |
 | Ignore / Accept Risk | Free service sleep/restart and cold-start latency. | Accepted only with durable idempotency/readback; no warm-up requirement. |
 

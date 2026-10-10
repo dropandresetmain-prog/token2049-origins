@@ -3,6 +3,7 @@
   "include": [
     "clients/multiwallet",
     "scripts/sui/import-history.ts",
-    "scripts/multiwallet"
+    "scripts/multiwallet",
+    "scripts/sui/retire-history.ts"
   ]
 }

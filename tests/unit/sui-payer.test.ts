@@ -1,3 +1,5 @@
+import { createHash } from 'node:crypto';
+import { readFileSync } from 'node:fs';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
@@ -5,7 +7,7 @@ import { join } from 'node:path';
 import type { FundingRequirementInput } from '../../src/contracts/ports.js';
 import { bindingMessage, encodeCandidate } from '../../src/funding/sui/wire.js';
 import { SUI_TYPE, USDC_TYPE } from '../../src/funding/sui/config.js';
-import { SuiLedger, type SuiLedgerEntry } from '../../clients/sui/ledger.js';
+import { SuiLedger, retireSuiFileLedger, type SuiLedgerEntry } from '../../clients/sui/ledger.js';
 import { SolanaLedger } from '../../clients/solana/ledger.js';
 import { loadSuiPayerConfig } from '../../clients/sui/config.js';
 import { paySuiPurchase } from '../../clients/sui/pay.js';
@@ -141,6 +143,15 @@ afterEach(() => {
 });
 
 describe('Sui payer', () => {
+  it('refuses a retired file signer before challenge, build, or gateway submission', async () => {
+    const s = await setup();
+    const hash = createHash('sha256').update(readFileSync(s.ledger.path)).digest('hex');
+    retireSuiFileLedger(s.ledger, hash);
+    await expect(s.pay()).rejects.toThrow(/retired/);
+    expect(s.fetchImpl).not.toHaveBeenCalled();
+    expect(s.build).not.toHaveBeenCalled();
+    expect(s.ledger.readForImport()).toEqual([]);
+  });
   it('signs once, retains the same real signed candidate after response loss, and resumes by digest', async () => {
     const s = await setup();
     s.loseNextSubmission();

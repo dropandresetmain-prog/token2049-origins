@@ -162,5 +162,12 @@
     "actual consolidated Render Free signer memory/initialization and outbound compatibility",
     "new live merchant/chain acceptance"
   ],
-  "manualLiveRows": "docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md"
+  "manualLiveRows": "docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md",
+  "preCutoverGates": {
+    "authorizationCheckpoint": "968807b04952a0c7d881b8f01a681daa8e7cb0de",
+    "backup": "protected authoritative export with integrity and isolated PG18 restore BEFORE authoritative mutation or existing-service replacement",
+    "quotas": "actual remaining workspace hours/build/bandwidth and billing/spend settings; published Free limits are insufficient",
+    "suiRetirement": "verified permanent owner/hash-bound .retired AND .lock; quiesce all old signers; partial or conflicting fences require manual reconciliation",
+    "status": "blocked pending permitted internal export executor and account quota evidence"
+  }
 }

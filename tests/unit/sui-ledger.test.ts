@@ -1,9 +1,10 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { createHash } from 'node:crypto';
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { NETWORK, USDC_TYPE } from '../../src/funding/sui/config.js';
-import { SuiLedger, type SuiLedgerEntry, type SuiSpendPolicy } from '../../clients/sui/ledger.js';
+import { SuiLedger, assertSuiFileRetired, retireSuiFileLedger, type SuiLedgerEntry, type SuiSpendPolicy } from '../../clients/sui/ledger.js';
 
 const OWNER = '0x' + 'a'.repeat(64);
 const NOW = new Date('2026-10-08T00:00:00.000Z');
@@ -138,5 +139,78 @@ describe('Sui durable payer ledger', () => {
     const { ledger } = setup();
     const stored = JSON.parse(readFileSync(ledger.path, 'utf8'));
     expect(stored).toMatchObject({ owner: OWNER, network: NETWORK, asset: USDC_TYPE });
+  });
+});
+
+const historyHash = (ledger: SuiLedger) => createHash('sha256').update(readFileSync(ledger.path)).digest('hex');
+
+describe('permanent Sui file signer retirement', () => {
+  it('preserves exact reservations, signed candidates and gas while refusing every ordinary payment access after restart', async () => {
+    const {ledger} = setup();
+    await store(ledger, entry('reserved'));
+    await store(ledger, entry('signed', {status:'signed',header:'opaque-candidate',digest:'digest'}));
+    const original = readFileSync(ledger.path), hash = historyHash(ledger);
+    retireSuiFileLedger(ledger, hash);
+    const restart = new SuiLedger(ledger.path, OWNER), signing = vi.fn();
+    expect(() => restart.read()).toThrow(/retired/);
+    expect(() => restart.initialize()).toThrow(/retired/);
+    expect(() => restart.upsert(entry('new'))).toThrow(/retired/);
+    expect(() => restart.assertCaps(1n,1n,policy,NOW)).toThrow(/retired/);
+    await expect(restart.exclusive(signing)).rejects.toThrow(/retired/);
+    expect(signing).not.toHaveBeenCalled();
+    expect(restart.readForImport()).toHaveLength(2);
+    expect(readFileSync(ledger.path)).toEqual(original);
+    assertSuiFileRetired(restart, hash);
+    retireSuiFileLedger(restart, hash); // Idempotent for precisely the same history.
+    expect(existsSync(ledger.path+'.lock')).toBe(true);
+  });
+
+  it('fails closed even on an invalid retirement marker and refuses to reinterpret it', async () => {
+    const {ledger} = setup(), hash = historyHash(ledger);
+    writeFileSync(ledger.path+'.retired','broken',{mode:0o600});
+    expect(() => ledger.read()).toThrow(/retired/);
+    await expect(ledger.exclusive(async()=>{})).rejects.toThrow(/retired/);
+    expect(() => retireSuiFileLedger(ledger,hash)).toThrow();
+    expect(ledger.readForImport()).toEqual([]);
+  });
+
+  it('refuses active/stale signer locks and changed history without replacing files', async () => {
+    const {ledger} = setup(), hash = historyHash(ledger);
+    await ledger.exclusive(async () => {
+      expect(() => retireSuiFileLedger(ledger, hash)).toThrow(/fence conflict/);
+      expect(existsSync(ledger.path+'.retired')).toBe(false);
+    });
+    expect(() => retireSuiFileLedger(ledger,'0'.repeat(64))).toThrow(/hash mismatch/);
+    expect(existsSync(ledger.path+'.lock')).toBe(false);
+    writeFileSync(ledger.path+'.lock','stale',{mode:0o600});
+    expect(() => retireSuiFileLedger(ledger,hash)).toThrow(/fence conflict/);
+    expect(readFileSync(ledger.path+'.lock','utf8')).toBe('stale');
+  });
+
+  it('resumes interrupted retirement only from its matching durable fence and requires both fences for import', async () => {
+    const {ledger} = setup(), hash = historyHash(ledger);
+    const marker=JSON.stringify({version:1,owner:OWNER,sourceSha256:hash});
+    writeFileSync(ledger.path+'.lock',marker,{mode:0o600});
+    expect(() => assertSuiFileRetired(ledger,hash)).toThrow();
+    const signing=vi.fn();
+    await expect(ledger.exclusive(signing)).rejects.toThrow(/locked/);
+    expect(signing).not.toHaveBeenCalled();
+    retireSuiFileLedger(ledger,hash);
+    assertSuiFileRetired(ledger,hash);
+    expect(() => assertSuiFileRetired(ledger,'0'.repeat(64))).toThrow(/hash mismatch/);
+  });
+});
+
+describe('interrupted Sui retirement fence writes',()=>{
+  it('keeps a partial fence closed without repairing it or modifying the history',async()=>{
+    const {ledger}=setup(),original=readFileSync(ledger.path),hash=historyHash(ledger);
+    writeFileSync(ledger.path+'.lock','{"version":1,',{mode:0o600});
+    const signing=vi.fn();
+    await expect(ledger.exclusive(signing)).rejects.toThrow(/locked/);
+    expect(signing).not.toHaveBeenCalled();
+    expect(()=>retireSuiFileLedger(ledger,hash)).toThrow(/fence conflict/);
+    expect(()=>assertSuiFileRetired(ledger,hash)).toThrow();
+    expect(readFileSync(ledger.path)).toEqual(original);
+    expect(readFileSync(ledger.path+'.lock','utf8')).toBe('{"version":1,');
   });
 });

@@ -1,4 +1,5 @@
-import { closeSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
+import { createHash } from 'node:crypto';
+import { closeSync, lstatSync, existsSync, fsyncSync, openSync, readFileSync, renameSync, unlinkSync, writeFileSync } from 'node:fs';
 import { dirname, isAbsolute } from 'node:path';
 import { z } from 'zod';
 import { NETWORK, USDC_TYPE } from '../../src/funding/sui/config.js';
@@ -94,7 +95,18 @@ export class SuiLedger {
     return Snapshot.parse({ version: 1, owner: this.owner, network: NETWORK, asset: USDC_TYPE, entries });
   }
 
+  private assertNotRetired(): void {
+    // Any marker, including a malformed file or dangling link, removes local signing authority.
+    if (pathPresent(this.path + '.retired')) throw new Error('Sui local signer permanently retired; use canonical PostgreSQL history');
+  }
+
   read(): SuiLedgerEntry[] {
+    this.assertNotRetired();
+    return this.readForImport();
+  }
+
+  /** Read-only identity/permission validation for approved import; never used by payment operations. */
+  readForImport(): SuiLedgerEntry[] {
     if (!existsSync(this.path)) throw new Error('Sui ledger is missing; operator reconciliation required before signing');
     try {
       this.protectedAccess();
@@ -108,6 +120,8 @@ export class SuiLedger {
 
   /** Initialize only a new ledger. Existing history is never replaced or reset. */
   initialize(): void {
+    this.assertNotRetired();
+    if (pathPresent(this.path + '.lock')) throw new Error('Sui ledger locked; refusing initialization');
     if (existsSync(this.path)) throw new Error('Sui ledger already exists; refusing to reset history');
     SolanaLedger.protectDirectory(dirname(this.path));
     const fd = openSync(this.path, 'wx', 0o600);
@@ -153,6 +167,7 @@ export class SuiLedger {
 
   /** Lock creation is exclusive. A stale lock is left for operator reconciliation, never removed automatically. */
   async exclusive<T>(fn: () => Promise<T>): Promise<T> {
+    this.assertNotRetired();
     let fd: number;
     try {
       fd = openSync(`${this.path}.lock`, 'wx', 0o600);
@@ -171,4 +186,53 @@ export class SuiLedger {
   assertCaps(amount: bigint, gasBudget: bigint, policy: SuiSpendPolicy, now: Date): void {
     assertSuiCaps(this.read(), amount, gasBudget, policy, now);
   }
+}
+
+const Retirement = z.object({ version: z.literal(1), owner: z.string().min(1), sourceSha256: z.string().regex(/^[a-f0-9]{64}$/) }).strict();
+
+function pathPresent(path: string): boolean {
+  try { lstatSync(path); return true; }
+  catch (error) { if ((error as NodeJS.ErrnoException).code === 'ENOENT') return false; throw error; }
+}
+
+function pinnedRetirement(ledger: SuiLedger, expectedSha256: string): string {
+  ledger.readForImport();
+  const hash = createHash('sha256').update(readFileSync(ledger.path)).digest('hex');
+  if (hash !== expectedSha256) throw new Error('Sui retirement history hash mismatch');
+  return JSON.stringify(Retirement.parse({ version: 1, owner: ledger.owner, sourceSha256: hash }));
+}
+
+function assertFenceFile(path: string, marker: string): void {
+  new SolanaLedger(path, '').assertProtected();
+  if (readFileSync(path, 'utf8') !== marker) throw new Error('Sui retirement fence conflict; operator reconciliation required');
+}
+
+/** Verify both fences without modifying history or permitting local signing. */
+export function assertSuiFileRetired(ledger: SuiLedger, expectedSha256: string): void {
+  const marker = pinnedRetirement(ledger, expectedSha256);
+  assertFenceFile(ledger.path + '.retired', marker);
+  assertFenceFile(ledger.path + '.lock', marker);
+}
+
+/** Operator-only cutover step, after backup and quiescence. It never resets history or removes a lock. */
+export function retireSuiFileLedger(ledger: SuiLedger, expectedSha256: string): void {
+  const marker = pinnedRetirement(ledger, expectedSha256);
+  if (pathPresent(ledger.path + '.retired')) assertFenceFile(ledger.path + '.retired', marker);
+  const lockPath = ledger.path + '.lock';
+  if (pathPresent(lockPath)) {
+    // An ordinary/stale signer lock is ambiguous: never reinterpret or delete it.
+    assertFenceFile(lockPath, marker);
+  } else {
+    const fd = openSync(lockPath, 'wx', 0o600);
+    try { writeFileSync(fd, marker); fsyncSync(fd); } finally { closeSync(fd); }
+    syncDirectory(dirname(ledger.path));
+  }
+  // All earlier file signers create this lock exclusively. Keep it permanently, including on failure.
+  if (pinnedRetirement(ledger, expectedSha256) !== marker) throw new Error('Sui history changed during retirement');
+  if (!pathPresent(ledger.path + '.retired')) {
+    const fd = openSync(ledger.path + '.retired', 'wx', 0o600);
+    try { writeFileSync(fd, marker); fsyncSync(fd); } finally { closeSync(fd); }
+    syncDirectory(dirname(ledger.path));
+  }
+  assertSuiFileRetired(ledger, expectedSha256);
 }
