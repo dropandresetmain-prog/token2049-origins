@@ -1,61 +1,72 @@
-# Public judge console release checkpoint
+# Capsule consolidated multi-wallet payer
 
-## Authority and scope
-- Branch: release/public-judge-console; isolated checkout C:/Dev/t2o-wt-judge-release.
-- Current origin/main and all three live services: 743e0475a3f02b8263aea4e4b73b1b6eae7531e1.
-- Existing tag token2049-submission resolves to that prior freeze; preserve it.
-- Founder reopened freeze to remove the website password and accepted public synthetic/demo observations.
-- Highlight in README: judges ask Min Htet directly for the MCP OAuth access code.
-- No private submission access field assumed. No credential is published or decrypted for this release.
-- Shared checkout and completed activation worktree remain untouched.
+Updated: 10 October 2026 (Singapore). Re-read before major phases and completion.
 
-## Lane convergence
-- Final Activation completed and included: a02216ccb69e78e6800a45c81cd349021fd834ef.
-- Atlas test-balance setting approved in the other chat and deployed; retain it.
-- Hosted Atlas/Nuitee executable dual-rail quotes PASS; historical actual E2Es retained.
-- Extra Solana/Nuitee recording cancelled by founder; no new payment/order for cleanup.
-- Submission narrative source 835de08c709f5802d63ab21d4e62575f47baa406 included in main.
-- CDP proof, CRE simulation/fresh Koios, Cardano/Shopify, OCBC and historical evidence retained.
-- Sokosumi further work skipped by explicit founder decision.
+## Objective and corrected architecture
+- Keep Render gateway, hosted /mcp OAuth, console, provider/browser implementations.
+- Keep Render PostgreSQL 18 token2049-origins-db authoritative; no network exposure changes.
+- Consolidate Cardano Preprod, Solana Devnet and Sui Testnet into one Render Free payer.
+- Authenticated customer -> logical payer profile -> multiple registered wallet sources.
+- Preserve known-good deployed demo; do not promote main or replace endpoints.
+- Superseding owner correction removes Neon/Cloudflare migration and no-sleep requirement.
 
-## Access behavior
-- Explicit MCP_PUBLIC_CONSOLE_READ_ONLY=true publishes fixed cus_HOSTEDMCPDEMO reads.
-- Anonymous GET: list, owned status/detail/proof, Treasury and bank observations only.
-- Read scopes exactly purchases:read, evidence:read, operator:read; no caller-selected ownership.
-- Purchase/evidence redaction retained; other customers inaccessible; invalid bearer rejected.
-- All mutations, OAuth, quote APIs, payment/signing and payer endpoints retain authentication.
-- Browser connects without a credential; optional quote reads skipped; live polling retained.
-- Public Treasury aggregates/masked sandbox bank values approved by founder as demo data.
-- Existing protected-console acceptance artifact retained as historical evidence.
+## Source
+- Remote: https://github.com/dropandresetmain-prog/token2049-origins.git
+- Branch: codex/capsule-on-demand-multiwallet
+- Worktree: C:/Dev/token2049-origins-on-demand
+- Base/initial HEAD: 7c09b37eaaeda2bf3eec94fc1e3456118962f636 (fetched origin/main).
+- Sui ref: origin/feat/sui-purchase-funding @ bae2f623dccc47d7604a48919c969e2229bce340.
+- Sui merge base equals base; three commits ahead. Overlap review pending.
+- Previous tracked ledger preserved: PUBLIC_JUDGE_CHECKPOINT.md.
+- Shared checkout codex/console-source-store and its uncommitted work untouched.
+- No cloud resource, migration code or secret relocation from original architecture started.
+- Abandoned read-only Neon lookup required reauthentication; no mutation occurred.
 
-## Protected runtime
-- Solana payer 7 rows/94220 committed units; sponsor 6 rows/25002 fee lamports.
-- Two historical 1050-unit candidates remain unresolved, permanently blocked, exposure retained.
-- Source identities/import markers/caps/retired signer locks must stay unchanged.
-- Active Solana incomplete=0; Cardano signing/signed=0 at prior freeze.
-- Cardano 5 accepted rows/94820 committed units; preserved caps/history.
-- CDP official CLI Server Wallet/Base Sepolia operational treasury; not exact adapter proof.
-- OCBC read-only fiat observation; internal ledger/manual reconciliation; no automatic conversion/rebalancing.
+## Fixed constraints
+- One payer runtime, multiple users/wallets; no new service per chain or wallet.
+- No key in gateway, arbitrary signing API, caller-selected customer or payer URL.
+- Wallet list reads registrations; only selected source performs live readiness.
+- Approval binds customer, quote digest, funding option and source; never fallback.
+- Preserve signed candidates, reservations, caps, sponsor roles and unknown outcomes.
+- Additive migrations only; applied historical migrations immutable.
+- No resets, replacement wallets, generic orchestration or new infrastructure provider.
+- Sandbox merchants/testnets/notional scale and independent confirmation remain explicit.
 
-## Validation
-- Backend 1219 tests/76 files PASS; console 88 tests/9 files PASS.
-- Backend and console typechecks PASS; console production build PASS.
-- Current public auth tests verify read allowlist, ownership, default-off, invalid bearer and mutation denial.
-- Full gateway build PASS; 117 important links PASS; 440 files/270 history blobs scanned, no findings.
-- Fresh anonymous deployed browser: Purchases/Proof/Receipt/Treasury/Connections PASS; no password/bearer; all GET.
-- Candidate gateway 93841120401c215b9f68cd1f8f7436c2586ba7f7 LIVE, dep-db36pfrbc2fs73cq43g0.
-- Acceptance: docs/evidence/release/public-console-20261008.json; no new payment/order.
+## Authorized work and gates
+- Inspect, code, fixtures, disposable local DB tests, exact-file commits and branch pushes.
+- Read-only existing deployment/account metadata and public state; never print secrets.
+- Owner approval required: provider writes, broadcast, key relocation, canonical DB mutation,
+  signing authority/fencing changes, main/deployed release replacement or paid resource.
+- Old services remain authoritative until approved cutover; no simultaneous old/new signer.
+- Owner performs nine live E2Es after hosted readiness; none authorized here.
 
-## Deployment and freeze
-- GitHub PUBLIC/default main; current frozen services main/auto-deploy off.
-- Release is sole Render deployment owner; gateway adds only public read flag.
-- Candidate code accepted; final promotion includes only acceptance JSON and checkpoint in addition to tested code.
-- Exact final main SHA is required on all three services; final deployment remains next.
-- Preserve previous tag; create token2049-submission-public-console only after verified final deployment.
+## Required outcomes / phases
+- [x] Fetch/verify main, Sui ref, remote and isolated branch.
+- [x] Reconcile corrected scope and preserve previous ledger.
+- [ ] Inspect gateway/MCP/auth, payer ledgers, provider contracts and hosted evidence.
+- [ ] Verify Render Free runtime/account metadata and DB expiry/backup read-only.
+- [ ] Integrate reviewed Sui lane; retain historical evidence/protocol restrictions.
+- [ ] Freeze ownership/source/approval contracts and additive DB design.
+- [ ] Implement consolidated selected-source dispatch and persistent Sui history/import.
+- [ ] Integrate existing MCP/core/console with explicit wallet selection.
+- [ ] Focused fixtures, concurrency/recovery/native PostgreSQL verification.
+- [ ] One integrated regression gate and fresh independent review; fix blockers.
+- [ ] Inspectable default-deny cutover manifest, retention advice and manual nine-row sheet.
+- [ ] Commit/push verified candidate; consolidated owner authorization packet.
 
-## Next action
-- Re-read before deployment, main promotion and completion.
-- Run build/scans, commit exact files, push candidate and deploy gateway exact candidate SHA.
-- Verify fresh anonymous Purchases/Proof/Receipt/Treasury/Connections and GET-only requests.
-- Promote tested candidate safely; deploy exact main SHA to all services and verify protected state.
-- Freeze and provide README file to Min Htet. No new orders/payments.
+## Checkpoint and next action
+- No application code changes yet. Isolated worktree clean before ledger preservation.
+- Next: inspect existing contracts/ledgers and read-only Render CLI access.
+- Ledger/current detailed record will link evidence as it is collected.
+
+## Blockers and evidence boundaries
+- Recorded DB expiry 5 Nov 2026 14:55 Singapore; actual metadata/backup not verified yet.
+- Real Render Free candidate initialization/memory acceptance pending; local tests cannot prove it.
+- Existing protected wallets/history not copied; hosted signing/import require approval.
+- Existing historical evidence is not new candidate hosted/live acceptance.
+- No live purchases/provider preflight writes performed.
+
+## Evidence
+- docs/work/PUBLIC_JUDGE_CHECKPOINT.md: prior tracked release history.
+- docs/ENVIRONMENT.md: recorded runtime/DB facts (to verify).
+- docs/work/SUI_FUNDING.md on Sui lane: integration review pending.
