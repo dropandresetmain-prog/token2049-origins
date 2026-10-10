@@ -51,6 +51,11 @@ export class Worker {
   private readonly workerId = newId('wrk');
   private timer: NodeJS.Timeout | null = null;
   private running = false;
+  private started = false;
+  private pumping = false;
+  private wakePending = false;
+  private idleIntervalMs = 30 * 60 * 1000;
+  private unsubscribe: (() => void) | undefined;
 
   constructor(private readonly core: CommerceCore, private readonly log: (line: Record<string, unknown>) => void = () => undefined) {}
 
@@ -69,15 +74,63 @@ export class Worker {
     return iso(this.core.deps.clock.now());
   }
 
-  async start(intervalMs = 1000): Promise<void> {
+  async start(intervalMs = 30 * 60 * 1000): Promise<void> {
+    if (this.started) throw new Error('worker already started');
+    if (!Number.isFinite(intervalMs) || intervalMs < 100) throw new Error('invalid worker idle interval');
     await this.recoverLeases();
     await this.recoverOrphans();
-    this.timer = setInterval(() => void this.tick().catch(e => this.logFailure(e, 'tick')), intervalMs);
+    this.idleIntervalMs = intervalMs;
+    this.started = true;
+    this.unsubscribe = this.core.onWorkCommitted(() => this.wake());
+    this.wake();
   }
 
   stop(): void {
-    if (this.timer) clearInterval(this.timer);
+    this.started = false;
+    this.unsubscribe?.();
+    this.unsubscribe = undefined;
+    if (this.timer) clearTimeout(this.timer);
     this.timer = null;
+  }
+
+  /** Durable local inserts wake immediately; other processes and missed notifications use the bounded fallback. */
+  private wake(): void {
+    if (!this.started) return;
+    this.wakePending = true;
+    if (this.pumping) return;
+    this.schedule(0);
+  }
+
+  private schedule(delayMs: number): void {
+    if (!this.started) return;
+    if (this.timer) clearTimeout(this.timer);
+    this.timer = setTimeout(() => { this.timer = null; void this.pump(); }, delayMs);
+  }
+
+  private async pump(): Promise<void> {
+    if (!this.started || this.pumping) return;
+    this.pumping = true;
+    this.wakePending = false;
+    let delay = this.idleIntervalMs;
+    try {
+      await this.tick();
+      // Delayed reconciliation, crashed leases and quote expiry retain their own deadlines.
+      const next = await this.db.get<{ due: string | null }>(
+        `SELECT MIN(due) AS due FROM (
+          SELECT run_after AS due FROM jobs WHERE status='pending'
+          UNION ALL SELECT COALESCE(lease_until,$1) FROM jobs WHERE status='claimed'
+          UNION ALL SELECT r.expires_at FROM reservations r JOIN purchases p ON p.id=r.purchase_id
+            WHERE r.status='active' AND p.state='awaiting_funding'
+        ) deadlines`, this.now());
+      if (next?.due) delay = Math.min(delay, Math.max(100, Date.parse(next.due) - this.core.deps.clock.now().getTime()));
+    } catch (error) {
+      this.logFailure(error, 'tick');
+      // Reconnect promptly after transient database failures without tight failure loops.
+      delay = Math.min(this.idleIntervalMs, 30_000);
+    } finally {
+      this.pumping = false;
+      this.schedule(this.wakePending ? 0 : delay);
+    }
   }
 
   /** Expired leases (crash mid-job) go back to pending. Execute jobs then see the started attempt and reconcile. */

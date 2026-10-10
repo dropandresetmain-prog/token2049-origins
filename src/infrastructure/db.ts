@@ -11,7 +11,7 @@ const CORE_WRITE_LOCK = 2049001;
 export class Db {
   readonly connectionName = `origins_${process.pid}_${randomUUID()}`;
   private readonly pool: Pool;
-  private readonly context = new AsyncLocalStorage<{ client: PoolClient; depth: number }>();
+  private readonly context = new AsyncLocalStorage<{ client: PoolClient; depth: number; committed?: Array<() => void> }>();
   private closing: Promise<void> | undefined;
 
   constructor(databaseUrl: string, schema = 'public') {
@@ -45,6 +45,18 @@ export class Db {
   async run(sql: string, ...params: SqlValue[]): Promise<{ changes: number }> {
     const query = this.context.getStore()?.client ?? this.pool;
     return { changes: (await query.query(sql, params)).rowCount ?? 0 };
+  }
+
+  /** Wake local work only after its durable insert commits. Failed savepoints discard their notifications. */
+  afterCommit(fn: () => void): void {
+    const context = this.context.getStore();
+    if (context && context.depth >= 0) context.committed!.push(fn);
+    else this.notifyCommitted([fn]);
+  }
+
+  private notifyCommitted(callbacks: Array<() => void>): void {
+    // Timers created by a callback must not inherit a session that is about to be released.
+    this.context.exit(() => { for (const fn of callbacks) { try { fn(); } catch { process.stderr.write('PostgreSQL commit notification failed; durable work retained\n'); } } });
   }
 
   /** Session lock spans funding verification without holding a transaction across network I/O. */
@@ -89,9 +101,11 @@ export class Db {
     if (parent && parent.depth >= 0) {
       const name = `sp_${parent.depth + 1}`;
       await parent.client.query(`SAVEPOINT ${name}`);
+      const committed: Array<() => void> = [];
       try {
-        const result = await this.context.run({ client: parent.client, depth: parent.depth + 1 }, fn);
+        const result = await this.context.run({ client: parent.client, depth: parent.depth + 1, committed }, fn);
         await parent.client.query(`RELEASE SAVEPOINT ${name}`);
+        parent.committed!.push(...committed);
         return result;
       } catch (error) {
         await parent.client.query(`ROLLBACK TO SAVEPOINT ${name}`);
@@ -100,17 +114,21 @@ export class Db {
       }
     }
     const client = parent?.client ?? await this.pool.connect();
+    const committed: Array<() => void> = [];
+    let didCommit = false;
     try {
       await client.query('BEGIN');
       if (serialize) await client.query('SELECT pg_advisory_xact_lock($1)', [CORE_WRITE_LOCK]);
-      const result = await this.context.run({ client, depth: 0 }, fn);
+      const result = await this.context.run({ client, depth: 0, committed }, fn);
       await client.query('COMMIT');
+      didCommit = true;
       return result;
     } catch (error) {
       await client.query('ROLLBACK');
       throw error;
     } finally {
       if (!parent) client.release();
+      if (didCommit) this.notifyCommitted(committed);
     }
   }
 

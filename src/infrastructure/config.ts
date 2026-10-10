@@ -18,7 +18,7 @@ const CoreEnv = z.object({
   /** Synthetic sandbox card capacity in USD minor units. Explicitly simulated; never OCBC cash. */
   SIMULATED_CARD_CAPACITY_USD_MINOR: z.coerce.bigint().default(200000n),
   SERVICE_FEE_BPS: z.coerce.number().int().min(0).max(1000).default(0),
-  WORKER_INTERVAL_MS: z.coerce.number().int().min(100).default(1000),
+  WORKER_INTERVAL_MS: z.coerce.number().int().min(100).default(30 * 60 * 1000),
 });
 export type CoreEnv = z.infer<typeof CoreEnv>;
 

@@ -1,7 +1,7 @@
 {
   "version": 1,
   "architecture": "existing-render-consolidated-payer",
-  "candidateBranch": "codex/capsule-on-demand-multiwallet",
+  "candidateBranch": "codex/capsule-neon-migration",
   "baseSha": "7c09b37eaaeda2bf3eec94fc1e3456118962f636",
   "defaultDeny": {
     "signing": false,
@@ -169,5 +169,20 @@
     "quotas": "actual remaining workspace hours/build/bandwidth and billing/spend settings; published Free limits are insufficient",
     "suiRetirement": "verified permanent owner/hash-bound .retired AND .lock; quiesce all old signers; partial or conflicting fences require manual reconciliation",
     "status": "blocked pending permitted internal export executor and account quota evidence"
+  },
+  "databaseMigration": {
+    "status": "isolated-restore-verified; authoritative cutover pending",
+    "projectId": "cool-paper-95079645",
+    "region": "aws-ap-southeast-1",
+    "major": 18,
+    "plan": "Free",
+    "validationBranch": "br-floral-glade-b30iu8nk",
+    "authoritativeBranch": "br-royal-leaf-b32j7xx6",
+    "directEndpoint": "ep-young-recipe-b3jx46ll",
+    "tls": "verify-full",
+    "sourceRetained": "dpg-db29mujncjis73dtvf70-a",
+    "initialBackupSha256": "b7064e44c69fec67333479bebdac998be5a11b0dc36e63346c1a9eb8ecc170ee",
+    "gatewayCompatibilitySha": "ad3d675cdeb1774c2f2a961823d6cb7107ee948e",
+    "runbook": "docs/architecture/NEON_DATABASE_MIGRATION.md"
   }
 }
