@@ -168,7 +168,7 @@
     "automatic rollback after signing or unknown outcome"
   ],
   "unknowns": [
-    "remaining shared free service hours/build/bandwidth/spend settings",
+    "pipeline spend limit and whether a payment method is attached (actual usage screenshot verified)",
     "actual consolidated Render Free signer memory/initialization and outbound compatibility",
     "new live merchant/chain acceptance"
   ],
@@ -178,7 +178,7 @@
     "backup": "protected authoritative export with integrity and isolated PG18 restore BEFORE authoritative mutation or existing-service replacement",
     "quotas": "actual remaining workspace hours/build/bandwidth and billing/spend settings; published Free limits are insufficient",
     "suiRetirement": "verified permanent owner/hash-bound .retired AND .lock; quiesce all old signers; partial or conflicting fences require manual reconciliation",
-    "status": "backup/PG18 restore verified; consolidated release waits for actual Render quota/spend evidence and final signer fencing"
+    "status": "backup/PG18 restore and actual capacity verified; consolidated release waits for pipeline spend-limit/payment-method evidence and final signer fencing"
   },
   "databaseMigration": {
     "status": "authoritative-cutover-hosted-verified; automatic-idle-and-hosted-reconnect-pass",
@@ -207,5 +207,30 @@
     "emptyQueueComputeEstimateCuHoursMonthly": 43.4,
     "ownerAcceptanceComputeReserveCuHours": 20,
     "exactBilledUsage": "unavailable through Free connector; project zeros not accepted as exact accounting"
+  },
+  "renderQuotaEvidence": {
+    "source": "owner-provided Billing dashboard screenshot, 11 October 2026 Singapore",
+    "workspaceId": "tea-db1tjj1srm7s73d6vra0",
+    "freeInstanceHours": {
+      "used": 81.85,
+      "included": 750,
+      "remaining": 668.15
+    },
+    "bandwidth": {
+      "usedMB": 105,
+      "includedGB": 5,
+      "approximateRemainingGB": 4.895
+    },
+    "pipelineMinutes": {
+      "used": 53,
+      "included": 500,
+      "remaining": 447
+    },
+    "includedServices": {
+      "used": 6,
+      "included": 25
+    },
+    "pipelineSpendLimit": "not visible; pending",
+    "paymentMethodPresent": "not visible; pending"
   }
 }

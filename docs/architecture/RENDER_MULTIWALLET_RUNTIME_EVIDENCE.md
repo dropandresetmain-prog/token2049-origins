@@ -18,6 +18,19 @@ Protected historical Sui snapshot hash `3db74885426ee2e7e42226d3a4ebb64b0ab8834b
 
 **UNVERIFIED:** remaining workspace instance-hours/build minutes/bandwidth, payment-method/spend-limit configuration, latest owner-managed database export/restore, final quiesced Solana history snapshot and actual consolidated Render initialization/memory/cold-start behavior. CLI metadata is not a quota balance. No candidate deploy occurred.
 
+## Owner dashboard evidence — 11 October 2026
+
+The owner supplied a Billing / Monthly Included Usage screenshot for the same workspace `tea-db1tjj1srm7s73d6vra0`. Record only sanitized quota numbers; the image contains unrelated browser details and is not committed.
+
+| Shared workspace allowance | Used / included | Remaining |
+|---|---|---|
+| Free instance hours | 81.85 / 750 hours | 668.15 hours |
+| Outbound bandwidth | 105 MB / 5 GB | Approximately 4.895 GB |
+| Pipeline minutes | 53 / 500 minutes | 447 minutes |
+| Included services | 6 / 25 | 19 slots; no new service is planned |
+
+Capacity is sufficient for the bounded existing-service deployment/verification scope, subject to other workspace usage. It does not prove an always-active monthly service budget. **Investigate Now / release gate:** pipeline spend limit and whether a payment method is attached are not visible; inspect the screenshot's “Manage spend on pipeline minutes” link and report payment-method presence without card details. No billing change is authorized. Earlier account observations below are historical; see the Neon migration record for current database/deployment state.
+
 ## Official Free-plan limits
 
 | Area | Official documented limit / behavior | Evidence boundary |

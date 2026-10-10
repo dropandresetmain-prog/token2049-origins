@@ -85,7 +85,9 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - Conservative empty-queue estimate43.4CUh/month using7minute active windows;20CUh reserved for owner tests.
 - Verification compute upper bound under0.6CUh across both0.25CU endpoints; exact billed meter unavailable.
 - Resolve current clean HEAD/source fingerprint from release-plan; final completion output records verified push.
-- Resume consolidated cutover ONLY after owner supplies actual Render workspace hours/build/bandwidth/spend evidence.
+- Owner screenshot11Oct verifies668.15/750Free hours remaining, ~4.895GB/5GB bandwidth remaining,447/500build minutes remaining.
+- Matching workspace tea-db1tjj1srm7s73d6vra0;6/25included services. Shared capacity is not a permanent allocation to Capsule.
+- Resume consolidated cutover ONLY after remaining pipeline spend-limit/payment-method evidence passes the retained no-paid gate.
 - Then reverify authority/gates; quiesce existingwriters, fresh Neon snapshot, actual Sui fencing, additive0010-0012/import/disabledregistration.
 - Only previously approved custody/deployment/activation steps after every retained gate passes; no live purchases.
 - Source has become stale after target OAuth writes; no blind complete-service rollback. Prefer target roll-forward/reconciliation.
@@ -93,7 +95,7 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 
 ## Risks and evidence limits
 - Act Now: actual old process/credential fencing and fresh canonical Neon snapshot before consolidated authority.
-- Investigate Now/blocker: actual Render workspace quota/spend dashboard evidence; API lacks fields and browser helper fails setup.
+- Investigate Now/blocker: pipeline spend limit and payment-method presence; actual capacity now verified by owner screenshot.
 - Investigate Now: actual consolidated Render signer initialization/memory and selected-rail hosted acceptance not yet run.
 - Investigate Now: exact Neon billed usage unavailable through Free consumption-history connector; observe idle/bound usage.
 - Park for Later: public onboarding/advanced orchestration; no new work introduced.
@@ -101,7 +103,7 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - Existing Cardano:5accepted/94,820; Solana payer7/2blocked/94,220, sponsor6/25,002lamports.
 - Sui file retained hash3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0,2signed/35,900/gas20,000,000.
 - Existing payment authority remains with the two legacy hosted payers; consolidated authority not enabled.
-- Current release boundary: BLOCKED_REQUIRES_OWNER_INPUT for retained actual Render quota/spend gate only.
+- Current release boundary: BLOCKED_REQUIRES_OWNER_INPUT for retained pipeline spend-limit/payment-method gate only.
 
 ## Evidence links
 - docs/architecture/NEON_DATABASE_MIGRATION.md: runtime/restore/cutover/Free-budget record.
