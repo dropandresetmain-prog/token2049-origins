@@ -40,6 +40,7 @@ describe('consolidated payer readiness and payment boundary', () => {
     expect(requests[0]!.url).toBe('https://bridge.example/private-path/status');
     expect(requests[0]!.init?.method).toBeUndefined();
     expect(new Headers(requests[0]!.init?.headers).get('authorization')).toBe(`Bearer ${TOKEN}`);
+    expect(new Headers(requests[0]!.init?.headers).get('user-agent')).toBe('Capsule/0.1');
     resolveFetch(json(ready(null)));
 
     await expect(Promise.all([first, second])).resolves.toEqual([true, true]);

@@ -40,7 +40,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
 - [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
 - [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: repair3945f9c live disabled. Actual978.981s idle check restarted gateway but payer GET429 failed safely before claim. Follow-up GET-only429/Retry-After90s readiness correction:85affectedtests/typecheck/build PASS; independent diff review no blocker. Gateway966b5a4 live; OAuth16/44-table history PASS. Payer3945andinstance retained. Next cold payer retest after22:16:02UTC, then gated activation.
+- Current checkpoint: repair3945f9c live disabled. Actual978.981s idle check restarted gateway but payer GET429 failed safely before claim. Follow-up GET-only429/Retry-After90s readiness correction:85affectedtests/typecheck/build PASS; independent diff review no blocker. Gateway966b5a4 live; OAuth16/44-table history PASS. Payer3945andinstance retained. Retest976.568s idle FAILED safely:12GETs all429/non-JSON over79.937s, no payer startup. Next: one identified Capsule user-agent cold compatibility experiment; no authority until PASS.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.

@@ -148,7 +148,7 @@ export class BridgeClient {
       let transient = false, retryAfterMs = 0;
       try {
         const res = await this.f(this.cfg.url + '/status', {
-          headers: { accept: 'application/json', authorization: 'Bearer ' + this.cfg.token },
+          headers: { accept: 'application/json', 'user-agent': 'Capsule/0.1', authorization: 'Bearer ' + this.cfg.token },
           redirect: 'error', signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
         });
         if (!res.ok) {
