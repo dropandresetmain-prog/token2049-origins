@@ -16,6 +16,8 @@ type Status = { source: FundingSource; headroomBaseUnits?: bigint };
 export type BridgeDiag = (event: Record<string, unknown>) => void;
 const stderrDiag: BridgeDiag = (event) => { process.stderr.write(`${JSON.stringify(event)}\n`); };
 const TRANSIENT_HTTP = new Set([502, 503, 504]);
+// Render cold ingress can throttle a read-only readiness request. Payment calls never use this retry set.
+const PREPARATION_TRANSIENT_HTTP = new Set([429, ...TRANSIENT_HTTP]);
 const TRANSIENT_CONNECT = new Set(['ECONNRESET', 'ECONNREFUSED', 'ETIMEDOUT', 'EAI_AGAIN', 'UND_ERR_CONNECT_TIMEOUT', 'UND_ERR_SOCKET']);
 function fetchOutcome(error: unknown): { outcome: string; transient: boolean; code?: string } {
   const e = error as { name?: string; cause?: { code?: unknown } };
@@ -140,10 +142,10 @@ export class BridgeClient {
   }
 
   private async prepareTransport(): Promise<boolean> {
-    const started = Date.now(), budget = this.cfg.statusTimeoutMs ?? 60_000, deadline = started + budget;
+    const started = Date.now(), budget = this.cfg.statusTimeoutMs ?? 90_000, deadline = started + budget;
     // Only safe GETs are repeated. A platform refusal never authorizes a repeated POST /pay.
     for (let attempt = 0; attempt < 12 && Date.now() < deadline; attempt++) {
-      let transient = false;
+      let transient = false, retryAfterMs = 0;
       try {
         const res = await this.f(this.cfg.url + '/status', {
           headers: { accept: 'application/json', authorization: 'Bearer ' + this.cfg.token },
@@ -151,8 +153,11 @@ export class BridgeClient {
         });
         if (!res.ok) {
           void res.body?.cancel().catch(() => undefined);
-          this.report('payer_transport', started, { outcome: 'http_error', status: res.status, attempt });
-          transient = TRANSIENT_HTTP.has(res.status);
+          const rawRetryAfter = res.headers.get('retry-after');
+          if (rawRetryAfter && /^\d{1,6}$/.test(rawRetryAfter)) retryAfterMs = Number(rawRetryAfter) * 1000;
+          else if (rawRetryAfter) { const at = Date.parse(rawRetryAfter); if (Number.isFinite(at)) retryAfterMs = Math.max(0, at - Date.now()); }
+          this.report('payer_transport', started, { outcome: 'http_error', status: res.status, attempt, contentType: (res.headers.get('content-type') ?? '').includes('application/json') ? 'json' : 'other' });
+          transient = PREPARATION_TRANSIENT_HTTP.has(res.status);
         } else {
           let json: unknown;
           try { json = await res.json(); } catch { this.report('payer_transport', started, { outcome: 'invalid_json', attempt }); return false; }
@@ -166,7 +171,7 @@ export class BridgeClient {
         transient = outcome.transient;
       }
       if (!transient) return false;
-      const backoff = Math.min(8000, 1000 * 2 ** Math.min(attempt, 3));
+      const backoff = Math.max(retryAfterMs, Math.min(8000, 1000 * 2 ** Math.min(attempt, 3)));
       if (deadline - Date.now() <= backoff) break;
       await (this.cfg.wait ?? ((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))))(backoff);
     }

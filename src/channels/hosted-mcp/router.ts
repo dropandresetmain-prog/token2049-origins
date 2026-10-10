@@ -111,7 +111,7 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
     if (auth?.extra?.customerId !== config.customerId || !auth.scopes.includes('purchases:read')) return rpcError(res,403,-32000,'forbidden');
     if (Object.keys(req.query).length || req.headers['content-length'] && req.headers['content-length'] !== '0' || req.headers['transfer-encoding']) return rpcError(res,400,-32602,'no diagnostic parameters allowed');
     if (!config.consolidatedBridge) return res.status(409).json({ok:false,code:'payer_unconfigured',paymentAttempted:false});
-    const client = new BridgeClient('cardano',{...config.consolidatedBridge,fetch:opts.fetch,statusTimeoutMs:config.bridgeStatusTimeoutMs ?? 60_000,timeoutMs:10_000});
+    const client = new BridgeClient('cardano',{...config.consolidatedBridge,fetch:opts.fetch,statusTimeoutMs:config.bridgeStatusTimeoutMs ?? 90_000,timeoutMs:10_000});
     void (async () => {
       if (!await client.prepare()) return res.status(503).json({ok:false,code:'payer_not_ready',paymentAttempted:false});
       const result = await client.pay('transport_diagnostic');
@@ -136,7 +136,7 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
       gatewayToken: token,
       // A free payer may be asleep: allow a cold start for /status and the payment call; durable payer history guards against repeats.
       bridgeTimeoutMs: config.bridgeTimeoutMs ?? 100_000,
-      bridgeStatusTimeoutMs: config.bridgeStatusTimeoutMs ?? 60_000,
+      bridgeStatusTimeoutMs: config.bridgeStatusTimeoutMs ?? 90_000,
       // Exact quotes drive a headless checkout on a small free instance and can take minutes; the quote itself continues server-side.
       gatewayTimeoutMs: config.gatewayTimeoutMs ?? 600_000,
       ...(config.consolidatedBridge ? { consolidatedBridge: config.consolidatedBridge } : {}),

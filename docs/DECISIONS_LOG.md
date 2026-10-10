@@ -1,5 +1,12 @@
 # Capsule decisions log
 
+## 11 October 2026 — payment transport and owner-authorized cap alignment
+
+Use authenticated, bounded read-only transport preparation before a durable payment claim. Repeat only safe GET readiness calls; never automatically retry POST /pay. Retain HTTP status and fixed response categories without secrets or transaction bodies. Unknown attempts remain blocked and require readback.
+
+The owner explicitly requested Solana and Sui token/commercial caps match Cardano: 5,100,000 token base units per-payment/daily/cumulative, with the existing 1:1000 scale. Preserve all prior exposure and independent chain gas/sponsor limits. Apply additive immutable policy revisions only while fenced; no history reset or replacement wallet. Existing Render/MCP/OAuth infrastructure remains unchanged. [Implementation and release evidence](architecture/PAYER_READINESS_REPAIR.md).
+
+
 ## 11 October 2026 — authorized database exception and consolidated hosted activation
 
 Status: owner-approved cutover complete; owner live purchase acceptance NOT RUN. The subsequent explicit Render-to-Neon authorization supersedes the 10 October database-retention decision below. Canonical state is Neon Free PG18 Singapore, direct/unpooled verified TLS; original Render source remains read-only with restored original access restrictions. Application gateway/MCP/OAuth/console/providers/Playwright remain on existing Render infrastructure.

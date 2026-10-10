@@ -68,9 +68,9 @@ try{
   const {data:d}=await api('POST','/services/'+ids[1]+'/deploys',{clearCache:'do_not_clear',commitId:state.candidateSha});state.normalDeploy=d.id;state.phase='normal-disabled';save();
  }else if(mode==='--activate'){
   assert.equal(state.phase,'normal-disabled');const proof=JSON.parse(readFileSync(join(BACKUP,'repair-disabled-hosted-proof.json')));assert.equal(proof.candidateSha,state.candidateSha);assert.equal(proof.transportContract,true);assert.equal(proof.historyUnchanged,true);assert.equal(proof.oauthMcpReadOnly,true);
-  for(const id of ids){const {deploy}=await detail(id);assert.equal(deploy.status,'live');assert.equal(deploy.commit.id,state.candidateSha);}
+  for(const id of ids){const {deploy}=await detail(id);assert.equal(deploy.status,'live');assert.equal(deploy.commit.id,id===ids[1] ? state.payerSha ?? state.candidateSha : state.candidateSha);}
   await env(ids[1],{MULTIWALLET_SIGNING_ENABLED:'true'});
-  const {data:d}=await api('POST','/services/'+ids[1]+'/deploys',{clearCache:'do_not_clear',commitId:state.candidateSha});state.activationDeploy=d.id;state.phase='activation-pending';save();
+  const {data:d}=await api('POST','/services/'+ids[1]+'/deploys',{clearCache:'do_not_clear',commitId:state.payerSha ?? state.candidateSha});state.activationDeploy=d.id;state.phase='activation-pending';save();
  }
  console.log(JSON.stringify({phase:state.phase,candidateSha:state.candidateSha,signingGranted:false,chainBroadcast:false,merchantWrites:false}));
 }catch(error){privateWrite(join(BACKUP,'repair-release-failure-'+Date.now()+'.json'),JSON.stringify({message:error.message,stack:error.stack}));console.error('Repair release stopped; protected state retained. Do not automatically roll back or activate signing.');process.exitCode=1;}

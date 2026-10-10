@@ -63,6 +63,25 @@ describe('consolidated payer readiness and payment boundary', () => {
     expect(paths.some((path) => path.endsWith('/pay'))).toBe(false);
   });
 
+  it('retries a read-only 429 and respects Retry-After without paying', async () => {
+    let calls = 0;
+    const h = harness(async () => ++calls === 1 ? new Response('edge throttle', { status: 429, headers: { 'retry-after': '2' } }) : json(ready(null)));
+    await expect(h.client.prepare()).resolves.toBe(true);
+    expect(calls).toBe(2);
+    expect(h.waits).toEqual([2000]);
+    expect(h.events[0]).toMatchObject({ status: 429, contentType: 'other' });
+  });
+
+  it('does not outwait its readiness budget or retry a throttled payment POST', async () => {
+    let calls = 0;
+    const h = harness(async () => { calls++; return new Response('edge throttle', { status: 429, headers: { 'retry-after': '120' } }); });
+    await expect(h.client.prepare()).resolves.toBe(false);
+    expect(calls).toBe(1);
+    expect(h.waits).toEqual([]);
+    await expect(h.client.pay('pur_1234567890')).resolves.toMatchObject({ ok: false, code: 'bridge_error', httpStatus: 429 });
+    expect(calls).toBe(2);
+  });
+
   it.each([
     ['authentication refusal', () => json({ error: 'secret auth detail' }, 401), 'http_error'],
     ['malformed success response', () => json({ ok: true, source: { rail: 'solana', private: 'secret data' } }), 'schema_mismatch'],
