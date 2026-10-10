@@ -119,3 +119,7 @@ Old cloud clients return401 with their actual retained tokens; original cloud ke
 Final pre-consolidation archive `9d7947be883f58b80bec9fff9ed683c309ee6e62f50acaffb8575dc920409477` restored31tables/560rows. Post-cutover archive `f1fe714b075f1d294d1927dbf3b4a4561462d2f16cdcbad47c262068d579ffa7` restored43tables/602rows, complete hashes/catalogs/ACL grant sets/app role, into a newly named disposable PG18 database. Protected directory `~/.capsule/neon-migration-20261011` contains consistent archives/journal/retirement/import/runtime proofs; no values or raw candidates are committed.
 
 Fresh integrated independent review found one namespace bypass, fixed and covered natively; narrow runtime review found no blocker, bounded-read improvement applied. Final correction10affected tests/typecheck/payer compile PASS. **READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED**. Owner setup/manual rows live in the linked sheet. No additional autonomous test follows this checkpoint.
+
+## Narrow owner payment repair
+
+The11October owner-authorized readiness/diagnostic and cap correction is recorded in [PAYER_READINESS_REPAIR.md](PAYER_READINESS_REPAIR.md). Its later deployment record supersedes prior cap/revision observations below; original evidence remains historical.

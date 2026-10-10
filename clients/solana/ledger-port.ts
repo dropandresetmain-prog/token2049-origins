@@ -8,6 +8,6 @@ export interface SolanaLedgerPort {
   read(): SolanaLedgerEntry[] | Promise<SolanaLedgerEntry[]>;
   upsert(entry: SolanaLedgerEntry): void | Promise<void>;
   exclusive<T>(fn: () => Promise<T>): Promise<T>;
-  assertCaps(amount: bigint, fee: bigint, maxAmount: bigint, maxFee: bigint): void | Promise<void>;
+  assertCaps(amount: bigint, fee: bigint, maxAmount: bigint, maxFee: bigint, maxDaily?: bigint): void | Promise<void>;
   reconcile(rpc: SolanaRpc): Promise<void>;
 }

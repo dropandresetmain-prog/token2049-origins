@@ -10,7 +10,7 @@ export function cardanoPolicy(c:PayerConfig) {
 }
 export function solanaPolicy(c:SolanaPayerConfig) {
  return {rail:'solana',asset:c.mint,payee:c.payee,treasuryTokenAccount:c.tokenAccount,payerTokenAccount:c.source,sponsor:c.sponsor,
- gateway:c.gatewayUrl,settlementMode:c.settlementMode,maxPerPayment:String(c.maxPerPayment),maxTotal:String(c.maxTotal),maxSponsorFees:String(c.maxFees),maxCommercial:String(c.maxCommercial)};
+ gateway:c.gatewayUrl,settlementMode:c.settlementMode,maxPerPayment:String(c.maxPerPayment),maxTotal:String(c.maxTotal),...(c.maxDaily===undefined?{}:{maxDaily:String(c.maxDaily)}),maxSponsorFees:String(c.maxFees),maxCommercial:String(c.maxCommercial)};
 }
 export function suiPolicy(c:SuiPayerConfig) {
  return {rail:'sui',payee:c.payee,gateway:c.gatewayUrl,maxAmount:String(c.maxAmount),maxPerPayment:String(c.policy.maxPerPayment),

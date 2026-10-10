@@ -195,3 +195,7 @@ Before deployment:
 - verify Chromium runtime;
 - verify provider/token readiness;
 - never relocate existing signing material without explicit custody authorization; gateway must never hold payer keys.
+
+## Owner-authorized cap alignment (11 October 2026)
+
+Solana/Sui token per-payment/daily/cumulative caps match Cardano at5,100,000 base units; keep the1:1000 notional policy. Set gateway SOLANA_MAX_PAYMENT_BASE_UNITS/SUI_MAX_PAYMENT_BASE_UNITS accordingly. Selected payer prefixes DEMO_SOLANA/DEMO_SUI require matching per-payment, total, daily and commercial510,000minor-unit settings. SOLANA_PAYER_MAX_DAILY_BASE_UNITS is optional for historical configurations but explicitly required in this aligned demo. Gas/sponsor caps are unchanged. Apply audited0013 amendments with authority fenced; an env edit alone is rejected. See docs/architecture/PAYER_READINESS_REPAIR.md.

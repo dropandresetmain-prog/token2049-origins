@@ -6,6 +6,7 @@ import type { McpConfig } from '../mcp/config.js';
 import { sendJson, serveMcpPost } from '../mcp/http.js';
 import type { HostedMcpConfig } from './config.js';
 import { HOSTED_MCP_SCOPES, HostedOAuth } from './oauth.js';
+import { BridgeClient } from '../mcp/bridge.js';
 import { BackgroundJobs } from '../mcp/tools.js';
 
 export interface HostedMcpMount {
@@ -102,6 +103,23 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
   const bearer = requireBearerAuth({ verifier: oauth, requiredScopes: [], resourceMetadataUrl: metadataUrl, expectedResource: resource });
 
   const mcp = express.Router();
+  // Fixed invalid identifier proves gateway-to-payer GET/POST transport without a payment claim or engine initialization.
+  // OAuth audience, customer and read scope apply; callers cannot supply a purchase, source, destination or amount.
+  mcp.get('/payer-readiness', guard, bearer, (req, res) => {
+    const auth = (req as Request & {auth?: {scopes: string[]; extra?: Record<string,unknown>}}).auth;
+    res.set('cache-control','no-store');
+    if (auth?.extra?.customerId !== config.customerId || !auth.scopes.includes('purchases:read')) return rpcError(res,403,-32000,'forbidden');
+    if (Object.keys(req.query).length || req.headers['content-length'] && req.headers['content-length'] !== '0' || req.headers['transfer-encoding']) return rpcError(res,400,-32602,'no diagnostic parameters allowed');
+    if (!config.consolidatedBridge) return res.status(409).json({ok:false,code:'payer_unconfigured',paymentAttempted:false});
+    const client = new BridgeClient('cardano',{...config.consolidatedBridge,fetch:opts.fetch,statusTimeoutMs:config.bridgeStatusTimeoutMs ?? 60_000,timeoutMs:10_000});
+    void (async () => {
+      if (!await client.prepare()) return res.status(503).json({ok:false,code:'payer_not_ready',paymentAttempted:false});
+      const result = await client.pay('transport_diagnostic');
+      const contract = !result.ok && result.code === 'invalid_request' && result.httpStatus === 400 && result.responseCategory === 'canonical_failure';
+      return res.status(contract ? 200 : 503).json({ok:contract,transportReady:true,postContractVerified:contract,paymentAttempted:false,
+        ...(!result.ok ? {httpStatus:result.httpStatus,responseCategory:result.responseCategory,code:result.code} : {})});
+    })().catch(() => { if (!res.headersSent) res.status(503).json({ok:false,code:'payer_diagnostic_unavailable',paymentAttempted:false}); });
+  });
   mcp.all('/', guard, (req, res, next) => {
     if (req.method !== 'POST') {
       // Stateless mode: no server-initiated stream and no session to delete.

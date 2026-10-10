@@ -1,6 +1,14 @@
 # Current Capsule issues
 
-## Consolidated payer candidate triage — 11 October 2026
+## Payment repair triage — 11 October 2026
+
+| Classification | Finding / action | Blocker |
+|---|---|---|
+| Act Now | Pre-claim readiness and audited cap alignment implemented; backup freshness/original-scope interruption gates fixed.175tests and6gate assertions PASS. | Fixes complete locally; hosted verification pending. |
+| Investigate Now | Historical HTTP status is unknown; verify fixed gateway-to-payer transport and cold start on candidate. | Blocks release until actual proof. |
+| Ignore / Accept Risk | Three expired unsafe failed handoffs and historical Sui candidates retained. No incident funds/merchant execution found. | Fresh quotes only; no reset or blind retry. |
+
+## Previous consolidated checkpoint — historical
 
 | Classification | Finding / recommended action | Risk of deferral / blocker |
 |---|---|---|

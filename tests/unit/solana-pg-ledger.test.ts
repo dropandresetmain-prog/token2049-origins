@@ -52,6 +52,15 @@ const verifyWithoutRpc = vi.fn(async (_owner: string, _entries: SolanaLedgerEntr
 
 
 describe('PostgreSQL Solana history import', () => {
+ it('counts same-day durable reservations before signing without combining sponsor fees',async()=>{
+  const db=await createTestDb();await importSolanaHistories(db,[input('payer',PAYER,[entry('past-reservation',null,'50')]),input('sponsor',SPONSOR,[])],verifyWithoutRpc);const ledger=await PgSolanaLedger.open(db,'payer',PAYER);
+  await ledger.exclusive(async()=>{await ledger.upsert({...entry('today-reservation',null,'100'),createdAt:new Date().toISOString()});});
+  await ledger.exclusive(async()=>{
+   await expect(ledger.assertCaps(1n,0n,5100000n,100000n,150n)).rejects.toThrow('daily');
+   await expect(ledger.assertCaps(1n,0n,5100000n,100000n,151n)).resolves.toBeUndefined();
+  });
+ });
+
   it('refuses signer startup without the permanent history marker', async () => {
     const db = await createTestDb();
     await expect(PgSolanaLedger.open(db, 'payer', PAYER)).rejects.toThrow(/history import missing or mismatched/);

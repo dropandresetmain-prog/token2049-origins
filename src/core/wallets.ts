@@ -8,7 +8,7 @@ export interface WalletRecord {
  public_address: string; signer_ref: string; ledger_namespace: string; policy_json: string; public_json: string; enabled: boolean;
 }
 export async function walletRecord(db: Db, sourceId: string): Promise<WalletRecord | undefined> {
- return db.get<WalletRecord>('SELECT w.*,p.customer_id FROM registered_wallets w JOIN payer_profiles p ON p.id=w.payer_id WHERE w.source_id=$1', sourceId);
+ return db.get<WalletRecord>('SELECT w.*,p.customer_id,COALESCE(a.policy_json,w.policy_json) AS policy_json FROM registered_wallets w JOIN payer_profiles p ON p.id=w.payer_id LEFT JOIN LATERAL (SELECT policy_json FROM wallet_policy_amendments WHERE source_id=w.source_id ORDER BY revision DESC LIMIT 1) a ON TRUE WHERE w.source_id=$1', sourceId);
 }
 /** No signer initialization or RPC in listing. Ownership comes from the verified gateway actor. */
 export async function registeredSources(db: Db, customerId: string): Promise<FundingSource[]> {
@@ -32,6 +32,9 @@ export async function approvedSource(db: Db, customerId: string, sourceId: strin
  const source = publicSource(row);
  if (source.rail !== option.rail || source.network !== option.amount.network || source.assetId !== option.amount.assetId)
   throw new CoreError('invalid_request', 'selected wallet does not match the approved funding option');
+ const policy = JSON.parse(row.policy_json) as {maxPerPayment?:string};
+ if (policy.maxPerPayment && BigInt(option.amount.amountBaseUnits) > BigInt(policy.maxPerPayment))
+  throw new CoreError('spend_limit_exceeded','selected wallet per-payment cap is below the approved amount');
  return source;
 }
 export async function purchaseSource(db: Db, purchaseId: string): Promise<FundingSource | undefined> {

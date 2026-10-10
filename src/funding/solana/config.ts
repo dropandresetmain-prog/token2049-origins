@@ -42,7 +42,7 @@ const Config = z.object({
 export function parseSolanaConfig(env: NodeJS.ProcessEnv) {
   const p = Config.safeParse(env);
   if (!p.success) return { ok: false as const, missing: [...new Set(p.error.issues.map(i => String(i.path[0])))] };
-  if (BigInt(p.data.SOLANA_MAX_PAYMENT_BASE_UNITS) > 1000000n) return { ok: false as const, missing: ['SOLANA_MAX_PAYMENT_BASE_UNITS'] };
+  if (BigInt(p.data.SOLANA_MAX_PAYMENT_BASE_UNITS) > 5100000n) return { ok: false as const, missing: ['SOLANA_MAX_PAYMENT_BASE_UNITS'] };
   return { ok: true as const, config: { rpcUrl: p.data.SOLANA_RPC_URL, mint: p.data.SOLANA_USDC_MINT, payee: p.data.SOLANA_TREASURY_ADDRESS,
     tokenAccount: p.data.SOLANA_TREASURY_TOKEN_ACCOUNT, sponsor: p.data.SOLANA_FEE_PAYER_ADDRESS,
     settlementMode: p.data.SOLANA_SETTLEMENT_MODE, facilitatorTokenFile: p.data.SOLANA_FACILITATOR_TOKEN_FILE, facilitatorUrl: p.data.SOLANA_FACILITATOR_URL.replace(/\/$/, ''), maxAmount: BigInt(p.data.SOLANA_MAX_PAYMENT_BASE_UNITS) } };

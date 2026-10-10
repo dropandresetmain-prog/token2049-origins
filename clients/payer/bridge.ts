@@ -175,6 +175,7 @@ export function createBridge(deps: BridgeDeps): Server {
         }
         if (typeof purchaseId !== 'string') return fail(res, 'invalid_request', 'purchaseId is required');
 
+        if (/^pur_[A-Za-z0-9]{10,40}$/.test(purchaseId)) log({ type: 'bridge.received', purchaseId });
         const r = await (deps.serializePayments === false ? deps.payer.pay(purchaseId as string) : exclusive(() => deps.payer.pay(purchaseId as string)));
         log({ type: 'bridge.paid', purchaseId, resumed: r.resumed });
         return send(res, 200, { ok: true, ...(r.purchase !== undefined ? { purchase: redact(r.purchase) } : {}), payment: { transferReference: r.transferReference } });

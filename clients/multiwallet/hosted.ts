@@ -19,9 +19,9 @@ export async function startMultiWalletPayer(env:NodeJS.ProcessEnv,opts:{db?:Db;p
  const db=opts.db??new Db(env.DATABASE_URL??'');
  // Migrations and identity/history imports are an explicit owner-approved release step, never implicit startup writes.
  try {
-  if(!(await db.get("SELECT version FROM schema_migrations WHERE version='0012_wallet_ledgers.sql'")))throw Error('consolidated payer migrations not applied');
+  if(!(await db.get("SELECT version FROM schema_migrations WHERE version='0013_wallet_policy_amendments.sql'")))throw Error('consolidated payer migrations not applied');
   const payer=new MultiWalletPayer({db,enabled:env.MULTIWALLET_SIGNING_ENABLED==='true',instanceId,load:w=>loadWalletEngine(db,env,w)});
-  const server=createBridge({payer,token,serializePayments:false,access:{mode:'hosted',allowedHosts}});
+  const server=createBridge({payer,token,serializePayments:false,access:{mode:'hosted',allowedHosts},log:event=>console.log(JSON.stringify(event))});
   await listenHosted(server,port);
   return {server,db,close:async()=>{await new Promise<void>(resolve=>server.close(()=>resolve()));if(!opts.db)await db.close();disposeRuntimeSecrets();}};
  }catch(error){if(!opts.db)await db.close();disposeRuntimeSecrets();throw error;}

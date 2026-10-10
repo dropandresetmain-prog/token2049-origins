@@ -11,6 +11,7 @@ import { MultiWalletPayer } from '../../clients/multiwallet/dispatcher.js';
 import { createBridge, listenLoopback } from '../../clients/payer/bridge.js';
 import { PgPayerLedger } from '../../clients/payer/pg-ledger.js';
 import { createTestDb, crashTestDb, newTestSchema } from '../support/database.js';
+import {walletRecord} from '../../src/core/wallets.js';
 import { demoData } from '../../src/demo/config.js';
 import type { AddressInfo } from 'node:net';
 
@@ -62,6 +63,44 @@ function payer(h:Harness,load:ConstructorParameters<typeof MultiWalletPayer>[0][
  return new MultiWalletPayer({db,instanceId:'fixture-candidate',enabled:true,now:()=>h.clock.now(),load});
 }
 describe('consolidated payer / canonical PostgreSQL / labeled fixture commerce',()=>{
+
+ it('leaves readiness failure unclaimed and resumes only the same still-valid approval',async()=>{
+  const h=await setup(),source=await register(h,'solana'),q=await quote(h);let ready=false,pays=0,statuses=0;
+  const f=(async(url:unknown,init?:RequestInit)=>{
+   if(String(url).startsWith('https://fixture-payer.invalid')){
+    if(String(url).endsWith('/status')){statuses++;return ready?Response.json({ok:true,source:null}):Response.json({ok:false},{status:401});}
+    pays++;return Response.json({ok:false,error:{code:'payment_rejected',message:'fixture unknown outcome'},retrySafe:false},{status:422});
+   }
+   return fetch(url as string,init);
+  }) as typeof fetch;
+  const mcp=createMcpServer({gatewayUrl:h.url,gatewayToken:h.alice.token,consolidatedBridge:{url:'https://fixture-payer.invalid',token:'fixture-token-123456789012345'},fetch:f},{profile:null});
+  const client=new Client({name:'fixture',version:'1'});const [a,b]=InMemoryTransport.createLinkedPair();await mcp.connect(a);await client.connect(b);active.push(()=>client.close());active.push(()=>mcp.close());
+  const option=q.fundingOptions.find((o:any)=>o.rail==='solana');
+  const args={quoteId:q.quoteId,maxTotal:q.payablePrincipal,quoteDigest:q.digest,selectedFundingOptionId:option.fundingOptionId,selectedSourceId:source.sourceId};
+  const first=await client.callTool({name:'buy',arguments:args});const original=(first.structuredContent as any).purchase;
+  expect((first.structuredContent as any).payment.attempted).toBe(false);expect(pays).toBe(0);
+  expect(await h.gw.db.get('SELECT * FROM payment_handoffs WHERE purchase_id=$1',original.purchaseId)).toBeUndefined();
+  ready=true;await client.callTool({name:'buy',arguments:args});expect(pays).toBe(1);expect(statuses).toBe(2);
+  await client.callTool({name:'buy',arguments:args});expect(pays).toBe(1);
+  expect((await h.gw.db.all('SELECT id FROM purchases WHERE quote_id=$1',q.quoteId))).toHaveLength(1);
+ });
+ it('appends fenced cap amendments while preserving immutable identities and original policy',async()=>{
+  const h=await setup(),source=await register(h,'solana'),db=h.gw.db;
+  const baseline=(await walletRecord(db,source.sourceId))!;
+  const amend=()=>db.run('INSERT INTO wallet_policy_amendments VALUES($1,1,$2,$3,$4,$5)',source.sourceId,baseline.policy_json,JSON.stringify({maxPerPayment:'5100000',maxDaily:'5100000',maxTotal:'5100000',maxCommercial:'510000'}),'owner-cap-alignment-20261011','now');
+  await expect(amend()).rejects.toThrow('disable');
+  await db.run('UPDATE registered_wallets SET enabled=FALSE WHERE source_id=$1',source.sourceId);
+  await expect(amend()).rejects.toThrow('disable');
+  await db.run('UPDATE wallet_signing_authority SET enabled=FALSE WHERE source_id=$1',source.sourceId);
+  await amend();
+  expect(JSON.parse((await walletRecord(db,source.sourceId))!.policy_json).maxDaily).toBe('5100000');
+  expect((await db.get<{policy_json:string}>('SELECT policy_json FROM registered_wallets WHERE source_id=$1',source.sourceId))!.policy_json).toBe(baseline.policy_json);
+  await expect(amend()).rejects.toThrow();
+  await expect(db.run("UPDATE wallet_policy_amendments SET authorization_reference='other-owner' WHERE source_id=$1",source.sourceId)).rejects.toThrow();
+  await expect(db.run('DELETE FROM wallet_policy_amendments WHERE source_id=$1',source.sourceId)).rejects.toThrow();
+  await expect(db.run('INSERT INTO wallet_policy_amendments VALUES($1,2,$2,$3,$4,$5)',source.sourceId,(await walletRecord(db,source.sourceId))!.policy_json,JSON.stringify({maxPerPayment:'5100000',maxDaily:'5100000',maxTotal:'5100000',maxCommercial:'510000',payee:'replacement'}),'owner-cap-alignment-20261011','now')).rejects.toThrow('identity');
+ });
+
  for(const category of ['retail','hotel','flight'] as const)for(const rail of ['cardano','solana','sui'] as const)it('FIXTURE: '+category+' + '+rail+' through one payer and MCP',async()=>{
   const h=await setup();const sources=await Promise.all((['cardano','solana','sui'] as const).map(r=>register(h,r)));
   const selected=sources.find(s=>s.rail===rail)!;const loaded:string[]=[];

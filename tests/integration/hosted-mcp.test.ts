@@ -63,7 +63,7 @@ function retailReportsPaid(h: Harness): void {
 }
 
 /** Gateway + hosted MCP on one listener, with an optional fake Cardano payer on the "private network". */
-async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; withSolanaBridge?: boolean; statusDelayMs?: number; status503Count?: number; headroomBaseUnits?: string; backgroundWaitMs?: number; payStartDelayMs?: number; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
+async function start(opts: { diagnosticFetch?: typeof fetch; withBridge?: boolean; allowedOrigins?: string[]; withSolana?: boolean; withSolanaBridge?: boolean; statusDelayMs?: number; status503Count?: number; headroomBaseUnits?: string; backgroundWaitMs?: number; payStartDelayMs?: number; payResponseDelayMs?: number; bridgeTimeoutMs?: number; bridgeStatusTimeoutMs?: number } = {}): Promise<Fixture> {
   const port = await freePort();
   const base = `http://127.0.0.1:${port}`;
   const cleanup: Array<() => Promise<void>> = [];
@@ -121,13 +121,14 @@ async function start(opts: { withBridge?: boolean; allowedOrigins?: string[]; wi
     cleanup.push(()=>new Promise<void>(r=>server.close(()=>r())));
   }
   const config: HostedMcpConfig = {
+    ...(opts.diagnosticFetch ? {consolidatedBridge:{url:"https://fixture-payer.invalid",token:BRIDGE_TOKEN}} : {}),
     publicUrl: new URL(base), allowedOrigins: opts.allowedOrigins ?? ['https://chatgpt.com'], ownerPasscode: PASSCODE,
     customerId: 'cus_HOSTEDTESTDEMO', apiClientId: 'cli_HOSTEDTESTDEMO', payerClientId: 'cli_HOSTEDTESTPAYER', extraRedirectUris: [], gatewayUrl: base,
     ...(opts.bridgeTimeoutMs ? { bridgeTimeoutMs: opts.bridgeTimeoutMs } : {}), ...(opts.backgroundWaitMs ? { backgroundWaitMs: opts.backgroundWaitMs } : {}), ...(opts.bridgeStatusTimeoutMs ? { bridgeStatusTimeoutMs: opts.bridgeStatusTimeoutMs } : {}),
     ...(solanaBridgeUrl ? { solanaBridge: { url: solanaBridgeUrl, token: BRIDGE_TOKEN } } : {}),
     ...(bridgeUrl ? { cardanoBridge: { url: bridgeUrl, token: BRIDGE_TOKEN } } : {}),
   };
-  h = await startHarness({ port, extraRouters: (core) => createHostedMcp({ db: core.deps.db, config }).mounts });
+  h = await startHarness({ port, extraRouters: (core) => createHostedMcp({ db: core.deps.db, config, ...(opts.diagnosticFetch ? {fetch:opts.diagnosticFetch} : {}) }).mounts });
   if (opts.withSolana) h.gw.core.deps.fundingAdapters.set('solana', solanaFixtureAdapter(h));
   payerToken = (await createClient(h.gw.db, { customerId: config.customerId, displayName: 'payer', channel: 'test', label: 'hosted-payer', scopes: ['purchases:read', 'purchases:fund'] }, new Date().toISOString())).token;
   return (current = { h, base, mcpUrl: `${base}/mcp`, cleanup, bridge, solanaCalls, readinessCalls, ...(bridgeUrl ? { bridgeUrl } : {}) });
@@ -150,8 +151,8 @@ async function token(f: Fixture, client: { client_id: string }, params: Record<s
   return fetch(`${f.base}/token`, { method: 'POST', headers: { 'content-type': 'application/x-www-form-urlencoded' }, body: new URLSearchParams({ client_id: client.client_id, ...params }) });
 }
 
-async function fullGrant(f: Fixture) {
-  const c = await connect(f);
+async function fullGrant(f: Fixture, over: {scope?:string} = {}) {
+  const c = await connect(f,over);
   const consent = await c.approve();
   expect(consent.status).toBe(302);
   const loc = new URL(consent.headers.get('location')!);
@@ -170,6 +171,26 @@ const rpc = (f: Fixture, headers: Record<string, string> = {}, body: unknown = {
   fetch(f.mcpUrl, { method: 'POST', headers: { 'content-type': 'application/json', accept: 'application/json, text/event-stream', ...headers }, body: JSON.stringify(body) });
 
 describe('hosted MCP: transport, host/origin and discovery', () => {
+  it('authenticates the fixed non-spending transport diagnostic and forbids caller overrides',async()=>{
+    const calls: Array<{url:string;body?:string}> = [];
+    const diagnosticFetch=(async(url:unknown,init?:RequestInit)=>{
+      calls.push({url:String(url),body:typeof init?.body==='string'?init.body:undefined});
+      expect(new Headers(init?.headers).get('authorization')).toBe('Bearer '+BRIDGE_TOKEN);
+      return String(url).endsWith('/status') ? Response.json({ok:true,source:null}) : Response.json({ok:false,error:{code:'invalid_request',message:'invalid purchase id'},retrySafe:false},{status:400});
+    }) as typeof fetch;
+    const f=await start({diagnosticFetch});
+    const endpoint=f.base+'/mcp/payer-readiness';
+    expect((await fetch(endpoint)).status).toBe(401);expect(calls).toHaveLength(0);
+    const {access_token}=(await fullGrant(f,{scope:'purchases:read'})).tokens;
+    const headers={authorization:'Bearer '+access_token};
+    expect((await fetch(endpoint+'?purchaseId=pur_1234567890',{headers})).status).toBe(400);expect(calls).toHaveLength(0);
+    const response=await fetch(endpoint,{headers});expect(response.status).toBe(200);
+    expect(await response.json()).toMatchObject({ok:true,postContractVerified:true,paymentAttempted:false});
+    expect(calls.map(c=>c.url)).toEqual(['https://fixture-payer.invalid/status','https://fixture-payer.invalid/pay']);
+    expect(calls[1]!.body).toBe(JSON.stringify({purchaseId:'transport_diagnostic'}));
+    const denied=(await fullGrant(f,{scope:'offers:read'})).tokens;
+    expect((await fetch(endpoint,{headers:{authorization:'Bearer '+denied.access_token}})).status).toBe(403);expect(calls).toHaveLength(2);
+  });
   it('rejects unauthenticated calls with a discoverable 401 challenge', async () => {
     const f = await start();
     const res = await rpc(f);

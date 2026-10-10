@@ -3,7 +3,7 @@ import { PAYER_RAILS, type McpConfig, type PayerRail } from './config.js';
 import { FundingSource } from '../../contracts/presentation.js';
 
 /** Outcome of asking the payer bridge to fund a purchase. Never throws; failures are values. */
-export type BridgeResult = { ok: true; transferReference: string | null } | { ok: false; code: string; message: string; retrySafe?: boolean };
+export type BridgeResult = { ok: true; transferReference: string | null } | { ok: false; code: string; message: string; retrySafe?: boolean; httpStatus?: number; responseCategory?: string };
 
 const BridgeFailure = z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }), retrySafe: z.boolean().optional() });
 const BridgeSuccess = z.object({
@@ -32,6 +32,7 @@ function fetchOutcome(error: unknown): { outcome: string; transient: boolean; co
 export class BridgeClient {
   private readonly f: typeof fetch;
   private pendingStatus?: Promise<Status | null>;
+  private pendingPreparation?: Promise<boolean>;
 
   constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; fetch?: typeof fetch; timeoutMs?: number; statusTimeoutMs?: number; diag?: BridgeDiag; wait?: (ms: number) => Promise<void> }) {
     this.f = cfg.fetch ?? fetch;
@@ -39,7 +40,7 @@ export class BridgeClient {
 
   /** A consolidated bridge dispatches from the canonical purchase, never the rail argument. */
   static consolidated(config: McpConfig): BridgeClient | undefined {
-    return config.consolidatedBridge ? new BridgeClient('cardano', { ...config.consolidatedBridge, ...(config.fetch ? { fetch: config.fetch } : {}), timeoutMs: config.bridgeTimeoutMs }) : undefined;
+    return config.consolidatedBridge ? new BridgeClient('cardano', { ...config.consolidatedBridge, ...(config.fetch ? { fetch: config.fetch } : {}), timeoutMs: config.bridgeTimeoutMs, statusTimeoutMs: config.bridgeStatusTimeoutMs }) : undefined;
   }
 
   /** One client per configured rail, in a fixed order. */
@@ -126,7 +127,56 @@ export class BridgeClient {
     return (await this.status())?.source ?? null;
   }
 
+  /** Authenticated transport readiness only. No wallet probes, signing or payment retry. */
+  async prepare(): Promise<boolean> {
+    if (this.pendingPreparation) return this.pendingPreparation;
+    const operation = this.prepareTransport();
+    this.pendingPreparation = operation;
+    try { return await operation; } finally { if (this.pendingPreparation === operation) this.pendingPreparation = undefined; }
+  }
+
+  private report(type: string, started: number, event: Record<string, unknown>): void {
+    try { (this.cfg.diag ?? stderrDiag)({ type, ...event, ms: Date.now() - started }); } catch { /* Logging never changes payment authority. */ }
+  }
+
+  private async prepareTransport(): Promise<boolean> {
+    const started = Date.now(), budget = this.cfg.statusTimeoutMs ?? 60_000, deadline = started + budget;
+    // Only safe GETs are repeated. A platform refusal never authorizes a repeated POST /pay.
+    for (let attempt = 0; attempt < 12 && Date.now() < deadline; attempt++) {
+      let transient = false;
+      try {
+        const res = await this.f(this.cfg.url + '/status', {
+          headers: { accept: 'application/json', authorization: 'Bearer ' + this.cfg.token },
+          redirect: 'error', signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())),
+        });
+        if (!res.ok) {
+          void res.body?.cancel().catch(() => undefined);
+          this.report('payer_transport', started, { outcome: 'http_error', status: res.status, attempt });
+          transient = TRANSIENT_HTTP.has(res.status);
+        } else {
+          let json: unknown;
+          try { json = await res.json(); } catch { this.report('payer_transport', started, { outcome: 'invalid_json', attempt }); return false; }
+          const parsed = z.object({ ok: z.literal(true), source: FundingSource.nullable(), ledger: z.record(z.string(), z.unknown()).optional() }).strict().safeParse(json);
+          this.report('payer_transport', started, { outcome: parsed.success ? 'ready' : 'schema_mismatch', attempt });
+          return parsed.success;
+        }
+      } catch (error) {
+        const outcome = fetchOutcome(error);
+        this.report('payer_transport', started, { ...outcome, attempt });
+        transient = outcome.transient;
+      }
+      if (!transient) return false;
+      const backoff = Math.min(8000, 1000 * 2 ** Math.min(attempt, 3));
+      if (deadline - Date.now() <= backoff) break;
+      await (this.cfg.wait ?? ((ms: number) => new Promise<void>(resolve => setTimeout(resolve, ms))))(backoff);
+    }
+    this.report('payer_transport', started, { outcome: 'not_ready' });
+    return false;
+  }
+
   async pay(purchaseId: string): Promise<BridgeResult> {
+    const started = Date.now();
+    const purchase = /^pur_[A-Za-z0-9]{10,40}$/.test(purchaseId) ? purchaseId : undefined;
     let res: Response;
     try {
       res = await this.f(`${this.cfg.url}/pay`, {
@@ -136,10 +186,16 @@ export class BridgeClient {
         redirect: 'error',
         signal: AbortSignal.timeout(this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS),
       });
-    } catch {
+    } catch (error) {
+      this.report('payer_payment_http', started, { ...fetchOutcome(error), purchaseId: purchase });
       // Outcome is ambiguous (the bridge may have paid before the connection failed): callers must re-read.
       return { ok: false, code: 'bridge_unreachable', message: 'payer bridge did not respond' };
     }
+    const mime = res.headers.get('content-type') ?? '';
+    const contentType = mime.includes('application/json') ? 'json' : mime.includes('text/html') ? 'html' : mime.startsWith('text/') ? 'text' : 'other';
+    const rawCorrelation = res.headers.get('rndr-id');
+    const correlation = rawCorrelation && /^[A-Za-z0-9-]{1,80}$/.test(rawCorrelation) ? rawCorrelation : undefined;
+    const report = (responseCategory: string) => this.report('payer_payment_http', started, { purchaseId: purchase, status: res.status, contentType, responseCategory, ...(correlation ? { correlation } : {}) });
     let json: unknown = null;
     try {
       json = JSON.parse(await res.text());
@@ -148,11 +204,13 @@ export class BridgeClient {
     }
     if (res.ok) {
       const s = BridgeSuccess.safeParse(json);
-      if (s.success) return { ok: true, transferReference: s.data.payment?.transferReference ?? null };
-      return { ok: false, code: 'bridge_bad_response', message: 'payer bridge returned an unexpected response' };
+      if (s.success) { report('canonical_success'); return { ok: true, transferReference: s.data.payment?.transferReference ?? null }; }
+      report(json === null ? 'invalid_json' : 'schema_mismatch');
+      return { ok: false, code: 'bridge_bad_response', message: 'payer bridge returned an unexpected response', httpStatus: res.status, responseCategory: json === null ? 'invalid_json' : 'schema_mismatch' };
     }
     const f = BridgeFailure.safeParse(json);
-    if (f.success) return { ok: false, code: f.data.error.code, message: f.data.error.message.slice(0, 300), retrySafe: f.data.retrySafe === true };
-    return { ok: false, code: 'bridge_error', message: `payer bridge returned HTTP ${res.status}` };
+    if (f.success) { report('canonical_failure'); return { ok: false, code: f.data.error.code, message: f.data.error.message.slice(0, 300), retrySafe: f.data.retrySafe === true, httpStatus: res.status, responseCategory: 'canonical_failure' }; }
+    report(json === null ? 'invalid_json' : 'schema_mismatch');
+    return { ok: false, code: 'bridge_error', message: `payer bridge returned HTTP ${res.status}`, httpStatus: res.status, responseCategory: json === null ? 'invalid_json' : 'schema_mismatch' };
   }
 }

@@ -57,8 +57,13 @@ export class PgSolanaLedger implements SolanaLedgerPort {
     return result.value;
   }
 
-  async assertCaps(amount: bigint, fee: bigint, maxAmount: bigint, maxFee: bigint): Promise<void> {
+  async assertCaps(amount: bigint, fee: bigint, maxAmount: bigint, maxFee: bigint, maxDaily?: bigint): Promise<void> {
     const rows = await this.read();
+    if (maxDaily !== undefined) {
+      const today = new Date().toISOString().slice(0, 10);
+      const spentToday = rows.filter(e => e.historicalBlocked || !e.signature || !e.header || e.createdAt.slice(0, 10) === today).reduce((sum,e) => sum + BigInt(e.amount), 0n);
+      if (spentToday + amount > maxDaily) throw new Error('Solana daily spend cap exceeded');
+    }
     if (rows.reduce((sum, e) => sum + BigInt(e.amount), 0n) + amount > maxAmount ||
         rows.reduce((sum, e) => sum + BigInt(e.fee), 0n) + fee > maxFee) throw new Error('Solana cumulative spend or fee cap exceeded');
   }

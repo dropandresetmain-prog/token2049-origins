@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED. The owner connects MCP and runs the live rows; the agent stops here.
+- ACTIVE: owner-authorized payment readiness/diagnostics repair and Solana/Sui cap alignment. Stop at hosted non-spending readiness; owner runs fresh live purchases.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -30,8 +30,21 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Subsequent explicit Neon authorization permits Free PG18 Singapore export/import and minimal idle-aware worker glue.
 - Owner explicitly permitted the early source read-only fence; quota screenshot and No card confirmation passed the bounded no-paid gate.
 - Conditional activation permission exercised only after history, ownership, fencing and hosted readiness passed.
-- No agent broadcast, funding, cap increase, provider hold/prebook/order/booking/ticketing or merchant payment permitted.
-- Every new live row is NOT RUN. No new feature, broad review or autonomous payment test follows this handoff.
+- Latest owner authorization permits the narrow repair through deployment/readiness and aligning Solana/Sui token/commercial per-payment/daily/cumulative caps to Cardano (5,100,000 units / USD5,100 at1:1000). Chain gas/fee caps remain separate. No agent broadcast, funding, provider writes or merchant payment.
+- Three owner incident rows failed before recorded signing; all expired with unsafe handoffs. Do not retry or mutate them. Remaining live rows NOT RUN.
+
+## Current repair checklist
+- [x] Authenticated selected-payer transport readiness before durable claim; useful bounded progress and expiry recheck.
+- [x] Fixed-field HTTP diagnostics and sanitized payer receipt/result logs; no automatic POST retries.
+- [x] Explicit additive audited cap amendment; original identities/history/blocked exposure retained.
+- [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
+- [ ] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
+- [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
+- Current checkpoint: local repair175PASS/typecheckPASS; livecb7b96e. Next action: checkpoint/build and execute gated narrow release.
+- Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
+- Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
+- VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
+- UNKNOWN: exact historical ingress HTTP status; inactive payer is leading hypothesis, not definitive cause.
 
 ## Implementation and local verification
 - [x] Instructions, refs, implementations and histories inspected; isolated lane and known-good checkpoint preserved.
@@ -98,7 +111,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action OWNER: install/refresh existing MCP OAuth, enter code only on consent, test fresh quotes/all nine rows, retain purchase IDs.
+- Next action PRIMARY: complete the repair checklist, preserve all failed IDs/history, then hand fresh owner acceptance rows back.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 

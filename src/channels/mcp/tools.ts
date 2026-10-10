@@ -469,7 +469,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         }
         // The one payer allowed to act for the selected option. Never another rail, never a fallback.
         let payer: BridgeClient | undefined;
-        const canAttempt = !purchase || (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && purchase.paymentAttempt?.status === 'failed' && purchase.paymentAttempt.retrySafe);
+        const canAttempt = !purchase || (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && (!purchase.paymentAttempt || (purchase.paymentAttempt.status === 'failed' && purchase.paymentAttempt.retrySafe)));
         if (canAttempt) {
           if (deps.consolidatedBridge || deps.bridges?.length) {
             const matching = (await connectedPayers(deps)).filter(p => sourceMatches(p.source, option) && (!selectedSourceId || p.source.sourceId === selectedSourceId));
@@ -501,6 +501,13 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         let paymentFailed = false;
         // A durable claim precedes network I/O. Unknown/lost handoffs cannot silently initiate another payment.
         if (purchase && canAttempt && payer && purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received') {
+          // This is transport readiness only, before any durable permission to sign exists.
+          if (deps.consolidatedBridge && !(await payer.prepare())) {
+            return failure(deps, 'The payment service is not ready. No payment was requested. Keep this purchase ID; the same approved purchase may be resumed while its quote is valid.', {
+              status: 'action_required', purchase, progress: projectProgress(purchase),
+              payment: { attempted: false, ok: false, code: 'payer_not_ready', retrySafe: true },
+            });
+          }
           const claim = await deps.gateway.claimPaymentAttempt(purchase.purchaseId);
           if (claim.claimed && claim.attempt) {
             const result = await payer.pay(purchase.purchaseId);
@@ -510,7 +517,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
               errorCode: result.ok ? null : (/^[a-z_]{3,40}$/.test(result.code) ? result.code : 'bridge_error'),
             });
             payment = result.ok ? { attempted: true, ok: true, transferReference: result.transferReference }
-              : { attempted: true, ok: false, code: result.code, retrySafe: result.retrySafe === true };
+              : { attempted: true, ok: false, code: result.code, retrySafe: result.retrySafe === true, ...(result.httpStatus ? { httpStatus: result.httpStatus } : {}), ...(result.responseCategory ? { responseCategory: result.responseCategory } : {}) };
           }
           purchase = (await deps.gateway.getPurchase(purchase.purchaseId)).purchase;
         }

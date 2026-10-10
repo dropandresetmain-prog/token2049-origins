@@ -13,7 +13,7 @@ const Config = z.object({
   SUI_NETWORK: z.enum(['testnet', NETWORK]), SUI_RPC_URL: z.literal(RPC_URL),
   SUI_USDC_TYPE: z.literal(USDC_TYPE), SUI_ASSET_DECIMALS: z.literal('6'),
   SUI_TREASURY_ADDRESS: Address.refine(v => v !== '0x' + '0'.repeat(64)),
-  SUI_MAX_PAYMENT_BASE_UNITS: PositiveUnits.refine(v => BigInt(v) <= 1000000n),
+  SUI_MAX_PAYMENT_BASE_UNITS: PositiveUnits.refine(v => BigInt(v) <= 5100000n),
   SUI_MAX_GAS_BUDGET_MIST: PositiveUnits.refine(v => BigInt(v) <= 50000000n),
 });
 export function parseSuiConfig(env: NodeJS.ProcessEnv) {

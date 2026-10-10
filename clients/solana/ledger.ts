@@ -56,8 +56,13 @@ export class SolanaLedger {
     this.read(); let fd: number; try { fd = openSync(this.path+'.lock','wx',0o600); } catch { throw new Error('ledger locked; active signer or manual crash recovery required'); }
     try { this.read(); return await fn(); } finally { closeSync(fd); unlinkSync(this.path+'.lock'); }
   }
-  assertCaps(amount: bigint, fee: bigint, maxAmount: bigint, maxFee: bigint): void {
+  assertCaps(amount: bigint, fee: bigint, maxAmount: bigint, maxFee: bigint, maxDaily?: bigint): void {
     const entries = this.read();
+    if (maxDaily !== undefined) {
+      const today = new Date().toISOString().slice(0, 10);
+      const spentToday = entries.filter(e => e.historicalBlocked || !e.signature || !e.header || e.createdAt.slice(0, 10) === today).reduce((sum,e) => sum + BigInt(e.amount), 0n);
+      if (spentToday + amount > maxDaily) throw new Error('Solana daily spend cap exceeded');
+    }
     if (entries.reduce((sum,e)=>sum+BigInt(e.amount),0n)+amount > maxAmount || entries.reduce((sum,e)=>sum+BigInt(e.fee),0n)+fee > maxFee) throw new Error('Solana cumulative spend or fee cap exceeded');
   }
   async reconcile(rpc: SolanaRpc): Promise<void> {

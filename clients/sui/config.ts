@@ -28,8 +28,8 @@ export function loadSuiPayerConfig(env: NodeJS.ProcessEnv, opts: { ledger?: 'ext
     maxTotal: BigInt(e.SUI_PAYER_MAX_TOTAL_BASE_UNITS), maxGasPerPayment: cfg.maxGasBudget, maxGasTotal: BigInt(e.SUI_PAYER_MAX_TOTAL_GAS_MIST) };
   const maxCommercial = BigInt(e.SUI_PAYER_MAX_COMMERCIAL_USD_MINOR);
   if (e.SUI_PAYER_ADDRESS === cfg.payee || policy.maxPerPayment > cfg.maxAmount || policy.maxPerPayment > policy.maxDaily ||
-      policy.maxDaily > policy.maxTotal || policy.maxTotal > 1000000n || policy.maxGasTotal > 500000000n ||
-      policy.maxGasPerPayment > policy.maxGasTotal || maxCommercial > 50000n) throw new Error('Sui signer isolation or spending caps invalid');
+      policy.maxDaily > policy.maxTotal || policy.maxTotal > 5100000n || policy.maxGasTotal > 500000000n ||
+      policy.maxGasPerPayment > policy.maxGasTotal || maxCommercial > 510000n) throw new Error('Sui signer isolation or spending caps invalid');
   return { ...cfg, policy, maxCommercial, payer: e.SUI_PAYER_ADDRESS, keyFile: e.SUI_PAYER_KEY_FILE,
     ledger: opts.ledger === 'external' ? '' : join(e.SUI_LEDGER_DIRECTORY!, 'sui-ledger.json'),
     gatewayUrl: e.SUI_GATEWAY_URL.replace(/\/$/, ''), tokenFile: e.SUI_GATEWAY_TOKEN_FILE };

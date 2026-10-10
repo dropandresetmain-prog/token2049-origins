@@ -1,6 +1,6 @@
 # Multiwallet owner acceptance
 
-**READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED.** Both existing Render services are live at `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78`. Non-spending hosted checks pass and owner-approved activation is complete. All nine new live rows are **NOT RUN**. This sheet is for the owner. Fixture E2E, historical live evidence and a local Docker build do not establish candidate live acceptance.
+**REPAIR IN PROGRESS.** The owner-authorized candidate has local verification; hosted readiness is pending. All nine live rows are NOT RUN on the repaired candidate.
 
 Use the existing `https://token2049-origins.onrender.com/mcp` with its existing OAuth implementation. Consult [current official connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt); account/workspace controls and UI wording may differ. Copy the exact redirect URI from the host's MCP/OAuth setup interface into the allowed configuration when needed. Retrieve the existing access code through its protected owner method; do not paste it into chat, logs or proof artifacts. No new OAuth provider is required. Console: [Capsule](https://token2049-origins.onrender.com/console/).
 
@@ -32,11 +32,11 @@ Say explicitly: “I approve quote [ID/digest], total at most [amount/currency],
 
 The existing testnet scale is **1:1000**, not exchange-rate or production-money settlement. Keep per-rail policies separate:
 
-| Source | Verified retained policy and exposure at 11 October hosted readiness |
+| Source | Owner-authorized target policy; retained exposure (hosted amendment verification pending) |
 |---|---|
 | Cardano Preprod demo wallet | Per-payment/daily/cumulative 5,100,000 token base units; fee cap 2,500,000,000 lovelace; ADA output cap 10,000,000,000 lovelace. Retained 5 entries/94,820 committed; cumulative headroom 5,005,180. Balance/fee availability is not established by those counters. |
-| Solana Devnet demo wallet | 250,000 base units/payment; 500,000 cumulative; USD 250 commercial cap; shared sponsor fee cap 100,000 lamports. Retained 7 entries/2 blocked,94,220 committed; cumulative headroom 405,780 and sponsor headroom 74,998 lamports. Read-only finalized balance check passed at 19:27 UTC 10 Oct; balances can change. Payer token funds and sponsor fees are separate. |
-| Sui Testnet demo wallet | 100,000 base units/payment; 500,000 daily; 1,000,000 cumulative; USD 100 commercial cap; 10,000,000 MIST gas/payment and 500,000,000 MIST cumulative gas. Retained history counts 35,900 token units and 20,000,000 MIST, including two signed records. |
+| Solana Devnet demo wallet | 5,100,000 base units per-payment/daily/cumulative; USD5,100 commercial cap; shared sponsor fee cap 100,000 lamports. Retained 7 entries/2 blocked,94,220 committed; cumulative headroom 5,005,780 and sponsor headroom 74,998 lamports. Read-only finalized balance check passed at 19:27 UTC 10 Oct; balances can change. Payer token funds and sponsor fees are separate. |
+| Sui Testnet demo wallet | 5,100,000 base units per-payment/daily/cumulative; USD5,100 commercial cap; 10,000,000 MIST gas/payment and 500,000,000 MIST cumulative gas. Retained history counts 35,900 token units and 20,000,000 MIST, including two signed records. |
 
 Use these exact registered source IDs (the same ID applies to that rail in every row):
 
@@ -59,10 +59,10 @@ Select the registered source matching the named rail; record its exact ID for ea
 | Shopify + Sui | “Find a small travel accessory under USD 25.” | Controlled Shopify test-store execution; Sui Testnet source | ORDER CONFIRMED; paid sandbox order readback + successful Testnet effects + receipt | NOT RUN |
 | Nuitée + Cardano | “Find one night in Bangkok for one adult, about two weeks from today, under USD 100 total.” | Nuitée sandbox; Cardano Preprod source | BOOKING CONFIRMED; booking readback + Preprod transfer + receipt | NOT RUN |
 | Nuitée + Solana | “Find one night in Bangkok for one adult, about two weeks from today, under USD 100 total.” | Nuitée sandbox; Solana Devnet source | BOOKING CONFIRMED; booking readback + finalized Devnet transfer + receipt | NOT RUN |
-| Nuitée + Sui | “Find one night in Bangkok for one adult, about two weeks from today, under USD 80 including fees.” | Nuitée sandbox; Sui Testnet source; quote must fit USD 100 cap | BOOKING CONFIRMED; booking readback + successful Testnet effects + receipt | NOT RUN |
+| Nuitée + Sui | “Find one night in Bangkok for one adult, about two weeks from today, under USD 150 including fees.” | Nuitée sandbox; Sui Testnet source; quote must fit USD 100 cap | BOOKING CONFIRMED; booking readback + successful Testnet effects + receipt | NOT RUN |
 | Atlas + Cardano | “Find a one-way Singapore–Kuala Lumpur flight for one adult, around three weeks from today, budget USD 150.” | Atlas sandbox; Cardano Preprod source | TICKET ISSUED; ticketed order readback + Preprod transfer + receipt | NOT RUN |
 | Atlas + Solana | “Find a one-way Singapore–Kuala Lumpur flight for one adult, around three weeks from today, under USD 150 total.” | Atlas sandbox; Solana Devnet source | TICKET ISSUED; ticketed order readback + finalized Devnet transfer + receipt | NOT RUN |
-| Atlas + Sui | “Find a one-way Singapore–Kuala Lumpur flight for one adult, flexible dates three weeks from today, under USD 80 including fees.” | Atlas sandbox; Sui Testnet source; availability within USD 100 cap is not guaranteed | TICKET ISSUED; ticketed order readback + successful Testnet effects + receipt | NOT RUN |
+| Atlas + Sui | “Find a one-way Singapore–Kuala Lumpur flight for one adult, flexible dates three weeks from today, under USD 80 including fees.” | Atlas sandbox; Sui Testnet source; availability and exact remaining allowance still require a fresh quote | TICKET ISSUED; ticketed order readback + successful Testnet effects + receipt | NOT RUN |
 
 Shopify discovery may show real-store products; execution remains Capsule's sandbox merchant. No real delivery, travel reservation, mainnet transfer or production settlement is claimed.
 
@@ -84,5 +84,7 @@ A PASS requires verified payment, actual final provider completion, independent 
 Retain the purchase ID. Read `get_purchase`, inspect its state, payment/merchant readback and receipt/proof. Polling is read-only. Free services may cold-start; no warm-up or owner startup command is needed.
 
 If any payment/signing/provider attempt may exist, stop new writes and reconcile that purchase. Do not repeat `buy`, switch wallets, create another order/booking or rebuild a signed candidate merely because a response was lost. Resume only through an explicitly permitted same-candidate recovery. Mark unresolved outcomes UNRESOLVED and retain their liabilities. Fresh quotes are appropriate only after the previous attempt is conclusively safe to abandon.
+
+The previous three expired failed purchases (pur_01M4KR2NFZ98985MZE7HR8158E, pur_01M4KRG20BRKFAAN5AD4GER4PT, pur_01M4KRWP9FJJ66CQNN4C99CZSP) remain untouched. Never retry those IDs; use fresh offers/quotes for new authorized acceptance.
 
 After the owner handoff, no autonomous live test or new feature work is implied.

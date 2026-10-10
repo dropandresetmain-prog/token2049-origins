@@ -28,7 +28,7 @@ export async function paySolanaPurchase(cfg: SolanaPayerConfig, purchaseId: stri
       const req=required.accepts[0]!;
       const bound=validateRequirement({x402Version:2,resource:required.resource,accepted:req},req,cfg);
       if(bound.purchaseId!==purchaseId||bound.resourceUrl!==resource)throw new Error('challenge purchase binding mismatch');
-      await ledger.assertCaps(BigInt(req.amount),0n,cfg.maxTotal,cfg.maxFees);
+      await ledger.assertCaps(BigInt(req.amount),0n,cfg.maxTotal,cfg.maxFees,cfg.maxDaily);
       entry={id:purchaseId,signature:null,amount:req.amount,fee:'0',header:null,createdAt:new Date().toISOString()}; await ledger.upsert(entry);
       const signer=await loadSigner(cfg.keyFile,cfg.payer);
       const guardedSigner={...signer,signTransactions:async(...args:Parameters<typeof signer.signTransactions>)=>{

@@ -1,6 +1,10 @@
 # Capsule — current handoff
 
-## Ready for owner MCP test — 11 October 2026
+## Narrow owner-authorized repair — in progress
+
+Owner requested readiness repair and Solana/Sui token caps match Cardano. Local175tests/typecheck/build PASS; independent review release-gate findings corrected with6focusedassertions. Gated existing-service deployment and hosted transport proof remain pending. See [repair record](architecture/PAYER_READINESS_REPAIR.md). No actual payment/provider operation is authorized.
+
+## Previous hosted checkpoint — historical, superseded by repair
 
 Branch `codex/capsule-neon-migration`; worktree `C:/Dev/token2049-origins-neon-migration`. Both Render Free gateway and consolidated payer are live at `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78`, source fingerprint `f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a`. Main is unchanged at `7c09b37eaaeda2bf3eec94fc1e3456118962f636`. Later documentation-only checkpoint HEAD is recorded by Git and the task ledger; it is not a different deployed artifact.
 
