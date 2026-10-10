@@ -1,8 +1,8 @@
 # Capsule
 
-## Consolidated payer candidate — 10 October 2026
+## Consolidated payer candidate — 11 October 2026
 
-The isolated `codex/capsule-on-demand-multiwallet` candidate keeps the existing Render gateway/MCP/OAuth, PostgreSQL 18, console and providers. One payer service contains Cardano Preprod, Solana Devnet and Sui Testnet modules; the authenticated demo customer explicitly chooses a registered wallet and approves the exact quote. Listing wallets does not check every balance. This candidate is **not deployed**; the known-good hosted demo remains unchanged.
+The isolated `codex/capsule-neon-migration` candidate keeps the existing Render gateway/MCP/OAuth, console and providers. The owner-authorized database-only migration now uses Neon Free PostgreSQL18 in Singapore; the retained Render source is fenced read-only. One payer service contains Cardano Preprod, Solana Devnet and Sui Testnet modules; the authenticated demo customer explicitly chooses a registered wallet and approves the exact quote. Listing wallets does not check every balance. The consolidated payer candidate is **not deployed**. The hosted demo uses its existing two payers and the gateway with only the reviewed idle-aware polling adjustment; URLs, OAuth and wallet identities remain unchanged. [Migration evidence](docs/architecture/NEON_DATABASE_MIGRATION.md).
 
 Implementation/cutover: [consolidated payer record](docs/architecture/CONSOLIDATED_PAYER.md). Runtime/account evidence: [verified boundaries](docs/architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md). Owner live acceptance: [nine-row sheet — all NOT RUN](docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md).
 

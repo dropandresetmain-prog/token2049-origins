@@ -1,135 +1,112 @@
-# Capsule consolidated multi-wallet payer
-Updated: 11 October 2026 (Singapore). Re-read before major phases and completion.
+# Capsule consolidated payer and database migration
+Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 
-## Objective and corrected architecture
-- Keep Render gateway, hosted /mcp OAuth, console, provider/browser implementations.
-- Owner now authorizes Render PG18 -> Neon Free PG18; application hosting/MCP unchanged.
-- Use direct TLS PostgreSQL; temporary verified development public IP /32 permitted only during export.
-- One Render Free payer: Cardano Preprod, Solana Devnet, Sui Testnet modules.
-- Authenticated customer -> logical payer profile -> multiple registered wallet sources.
-- Preserve deployed demo. Owner correction supersedes Neon/Cloudflare and no-sleep requirement.
+## Objective and current architecture
+- Existing Render Free gateway/MCP/OAuth, console, providers and Playwright unchanged except reviewed idle worker glue.
+- Owner authorized existing Render PG18 -> Neon Free PG18; this supersedes the earlier database-provider prohibition.
+- One consolidated Render Free payer candidate: Cardano Preprod, Solana Devnet, Sui Testnet modules.
+- Authenticated customer -> logical payer profile -> multiple registered wallets; demo owner cus_HOSTEDMCPDEMO.
+- Existing two payers still deployed. Consolidation is implemented locally, not hosted or activated.
 
-## Source
-- Remote: https://github.com/dropandresetmain-prog/token2049-origins.git
-- Branch: codex/capsule-neon-migration (isolated migration lane).
-- Parent candidate:7785c6674b1dd0b1b0a81c8ee48cd794abbb7019; preserved clean original lane.
-- Worktree: C:/Dev/token2049-origins-neon-migration
-- Base: 7c09b37eaaeda2bf3eec94fc1e3456118962f636 (fetched origin/main).
-- Implementation checkpoint: final candidate SHA resolved by clean release-plan script after exact-file commit.
-- Sui: bae2f623dccc47d7604a48919c969e2229bce340 merged as d7cd82c after overlap review.
-- Prior ledger preserved: PUBLIC_JUDGE_CHECKPOINT.md.
-- Shared checkout codex/console-source-store and its uncommitted work untouched.
-- Previous checkpoint preserved in CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md; earlier constraints are historical.
-- Isolated Neon restore verified; existing service/database/signing authority unchanged.
+## Repository/checkpoint
+- Remote https://github.com/dropandresetmain-prog/token2049-origins.git; main verified7c09b37eaaeda2bf3eec94fc1e3456118962f636.
+- Branch codex/capsule-neon-migration; worktree C:/Dev/token2049-origins-neon-migration.
+- Parent candidate7785c6674b1dd0b1b0a81c8ee48cd794abbb7019, original lane preserved clean.
+- Previous migration checkpoint cef5d17124216f5508e5317ca04c8d3e5be705ce; this checkpoint records verified hosted database cutover.
+- Exact final SHA/source fingerprint: clean scripts/multiwallet/release-plan.mjs output after exact-file commit.
+- Gateway-only compatibility branch codex/capsule-neon-idle-gateway, pushed/livead3d675cdeb1774c2f2a961823d6cb7107ee948e.
+- Shared checkout codex/console-source-store and unrelated changes untouched; no main promotion.
+- Prior ledgers preserved PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md.
+- Sui feature bae2f623dccc47d7604a48919c969e2229bce340 integrated asd7cd82c after overlap review.
 
-## Fixed constraints
-- One payer runtime, multiple profiles/wallets; no service per chain or wallet.
-- No keys in gateway or caller-selected identity/URL; purchase-id-only payer API.
-- Listing/quoting reads registrations/configuration; only selected source performs live checks.
-- Approval binds customer, exact quote, funding option and source; never fallback.
-- Preserve signed candidates, reservations, independent caps, sponsor roles, unknown outcomes.
-- Additive migrations only; 0001-0010 unchanged. No history resets/reassignment.
-- Only authorized Neon database migration; no new app runtime/workflow/keepalive/wake system.
-- Sandbox/testnets/notional scale and independent payment+merchant confirmation remain explicit.
+## Constraints and authorization
+- One payer runtime, many profiles/wallets; no service per customer/rail/wallet; no new queue/framework/runtime.
+- Keys remain outside gateway. Listing/quoting reads registration, only selected source probes its required chain/sponsor.
+- Approval binds owner, quote/digest/amount/expiry, funding option and source; never fall back after failure.
+- Preserve reservations, signed candidates, independent caps, histories, sponsor separation and unknown outcomes.
+- Immutable applied migrations; additive changes only; no historical owner reassignment or namespace resets.
+- Fixture signing/native disposable tests/exact-file commits and task-branch pushes authorized.
+- Conditional consolidated authorization for968807b/source05c1ff09 retains quota/backup/Sui fencing gates.
+- New attachment authorizes Neon Free creation/export/restore, coordinated DATABASE_URL-only cutover and minimal required polling compatibility.
+- Owner reply11October explicitly authorizes temporary SOURCE read-only fence before resume/redeploy.
+- No provider holds/prebooks/orders/bookings/payments/ticketing, chain broadcast, main promotion or paid plan.
+- Existing keys were not moved/read during database migration; consolidated custody/authority changes wait for retained gates.
+- Owner performs all nine live tests after hosted consolidated readiness; every live matrix row NOT RUN.
 
-## Authorization
-- Code, fixture signing, disposable local DB tests, exact-file commits and branch pushes permitted.
-- Read-only existing account/deployment metadata/public state permitted; no secrets printed.
-- Conditional owner authorization received for968807b/source05c1ff09 (exact values in architecture record).
-- New owner authorization permits PG export/Neon restore and coordinated DATABASE_URL-only cutover.
-- Quiesce all DB writers; final fresh consistent dump; restore original Render allowlist immediately.
-- Existing services retain revisions/keys/caps; consolidated activation remains separately gated.
-- Provider writes/broadcast/main/paid plans remain excluded; no implicit exception to access gates.
-- Old services retain authority until approved cutover; same wallet must never have two active signers.
-- Owner performs nine live tests after hosted readiness; no live purchases authorized.
+## Implementation verified before migration
+- [x] Inspect instructions/refs/code/legacy ledgers/Sui evidence; isolate lane and preserve submission.
+- [x] Customer/profile/source ownership, exact approval/persisted source and selected-only dispatch.
+- [x] Default-disabled single service three-rail payer; preserved legacy namespaces and immutable policies.
+- [x] Native PostgreSQL history/import/idempotency/concurrency/recovery and synthetic nine-provider/rail matrix.
+- [x] Sui durable hosted ledger/import tooling; permanent file retirement guards and old-binary lock denial.
+- [x] Console/progress/payment plus merchant proof contracts; release manifest/manual matrix/runbook.
+- [x] One fresh independent integrated review; legacy wallet namespace bypass fixed with DB/runtime guards.
+- Integrated gate55files/732tests:729 passed; three changed expectations fixed, affected8files/150passed.
+- Selected-source contracts3files/126passed; console9files/89passed; root/console typechecks/build passed.
+- Final affected multiwallet/registration/hostedpayer35passed; walletledger5passed.
+- Retirement affected4files/38distinct tests passed; typecheck/rebuilt image passed.
+- Node24.21 Linux512MiB/0.1CPU, network disabled/read-only FS: three-rail fixture signing/serialization8PASS, peak137.2MiB.
+- Permanent Sui retirement fixture4PASS, peak76,008KiB; actual old local signer retirement not performed.
+- Local payer artifact sha256:6b9d656776c66ea06c8f28c942561bae12f34052cd37e373cef83a5a809eeb05.
 
-## Phases and outcomes
-- [x] Verify refs/remote/worktree; reconcile correction; preserve previous ledger.
-- [x] Inspect core/MCP/OAuth/config/provider execution and legacy ledgers/historical Sui evidence.
-- [x] Verify read-only Render service plans and PostgreSQL18 expiry/network metadata.
-- [x] Review/integrate Sui feature lane and async persistent-ledger port.
-- [x] Implement ownership, source snapshot, exact approval and selected-source MCP/core/proof.
-- [x] Implement single default-disabled lazy dispatcher and preserved legacy ledger namespaces.
-- [x] Finish immutable financial policy/import/recovery tooling and native PostgreSQL tests.
-- [x] Integrated regression gate/build and fresh independent review; fix blockers.
-- [x] Inspectable cutover manifest/runbook, owning docs, backup recommendation, manual sheet.
-- [x] Prepare verified exact-file checkpoint and consolidated owner authorization packet; final push verified below.
+## Database migration and deployed checkpoint
+- [x] Neon orgfree_v3 verified; projectcool-paper-95079645, AWSaws-ap-southeast-1, actualPG18.6.
+- [x] Direct/unpooled verified TLS,0.25CU min/max,112connections,1GiB/project,100CUh/month documented.
+- [x] Protected initial completePG18 archive31tables/705rows; full hash/schema/role/ACL restore verified.
+- Initial SHA b7064e44c69fec67333479bebdac998be5a11b0dc36e63346c1a9eb8ecc170ee.
+- [x] Seven native Neon session/lock/interruption/tx/savepoint/postcommit/row-lock/idempotency checks PASS.
+- [x] Validation automatic suspension/resume PASS1.8s; nine applied migration checksums match7c09b37.
+- [x] Quiesce all three source writers; fresh final full snapshot31tables/707rows; complete clean authoritative restore PASS.
+- Final SHA1a5a444c7084d82e04c713bc00a9744c0c503d4295051633457de29366606622.
+- Final archive: one succeeded purchase/merchant/funding handoff; two done jobs; consumed reservation; no active/unknown work.
+- Source snapshot session inventory only migration client; full archive retains all histories/signed headers/import/blocked records.
+- [x] Source/target full table hashes still matched after re-quiescence; owner-approved source role read-only fence applied.
+- [x] New source session UPDATE denied SQLSTATE25006; original Render allowlist restored and independently GET-verified.
+- Render rejects deploy while suspended; resume alone retained old environment. Explicit unchanged-artifact deployment required.
+- [x] Only DATABASE_URL changed across existingthree services; all other env hashes unchanged; all known-good7c artifacts verified live on Neon.
+- [x] OAuth/PKCE/resource metadata/foreign Origin/code replay/MCP initialize/discovery/historical get_purchase16checks PASS.
+- [x] Cardano and Solana hosted health/authenticated status PASS; original identities, histories and caps retained.
+- [x] Console/treasury/historical purchase/receipt/proof GETs200; no merchant or chain write.
+- Only four OAuth bookkeeping tables differ from final source; all other financial/history hashes unchanged.
+- Target authoritative branchbr-royal-leaf-b32j7xx6; endpoint ep-young-recipe-b3jx46ll; validationbr-floral-glade-b30iu8nk.
+- Source retaineddpg-db29mujncjis73dtvf70-a; expiry2026-11-05T06:55:54.699333Z (Nov5 14:55:54SG).
+- Protected owner-only backups/journal/credentials outsideGit at ~/.capsule/neon-migration-20261011.
+- Four future-object default ACL creator/owner/grantor labels mapped Renderpostgres->Neonadmin; original archive immutable.
+- Explicit schema bootstrap privileges preserved; allowners/app role flags/table hashes/catalog comparisons PASS.
+- [x] Minimal idle-aware worker: immediate local committed wake, persisted deadlines/lease/reconciliation, empty queue every 30 minutes.
+- Migration focused44PASS then19affectedPASS; gateway-only45PASS/typecheck/build; access failure-recovery5PASS/typecheck.
+- Fresh bounded independent migration review completed: reservation wake, env example, recovery journal issues fixed.
+- [x] Deployed automatic idle at17:43:17UTC; hosted purchase read resumed in0.965s; post-idle OAuth/MCP16checks PASS.
+- Compute usage fields currently0 are delayed/ambiguous, not exact billed evidence; conservative bounds required.
 
-## Current checkpoint and next action
-- Integrated gate: 55 files / 732 tests; 729 passed, three changed expectations fixed.
-- Affected rerun: 8 files / 150 passed (contracts, MCP, Sui payer, hosted config/OAuth).
-- Selected-payer wrong-source checks: 3 files / 126 passed, no broadcast/settlement.
-- Policy/import/native PG focused gate passed; namespace review fix: 4 files / 28 passed.
-- Console tests: 9 files / 89 passed; root and console typechecks passed.
-- Final gateway/console build and root/console typechecks passed.
-- Actual Node24 Linux production payer image: disposable 3-rail signing/serialization PASS8checks.
-- Network disabled, read-only filesystem, 512MiB/0.1CPU; peak RSS137.2MiB, Node24.21.0.
-- Independent reviewer found legacy wallet history bypass via fresh namespace; fixed runtime/DB guards.
-- Independent review complete: namespace bypass fixed, no unresolved code blocker; owner boundaries retained.
-- Read-only Cardano status: 5 accepted, 94,820 committed, headroom5,005,180; import4/66,830.
-- Sui existing file: 2 signed, amount35,900/gas20,000,000; both signatures verified read-only.
-- Protected Sui sha256: 3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0.
-- Solana authenticated read-only status: payer7entries/2blocked/0incomplete,94,220committed.
-- Sponsor6entries/0incomplete,25,002lamports; remaining405,780token/74,998fee, unchanged caps.
-- API retrieved only named bridge token in memory; no key read, /pay or secrets printed.
-- Final affected gate: multiwallet13 + registration2 + hostedpayer20 =35 passed; walletledger5 passed.
-- HTTP startup has no keys and denies pay/sign; stalled wallet does not block another selected rail.
-- Operator selected-source preflight initializes without pay/sign/balance claims; legacy open is read-only.
-- Prior export blocker resolved by new exact-IP authorization; full protected archive/restore verified.
-- Workspace API lacks quota/spend fields; browser helper setup failed; actual balances unverified.
-- Gate2 code: permanent Sui marker + hash-bound retained lock; import verifies both before DB.
-- Actual old Sui ledger bae2f/source3e557f5b denied callback using disposable permanent lock.
-- Narrow independent review: no completed-fence blocker; partial locks require manual reconciliation.
-- Existing histories/keys/authority unchanged; actual retirement waits for gate1.
-- Retirement affected gate: 4 files / 38 distinct tests passed (14ledger/4tool/15payer/5nativePG).
-- Root typecheck and rebuilt production payer image passed; Linux no-network retirement PASS4.
-- Node24.21.0,512MiB/0.1CPU/read-only root; retirement-only peak RSS76,008KiB.
-- Protected Sui hash unchanged; all three deployed services live/Free at main7c09b37.
-- Next: final quiescence/export/restore then DATABASE_URL-only switch; idle-only ad3d675 after acceptance.
-- Disposable Docker PG18: capsule-consolidated-payer-tests, loopback55436, UUID test schemas only.
-- Tests never use deployed DB or existing wallet keys. Detailed tool logs kept outside Git.
+## Next action / boundaries
+- Post-cutover source remains read-only and all31tables match final snapshot; target differs only in OAuth bookkeeping.
+- Original network restriction independently reverified; target11,796,480bytes; pending jobs/purchases/funding allzero.
+- Conservative empty-queue estimate43.4CUh/month using7minute active windows;20CUh reserved for owner tests.
+- Verification compute upper bound under0.6CUh across both0.25CU endpoints; exact billed meter unavailable.
+- Resolve current clean HEAD/source fingerprint from release-plan; final completion output records verified push.
+- Resume consolidated cutover ONLY after owner supplies actual Render workspace hours/build/bandwidth/spend evidence.
+- Then reverify authority/gates; quiesce existingwriters, fresh Neon snapshot, actual Sui fencing, additive0010-0012/import/disabledregistration.
+- Only previously approved custody/deployment/activation steps after every retained gate passes; no live purchases.
+- Source has become stale after target OAuth writes; no blind complete-service rollback. Prefer target roll-forward/reconciliation.
+- Gateway compatibility rollback must retain idle-aware behavior or suspend gateway; no permanent1secondhotpoll.
 
-## Release state
-- ACTIVE authorized database migration; previous export access blocker superseded by exact-IP permission.
-- Replacement candidate includes authorized narrow Sui guard; exact SHA/fingerprint from clean release plan.
-- Implementation commit: 454bf66309694580a42cb332e97461191cf08b7a, pushed and verified.
-- Final release SHA/fingerprint: run scripts/multiwallet/release-plan.mjs on clean branch (includes this evidence checkpoint).
-- Prior Docker artifact: sha256:0b80b5028f6efb06236ddb5e734cea308d8d925a1828ac4ce596db8ebf1d3b04.
-- Replacement payer artifact: sha256:6b9d656776c66ea06c8f28c942561bae12f34052cd37e373cef83a5a809eeb05 (local only).
-- Implementation push verified against remote SHA; main remains7c09b37. Final evidence checkpoint pushed and matched before handoff.
-- Exact resource/secret names/actions: deploy/consolidated-payer-release.json.
-- Cutover/rollback/independent review: docs/architecture/CONSOLIDATED_PAYER.md.
-- Act Now: old authority fencing, approved consistent private backup/restore before expiry.
-- Investigate Now: actual quota/spend settings, Render candidate runtime and hosted readiness.
-- Park for Later: public onboarding, richer background orchestration.
-- Ignore / Accept Risk: Free sleep/restarts with durable recovery; expected latency.
-
-## Evidence boundaries / blockers
-- Actual DB expiry: 2026-11-05T06:55:54.699333Z = 5 Nov 14:55:54 Singapore.
-- Render Free PG18: available, Singapore, no HA/replica/pool, external access disabled.
-- Source has no managed backups; protected owner backup + isolated Neon restore now verified.
-- Existing gateway/Cardano/Solana Render services Free; no deployment changes.
-- Workspace remaining hours/build/bandwidth/spend setting unverified; shared750h/month documented.
-- Real candidate Render initialization/memory pending approved non-spending deployment.
-- Keys/history untouched; Sui pinned import and signing activation require owner approval.
-- Historical Sui/live evidence does not prove candidate hosted acceptance.
-- Manual nine-row live matrix NOT RUN. No provider preflight writes/broadcasts.
+## Risks and evidence limits
+- Act Now: actual old process/credential fencing and fresh canonical Neon snapshot before consolidated authority.
+- Investigate Now/blocker: actual Render workspace quota/spend dashboard evidence; API lacks fields and browser helper fails setup.
+- Investigate Now: actual consolidated Render signer initialization/memory and selected-rail hosted acceptance not yet run.
+- Investigate Now: exact Neon billed usage unavailable through Free consumption-history connector; observe idle/bound usage.
+- Park for Later: public onboarding/advanced orchestration; no new work introduced.
+- Ignore / Accept Risk: Free sleep/cold starts with durable idempotency/readback; sandbox/testnet/notional disclosures retained.
+- Existing Cardano:5accepted/94,820; Solana payer7/2blocked/94,220, sponsor6/25,002lamports.
+- Sui file retained hash3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0,2signed/35,900/gas20,000,000.
+- Existing payment authority remains with the two legacy hosted payers; consolidated authority not enabled.
+- Current release boundary: BLOCKED_REQUIRES_OWNER_INPUT for retained actual Render quota/spend gate only.
 
 ## Evidence links
-- docs/work/PUBLIC_JUDGE_CHECKPOINT.md: preserved prior release checkpoint.
-- docs/work/SUI_FUNDING.md and docs/demo/: retained Sui historical evidence.
-- docs/architecture/NEON_DATABASE_MIGRATION.md: complete restore/native checks and gated cutover.
-- docs/architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md: runtime/account limits.
-- docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md: owner manual matrix (all NOT RUN).
-- tests/integration/multiwallet.test.ts: canonical native-PG/MCP fixture matrix and ownership.
-
-## Authorized Neon migration
-- [x] Exact parent/remote/main verified; new isolated branch/worktree created.
-- [x] Neon connector authenticated; organization Free, no projects, AWS Singapore listed.
-- [x] Source full protected PG18 dump:31tables/705rows; SHA b7064e44c69f...; original allowlist restored.
-- [x] NeonFreePG18Singapore project cool-paper-95079645; complete isolated restore/hash/native7checks PASS.
-- [ ] Free idle budget:44local +19affected tests PASS; observed idle/resume PASS1.8s; accounting pending.
-- [ ] Review complete; idle-only branch ad3d675 pushed/45tests/build PASS; final snapshot pending.
-- [ ] Existing three services DATABASE_URL-only switch; exact deployed revisions preserved.
-- [ ] Non-spending hosted OAuth/proof/lock/restart/idle/compute acceptance.
-- [ ] Resume previously authorized payer release after all retained history/fencing/quota gates.
+- docs/architecture/NEON_DATABASE_MIGRATION.md: runtime/restore/cutover/Free-budget record.
+- docs/architecture/CONSOLIDATED_PAYER.md and deploy/consolidated-payer-release.json: approved release/gates/rollback.
+- docs/architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md: actual local image and account proof boundaries.
+- docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md: nine owner rows, all NOT RUN.
+- docs/work/CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md: preserved detailed previous candidate evidence.
+- docs/work/SUI_FUNDING.md and docs/demo/: historical local/live Sui evidence, not candidate hosted acceptance.

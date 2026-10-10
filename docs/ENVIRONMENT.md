@@ -2,7 +2,7 @@
 
 ## Consolidated payer candidate configuration — 10 October 2026
 
-Keep existing Render PostgreSQL 18/internal `DATABASE_URL`, gateway origin, OAuth issuer/passcode, provider credentials and Playwright. No database provider/network or OAuth migration.
+Owner-authorized database migration: existing Render Free gateway and both legacy payers now use Neon Free PostgreSQL18.6, AWS Singapore, project `cool-paper-95079645`, authoritative branch `br-royal-leaf-b32j7xx6`. `DATABASE_URL` must use the direct endpoint (no `-pooler`) with `sslmode=verify-full`. Gateway origin, OAuth issuer/passcode, provider credentials, keys and Playwright remain unchanged. Gateway idle-aware revision `ad3d675` wakes committed local work immediately and polls an empty queue every30min; explicit `WORKER_INTERVAL_MS=1000` would defeat the Free budget. See [database migration record](architecture/NEON_DATABASE_MIGRATION.md).
 
 Gateway: `MULTIWALLET_PAYER_URL`, `MULTIWALLET_PAYER_TOKEN_FILE`, `MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256`. Consolidated mode rejects legacy bridge and payer-client hash configuration; remove `CARDANO_PAYER_BRIDGE_*`, `SOLANA_PAYER_BRIDGE_*`, `MCP_PAYER_GATEWAY_TOKEN_SHA256` and `MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256` only during approved replacement. The dedicated funding client is `cli_HOSTEDMULTIWALLETPAYER`; revoked legacy client rows stay revoked.
 
@@ -10,7 +10,7 @@ Payer: `DATABASE_URL`, `MULTIWALLET_INSTANCE_ID`, `MULTIWALLET_ALLOWED_HOSTS`, `
 
 Build uses `Dockerfile.multiwallet`; entrypoint is `dist/clients/multiwallet/hosted.js`. Migrations/imports/registration are explicit approved steps, never startup history replacement. Registration defaults to verification and inserts disabled sources only under `CAPSULE_APPROVED_REGISTRATION=true` plus `--apply`. Sui import defaults to offline verification; `--apply` also requires `CAPSULE_APPROVED_SUI_IMPORT=true` and a pinned protected manifest plus verified permanent Sui .retired/.lock fences before DB connection. scripts/sui/retire-history.ts defaults to offline verification; --retire requires CAPSULE_APPROVED_SUI_RETIREMENT=true and CAPSULE_BACKUP_RESTORE_VERIFIED=true after actual gate completion/quiescence. These flags do not replace owner authorization.
 
-Current read-only database expiry: `2026-11-05T06:55:54.699333Z` (5 Nov 14:55:54 Singapore), Free/available, external access disabled; backup status unknown. [Runbook](architecture/CONSOLIDATED_PAYER.md) owns cutover and retention. Historical environment notes below do not authorize redeployment or secret copying.
+Retained source database expiry: `2026-11-05T06:55:54.699333Z` (5 Nov14:55:54 Singapore). Full protected initial/final backups and PG18 restore/hash verification passed. Original external restriction restored; source app role read-only. Source is retained, never a stale-history rollback destination. [Runbook](architecture/CONSOLIDATED_PAYER.md) owns cutover and retention. Historical environment notes below do not authorize redeployment or secret copying.
 
 
 Baseline: main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540
@@ -37,7 +37,7 @@ Do not use DATABASE_PATH; SQLite is unsupported.
 
 Migrations are the ordered immutable files in `src/migrations/`. The consolidated candidate adds `0011_registered_wallets.sql` and `0012_wallet_ledgers.sql` after the integrated Sui `0010_sui_funding_recovery.sql`. Existing deployed history must remain intact; authoritative migration execution requires owner approval.
 
-Recorded Render DB:
+Retained former Render DB (historical; Neon is authoritative):
 - name: token2049-origins-db
 - region: Singapore
 - free plan recorded during provisioning

@@ -1,10 +1,11 @@
 # Current Capsule issues
 
-## Consolidated payer candidate triage — 10 October 2026
+## Consolidated payer candidate triage — 11 October 2026
 
 | Classification | Finding / recommended action | Risk of deferral / blocker |
 |---|---|---|
-| Act Now | Existing PostgreSQL 18 expires 5 Nov 2026 at 14:55:54 Singapore; establish approved internal consistent backup/export and restore evidence. No managed Free backup. | Financial history may become inaccessible; Render export list is empty, external CLI access is denied, and Free has no shell/jobs; a permitted internal executor and restore proof are required before mutation/replacement. |
+| Ignore / Accept Risk | Owner-authorized Neon migration: complete31-table/707-row protected final restore verified; all three existing apps use the same target. Render source retained read-only until its5Nov expiry. | Old source is stale after OAuth bookkeeping on target; no blind rollback. Backups remain owner-protected outside Git. |
+| Investigate Now | Verify hosted idle suspension/reconnect and ongoing Neon Free compute usage. Reviewed idle-aware gateway is deployed; automatic suspension and0.965s hosted reconnect pass. Exact consumption-history meter unavailable through Free connector. | Local compute behavior alone does not prove hosted allowance; observe ongoing traffic/active time against the43.4CUh empty-queue monthly estimate and reserve20CUh for owner tests. |
 | Act Now | Stop old commerce/signing processes and revoke old credentials before granting consolidated authority. Legacy images do not obey new database grants. | Concurrent signers/divergent history; mandatory owner-approved cutover gate. |
 | Investigate Now | Measure exact candidate on Render Free, selected-rail initialization, memory and host behavior. | Local tests/builds cannot establish hosted readiness; pending approved deployment. |
 | Investigate Now | Verify remaining workspace hours/build/bandwidth and spend settings; same quota serves unrelated projects. | Cannot certify no-spend capacity from published limits; Documented CLI/API do not expose these balances; browser helper failed to initialize, so owner dashboard evidence is pending. |

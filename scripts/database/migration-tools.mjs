@@ -154,6 +154,11 @@ async function main() {
     const client = await connect(url);
     try {
       const inv = await inventory(client);
+      if(command==='export-final') {
+        const status=(await client.query("SELECT (SELECT count(*) FROM jobs WHERE status IN ('pending','claimed'))::int AS jobs, (SELECT count(*) FROM purchases WHERE state NOT IN ('succeeded','failed','expired'))::int AS purchases, (SELECT count(*) FROM funding_attempts WHERE status='pending')::int AS funding, (SELECT count(*) FROM execution_attempts WHERE status IN ('started','unknown'))::int AS merchant_attempts, (SELECT count(*) FROM payment_handoffs WHERE status='running')::int AS handoffs, (SELECT count(*) FROM pg_stat_activity WHERE datname=current_database() AND backend_type='client backend' AND pid<>pg_backend_pid())::int AS other_sessions")).rows[0];
+        if(Object.values(status).some(n=>n!==0)) throw new Error('Final snapshot has active or uncertain obligations; reconcile before cutover');
+        privateWrite(join(root,'quiescence.json'),JSON.stringify({status,verifiedAt:new Date().toISOString()}));
+      }
       privateWrite(join(root, 'inventory.json'), JSON.stringify(inv, null, 2));
       privateWrite(join(root, 'source-url'), url);
       if (Number(inv.info.bytes) > 900000000) throw new Error('Source exceeds conservative Free target budget');

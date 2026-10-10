@@ -31,14 +31,25 @@
       "action": "suspend; preserve service/configuration; never automatically delete"
     },
     "database": {
+      "id": "cool-paper-95079645",
+      "branch": "br-royal-leaf-b32j7xx6",
+      "endpoint": "ep-young-recipe-b3jx46ll",
+      "provider": "Neon",
+      "region": "aws-ap-southeast-1",
+      "major": 18,
+      "plan": "Free",
+      "connection": "direct/unpooled TLS verify-full",
+      "authoritative": true
+    },
+    "additionalServices": 0,
+    "retainedSourceDatabase": {
       "id": "dpg-db29mujncjis73dtvf70-a",
       "name": "token2049-origins-db",
       "major": 18,
       "plan": "Free",
       "expiresAt": "2026-11-05T06:55:54.699333Z",
-      "externalAccess": "disabled; do not change"
-    },
-    "additionalServices": 0
+      "externalAccess": "original loopback-only allowlist restored; application role default read-only fenced with owner authorization"
+    }
   },
   "bindings": {
     "customerId": "cus_HOSTEDMCPDEMO",
@@ -140,7 +151,7 @@
   "approvedActionsRequired": [
     "Verify workspace remaining free hours, build/bandwidth and spend settings; no billing enrollment",
     "Quiesce gateway and old cloud/local signing runtimes; revoke legacy gateway payer clients",
-    "Final consistent private-network PostgreSQL18 snapshot and pinned Sui source/requirements manifests; retain original receipt schemas/volumes",
+    "Final consistent direct verified-TLS authoritative Neon PostgreSQL18 snapshot and pinned Sui source/requirements manifests; retain original receipt schemas/volumes",
     "Apply additive migrations; verified Sui history import; register wallets disabled with immutable public policy",
     "Provision protected existing signer files in consolidated payer only and new restricted gateway/bridge credentials",
     "Replace existing gateway/Cardano payer deployments with approved exact SHA; no endpoint/OAuth/DNS change",
@@ -151,14 +162,13 @@
     "chain broadcast",
     "provider hold/prebook/order/booking/ticket/payment",
     "main promotion",
-    "database network exposure",
+    "broad or permanent Render database network exposure",
     "paid upgrade",
     "wallet replacement/history reset",
     "automatic rollback after signing or unknown outcome"
   ],
   "unknowns": [
     "remaining shared free service hours/build/bandwidth/spend settings",
-    "owner-managed backup/export status and approved internal snapshot execution method",
     "actual consolidated Render Free signer memory/initialization and outbound compatibility",
     "new live merchant/chain acceptance"
   ],
@@ -168,10 +178,10 @@
     "backup": "protected authoritative export with integrity and isolated PG18 restore BEFORE authoritative mutation or existing-service replacement",
     "quotas": "actual remaining workspace hours/build/bandwidth and billing/spend settings; published Free limits are insufficient",
     "suiRetirement": "verified permanent owner/hash-bound .retired AND .lock; quiesce all old signers; partial or conflicting fences require manual reconciliation",
-    "status": "blocked pending permitted internal export executor and account quota evidence"
+    "status": "backup/PG18 restore verified; consolidated release waits for actual Render quota/spend evidence and final signer fencing"
   },
   "databaseMigration": {
-    "status": "isolated-restore-verified; authoritative cutover pending",
+    "status": "authoritative-cutover-hosted-verified; automatic-idle-and-hosted-reconnect-pass",
     "projectId": "cool-paper-95079645",
     "region": "aws-ap-southeast-1",
     "major": 18,
@@ -183,6 +193,19 @@
     "sourceRetained": "dpg-db29mujncjis73dtvf70-a",
     "initialBackupSha256": "b7064e44c69fec67333479bebdac998be5a11b0dc36e63346c1a9eb8ecc170ee",
     "gatewayCompatibilitySha": "ad3d675cdeb1774c2f2a961823d6cb7107ee948e",
-    "runbook": "docs/architecture/NEON_DATABASE_MIGRATION.md"
+    "runbook": "docs/architecture/NEON_DATABASE_MIGRATION.md",
+    "finalBackupSha256": "1a5a444c7084d82e04c713bc00a9744c0c503d4295051633457de29366606622",
+    "finalTables": 31,
+    "finalRows": 707,
+    "sourceReadOnlyFence": "owner-authorized before resume/redeploy; new-session write rejected SQLSTATE25006",
+    "currentRevisions": {
+      "gateway": "ad3d675cdeb1774c2f2a961823d6cb7107ee948e",
+      "cardano": "7c09b37eaaeda2bf3eec94fc1e3456118962f636",
+      "solana": "7c09b37eaaeda2bf3eec94fc1e3456118962f636"
+    },
+    "hostedReconnectSeconds": 0.965,
+    "emptyQueueComputeEstimateCuHoursMonthly": 43.4,
+    "ownerAcceptanceComputeReserveCuHours": 20,
+    "exactBilledUsage": "unavailable through Free connector; project zeros not accepted as exact accounting"
   }
 }

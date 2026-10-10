@@ -37,7 +37,8 @@ try {
     await client.query(`CREATE ROLE ${quote(role.rolname)} LOGIN ${role.rolcreatedb?'CREATEDB':'NOCREATEDB'} ${role.rolcreaterole?'CREATEROLE':'NOCREATEROLE'} NOSUPERUSER NOBYPASSRLS NOREPLICATION PASSWORD '${password}'`);
   }
   // Restore runs as the Neon administrator, which must inherit the imported owner's schema rights.
-  await client.query(`GRANT ${quote(role.rolname)} TO ${quote(info.current_user)} WITH INHERIT TRUE, SET TRUE`);
+  const inherited=(await client.query("SELECT pg_has_role(current_user,$1,'USAGE') AS ok",[role.rolname])).rows[0].ok;
+  if(!inherited) await client.query(`GRANT ${quote(role.rolname)} TO ${quote(info.current_user)} WITH INHERIT TRUE, SET TRUE`);
   await client.end();
   await dockerPg('render-sql',adminUrl,root,'source.dump');
   const originalSql=readFileSync(join(root,'restore-original.sql'),'utf8');
@@ -46,18 +47,22 @@ try {
   for(const line of aclLines) assert.match(line,/^ALTER DEFAULT PRIVILEGES FOR ROLE postgres GRANT ALL ON (TABLES|SEQUENCES|FUNCTIONS|TYPES) TO token2049_origins_db_user;$/);
   // Render's managed superuser is absent on Neon. Map only its four future-object grants to the Neon administrator.
   const mappedSql=originalSql.replace(/^ALTER DEFAULT PRIVILEGES FOR ROLE postgres /gm,()=> 'ALTER DEFAULT PRIVILEGES FOR ROLE '+quote(info.current_user)+' ');
-  privateWrite(join(root,'restore-mapped.sql'),mappedSql);
-  privateWrite(join(root,'role-mapping.json'),JSON.stringify({sourceManagedRole:'postgres',targetManagedRole:info.current_user,statements:aclLines,derivedSqlSha256:createHash('sha256').update(mappedSql).digest('hex')},null,2));
+  if(existsSync(join(root,'restore-mapped.sql'))) assert.equal(readFileSync(join(root,'restore-mapped.sql'),'utf8'),mappedSql,'Recovery derived SQL mismatch');
+  else privateWrite(join(root,'restore-mapped.sql'),mappedSql);
+  if(!existsSync(join(root,'role-mapping.json'))) privateWrite(join(root,'role-mapping.json'),JSON.stringify({sourceManagedRole:'postgres',targetManagedRole:info.current_user,statements:aclLines,derivedSqlSha256:createHash('sha256').update(mappedSql).digest('hex')},null,2));
   await dockerPg('restore-sql',adminUrl,root,'restore-mapped.sql');
   const ownerAdmin=await connect(adminUrl);
   await ownerAdmin.query(`ALTER DATABASE ${quote(info.current_database)} OWNER TO ${quote(role.rolname)}`);
   await ownerAdmin.end();
   const restored=await connect(u.toString());
+  assert.deepEqual(source.catalogs.schemas,[{nspname:'public',owner:role.rolname,acl:'{'+role.rolname+'=UC/'+role.rolname+',=U/'+role.rolname+'}'}],'Unreviewed schema privileges');
+  await restored.query('GRANT USAGE,CREATE ON SCHEMA public TO '+quote(role.rolname));
+  await restored.query('GRANT USAGE ON SCHEMA public TO PUBLIC');
   const target=await inventory(restored);await restored.query('ROLLBACK');await restored.end();
   privateWrite(join(root,'target-inventory.json'),JSON.stringify(target,null,2));
   const comparison={tables:JSON.stringify(source.tables)===JSON.stringify(target.tables)};
   for(const key of ['schemas','extensions','objects','functions','indexes','constraints','triggers','policies','sequences'])comparison[key]=JSON.stringify(source.catalogs[key])===JSON.stringify(target.catalogs[key]);
-  comparison.defaultAcls=JSON.stringify(source.catalogs.default_acls.map(x=>({...x,role:x.role==='postgres'?info.current_user:x.role,acl:x.acl.replaceAll('/postgres','/'+info.current_user)})))===JSON.stringify(target.catalogs.default_acls);
+  comparison.defaultAcls=JSON.stringify(source.catalogs.default_acls.map(x=>({...x,role:x.role==='postgres'?info.current_user:x.role,acl:x.acl.replaceAll('postgres=',info.current_user+'=').replaceAll('/postgres','/'+info.current_user)})))===JSON.stringify(target.catalogs.default_acls);
   const restoredRole=target.catalogs.roles.find(x=>x.rolname===role.rolname);comparison.appRole=JSON.stringify(role)===JSON.stringify(restoredRole);
   privateWrite(join(root,'restore-verification.json'),JSON.stringify({comparison,targetVersion:target.info.version,sourceBytes:source.info.bytes,targetBytes:target.info.bytes,maxConnections:target.info.max_connections},null,2));
   assert.ok(Object.values(comparison).every(Boolean),'Complete restore mismatch');

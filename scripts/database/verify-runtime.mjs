@@ -3,7 +3,7 @@ import { randomUUID } from 'node:crypto';
 import assert from 'node:assert/strict';
 import { Db } from '../../src/infrastructure/db.ts';
 import { BACKUP, connect, privateWrite } from './migration-tools.mjs';
-const url=readFileSync(BACKUP+'/neon-validation-app-url','utf8'),admin=await connect(url);
+const url=readFileSync(BACKUP+'/neon-validation-app-url','utf8');assert.equal(new URL(url).hostname,'ep-summer-heart-b361hnom.c-4.ap-southeast-1.aws.neon.tech','Synthetic runtime tests require isolated validation endpoint');const admin=await connect(url);
 const schema='test_'+randomUUID().replaceAll('-',''),a=new Db(url,schema),b=new Db(url,schema);
 const checks=[];
 const deferred=()=>{let resolve;const promise=new Promise(r=>resolve=r);return{promise,resolve};};
