@@ -6,6 +6,12 @@ import { makeSuiCandidate, suiClock, suiScenario, suiInput } from '../support/su
 afterEach(() => suiClock.set('2026-10-08T00:00:00.000Z'));
 
 describe('Sui Testnet funding adapter', () => {
+  it('rejects a different registered payer before execution',async()=>{
+    const s=await suiScenario(),input={...s.input,expectedPayer:'0x'+'c'.repeat(64)};
+    expect(await s.adapter.prepare(s.candidate.header,input)).toMatchObject({ok:false});
+    expect(await s.adapter.verify(s.candidate.header,input)).toMatchObject({ok:false,settlementAttempted:false});expect(s.counts().executed).toBe(0);
+  });
+
   it('prepares and verifies an exact payer-signed USDC transfer, then recovers its digest after restart', async () => {
     const s = await suiScenario();
     expect(await s.adapter.prepare(s.candidate.header, s.input)).toMatchObject({

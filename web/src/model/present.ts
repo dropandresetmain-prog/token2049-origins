@@ -343,6 +343,7 @@ function buildProof(f: Facts): ProofVM {
   const paymentFields: Field[] = [
     { label: copy.proof.rowMethod, value: f.networkIsTest ? `${f.method}, ${copy.testNetwork.toLowerCase()}` : f.method },
   ];
+  if (p.selectedSource) paymentFields.push({ label: 'Selected wallet', value: p.selectedSource.displayAddress });
   if (requirement) paymentFields.push({ label: copy.proof.rowAmount, value: formatCrypto(requirement.amount, copy.testFunds, f.ctx) });
   if (funding) {
     paymentFields.push({ label: copy.proof.rowCovers, value: copy.paymentCovers[funding.purpose] });

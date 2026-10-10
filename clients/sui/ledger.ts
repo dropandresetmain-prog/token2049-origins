@@ -73,7 +73,7 @@ export function assertSuiCaps(entries: SuiLedgerEntry[], amount: bigint, gasBudg
   const committed = entries.reduce((sum, entry) => sum + BigInt(entry.amount), 0n);
   const committedGas = entries.reduce((sum, entry) => sum + BigInt(entry.gasBudget), 0n);
   const cutoff = nowMs - 24 * 60 * 60 * 1000;
-  const daily = entries.reduce((sum, entry) => Date.parse(entry.createdAt) >= cutoff ? sum + BigInt(entry.amount) : sum, 0n);
+  const daily = entries.reduce((sum, entry) => (entry.status !== 'accepted' || Date.parse(entry.createdAt) >= cutoff) ? sum + BigInt(entry.amount) : sum, 0n);
   if (daily + amount > policy.maxDaily) throw new Error('Sui rolling 24-hour cap exceeded');
   if (committed + amount > policy.maxTotal) throw new Error('Sui cumulative spend cap exceeded');
   if (committedGas + gasBudget > policy.maxGasTotal) throw new Error('Sui cumulative gas cap exceeded');

@@ -138,11 +138,15 @@ function Console() {
     );
   }, [signOut]);
 
-  /* New API purchases must update Current purchase even while a completed detail is open. */
+  // Active purchases refresh while visible. Completed/idle screens refresh on return or navigation.
+  const listLive = useRef(false);
+  listLive.current = (list?.counts.in_progress ?? 0) > 0;
   useEffect(() => {
     if (session?.source.kind !== 'gateway') return;
-    const timer = window.setInterval(refreshList, 5000);
-    return () => window.clearInterval(timer);
+    const timer = window.setInterval(() => { if (!document.hidden && listLive.current) void refreshList(); }, 5000);
+    const onVisible = () => { if (!document.hidden) void refreshList(); };
+    document.addEventListener('visibilitychange', onVisible);
+    return () => { window.clearInterval(timer); document.removeEventListener('visibilitychange', onVisible); };
   }, [session?.source, refreshList]);
 
   /* Home resolves to the current purchase, replacing the entry so Back does not bounce. */

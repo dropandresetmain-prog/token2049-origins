@@ -62,6 +62,14 @@ describe('hosted MCP configuration', () => {
     expect(loadHostedMcpConfig(env())!.payerTokenSha256).toBeUndefined();
   });
 
+  it('uses a separate consolidated client and refuses overlapping legacy authority', () => {
+    const legacy=env();
+    const over={CARDANO_PAYER_BRIDGE_URL:undefined,CARDANO_PAYER_BRIDGE_TOKEN_FILE:undefined,MULTIWALLET_PAYER_URL:PAYER,MULTIWALLET_PAYER_TOKEN_FILE:legacy.CARDANO_PAYER_BRIDGE_TOKEN_FILE,MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256:'b'.repeat(64)};
+    expect(()=>loadHostedMcpConfig(env({MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256:'b'.repeat(64)}))).toThrow(HostedConfigError);
+    expect(loadHostedMcpConfig(env(over))?.multiwalletPayerTokenSha256).toBe('b'.repeat(64));
+    for(const bad of [{MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256:'bad'},{MCP_PAYER_GATEWAY_TOKEN_SHA256:'a'.repeat(64)},{MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256:'c'.repeat(64)},{CARDANO_PAYER_BRIDGE_URL:PAYER,CARDANO_PAYER_BRIDGE_TOKEN_FILE:legacy.CARDANO_PAYER_BRIDGE_TOKEN_FILE},{MULTIWALLET_PAYER_TOKEN_FILE:undefined}])expect(()=>loadHostedMcpConfig(env({...over,...bad}))).toThrow(HostedConfigError);
+  });
+
   it('refuses a short owner passcode and never echoes secrets in errors', () => {
     const root = mkdtempSync(join(tmpdir(), 'hosted-short-')); roots.push(root);
     const short = join(root, 'short'); writeFileSync(short, 'tooshort');

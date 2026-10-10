@@ -1,0 +1,166 @@
+{
+  "version": 1,
+  "architecture": "existing-render-consolidated-payer",
+  "candidateBranch": "codex/capsule-on-demand-multiwallet",
+  "baseSha": "7c09b37eaaeda2bf3eec94fc1e3456118962f636",
+  "defaultDeny": {
+    "signing": false,
+    "merchantWrites": "not authorized; stop gateway during cutover; this manifest is not a runtime switch",
+    "registrationEnabled": false,
+    "automaticDeployment": false
+  },
+  "resources": {
+    "gateway": {
+      "id": "srv-db2jgqnavr4c73e9blrg",
+      "url": "https://token2049-origins.onrender.com",
+      "plan": "Free",
+      "dockerfile": "Dockerfile"
+    },
+    "consolidatedPayer": {
+      "id": "srv-db2mnk1srm7s73c1f5c0",
+      "url": "https://t2o-cardano-payer.onrender.com",
+      "plan": "Free",
+      "dockerfile": "Dockerfile.multiwallet",
+      "command": [
+        "node",
+        "dist/clients/multiwallet/hosted.js"
+      ]
+    },
+    "retireAfterApprovedFencing": {
+      "id": "srv-db35psid0e5s73f7ltng",
+      "action": "suspend; preserve service/configuration; never automatically delete"
+    },
+    "database": {
+      "id": "dpg-db29mujncjis73dtvf70-a",
+      "name": "token2049-origins-db",
+      "major": 18,
+      "plan": "Free",
+      "expiresAt": "2026-11-05T06:55:54.699333Z",
+      "externalAccess": "disabled; do not change"
+    },
+    "additionalServices": 0
+  },
+  "bindings": {
+    "customerId": "cus_HOSTEDMCPDEMO",
+    "payerId": "payer_HOSTEDMCPDEMO",
+    "gatewayClientId": "cli_HOSTEDMULTIWALLETPAYER",
+    "gatewayClientScopes": [
+      "purchases:read",
+      "purchases:fund"
+    ],
+    "privateSigningSurface": "POST /pay with canonical purchaseId only; protected HTTPS bearer token and host allowlist"
+  },
+  "migrations": [
+    "0010_sui_funding_recovery.sql",
+    "0011_registered_wallets.sql",
+    "0012_wallet_ledgers.sql"
+  ],
+  "networks": [
+    "cardano:preprod",
+    "solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1",
+    "sui:testnet"
+  ],
+  "wallets": [
+    {
+      "rail": "cardano",
+      "signerRef": "DEMO_CARDANO",
+      "ledgerNamespace": "legacy",
+      "publicAddress": "addr_test1qrwghp45ywnyn6vvm6utfk3xmjxap97mve5gql2cj2fq6wnqdqnepvemxymt7h4f4hteytznvy5n9kte95vtvufetnqqtthyxm",
+      "history": "existing hosted_payer_identity/hosted_payer_ledger; no replacement import or reset",
+      "caps": {
+        "perPayment": "5100000",
+        "total": "5100000",
+        "daily": "5100000",
+        "feeLovelace": "2500000000",
+        "adaOutputLovelace": "10000000000"
+      },
+      "assetId": "16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d",
+      "payee": "addr_test1qrw503gkfd8cygz77c7jdympe75c66twatus3japsemz7eqdmmdxvsstkvdftkvanpquhyt86ra048k5rwjx9x0gxytqn523py"
+    },
+    {
+      "rail": "solana",
+      "signerRef": "DEMO_SOLANA",
+      "ledgerNamespace": "legacy",
+      "publicAddress": "5iSWoZSucVSaNjtxeVC5TCJTN1RQBC6nScw8P32X5MZ6",
+      "sponsor": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU",
+      "history": "existing hosted_solana_identity/ledger/blocked_attempts; shared canonical sponsor fee history",
+      "caps": {
+        "perPayment": "250000",
+        "total": "500000",
+        "commercialUsdMinor": "25000",
+        "sponsorFeesLamports": "100000"
+      },
+      "assetId": "4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU",
+      "payerTokenAccount": "2dWzL6j5sxpcfrqmuQdhbj22A4WXz2JwDNdbwa9wheMs",
+      "treasuryTokenAccount": "6imvBRJazCiUyJ96nBfFnFBBrKaJjZvALzyLCW8nkpJF",
+      "payee": "6QdrzAxbQMZGCSuk2R9ddneHum22VUJdabDM56ZAr6EU"
+    },
+    {
+      "rail": "sui",
+      "signerRef": "DEMO_SUI",
+      "ledgerNamespace": "sui-demo",
+      "publicAddress": "0x99eb4437d493fae3b8c43830e18b2710cd285f9cdd40264e0056d275eb86d20b",
+      "history": "protected file history; final hash must be recaptured after retiring local signer",
+      "observedSha256": "3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0",
+      "observedEntries": 2,
+      "observedSignedExposure": "35900",
+      "observedGasExposureMist": "20000000",
+      "caps": {
+        "perPayment": "100000",
+        "daily": "500000",
+        "total": "1000000",
+        "gasPerPaymentMist": "10000000",
+        "gasTotalMist": "500000000",
+        "commercialUsdMinor": "10000"
+      },
+      "assetId": "0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC",
+      "payee": "0x450e23b2c8d3d6b6103c878b67fa7687b09422ee2f874851b87f1dba87d05f56"
+    }
+  ],
+  "secretNames": {
+    "gateway": [
+      "DATABASE_URL",
+      "MCP_OAUTH_OWNER_PASSCODE_FILE",
+      "MULTIWALLET_PAYER_TOKEN_FILE",
+      "MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256"
+    ],
+    "payer": [
+      "DATABASE_URL",
+      "MULTIWALLET_PAYER_TOKEN_FILE",
+      "DEMO_CARDANO_PAYER_CARDANO_MNEMONIC_FILE",
+      "DEMO_CARDANO_PAYER_GATEWAY_TOKEN_FILE",
+      "DEMO_CARDANO_BLOCKFROST_PROJECT_ID",
+      "DEMO_SOLANA_SOLANA_PAYER_KEY_FILE",
+      "DEMO_SOLANA_SOLANA_SPONSOR_KEY_FILE",
+      "DEMO_SOLANA_SOLANA_GATEWAY_TOKEN_FILE",
+      "DEMO_SUI_SUI_PAYER_KEY_FILE",
+      "DEMO_SUI_SUI_GATEWAY_TOKEN_FILE"
+    ]
+  },
+  "approvedActionsRequired": [
+    "Verify workspace remaining free hours, build/bandwidth and spend settings; no billing enrollment",
+    "Quiesce gateway and old cloud/local signing runtimes; revoke legacy gateway payer clients",
+    "Final consistent private-network PostgreSQL18 snapshot and pinned Sui source/requirements manifests; retain original receipt schemas/volumes",
+    "Apply additive migrations; verified Sui history import; register wallets disabled with immutable public policy",
+    "Provision protected existing signer files in consolidated payer only and new restricted gateway/bridge credentials",
+    "Replace existing gateway/Cardano payer deployments with approved exact SHA; no endpoint/OAuth/DNS change",
+    "Non-spending deployed initialization, ownership/configuration/history/selected-readiness/console/proof checks",
+    "Only after approved activation conditions: grant authority for exact instance and enable registered sources/signing; unquiesce approved gateway"
+  ],
+  "excludedActions": [
+    "chain broadcast",
+    "provider hold/prebook/order/booking/ticket/payment",
+    "main promotion",
+    "database network exposure",
+    "paid upgrade",
+    "wallet replacement/history reset",
+    "automatic rollback after signing or unknown outcome"
+  ],
+  "unknowns": [
+    "remaining shared free service hours/build/bandwidth/spend settings",
+    "owner-managed backup/export status and approved internal snapshot execution method",
+    "actual consolidated Render Free signer memory/initialization and outbound compatibility",
+    "new live merchant/chain acceptance"
+  ],
+  "manualLiveRows": "docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md"
+}

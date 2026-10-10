@@ -1,5 +1,12 @@
 # Capsule remaining hackathon roadmap
 
+## Current bounded milestone — consolidated payer
+
+The candidate keeps existing Render infrastructure. Complete the task ledger's focused verification/review and authorization packet, then perform only approved migration, credential, fencing and existing-service deployment steps. Hand off after non-spending hosted checks; the owner runs all nine live combinations. No new infrastructure platform, public onboarding, UI redesign or autonomous live purchase is part of this milestone.
+
+See [ACTIVE_TASK](work/ACTIVE_TASK.md), [cutover](architecture/CONSOLIDATED_PAYER.md) and [manual matrix](demo/MULTIWALLET_MANUAL_ACCEPTANCE.md). The submission roadmap below is retained broader history and does not expand this milestone.
+
+
 Integration base: main @ 84c0aef7a7acd1851c590c54ccd8881b9dc365d5; native Masumi source is integrated and its gate is docs/work/MASUMI_INTEGRATION.md.
 
 Goal: smallest reliable, judge-clear system that proves agent-native funding -> ordinary commerce -> verifiable result.

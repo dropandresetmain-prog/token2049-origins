@@ -67,11 +67,11 @@ export function createSolanaFundingAdapter(env: NodeJS.ProcessEnv, opts: SolanaA
       } catch { return { ...base, status: 'ACCESS_BLOCKED', detail: 'Devnet RPC, accounts or facilitator failed independent readiness' }; }
     },
     paymentRequirements: input => ({ x402Version: 2, resource: { url: input.resourceUrl, description: input.description, mimeType: 'application/json' }, accepts: [requirement(input)] }),
-    prepare: (header, input): FundingPreparation => { try { const r = requirement(input), p = readHeader(header, r, input.resourceUrl); assertTransfer(p.transfer, r); if (!p.transfer.signature) return invalid('sponsor signature required'); return { ok: true, transferReference: p.transfer.signature }; } catch { return invalid('Solana signed payment does not bind requirement'); } },
+    prepare: (header, input): FundingPreparation => { try { const r = requirement(input), p = readHeader(header, r, input.resourceUrl); assertTransfer(p.transfer, r); if (!p.transfer.signature) return invalid('sponsor signature required'); if (input.expectedPayer && p.transfer.payer !== input.expectedPayer) return invalid('payer differs from approved wallet', false); return { ok: true, transferReference: p.transfer.signature }; } catch { return invalid('Solana signed payment does not bind requirement'); } },
     recover,
     verify: async (header, input) => {
       let p: ReturnType<typeof readHeader>, req: PaymentRequirements;
-      try { req = requirement(input); p = readHeader(header, req, input.resourceUrl); assertTransfer(p.transfer, req); } catch { return invalid('Solana payment requirement mismatch', false); }
+      try { req = requirement(input); p = readHeader(header, req, input.resourceUrl); assertTransfer(p.transfer, req); if (input.expectedPayer && p.transfer.payer !== input.expectedPayer) return invalid('payer differs from approved wallet', false); } catch { return invalid('Solana payment requirement mismatch', false); }
       const reference = p.transfer.signature!;
       const existing = await recover(reference, input); if (existing.ok) return existing;
       if (cfg!.settlementMode === 'payer_broadcast') return { ok: false, code: 'payment_required', reason: 'Hosted Solana candidate retained for independent finality recovery', settlementAttempted: true };

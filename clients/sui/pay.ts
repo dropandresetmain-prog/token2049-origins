@@ -86,7 +86,7 @@ export async function paySuiPurchase(cfg: SuiPayerConfig, purchaseId: string, de
       const challenge = await request(resource, { method: 'POST', headers: { authorization: 'Bearer ' + token }, redirect: 'error', signal: AbortSignal.timeout(15000) });
       if (challenge.status !== 402) throw new Error('gateway did not issue Sui payment requirements');
       const input = validateChallenge(await challenge.json(), cfg, purchaseId);
-      ledger.assertCaps(BigInt(input.amount.amountBaseUnits), cfg.maxGasBudget, cfg.policy, new Date());
+      await ledger.assertCaps(BigInt(input.amount.amountBaseUnits), cfg.maxGasBudget, cfg.policy, new Date());
       entry = { id: purchaseId, amount: input.amount.amountBaseUnits, gasBudget: cfg.maxGasBudget.toString(), header: null, digest: null, createdAt: new Date().toISOString(), status: 'reserved' };
       await ledger.upsert(entry);
       const nonce = (await ledger.read()).length;

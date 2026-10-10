@@ -18,7 +18,7 @@ import { createServer, type IncomingMessage, type Server, type ServerResponse } 
 import { pathToFileURL } from 'node:url';
 import { loadBridgeConfig, loadPayerConfig, readSecretFile } from './config.js';
 import { redact } from '../../src/infrastructure/redact.js';
-import { Payer, PayerError, type PayerErrorCode } from './payer.js';
+import { PayerError, type PayerErrorCode } from './errors.js';
 import { FundingSource } from '../../src/contracts/presentation.js';
 
 const STATUS: Record<PayerErrorCode, number> = {
@@ -47,6 +47,8 @@ export type BridgeAccess =
 
 export interface BridgeDeps {
   payer: BridgePayer;
+  /** Consolidated dispatch already uses authoritative per-wallet locks; unrelated wallets may progress independently. */
+  serializePayments?: boolean;
   access?: BridgeAccess;
   source?: () => Promise<FundingSource>;
   /** Optional operator summary (caps, committed spend, imported history) merged into /status. Must never contain secrets. */
@@ -173,7 +175,7 @@ export function createBridge(deps: BridgeDeps): Server {
         }
         if (typeof purchaseId !== 'string') return fail(res, 'invalid_request', 'purchaseId is required');
 
-        const r = await exclusive(() => deps.payer.pay(purchaseId as string));
+        const r = await (deps.serializePayments === false ? deps.payer.pay(purchaseId as string) : exclusive(() => deps.payer.pay(purchaseId as string)));
         log({ type: 'bridge.paid', purchaseId, resumed: r.resumed });
         return send(res, 200, { ok: true, ...(r.purchase !== undefined ? { purchase: redact(r.purchase) } : {}), payment: { transferReference: r.transferReference } });
       } catch (e) {
@@ -220,6 +222,7 @@ export async function startBridge(env: NodeJS.ProcessEnv): Promise<Server> {
   const b = loadBridgeConfig(env);
   const token = readSecretFile(b.tokenFile, 'PAYER_BRIDGE_TOKEN_FILE');
   if (token.length < 24) throw new Error('PAYER_BRIDGE_TOKEN_FILE must hold a token of at least 24 characters');
+  const { Payer } = await import('./payer.js');
   const payer = new Payer({ config: loadPayerConfig(env), log: (e) => process.stdout.write(`${JSON.stringify(e)}\n`) });
   const server = createBridge({ payer, token, source: () => payer.source(), log: (e) => process.stdout.write(`${JSON.stringify(e)}\n`) });
   await listenLoopback(server, b.port);

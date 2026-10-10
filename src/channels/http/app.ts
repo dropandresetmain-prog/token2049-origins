@@ -128,6 +128,10 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
     }),
   );
 
+  app.get('/v1/funding-sources', auth, asyncH(async (req, res) => {
+    res.json({ sources: await core.listFundingSources(req.actor!) });
+  }));
+
   app.get('/v1/quotes/:id/purchase', auth, asyncH(async (req, res) => {
     res.json(await core.quotePurchase(req.actor!, String(req.params.id)));
   }));

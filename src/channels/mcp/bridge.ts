@@ -37,6 +37,11 @@ export class BridgeClient {
     this.f = cfg.fetch ?? fetch;
   }
 
+  /** A consolidated bridge dispatches from the canonical purchase, never the rail argument. */
+  static consolidated(config: McpConfig): BridgeClient | undefined {
+    return config.consolidatedBridge ? new BridgeClient('cardano', { ...config.consolidatedBridge, ...(config.fetch ? { fetch: config.fetch } : {}), timeoutMs: config.bridgeTimeoutMs }) : undefined;
+  }
+
   /** One client per configured rail, in a fixed order. */
   static fromConfig(config: McpConfig): BridgeClient[] {
     return PAYER_RAILS.flatMap((rail) => {

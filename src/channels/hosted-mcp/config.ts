@@ -19,6 +19,8 @@ export interface HostedMcpConfig {
   extraRedirectUris: string[];
   /** The single hosted Cardano payer (exact https origin of its free web service), if configured. */
   cardanoBridge?: { url: string; token: string };
+  consolidatedBridge?: { url: string; token: string };
+  multiwalletPayerTokenSha256?: string;
   /** SHA-256 (hex) of the hosted payer's gateway token. Only the hash is configured; it registers the payer's gateway client. */
   payerTokenSha256?: string;
   /** SHA-256 (hex) of a GET-only judge password (purchases:read + evidence:read + operator:read) for the hosted customer. Hash only. */
@@ -29,7 +31,7 @@ export interface HostedMcpConfig {
   bridgeTimeoutMs?: number;
   bridgeStatusTimeoutMs?: number;
   gatewayTimeoutMs?: number;
-  /** How long a tool call waits for a long operation before answering "still running" (ChatGPT gives up after ~60 s). */
+  /** How long a tool call waits for a long operation before answering "still running" (host timeout and progress support vary). */
   backgroundWaitMs?: number;
   solanaBridge?: { url: string; token: string };
   solanaPayerTokenSha256?: string;
@@ -116,6 +118,12 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
     cardanoBridge = { url: parsePayerBridgeUrl(env.CARDANO_PAYER_BRIDGE_URL, 'CARDANO_PAYER_BRIDGE_URL', publicUrl.origin), token: readSecret(env.CARDANO_PAYER_BRIDGE_TOKEN_FILE, 'CARDANO_PAYER_BRIDGE_TOKEN_FILE', 24) };
   }
 
+  let consolidatedBridge: HostedMcpConfig['consolidatedBridge'];
+  if (env.MULTIWALLET_PAYER_URL || env.MULTIWALLET_PAYER_TOKEN_FILE) {
+    if (!env.MULTIWALLET_PAYER_URL || !env.MULTIWALLET_PAYER_TOKEN_FILE) throw new HostedConfigError('MULTIWALLET_PAYER_URL and MULTIWALLET_PAYER_TOKEN_FILE must be set together');
+    consolidatedBridge = { url: parsePayerBridgeUrl(env.MULTIWALLET_PAYER_URL, 'MULTIWALLET_PAYER_URL', publicUrl.origin), token: readSecret(env.MULTIWALLET_PAYER_TOKEN_FILE, 'MULTIWALLET_PAYER_TOKEN_FILE', 24) };
+    if (cardanoBridge || solanaBridge) throw new HostedConfigError('Consolidated and legacy bridge authority cannot be enabled together');
+  }
   const consoleKeySha256 = env.MCP_CONSOLE_KEY_SHA256?.trim().toLowerCase();
   if (consoleKeySha256 !== undefined && !/^[0-9a-f]{64}$/.test(consoleKeySha256)) throw new HostedConfigError('MCP_CONSOLE_KEY_SHA256 must be a 64-character hex SHA-256');
   const payerTokenSha256 = env.MCP_PAYER_GATEWAY_TOKEN_SHA256?.trim().toLowerCase();
@@ -127,6 +135,10 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
   if (solanaPayerTokenSha256 !== undefined && !/^[0-9a-f]{64}$/.test(solanaPayerTokenSha256)) throw new HostedConfigError('MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256 must be a 64-character hex SHA-256');
   if (solanaPayerTokenSha256 && solanaPayerTokenSha256 === payerTokenSha256) throw new HostedConfigError('Hosted payer gateway tokens must be distinct');
 
+  const multiwalletPayerTokenSha256 = env.MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256?.trim().toLowerCase();
+  if (multiwalletPayerTokenSha256 !== undefined && !/^[0-9a-f]{64}$/.test(multiwalletPayerTokenSha256)) throw new HostedConfigError('MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256 must be a 64-character hex SHA-256');
+  if (multiwalletPayerTokenSha256 && !consolidatedBridge) throw new HostedConfigError('Consolidated payer client requires the consolidated bridge');
+  if (consolidatedBridge && (payerTokenSha256 || solanaPayerTokenSha256)) throw new HostedConfigError('Remove legacy payer client hashes at consolidated cutover');
   const port = Number(env.PORT ?? '8787');
   if (!Number.isInteger(port) || port < 1 || port > 65535) throw new HostedConfigError('PORT must be 1-65535');
   return {
@@ -138,6 +150,8 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
     payerClientId: 'cli_HOSTEDPAYER',
     extraRedirectUris,
     ...(cardanoBridge ? { cardanoBridge } : {}),
+    ...(consolidatedBridge ? { consolidatedBridge } : {}),
+    ...(multiwalletPayerTokenSha256 ? { multiwalletPayerTokenSha256 } : {}),
     ...(payerTokenSha256 ? { payerTokenSha256 } : {}),
     ...(consoleKeySha256 ? { consoleKeySha256 } : {}),
     ...(env.MCP_PUBLIC_CONSOLE_READ_ONLY === 'true' ? { publicConsoleReadOnly: true } : {}),

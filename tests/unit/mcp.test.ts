@@ -1,4 +1,4 @@
-import { describe, it, expect, beforeEach, afterEach } from 'vitest';
+import { describe, it, expect, beforeEach, afterEach, vi } from 'vitest';
 import { createServer, request as httpRequest, type Server } from 'node:http';
 import type { AddressInfo } from 'node:net';
 import { mkdtempSync, writeFileSync } from 'node:fs';
@@ -355,7 +355,7 @@ describe('MCP channel', () => {
   });
 
   it('a zero-option quote clearly reports that payment is unavailable', async () => {
-    h.funding.readinessStatus = 'MISSING_CONFIG';
+    vi.spyOn(h.funding, 'acceptedAsset').mockReturnValue(null as never); // Configured capability, without a live readiness probe.
     const m = await connect(cfg);
     try {
       const found = await m.call('find_offers', { intent: retailIntent() });

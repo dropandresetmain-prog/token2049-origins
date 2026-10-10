@@ -22,6 +22,7 @@ import type { FundingRail, ProviderRoute } from '../contracts/common.js';
 import { Accounts, cryptoAsset, entriesForPurchase, fiatAsset, postEntry, type JournalLine } from './journal.js';
 import { validateSettlement } from '../contracts/settlement.js';
 import { fundingRequirementView, fundingSummaries } from './views.js';
+import { purchaseSource } from './wallets.js';
 import { Money, minor, rescaleMinor } from '../contracts/money.js';
 
 interface JobRow {
@@ -563,7 +564,9 @@ export class Worker {
     const funding = await fundingSummaries(this.db, p.id);
     if (funding.some(f => f.evidenceMode === 'local_fixture')) limitations.unshift('Funding is SIMULATED / LOCAL FIXTURE; no externally confirmed chain transaction is proved.');
     if (qv.sourceOffer && qv.sandboxRepresentation) limitations.push(qv.sandboxRepresentation.boundary, 'Source price is an observed item price. Shipping, tax and total are Capsule sandbox charges, not source merchant checkout charges.');
+    const selectedSource = await purchaseSource(this.db, p.id);
     return {
+      ...(selectedSource ? { selectedSource } : {}),
       receiptId: newId('rcp'),
       ...(qv.sourceOffer ? { sourceOffer: qv.sourceOffer } : {}),
       ...(qv.sandboxRepresentation ? { sandboxExecution: { ...qv.sandboxRepresentation, quotedTotal: qv.merchantTotal, orderReference: r.providerReference, paymentStatus: r.merchantPaymentStatus, evidenceMode } } : {}),

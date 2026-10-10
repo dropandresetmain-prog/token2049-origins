@@ -3,6 +3,21 @@ import { startDetailRefresh, LIVE_REFRESH_MS } from './detailRefresh.js';
 
 afterEach(() => vi.useRealTimers());
 describe('live detail refresh', () => {
+  it('pauses hidden-page polling and resumes an active purchase once visible', async () => {
+    vi.useFakeTimers();
+    let hidden = true;
+    const listeners = new Set<()=>void>();
+    const visibility = {get visibilityState(){return hidden?'hidden':'visible';},addEventListener:(_name:string,fn:()=>void)=>listeners.add(fn),removeEventListener:(_name:string,fn:()=>void)=>listeners.delete(fn)} as unknown as Document;
+    const read=vi.fn().mockResolvedValue(true);
+    const controller=startDetailRefresh(read,1000,visibility);
+    await vi.advanceTimersByTimeAsync(10000);expect(read).not.toHaveBeenCalled();
+    hidden=false;for(const fn of listeners)fn();
+    await vi.advanceTimersByTimeAsync(0);expect(read).toHaveBeenCalledTimes(1);
+    hidden=true;for(const fn of listeners)fn();
+    await vi.advanceTimersByTimeAsync(10000);expect(read).toHaveBeenCalledTimes(1);
+    controller.stop();expect(listeners.size).toBe(0);
+  });
+
   it('polls at 1.5s while live and stops immediately on final', async () => {
     vi.useFakeTimers();
     const read = vi.fn().mockResolvedValueOnce(true).mockResolvedValueOnce(true).mockResolvedValue(false);

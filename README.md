@@ -1,5 +1,12 @@
 # Capsule
 
+## Consolidated payer candidate — 10 October 2026
+
+The isolated `codex/capsule-on-demand-multiwallet` candidate keeps the existing Render gateway/MCP/OAuth, PostgreSQL 18, console and providers. One payer service contains Cardano Preprod, Solana Devnet and Sui Testnet modules; the authenticated demo customer explicitly chooses a registered wallet and approves the exact quote. Listing wallets does not check every balance. This candidate is **not deployed**; the known-good hosted demo remains unchanged.
+
+Implementation/cutover: [consolidated payer record](docs/architecture/CONSOLIDATED_PAYER.md). Runtime/account evidence: [verified boundaries](docs/architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md). Owner live acceptance: [nine-row sheet — all NOT RUN](docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md).
+
+
 <img src="assets/brand/capsule-wordmark-accent.webp" alt="Capsule" width="280">
 
 **Any agent. Agent-native money in. Ordinary commerce out.**
@@ -26,7 +33,7 @@ Open the [live Capsule console](https://token2049-origins.onrender.com/console/)
 
 ### Connect your assistant
 
-In ChatGPT, open **Plugins → + → Add custom MCP server** and use these settings. The [OpenAI connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt) covers the setup.
+Follow the [current OpenAI connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt) for your account/workspace, using these settings. Copy any required OAuth redirect URI from the host's setup interface.
 
 | Setting | Value |
 | --- | --- |
@@ -35,7 +42,7 @@ In ChatGPT, open **Plugins → + → Add custom MCP server** and use these setti
 | Authentication | OAuth |
 | Client ID / secret | Leave blank |
 
-Select **Create as a plugin**, enter the access code from Min Htet on Capsule's consent screen and approve. Install Capsule, start a new conversation, and type **@Capsule** to select it. Account and workspace policies may control access to custom MCP servers.
+Complete the host's connection flow, enter the access code from Min Htet only on Capsule's consent screen and approve. Select **@Capsule** in a conversation. Account and workspace policies may control access to custom MCP servers.
 
 ### Make a request
 

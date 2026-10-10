@@ -44,7 +44,8 @@
     "payer:sui": "tsx clients/sui/pay.ts",
     "payer:sui:bridge": "tsx clients/sui/bridge.ts",
     "payer:sui:setup": "tsx scripts/sui/setup.ts",
-    "e2e:sui": "tsx scripts/sui/live-e2e.ts"
+    "e2e:sui": "tsx scripts/sui/live-e2e.ts",
+    "payer:multiwallet:hosted": "tsx clients/multiwallet/hosted.ts"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "1.57.0",

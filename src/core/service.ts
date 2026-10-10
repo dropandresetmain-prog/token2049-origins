@@ -1,3 +1,4 @@
+import { approvedSource, registeredSources, purchaseSource } from './wallets.js';
 import type { Db } from '../infrastructure/db.js';
 import type { Clock } from '../infrastructure/clock.js';
 import { iso } from '../infrastructure/clock.js';
@@ -348,7 +349,7 @@ export class CommerceCore {
     const out: FundingOption[] = [];
     const policy = SettlementPolicy.parse(this.d.config.settlementPolicy ?? demoData.settlementPolicy);
     for (const [rail, adapter] of this.d.fundingAdapters) {
-      if (!this.fundingReady((await adapter.readiness()).status)) continue;
+      // Quote capability comes from configuration; only the selected rail is checked live before payment.
       const asset = adapter.acceptedAsset();
       if (!asset || !asset.supportsUsdNotional || payable.currency !== 'USD') continue;
       let settlement;
@@ -368,6 +369,11 @@ export class CommerceCore {
       });
     }
     return out;
+  }
+
+  async listFundingSources(actor: ActorContext) {
+    this.requireScope(actor, 'purchases:read');
+    return registeredSources(this.d.db, actor.customerId);
   }
 
   async getQuote(actor: ActorContext, quoteId: string, requireActive = false): Promise<QuoteView> {
@@ -447,6 +453,7 @@ export class CommerceCore {
       if (limit === undefined || minor(payable) > limit) {
         throw new CoreError('spend_limit_exceeded', 'quote exceeds the deployment per-purchase demo limit', { currency: payable.currency });
       }
+      const source = await approvedSource(this.d.db, actor.customerId, req.approval.selectedSourceId, option);
       const existing = await this.d.db.get<{ id: string }>('SELECT id FROM purchases WHERE quote_id = $1', quote.id);
       if (existing) throw new CoreError('conflict', 'a purchase already exists for this quote', { purchaseId: existing.id });
 
@@ -462,6 +469,7 @@ export class CommerceCore {
       const purchaseId = newId('pur');
       const requirement: FundingRequirementRecord = {
         fundingOptionId: option.fundingOptionId,
+        ...(source ? { payerPublicAddress: source.publicAddress } : {}),
         resourceUrl: `${this.d.config.publicBaseUrl}/v1/purchases/${purchaseId}/fund`,
         rail: option.rail,
         network: option.amount.network,
@@ -488,6 +496,7 @@ export class CommerceCore {
         nowIso,
         nowIso,
       );
+      if (source) await this.d.db.run('INSERT INTO purchase_wallets(purchase_id,source_id,customer_id,source_json) VALUES($1,$2,$3,$4)', purchaseId, source.sourceId, actor.customerId, JSON.stringify(source));
       await this.d.db.run(
         `INSERT INTO reservations(id, purchase_id, currency, scale, amount_minor, status, expires_at, created_at, updated_at)
          VALUES ($1,$2,$3,$4,$5, 'active', $6,$7,$8)`,
@@ -579,6 +588,7 @@ export class CommerceCore {
       purchaseId: p.id,
       quoteId: p.quote_id,
       quoteDigest: r.quoteDigest,
+      ...(r.payerPublicAddress ? { expectedPayer: r.payerPublicAddress } : {}),
       amount: {
         network: r.network,
         assetId: r.assetId,
@@ -672,6 +682,12 @@ export class CommerceCore {
 
   private async recordVerifiedFunding(purchaseId: string, f: VerifiedFunding, input: FundingRequirementInput): Promise<FundResult> {
     let p = (await getPurchaseRow(this.d.db, purchaseId))!;
+    const selectedSource = await purchaseSource(this.d.db, purchaseId);
+    if (selectedSource && f.payer !== selectedSource.publicAddress && p.state === 'awaiting_funding') {
+      // An independently observed payment from an unapproved wallet is a liability, never merchant authority.
+      await this.expirePurchase(p.id, 'funding source differs from approval; reconcile the unapplied payment');
+      p = (await getPurchaseRow(this.d.db, purchaseId))!;
+    }
     if (f.rail !== p.funding_rail) throw new CoreError('payment_invalid', 'funding rail does not match purchase');
     if (p.state === 'awaiting_funding' && Date.parse(input.expiresAt) <= this.d.clock.now().getTime()) {
       await this.expirePurchase(p.id,'quote expired before funding was independently confirmed');

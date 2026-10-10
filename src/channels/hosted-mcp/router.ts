@@ -42,7 +42,7 @@ const limiter = (max: number, windowMs: number) => ({ windowMs, max, validate: f
  * and an operator-revoked client stays revoked.
  */
 export async function provisionPayerClient(db: Db, config: HostedMcpConfig, nowIso = new Date().toISOString()): Promise<void> {
-  if (!config.payerTokenSha256 && !config.solanaPayerTokenSha256 && !config.consoleKeySha256) return;
+  if (!config.payerTokenSha256 && !config.solanaPayerTokenSha256 && !config.multiwalletPayerTokenSha256 && !config.consoleKeySha256) return;
   await db.tx(async () => {
     await db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', config.customerId, 'Hosted MCP demo customer', nowIso);
     const upsert = (id: string, channel: string, label: string, sha: string, scopes: string[]) => db.run(
@@ -51,6 +51,7 @@ export async function provisionPayerClient(db: Db, config: HostedMcpConfig, nowI
       id, config.customerId, channel, label, sha, JSON.stringify(scopes), nowIso);
     if (config.payerTokenSha256) await upsert(config.payerClientId, 'http', 'Hosted Cardano payer', config.payerTokenSha256, ['purchases:read', 'purchases:fund']);
     if (config.solanaPayerTokenSha256) await upsert(config.solanaPayerClientId ?? 'cli_HOSTEDSOLANAPAYER', 'http', 'Hosted Solana payer', config.solanaPayerTokenSha256, ['purchases:read', 'purchases:fund']);
+    if (config.multiwalletPayerTokenSha256) await upsert('cli_HOSTEDMULTIWALLETPAYER', 'http', 'Consolidated hosted payer', config.multiwalletPayerTokenSha256, ['purchases:read', 'purchases:fund']);
     // Judge console: customer purchases/proof and redacted treasury reads; HTTP middleware enforces GET only.
     if (config.consoleKeySha256) {
       await upsert('cli_HOSTEDCONSOLE', 'console', 'Hosted console (read only)', config.consoleKeySha256, ['purchases:read', 'evidence:read', 'operator:read']);
@@ -120,6 +121,7 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
       bridgeStatusTimeoutMs: config.bridgeStatusTimeoutMs ?? 60_000,
       // Exact quotes drive a headless checkout on a small free instance and can take minutes; the quote itself continues server-side.
       gatewayTimeoutMs: config.gatewayTimeoutMs ?? 600_000,
+      ...(config.consolidatedBridge ? { consolidatedBridge: config.consolidatedBridge } : {}),
       bridges: { ...(config.cardanoBridge ? { cardano: config.cardanoBridge } : {}), ...(config.solanaBridge ? { solana: config.solanaBridge } : {}) },
       ...(opts.fetch ? { fetch: opts.fetch } : {}),
     };

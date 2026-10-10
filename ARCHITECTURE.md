@@ -1,5 +1,12 @@
 # Capsule architecture
 
+## Consolidated payer candidate boundary
+
+The October 2026 candidate preserves the existing Render commerce gateway, hosted MCP/OAuth, console, Playwright and canonical Render PostgreSQL 18. One separate Render Free payer contains Cardano, Solana and Sui modules. An authenticated customer owns a payer profile and multiple registered sources; exact approval and purchase bind the chosen source. Listing/quoting reads records, payment probes only its selected source. No model call is needed to dispatch adapters.
+
+See [the compact implementation and cutover record](docs/architecture/CONSOLIDATED_PAYER.md) for immutable ownership/history contracts, default-deny activation and rollback limits. Candidate hosted acceptance is pending approval; the separate-payer descriptions below describe the retained deployed baseline where they differ.
+
+
 ## A common transaction layer between different worlds
 
 Capsule connects agents, payment networks and commerce providers that each describe a purchase differently. An assistant works with a user's request. A blockchain works with signed transfers. A merchant works with orders, reservations and payments in its own system.

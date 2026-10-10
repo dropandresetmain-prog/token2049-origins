@@ -1,5 +1,20 @@
 # Current Capsule issues
 
+## Consolidated payer candidate triage — 10 October 2026
+
+| Classification | Finding / recommended action | Risk of deferral / blocker |
+|---|---|---|
+| Act Now | Existing PostgreSQL 18 expires 5 Nov 2026 at 14:55:54 Singapore; establish approved internal consistent backup/export and restore evidence. No managed Free backup. | Financial history may become inaccessible; backup method/status is unresolved before cutover. |
+| Act Now | Stop old commerce/signing processes and revoke old credentials before granting consolidated authority. Legacy images do not obey new database grants. | Concurrent signers/divergent history; mandatory owner-approved cutover gate. |
+| Investigate Now | Measure exact candidate on Render Free, selected-rail initialization, memory and host behavior. | Local tests/builds cannot establish hosted readiness; pending approved deployment. |
+| Investigate Now | Verify remaining workspace hours/build/bandwidth and spend settings; same quota serves unrelated projects. | Cannot certify no-spend capacity from published limits; account evidence pending. |
+| Investigate Now | Verify final Solana exposure and complete Sui migration/old receipt access from protected retained history. | Lost caps/proof/recovery authority; final import and history reconciliation gated. |
+| Park for Later | Consumer wallet onboarding, advanced orchestration and infrastructure replacement. | Outside current demo scope; synthetic isolation covers ownership contracts. |
+| Ignore / Accept Risk | Free service sleep/restart and cold-start latency. | Accepted only with durable idempotency/readback; no warm-up requirement. |
+
+Candidate live provider/rail rows are all NOT RUN. Existing hosted history is retained evidence, not consolidated runtime acceptance. Approval/cutover and rollback boundaries: [runbook](architecture/CONSOLIDATED_PAYER.md). The issue history below predates this candidate and must be read against these current gates.
+
+
 Integration base: main @ 84c0aef7a7acd1851c590c54ccd8881b9dc365d5; native Masumi integration checks are in docs/work/MASUMI_INTEGRATION.md.
 
 Historical issue ledgers remain in docs/evidence/. This file contains only current actionable triage.
@@ -47,7 +62,7 @@ Historical issue ledgers remain in docs/evidence/. This file contains only curre
 - **Operational:** free services sleep (first request after idle can take ~50 s, longer for two services); 750 free instance-hours per month are shared by all free services in the workspace; the Render Postgres instance has an expiry date.
 - **Spend limits (owner-authorised 50x on 2026-10-07):** payer per-payment/daily/cumulative 5,100,000 base units (was 102,000), max fee 2,500,000,000 lovelace (was 50,000,000), max ADA output 10,000,000,000 lovelace (was 200,000,000); gateway `DEMO_PER_PURCHASE_LIMIT_USD_MINOR` 2,500,000 (USD 25,000; default was 50,000) and `SIMULATED_CARD_CAPACITY_USD_MINOR` 10,000,000 (USD 100,000; default 200,000). The payer's real exposure is still bounded by the wallet balance (about 104 tADA / 99.9 tUSDM) and by its cumulative cap, which includes the imported history (66,830 committed). The authorised payer policy lives in the protected payer directory (`.env.hosted-policy`), which the provisioner prefers.
 - **Latency:** a live-offer quote takes ~2 minutes and order execution is similarly slow on the free 0.1-vCPU gateway; the conversation needs several "still running" polls.
-- **Accepted:** single-owner passcode consent with global (not per-IP) lockout; stateless `/mcp` with no SSE; a failed or unconfirmed first payment attempt is not resent by the same `buy` (check `get_purchase`, or request a fresh quote); a payer crash mid-signing leaves a `signing` ledger row that blocks only that purchase until an operator reconciles it.
+- **Accepted:** single-owner passcode consent with global (not per-IP) lockout; stateless `/mcp` with no SSE; a failed or unconfirmed first payment attempt requires read-only `get_purchase` and reconciliation; never request a fresh quote to bypass an ambiguous attempt; a payer crash mid-signing leaves a `signing` ledger row that blocks only that purchase until an operator reconciles it.
 
 ## Ignore / Accept Risk for hackathon
 

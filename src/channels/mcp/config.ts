@@ -15,6 +15,7 @@ export interface McpConfig {
   gatewayToken: string;
   /** Optional separate bounded payer processes, at most one per rail. Absent => `buy` returns action_required. */
   bridges?: Partial<Record<PayerRail, BridgeEndpoint>>;
+  consolidatedBridge?: BridgeEndpoint;
   /** Optional streamable-HTTP listener port on 127.0.0.1. Absent => stdio. */
   httpPort?: number;
   /** Test seam: replaces global fetch for gateway and bridge calls. */
@@ -106,7 +107,12 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConf
 
   const cfg: McpConfig = { gatewayUrl, gatewayToken };
 
+  if (env.MULTIWALLET_PAYER_URL || env.MULTIWALLET_PAYER_TOKEN_FILE) {
+    if (!env.MULTIWALLET_PAYER_URL || !env.MULTIWALLET_PAYER_TOKEN_FILE) throw new ConfigError('MULTIWALLET_PAYER_URL and MULTIWALLET_PAYER_TOKEN_FILE must be set together');
+    cfg.consolidatedBridge = { url: requireHttpUrl(env.MULTIWALLET_PAYER_URL, 'MULTIWALLET_PAYER_URL', true), token: readTokenFile(env.MULTIWALLET_PAYER_TOKEN_FILE, 'MULTIWALLET_PAYER_TOKEN_FILE') };
+  }
   const bridges = loadBridges(env);
+  if (cfg.consolidatedBridge && Object.keys(bridges).length) throw new ConfigError('Consolidated and legacy bridges cannot be enabled together');
   if (Object.keys(bridges).length) cfg.bridges = bridges;
 
   if (env.MCP_HTTP_PORT) {
@@ -119,5 +125,5 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConf
 
 /** All secret strings in a config, for output scrubbing. */
 export function secretsOf(cfg: McpConfig): string[] {
-  return [cfg.gatewayToken, ...Object.values(cfg.bridges ?? {}).map((b) => b.token)];
+  return [cfg.gatewayToken, ...(cfg.consolidatedBridge ? [cfg.consolidatedBridge.token] : []), ...Object.values(cfg.bridges ?? {}).map((b) => b.token)];
 }

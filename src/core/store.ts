@@ -84,6 +84,7 @@ export interface AttemptRow {
 }
 
 export interface FundingRequirementRecord {
+  payerPublicAddress?: string;
   fundingOptionId?: string;
   /** Frozen x402 resource identity; optional only for pre-recovery-schema records. */
   resourceUrl?: string;

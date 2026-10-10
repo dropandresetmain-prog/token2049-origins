@@ -9,13 +9,14 @@ import { OfferId, PurchaseId, QuoteId } from '../../contracts/common.js';
 import type { PurchaseView, QuoteView, OfferView } from '../../contracts/commerce.js';
 import { redact, redactString } from '../../infrastructure/redact.js';
 import { GatewayClient, GatewayError } from './client.js';
-import type { BridgeClient } from './bridge.js';
+import { BridgeClient } from './bridge.js';
 import { applyDemoProfile, deliveryLabel, type DemoCustomerProfile } from '../../demo/profile.js';
 
 /** Dependencies of the tool layer. `bridges` may be empty: without one `buy` can never move money. */
 export interface ToolDeps {
   gateway: GatewayClient;
   bridges?: BridgeClient[];
+  consolidatedBridge?: BridgeClient;
   /** Secret strings (gateway token, bridge tokens) that must never appear in any output. */
   secrets: string[];
   /**
@@ -102,6 +103,10 @@ export function sourceMatches(source: FundingSource, option: FundingOptionView):
 
 /** Every reachable connected payer with its bridge (and the spend headroom it reports, if any). Read-only: /status never moves money. */
 async function connectedPayers(deps: ToolDeps): Promise<Array<{ bridge: BridgeClient; source: FundingSource; headroom?: bigint }>> {
+  if (deps.consolidatedBridge) {
+    const { sources } = await deps.gateway.fundingSources();
+    return sources.map(source => ({ bridge: deps.consolidatedBridge!, source }));
+  }
   const all = await Promise.all((deps.bridges ?? []).map(async (bridge) => ({ bridge, status: await bridge.status() })));
   return all.flatMap((p) => (p.status ? [{ bridge: p.bridge, source: p.status.source, ...(p.status.headroomBaseUnits !== undefined ? { headroom: p.status.headroomBaseUnits } : {}) }] : []));
 }
@@ -258,8 +263,8 @@ export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms:
     delivery ?? 'Fulfillment: ' + q.fulfillmentSummary,
     ...q.terms.filter(t => !ENVIRONMENT_TERM.test(t)).map(t => 'Terms: ' + t),
     'Expires ' + q.expiresAt + '.',
-    ...(fund.length ? ['Available funding options:', ...fund] : ['No payment source is currently available. Purchase creation is unavailable.']),
-    'Nothing has been purchased yet. Show these exact terms to the user, ask them to select one available funding option, then ask for explicit approval of the terms and that payment choice. Only then call buy with selectedFundingOptionId, quoteId, maxTotal and quoteDigest from this quote. Never infer a choice or fabricate customer information. Do not ask for name, email, phone, address or traveller details: the saved customer profile already covers them. Immediately before asking for that final approval, state this once, verbatim: "' + demoDisclosure() + '" Do not repeat it elsewhere.',
+    ...(fund.length ? ['Available funding options:', ...fund, ...sources.map(s => '- Registered wallet '+s.displayAddress+' / '+s.rail+' / '+s.readiness+' / selectedSourceId '+s.sourceId+' (balance checked only when selected)')] : ['No payment source is currently available. Purchase creation is unavailable.']),
+    'Nothing has been purchased yet. Show these exact terms to the user, ask them to select one available funding option, then ask for explicit approval of the terms and that payment choice. Only then call buy with selectedFundingOptionId, selectedSourceId for the chosen registered wallet, quoteId, maxTotal and quoteDigest from this quote. Never infer a choice or fabricate customer information. Do not ask for name, email, phone, address or traveller details: the saved customer profile already covers them. Immediately before asking for that final approval, state this once, verbatim: "' + demoDisclosure() + '" Do not repeat it elsewhere.',
   ].join('\n');
 }
 
@@ -429,12 +434,13 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         maxTotal: Money.optional(),
         quoteDigest: z.string().min(1).optional(),
         selectedFundingOptionId: z.string().regex(/^fop_[0-9A-Za-z]{10,40}$/).optional(),
+        selectedSourceId: z.string().regex(/^src_[0-9a-f]{32}$/).optional(),
         idempotencyKey: IdempotencyKey.optional(),
       },
       annotations: { readOnlyHint: false, destructiveHint: true, idempotentHint: true, openWorldHint: true },
       ...securityMeta(deps, 'buy'),
     },
-    bounded('buy', async ({ quoteId, maxTotal, quoteDigest, selectedFundingOptionId, idempotencyKey }, extra) => {
+    bounded('buy', async ({ quoteId, maxTotal, quoteDigest, selectedFundingOptionId, selectedSourceId, idempotencyKey }, extra) => {
       const denied = missingScope(deps, 'buy', extra);
       if (denied) return denied;
       try {
@@ -448,8 +454,9 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         if (!maxTotal) fields.push({ path: 'maxTotal', humanLabel: 'Approved maximum', expectedType: 'object', reason: 'Show the commercial amount and collect explicit approval', issue: 'missing' });
         if (!quoteDigest) fields.push({ path: 'quoteDigest', humanLabel: 'Exact quote approval', expectedType: 'string', reason: 'Collect approval of this exact quote and selected payment choice', issue: 'missing' });
         if (fields.length) return inputNeeded(deps, { status: 'needs_input', phase: 'approval', fields });
-        const approval = { maxTotal: maxTotal!, quoteDigest: quoteDigest!, selectedFundingOptionId };
-        const sameApproval = (a: typeof approval | null) => a && a.quoteDigest === approval.quoteDigest && a.selectedFundingOptionId === selectedFundingOptionId && a.maxTotal.currency === maxTotal!.currency && a.maxTotal.scale === maxTotal!.scale && a.maxTotal.amountMinor === maxTotal!.amountMinor;
+        const approval = { maxTotal: maxTotal!, quoteDigest: quoteDigest!, selectedFundingOptionId, ...(selectedSourceId ? { selectedSourceId } : {}) };
+        if (deps.consolidatedBridge && !selectedSourceId) return inputNeeded(deps, { status: 'needs_input', phase: 'funding_selection', fields: [{ path: 'selectedSourceId', humanLabel: 'Wallet', expectedType: 'string', reason: 'Ask the user to choose a registered wallet from the exact quote', issue: 'missing' }] });
+        const sameApproval = (a: typeof approval | null) => a && a.quoteDigest === approval.quoteDigest && a.selectedFundingOptionId === selectedFundingOptionId && a.selectedSourceId === selectedSourceId && a.maxTotal.currency === maxTotal!.currency && a.maxTotal.scale === maxTotal!.scale && a.maxTotal.amountMinor === maxTotal!.amountMinor;
         const existing = await deps.gateway.quotePurchase(quoteId);
         let purchase = existing.purchase;
         if (purchase && !sameApproval(existing.approval)) {
@@ -464,8 +471,8 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         let payer: BridgeClient | undefined;
         const canAttempt = !purchase || (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && purchase.paymentAttempt?.status === 'failed' && purchase.paymentAttempt.retrySafe);
         if (canAttempt) {
-          if (deps.bridges?.length) {
-            const matching = (await connectedPayers(deps)).filter(p => sourceMatches(p.source, option));
+          if (deps.consolidatedBridge || deps.bridges?.length) {
+            const matching = (await connectedPayers(deps)).filter(p => sourceMatches(p.source, option) && (!selectedSourceId || p.source.sourceId === selectedSourceId));
             if (matching.length > 1) {
               return failure(deps, 'More than one connected payer claims the selected funding option. Fix the payer configuration. Nothing has been purchased.', { error: { code: 'payer_ambiguous' }, selectedFundingOptionId });
             }

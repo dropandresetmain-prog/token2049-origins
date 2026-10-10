@@ -1,5 +1,14 @@
 # Capsule — current handoff
 
+## Current consolidated-payer candidate — 10 October 2026
+
+Worktree: `C:/Dev/token2049-origins-on-demand`; branch: `codex/capsule-on-demand-multiwallet`; base: `7c09b37eaaeda2bf3eec94fc1e3456118962f636`. Resolve exact checkpoint SHA/state from [ACTIVE_TASK](work/ACTIVE_TASK.md) and `git rev-parse HEAD`; do not resume from the historical baseline below.
+
+The candidate reuses existing Render infrastructure and integrates Sui with one customer-linked multi-wallet payer. Keys, canonical history, live deployments and old authority remain untouched until approval. Read [cutover/rollback](architecture/CONSOLIDATED_PAYER.md), [runtime evidence](architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md) and [owner manual tests](demo/MULTIWALLET_MANUAL_ACCEPTANCE.md). Finish the ledger's recorded next action in the same coding chat. No live purchases are authorized; all nine new live rows are NOT RUN.
+
+The following older handoff remains retained integration history, not a current deployment claim.
+
+
 ## Current repository state
 
 Repository: dropandresetmain-prog/token2049-origins

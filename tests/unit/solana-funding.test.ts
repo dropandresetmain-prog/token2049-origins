@@ -4,6 +4,11 @@ import { address } from '@solana/kit';
 import { createSolanaFundingAdapter } from '../../src/funding/solana/adapter.js';
 import { scenario,clock } from '../support/solana.js';
 describe('Solana exact funding',()=>{
+  it('rejects a different registered payer before any broadcast',async()=>{
+    const s=await scenario(),input={...s.input,expectedPayer:'11111111111111111111111111111111'};
+    expect(s.adapter.prepare(s.header,input).ok).toBe(false);
+    expect(await s.adapter.verify(s.header,input)).toMatchObject({ok:false,settlementAttempted:false});expect(s.submissions()).toBe(0);
+  });
   it('freezes exact mint, payee token account, amount and signed quote memo',async()=>{
     const s=await scenario();expect(s.adapter.prepare(s.header,s.input)).toEqual({ok:true,transferReference:s.transfer.signature});
     expect(await s.adapter.recover(s.transfer.signature!,s.input)).toMatchObject({ok:true,funding:{rail:'solana',paymentState:'confirmed',amountBaseUnits:'1000',details:{commitment:'finalized'}}});

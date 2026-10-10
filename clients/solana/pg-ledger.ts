@@ -9,17 +9,20 @@ type StoredEntry = Omit<SolanaLedgerEntry, 'createdAt'> & { created_at: string; 
 
 /** No empty-ledger initialization: both identities must have a verified, pinned history import first. */
 export class PgSolanaLedger implements SolanaLedgerPort {
-  private constructor(private readonly db: Db, readonly role: SolanaRole, readonly owner: string) {}
+  private constructor(private readonly db: Db, readonly role: SolanaRole, readonly owner: string, private readonly namespace?: string) {}
+  private get prefix() { return this.namespace ? 'wallet_solana' : 'hosted_solana'; }
+  private get roleKey() { return this.namespace ? this.namespace+':'+this.role : this.role; }
 
-  static async open(db: Db, role: SolanaRole, owner: string): Promise<PgSolanaLedger> {
-    const ledger = new PgSolanaLedger(db, role, owner);
+  static async open(db: Db, role: SolanaRole, owner: string, namespace?: string): Promise<PgSolanaLedger> {
+    const ledger = new PgSolanaLedger(db, role, owner, namespace);
     await ledger.assertReady();
     return ledger;
   }
 
   async assertReady(): Promise<void> {
+    if(this.namespace && await this.db.get('SELECT owner FROM hosted_solana_identity WHERE owner=$1',this.owner))throw Error('legacy Solana wallet must retain its canonical ledger namespace');
     const identity = await this.db.get<{ owner: string; network: string; mint: string }>(
-      'SELECT owner, network, mint FROM hosted_solana_identity JOIN hosted_solana_import USING(role) WHERE role=$1', this.role);
+      `SELECT owner, network, mint FROM ${this.prefix}_identity JOIN ${this.prefix}_import USING(role) WHERE role=$1`, this.roleKey);
     if (identity?.owner !== this.owner || identity.network !== NETWORK || identity.mint !== TEST_MINT) {
       throw new Error('Solana identity/history import missing or mismatched; refusing to sign');
     }
@@ -35,21 +38,21 @@ export class PgSolanaLedger implements SolanaLedgerPort {
 
   async read(): Promise<SolanaLedgerEntry[]> {
     await this.assertReady();
-    return (await this.db.all<StoredEntry>('SELECT l.id,l.signature,l.amount,l.fee,l.header,l.created_at,(b.purchase_id IS NOT NULL) AS blocked FROM hosted_solana_ledger l LEFT JOIN hosted_solana_blocked_history b ON b.role=l.role AND b.purchase_id=l.id WHERE l.role=$1 ORDER BY l.id', this.role))
+    return (await this.db.all<StoredEntry>(`SELECT l.id,l.signature,l.amount,l.fee,l.header,l.created_at,(b.purchase_id IS NOT NULL) AS blocked FROM ${this.prefix}_ledger l LEFT JOIN hosted_solana_blocked_history b ON b.role=l.role AND b.purchase_id=l.id WHERE l.role=$1 ORDER BY l.id`, this.roleKey))
       .map(({ created_at, blocked, ...row }) => ({ ...row, createdAt: created_at, ...(blocked ? { historicalBlocked: true } : {}) }));
   }
 
   async upsert(entry: SolanaLedgerEntry): Promise<void> {
     await this.assertReady();
     await this.assertAllowed(entry.id, ...(entry.signature ? [entry.signature] : []));
-    await this.db.run(`INSERT INTO hosted_solana_ledger(role,id,signature,amount,fee,header,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)
+    await this.db.run(`INSERT INTO ${this.prefix}_ledger(role,id,signature,amount,fee,header,created_at) VALUES($1,$2,$3,$4,$5,$6,$7)
       ON CONFLICT(role,id) DO UPDATE SET signature=EXCLUDED.signature,amount=EXCLUDED.amount,fee=EXCLUDED.fee,header=EXCLUDED.header,created_at=EXCLUDED.created_at`,
-      this.role, entry.id, entry.signature, entry.amount, entry.fee, entry.header, entry.createdAt);
+      this.roleKey, entry.id, entry.signature, entry.amount, entry.fee, entry.header, entry.createdAt);
   }
 
   async exclusive<T>(fn: () => Promise<T>): Promise<T> {
     await this.assertReady();
-    const result = await this.db.withExclusiveLock(`hosted-solana:${this.role}:${this.owner}`, fn);
+    const result = await this.db.withExclusiveLock(`hosted-solana:${this.role}:${this.owner}`, async () => { await this.assertReady(); return fn(); });
     if (!result.acquired) throw new Error('Solana ledger busy; no signing attempted');
     return result.value;
   }
@@ -70,7 +73,7 @@ export class PgSolanaLedger implements SolanaLedgerPort {
   async summary(): Promise<Record<string, unknown>> {
     const entries = await this.read();
     const imported = await this.db.get<{ source_sha256: string; entry_count: number; committed_amount: string; committed_fee: string; imported_at: string }>(
-      'SELECT * FROM hosted_solana_import WHERE role=$1', this.role);
+      `SELECT * FROM ${this.prefix}_import WHERE role=$1`, this.roleKey);
     return {
       role: this.role, owner: this.owner, entries: entries.length,
       historicalBlocked: entries.filter(e => e.historicalBlocked).length,

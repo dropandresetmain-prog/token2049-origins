@@ -1,5 +1,18 @@
 # Capsule environment and external services
 
+## Consolidated payer candidate configuration — 10 October 2026
+
+Keep existing Render PostgreSQL 18/internal `DATABASE_URL`, gateway origin, OAuth issuer/passcode, provider credentials and Playwright. No database provider/network or OAuth migration.
+
+Gateway: `MULTIWALLET_PAYER_URL`, `MULTIWALLET_PAYER_TOKEN_FILE`, `MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256`. Consolidated mode rejects legacy bridge and payer-client hash configuration; remove `CARDANO_PAYER_BRIDGE_*`, `SOLANA_PAYER_BRIDGE_*`, `MCP_PAYER_GATEWAY_TOKEN_SHA256` and `MCP_SOLANA_PAYER_GATEWAY_TOKEN_SHA256` only during approved replacement. The dedicated funding client is `cli_HOSTEDMULTIWALLETPAYER`; revoked legacy client rows stay revoked.
+
+Payer: `DATABASE_URL`, `MULTIWALLET_INSTANCE_ID`, `MULTIWALLET_ALLOWED_HOSTS`, `MULTIWALLET_PAYER_TOKEN_FILE`, `MULTIWALLET_SIGNING_ENABLED=false`. Every registered private `signerRef` is an environment prefix: e.g. `DEMO_CARDANO_PAYER_CARDANO_MNEMONIC_FILE` supplies `PAYER_CARDANO_MNEMONIC_FILE` to that selected module. Preserve every module's existing public identity, policy and protected key-file configuration. Solana payer and gas sponsor keys remain separate. No gateway signer key.
+
+Build uses `Dockerfile.multiwallet`; entrypoint is `dist/clients/multiwallet/hosted.js`. Migrations/imports/registration are explicit approved steps, never startup history replacement. Registration defaults to verification and inserts disabled sources only under `CAPSULE_APPROVED_REGISTRATION=true` plus `--apply`. Sui import defaults to offline verification; `--apply` also requires `CAPSULE_APPROVED_SUI_IMPORT=true` and a pinned protected manifest. These flags do not replace owner authorization.
+
+Current read-only database expiry: `2026-11-05T06:55:54.699333Z` (5 Nov 14:55:54 Singapore), Free/available, external access disabled; backup status unknown. [Runbook](architecture/CONSOLIDATED_PAYER.md) owns cutover and retention. Historical environment notes below do not authorize redeployment or secret copying.
+
+
 Baseline: main @ 8a76225364bf3b56fe2bf192297ee17b86d8f540
 
 This document names required configuration groups and verified service status. It contains no secrets.
@@ -22,10 +35,7 @@ Required:
 
 Do not use DATABASE_PATH; SQLite is unsupported.
 
-Migrations:
-1. 0001_initial.sql
-2. 0002_journal_truncate_guard.sql
-3. 0003_shopify_shadows.sql
+Migrations are the ordered immutable files in `src/migrations/`. The consolidated candidate adds `0011_registered_wallets.sql` and `0012_wallet_ledgers.sql` after the integrated Sui `0010_sui_funding_recovery.sql`. Existing deployed history must remain intact; authoritative migration execution requires owner approval.
 
 Recorded Render DB:
 - name: token2049-origins-db
@@ -173,10 +183,10 @@ With variables already in the process environment, `npm run channel:masumi` laun
 
 ## Render deployment
 
-render.yaml points at main with auto-deploy off. The 7 October rehearsal is live from the isolated
-`codex/render-rehearsal-solana-https` branch at `https://token2049-origins.onrender.com`; that same
-HTTPS origin is frozen as PUBLIC_BASE_URL. Solana is deliberately disabled pending a trusted tunnel.
-See [deployment evidence](evidence/render-rehearsal.md) for exact SHA, readiness and limitations.
+Read-only 10 October metadata verifies the live gateway at known-good main
+7c09b37eaaeda2bf3eec94fc1e3456118962f636, alongside separate Free Cardano/Solana services.
+The consolidated branch remains undeployed; existing origin and provider/browser configuration stay fixed.
+See [runtime/account evidence](architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md).
 
 Before deployment:
 - verify secrets in Render rather than copying local env wholesale;
@@ -184,4 +194,4 @@ Before deployment:
 - set final PUBLIC_BASE_URL;
 - verify Chromium runtime;
 - verify provider/token readiness;
-- never put Cardano/Solana signer private material on Render.
+- never relocate existing signing material without explicit custody authorization; gateway must never hold payer keys.

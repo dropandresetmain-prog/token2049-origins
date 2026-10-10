@@ -1,3 +1,4 @@
+import { purchaseSource } from './wallets.js';
 import type { Db } from '../infrastructure/db.js';
 import { paymentAttempt } from './handoffs.js';
 import type { PurchaseView, QuoteView, FundingSummary, ReceiptView } from '../contracts/commerce.js';
@@ -39,8 +40,10 @@ export async function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: s
   const handoff = await paymentAttempt(db, p.id);
   if (handoff?.status === 'running' && now - Date.parse(handoff.updatedAt) > 10 * 60_000) handoff.reviewRequired = true;
   const manual = await db.get("SELECT id FROM purchase_events WHERE purchase_id = $1 AND type IN ('reconciliation.manual_required','funding.manual_required','outcome.manual_required') LIMIT 1", p.id);
+  const selectedSource = await purchaseSource(db, p.id);
   return {
     purchaseId: p.id,
+    ...(selectedSource ? { selectedSource } : {}),
     customerId: p.customer_id,
     quoteId: p.quote_id,
     quoteVersion: q.version,

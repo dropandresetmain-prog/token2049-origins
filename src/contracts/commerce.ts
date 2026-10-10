@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FundingSource } from './presentation.js';
 import { SourceOffer, SandboxRepresentation, SandboxExecution } from './provenance.js';
 import { SettlementBreakdown, validateSettlement } from './settlement.js';
 import { CryptoAmount, Money } from './money.js';
@@ -177,6 +178,7 @@ export type MerchantPaymentStatus = z.infer<typeof MerchantPaymentStatus>;
 export const Approval = z
   .object({
     selectedFundingOptionId: z.string().regex(/^fop_[0-9A-Za-z]{10,40}$/),
+    selectedSourceId: z.string().regex(/^src_[0-9a-f]{32}$/).optional(),
     /** Ceiling the customer authorizes; must be >= quote.payablePrincipal and in the same currency. */
     maxTotal: Money,
     /** Must equal the quote digest: approval binds exact merchant/offer/amount/fulfillment/expiry. */
@@ -204,6 +206,7 @@ export type FundingSummary = z.infer<typeof FundingSummary>;
 export const ReceiptView = z
   .object({
     receiptId: z.string(),
+    selectedSource: FundingSource.optional(),
     sourceOffer: SourceOffer.optional(),
     sandboxExecution: SandboxExecution.optional(),
     purchaseId: PurchaseId,
@@ -257,6 +260,7 @@ export const PaymentAttempt = z.object({
 export const PurchaseView = z
   .object({
     purchaseId: PurchaseId,
+    selectedSource: FundingSource.optional(),
     customerId: CustomerId,
     quoteId: QuoteId,
     quoteVersion: z.number().int(),

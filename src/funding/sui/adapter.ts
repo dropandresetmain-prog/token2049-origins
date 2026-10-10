@@ -55,7 +55,7 @@ export function createSuiFundingAdapter(env: NodeJS.ProcessEnv, opts: { clock?: 
     paymentRequirements: input => {
       if (!cfg) throw new Error('Sui funding unavailable');
       assertRequirement(input, cfg, clock.now());
-      return { protocol: 'sui-usdc-transfer', version: 1, paymentHeader: 'sui-payment', requirement: input,
+      return { protocol: 'sui-usdc-transfer', version: 1, paymentHeader: 'sui-payment', requirement: (({ expectedPayer: _expectedPayer, ...publicInput }) => publicInput)(input),
         maxGasBudgetMist: cfg.maxGasBudget.toString(), binding: 'payer_signed_application_candidate', onChainPurchaseCommitment: false };
     },
     prepare: async (header, input) => {
@@ -63,6 +63,7 @@ export function createSuiFundingAdapter(env: NodeJS.ProcessEnv, opts: { clock?: 
         if (!cfg) return invalid('Sui funding unavailable', false);
         assertRequirement(input, cfg, clock.now());
         const c = await readCandidate(header, input, cfg);
+        if (input.expectedPayer && c.transfer.payer !== input.expectedPayer) return invalid('payer differs from approved wallet', false);
         return { ok: true, transferReference: c.candidate.digest, recoveryPayload: { header } };
       } catch { return invalid('Sui signed candidate does not bind the exact requirement', false); }
     },
@@ -86,6 +87,7 @@ export function createSuiFundingAdapter(env: NodeJS.ProcessEnv, opts: { clock?: 
         if (!cfg) return invalid('Sui funding unavailable', false);
         assertRequirement(input, cfg, clock.now());
         c = await readCandidate(header, input, cfg);
+        if (input.expectedPayer && c.transfer.payer !== input.expectedPayer) return invalid('payer differs from approved wallet', false);
       } catch { return invalid('Sui signed candidate rejected', false); }
       try { await rpc.assertNetwork(); } catch { return invalid('Sui network identity check failed', false); }
       // An existing (even uncheckpointed or failed) transaction is never submitted again.

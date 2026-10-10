@@ -28,31 +28,8 @@ import { createBoundSigner } from './signer.js';
 import { timedOperation } from '../../src/infrastructure/timing.js';
 import { PayerLedger, type LedgerPort } from './ledger.js';
 
-export type PayerErrorCode =
-  | 'invalid_request'
-  | 'policy_violation'
-  | 'not_found'
-  | 'unauthenticated'
-  | 'conflict'
-  | 'payment_rejected'
-  | 'gateway_unreachable'
-  | 'rate_limited'
-  | 'internal';
-
-/** Safe-to-return failure: messages are written here, never copied from gateway bodies or wallet code. */
-export class PayerError extends Error {
-  /** Set only while holding the durable ledger lock, after confirming no reservation exists. */
-  retrySafe = false;
-  constructor(
-    readonly code: PayerErrorCode,
-    message: string,
-    /** Latest purchase view when we fetched one (useful after a 409). */
-    readonly purchase?: unknown,
-  ) {
-    super(message);
-    this.name = 'PayerError';
-  }
-}
+import { PayerError } from './errors.js';
+export { PayerError, type PayerErrorCode } from './errors.js';
 
 export interface PayResult {
   purchase: unknown;

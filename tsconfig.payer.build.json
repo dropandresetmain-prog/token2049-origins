@@ -1,0 +1,8 @@
+{
+  "extends": "./tsconfig.json",
+  "include": [
+    "clients/multiwallet",
+    "scripts/sui/import-history.ts",
+    "scripts/multiwallet"
+  ]
+}

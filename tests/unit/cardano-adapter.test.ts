@@ -272,6 +272,11 @@ describe('cardano adapter: asset and requirements', () => {
 });
 
 describe('cardano adapter: verify and settle', () => {
+  it('rejects a different registered payer before settlement', async () => {
+    const r=okRig(),inp=input({expectedPayer:OTHER});
+    expect(await r.adapter.verify(header(r,{},inp),inp)).toMatchObject({ok:false,settlementAttempted:false});
+    expect(r.fac.calls).not.toContain('settle');
+  });
   it('confirms a valid payment: verify then settle, independent chain check, safe evidence', async () => {
     const r = okRig();
     const f = expectOk(await r.adapter.verify(header(r), input()));

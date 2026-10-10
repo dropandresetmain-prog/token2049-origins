@@ -30,7 +30,23 @@ export class PgPayerLedger {
   /** Tells the payer to refuse (not re-sign) a purchase whose previous signing attempt never completed. */
   readonly failClosedOnStaleSigning = true;
 
-  private constructor(private readonly db: Db, readonly network: string, readonly address: string) {}
+  private constructor(private readonly db: Db, readonly network: string, readonly address: string, private readonly walletNamespace?: string) {}
+
+  private get ledgerTable() { return this.walletNamespace ? 'wallet_cardano_ledger' : 'hosted_payer_ledger'; }
+  private get identityTable() { return this.walletNamespace ? 'wallet_cardano_identity' : 'hosted_payer_identity'; }
+
+  static async openWallet(db: Db, namespace: string, identity: { network: string; address: string }): Promise<PgPayerLedger> {
+    if(await db.get('SELECT public_address FROM hosted_payer_identity WHERE public_address=$1',identity.address))throw Error('legacy Cardano wallet must retain its canonical ledger namespace');
+    const row = await db.get<{network:string;public_address:string}>('SELECT * FROM wallet_cardano_identity WHERE singleton=$1', namespace);
+    if (row?.network !== identity.network || row.public_address !== identity.address) throw Error('Cardano wallet history import missing or mismatched');
+    return new PgPayerLedger(db,identity.network,identity.address,namespace);
+  }
+
+  static async openExisting(db: Db, identity: { network: string; address: string }): Promise<PgPayerLedger> {
+    const row=await db.get<{network:string;public_address:string}>('SELECT network,public_address FROM hosted_payer_identity WHERE singleton');
+    if(row?.network!==identity.network||row.public_address!==identity.address)throw Error('legacy Cardano identity/history missing');
+    return new PgPayerLedger(db,identity.network,identity.address);
+  }
 
   /**
    * Bind the ledger to the wallet identity. First start records it; any later start with a different wallet or network refuses.
@@ -46,7 +62,8 @@ export class PgPayerLedger {
   }
 
   async assertReady(): Promise<void> {
-    const row = await this.db.get<{ public_address: string }>('SELECT public_address FROM hosted_payer_identity WHERE singleton');
+    if(this.walletNamespace && await this.db.get('SELECT public_address FROM hosted_payer_identity WHERE public_address=$1',this.address))throw Error('legacy Cardano wallet must retain its canonical ledger namespace');
+    const row = await this.db.get<{ public_address: string }>(`SELECT public_address FROM ${this.identityTable} WHERE public_address=$1`, this.address);
     if (row?.public_address !== this.address) throw new Error('payer ledger identity is missing or changed; refusing to sign');
   }
 
@@ -55,7 +72,7 @@ export class PgPayerLedger {
     await this.assertReady();
     const deadline = Date.now() + LOCK_WAIT_MS;
     for (;;) {
-      const r = await this.db.withExclusiveLock(`hosted-payer-ledger:${this.address}`, fn);
+      const r = await this.db.withExclusiveLock(`hosted-payer-ledger:${this.address}`, async () => { await this.assertReady(); return fn(); });
       if (r.acquired) return r.value;
       if (Date.now() >= deadline) throw new Error('payer ledger is locked; another payment is in progress');
       await new Promise((resolve) => setTimeout(resolve, 150 + Math.floor(Math.random() * 150)));
@@ -63,14 +80,14 @@ export class PgPayerLedger {
   }
 
   async find(purchaseId: string): Promise<LedgerEntry | undefined> {
-    const row = await this.db.get<Row>('SELECT * FROM hosted_payer_ledger WHERE purchase_id = $1 AND payer_address = $2', purchaseId, this.address);
+    const row = await this.db.get<Row>(`SELECT * FROM ${this.ledgerTable} WHERE purchase_id = $1 AND payer_address = $2`, purchaseId, this.address);
     return row ? toEntry(row) : undefined;
   }
 
   /** Base units reserved, signed or accepted in this exact network + asset. */
   async committed(network: string, asset: string): Promise<bigint> {
     const row = await this.db.get<{ total: string | null }>(
-      'SELECT COALESCE(SUM(amount_base_units::numeric), 0)::text AS total FROM hosted_payer_ledger WHERE payer_address = $1 AND network = $2 AND asset = $3', this.address, network, asset);
+      `SELECT COALESCE(SUM(amount_base_units::numeric), 0)::text AS total FROM ${this.ledgerTable} WHERE payer_address = $1 AND network = $2 AND asset = $3`, this.address, network, asset);
     return BigInt(row?.total ?? '0');
   }
 
@@ -78,18 +95,18 @@ export class PgPayerLedger {
   async daily(network: string, asset: string, now: Date): Promise<bigint> {
     const day = now.toISOString().slice(0, 10);
     const row = await this.db.get<{ total: string | null }>(
-      `SELECT COALESCE(SUM(amount_base_units::numeric), 0)::text AS total FROM hosted_payer_ledger
+      `SELECT COALESCE(SUM(amount_base_units::numeric), 0)::text AS total FROM ${this.ledgerTable}
         WHERE payer_address = $1 AND network = $2 AND asset = $3 AND (status <> 'accepted' OR substr(updated_at, 1, 10) = $4)`, this.address, network, asset, day);
     return BigInt(row?.total ?? '0');
   }
 
   async upsert(entry: LedgerEntry): Promise<void> {
     await this.db.run(
-      `INSERT INTO hosted_payer_ledger(purchase_id, payer_address, network, asset, amount_base_units, pay_to, status, header, transfer_reference, created_at, updated_at)
+      `INSERT INTO ${this.ledgerTable}(purchase_id, payer_address, network, asset, amount_base_units, pay_to, status, header, transfer_reference, created_at, updated_at)
        VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11)
-       ON CONFLICT(purchase_id) DO UPDATE SET status = EXCLUDED.status, header = COALESCE(hosted_payer_ledger.header, EXCLUDED.header),
-         transfer_reference = EXCLUDED.transfer_reference, updated_at = EXCLUDED.updated_at
-       WHERE hosted_payer_ledger.payer_address = EXCLUDED.payer_address`,
+       ON CONFLICT(purchase_id) DO UPDATE SET payer_address=EXCLUDED.payer_address,network=EXCLUDED.network,asset=EXCLUDED.asset,
+         amount_base_units=EXCLUDED.amount_base_units,pay_to=EXCLUDED.pay_to,created_at=EXCLUDED.created_at,
+         status=EXCLUDED.status,header=EXCLUDED.header,transfer_reference=EXCLUDED.transfer_reference,updated_at=EXCLUDED.updated_at`,
       entry.purchaseId, this.address, entry.network, entry.asset, entry.amountBaseUnits, entry.payTo, entry.status, entry.header, entry.transferReference, entry.createdAt, entry.updatedAt,
     );
   }
@@ -99,12 +116,12 @@ export class PgPayerLedger {
    * Headroom is the largest single payment the caps would still allow right now.
    */
   async summary(policy: { network: string; asset: string; maxPerPayment: bigint; maxCumulative: bigint; maxDaily: bigint }, now = new Date()) {
-    const counts = await this.db.all<{ status: string; n: number }>('SELECT status, COUNT(*)::int AS n FROM hosted_payer_ledger WHERE payer_address = $1 GROUP BY status', this.address);
+    const counts = await this.db.all<{ status: string; n: number }>(`SELECT status, COUNT(*)::int AS n FROM ${this.ledgerTable} WHERE payer_address = $1 GROUP BY status`, this.address);
     const committed = await this.committed(policy.network, policy.asset);
     const daily = await this.daily(policy.network, policy.asset, now);
     const clamp = (v: bigint) => (v < 0n ? 0n : v);
     const headroom = [policy.maxPerPayment, clamp(policy.maxCumulative - committed), clamp(policy.maxDaily - daily)].reduce((a, b) => (a < b ? a : b));
-    const marker = await importMarker(this.db);
+    const marker = this.walletNamespace ? null : await importMarker(this.db);
     return {
       address: this.address,
       network: policy.network,
@@ -120,6 +137,6 @@ export class PgPayerLedger {
 
   /** Remove an unsent reservation after an in-process signing failure. The table refuses to delete anything that holds a signed payment. */
   async release(purchaseId: string): Promise<void> {
-    await this.db.run("DELETE FROM hosted_payer_ledger WHERE purchase_id = $1 AND payer_address = $2 AND status = 'signing'", purchaseId, this.address);
+    await this.db.run(`DELETE FROM ${this.ledgerTable} WHERE purchase_id = $1 AND payer_address = $2 AND status = 'signing'`, purchaseId, this.address);
   }
 }

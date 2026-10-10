@@ -681,6 +681,21 @@ describe('hosted payer gateway client provisioning (hash only)', () => {
     expect(JSON.stringify(await f.h.gw.db.all('SELECT * FROM api_clients'))).not.toContain(token);
   });
 
+  it('provisions the consolidated client without restoring revoked legacy authority', async () => {
+    const f=await start(),old='t2o_'+randomBytes(32).toString('base64url'),token='t2o_'+randomBytes(32).toString('base64url');
+    await provisionPayerClient(f.h.gw.db,cfg(f,sha256Hex(old)));
+    await f.h.gw.db.run("UPDATE api_clients SET revoked_at=$1 WHERE id='cli_HOSTEDTESTPAYER'",new Date().toISOString());
+    const config={...cfg(f),multiwalletPayerTokenSha256:sha256Hex(token)};
+    await provisionPayerClient(f.h.gw.db,config);
+    const row=await f.h.gw.db.get<any>("SELECT * FROM api_clients WHERE id='cli_HOSTEDMULTIWALLETPAYER'");
+    expect(row.customer_id).toBe('cus_HOSTEDTESTDEMO');expect(JSON.parse(row.scopes_json)).toEqual(['purchases:read','purchases:fund']);
+    expect((await f.h.call('POST','/v1/offers/search',{token,body:{intent:retailIntent()}})).status).toBe(403);
+    expect((await f.h.call('GET','/v1/purchases/pur_0000000000000',{token:old})).status).toBe(401);
+    await f.h.gw.db.run("UPDATE api_clients SET revoked_at=$1 WHERE id='cli_HOSTEDMULTIWALLETPAYER'",new Date().toISOString());
+    await provisionPayerClient(f.h.gw.db,config);
+    expect((await f.h.call('GET','/v1/purchases/pur_0000000000000',{token})).status).toBe(401);
+  });
+
   it('rotates the hash, keeps operator revocation, and does nothing without a configured hash', async () => {
     const f = await start();
     const one = 't2o_' + randomBytes(32).toString('base64url'), two = 't2o_' + randomBytes(32).toString('base64url');

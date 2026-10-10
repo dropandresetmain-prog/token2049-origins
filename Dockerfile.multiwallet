@@ -1,0 +1,21 @@
+# Candidate only. Owner approval precedes any replacement of existing Render signers.
+FROM node:24-bookworm-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci
+COPY tsconfig.json tsconfig.payer.build.json ./
+COPY src ./src
+COPY clients ./clients
+COPY scripts ./scripts
+RUN npx tsc -p tsconfig.payer.build.json && node scripts/copy-migrations.mjs
+
+FROM node:24-bookworm-slim
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
+ENV NODE_ENV=production
+ENV MULTIWALLET_SIGNING_ENABLED=false
+COPY --from=build /app/dist ./dist
+USER node
+EXPOSE 10000
+CMD ["node", "dist/clients/multiwallet/hosted.js"]

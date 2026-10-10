@@ -1,5 +1,18 @@
 # Hosted MCP + ChatGPT purchase path
 
+## Consolidated payer candidate (not deployed)
+
+Keep the existing hosted URL/OAuth/console and Render PostgreSQL 18. The isolated candidate replaces the separate payer dispatch with one authenticated purchase-id-only payer bridge containing Cardano Preprod, Solana Devnet and Sui Testnet modules. Reuse the existing Cardano Render service only at owner-approved cutover; suspend the old Solana signer afterward within that approval. No new endpoint, per-wallet service or browser runtime is introduced.
+
+Authenticated customer → payer profile → registered sources. The demo customer is `cus_HOSTEDMCPDEMO`, not each visitor's personal wallet. `create_quote` lists eligible registered source records without chain-RPC fan-out or invented balances. `buy` requires explicit `selectedFundingOptionId` **and** `selectedSourceId`, bound into the exact quote approval and immutable purchase. Only the selected source and required sponsor get live spendability checks. Never infer another source after failure.
+
+Gateway config is `MULTIWALLET_PAYER_URL`, `MULTIWALLET_PAYER_TOKEN_FILE` and `MCP_MULTIWALLET_GATEWAY_TOKEN_SHA256`. The new dedicated gateway funding client is `cli_HOSTEDMULTIWALLETPAYER`; old revoked payer clients remain revoked. Legacy bridge/hash settings are mutually exclusive with consolidated mode. Keys remain solely in the payer boundary.
+
+Payer startup is default disabled, registration inserts disabled sources, and wallet signing grants bind to the approved instance. Startup performs no migrations/imports. Old signer **processes and credentials must be fenced**; legacy builds do not consult the new grant table. The [cutover record](../architecture/CONSOLIDATED_PAYER.md) owns ordering, retained history and rollback limits.
+
+Existing protocol/OAuth tests and native PostgreSQL fixture tests are separate from actual host acceptance. Current account plans/expiry and unresolved quotas are in [runtime evidence](../architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md). All nine new live rows are [NOT RUN](../demo/MULTIWALLET_MANUAL_ACCEPTANCE.md). Historical separate-payer operational notes below remain background; do not run their provisioners as the consolidated cutover.
+
+
 Capsule's MCP is served from the gateway's own public origin so ChatGPT can connect to it directly:
 
 ```
@@ -53,8 +66,8 @@ headers are never consulted (`trust proxy` is off). `Origin` must be absent (ser
 ## Shopping behaviour (mandatory acceptance criteria)
 
 1. `find_offers` returns a structured **shortlist of at most 3** real offers (gateway order, never re-ranked, only fields the offer actually carries: title, description, category/route, indicative price, merchant/product URL/variant when sourced, terms, expiry) plus `interaction: { nextAction: "present_options_and_ask_user_to_choose", createQuoteAllowedNow: false, markExactlyOneRecommended: true, presentAtMost: 3 }` and text saying **Do NOT call create_quote yet**. The host model recommends exactly one from those facts (nothing hardcoded) and asks the user which they want.
-2. `create_quote` only after the user explicitly chooses; `{ category }` alone is enough because the saved demo customer profile fills shipping / booking-holder / traveller details server-side → exact terms and every available funding option (Cardano and Solana, with which are "Connected wallet" vs "External payment action required").
-3. The user explicitly selects a payment rail and explicitly approves the exact quote → `buy`. Missing choice or approval returns `needs_input`; a rail without a hosted payer returns `action_required` and creates nothing.
+2. `create_quote` only after the user explicitly chooses; allowed saved demo details fill known shipping / booking-holder / traveller fields → exact terms, configured funding options and owned eligible registered sources. Capability is distinct from current balance; quoting performs no wallet-readiness fan-out.
+3. The user explicitly selects a funding option and registered wallet/source and approves the exact quote → `buy`. Missing choice or approval returns `needs_input`; an unavailable source returns a truthful action/error result and is never replaced implicitly.
 4. `get_purchase` is read-only. Polling never creates a purchase or payment (tested: purchases, funding rows and payer calls are unchanged across repeated polls).
 5. `orderConfirmation` is returned (and its headline leads the text) **only** when the existing durable completion conditions hold (`state=succeeded`, paid commerce + merchant status, receipt issued) **and** the provider status proves that commerce type **and** a funding payment was verified:
 
@@ -82,17 +95,19 @@ Also returned: merchant, receipt id, verified payment (rail + transfer reference
 
 **Caps.** Policy is copied from the most recent protected payer configuration that references the wallet's ledger and mnemonic (including `.env.hosted-policy` in the protected payer directory), never from older docs or defaults, and is never raised by tooling. The current values were raised 50x by the owner's explicit authorisation on 2026-10-07 (see KNOWN_ISSUES). The payer reports `ledger` in `GET /status`: committed history, imported marker, caps and `headroomBaseUnits` (the largest single payment still allowed).
 
-**Slow steps on free instances (verified live).** ChatGPT abandons a tool call after about 60 s, but on the 0.1-vCPU free gateway an exact Shopify quote (headless checkout) takes about 2 minutes, and a payment settles slower than a minute at times. Hosted mode therefore runs `create_quote` and the payer call as in-process background jobs: the tool answers after 45 s with `quote_pending` / `payment_in_progress`, and repeating the same call (same arguments) joins the running job (no second quote, no second payment; the payer's durable history is the guard). The browser runs in low-memory mode (`SHOPIFY_BROWSER_LOW_MEMORY=true`: lean Chromium flags, no images/media/fonts, one browser at a time, step timeouts x4) at the lowest CPU priority (`nice -n 19` wrapper), because without that the 512 MB instance was OOM-killed and then health-check-killed mid-quote. The agent is told to wait ~20 s and call again.
+**Slow steps on free instances (historical observations).** One prior host run disconnected around a minute; this is not a universal ChatGPT/MCP timeout. On the 0.1-vCPU free gateway a historical exact Shopify quote took about 2 minutes, and payment can take longer than a minute. Hosted mode therefore runs `create_quote` and the payer call as in-process background jobs: the tool answers after 45 s with `quote_pending` / `payment_in_progress`, and repeating the same call (same arguments) joins the running job (no second quote, no second payment; the payer's durable history is the guard). The browser runs in low-memory mode (`SHOPIFY_BROWSER_LOW_MEMORY=true`: lean Chromium flags, no images/media/fonts, one browser at a time, step timeouts x4) at the lowest CPU priority (`nice -n 19` wrapper), because without that the 512 MB instance was OOM-killed and then health-check-killed mid-quote. The agent is told to wait ~20 s and call again.
 
 **Retail discovery.** Open retail requests search the live Shopify catalog by default (`discovery: live`), with the controlled test catalog only as a fallback.
 
-**Spend headroom is checked up front.** The payer reports its remaining headroom in `/status`; the quote lists the wallet as connected but flags a payment above the headroom ("would be refused"), and `buy` refuses before creating a purchase.
+**Candidate readiness is selected-source only.** Quote/list results describe registered capability and disclose that balances are checked during payment preparation. The consolidated bridge does not probe legacy `/status` endpoints when listing sources. The selected module enforces pinned policy and live spendability before irreversible work.
 
-**Cold starts.** Free services sleep. The gateway allows up to 60 s for the payer's `/status` (a wake-up) and up to 100 s for `/pay`. A timeout never causes a second payment: the outcome is ambiguous, `buy` reports the payment attempt as unconfirmed, and durable payer history plus the gateway purchase decide what is real (`get_purchase`). The no-spend smoke wakes the payer first (`/health`, `/status`); nothing keeps it awake afterwards.
+**Cold starts.** Free services may sleep and restart. The user need not issue startup or warm-up commands. Once an irreversible attempt may exist, a timeout is an unknown outcome: retain the purchase ID and use read-only `get_purchase` plus canonical payment/provider readback. Do not create another payment or switch wallets. No keepalive or separate waking system is used.
 
 **Cost / limits.** All free: two free web services + the existing Render Postgres. Render shares 750 free instance-hours per month across the workspace's free services, and the Postgres instance shown by `render postgres list` has an `expiresAt` date (OAuth state and purchase history live there).
 
-## One-command provisioning
+## Historical separate-payer provisioning — not the candidate release
+
+**Do not run this provisioner for consolidation.** It can retire signers, upload secrets and replace deployments. The new owner packet and cutover record supersede its apply path; these details document prior operation.
 
 ```
 cd C:\Dev\t2o-wt-freepayer   (any checkout of main with dependencies installed)
@@ -114,13 +129,13 @@ Reference only: `deploy/render-payer-free.yaml` (dashboard Blueprint path for th
 
 ## Connecting ChatGPT
 
-ChatGPT → **Plugins → + → Add custom MCP server** ([official connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt)):
+Use the [current official connection guide](https://developers.openai.com/plugins/deploy/connect-chatgpt) for the host/account interface. Do not infer a universal menu path or timeout. Keep the existing URL and OAuth issuer; copy the exact redirect URI from the host's MCP/OAuth setup interface where required.
 
 > **Judges: ask Min Htet directly for the MCP access code. The [live console](https://token2049-origins.onrender.com/console/) needs no password.**
 
 - Name: `Capsule`; MCP server URL: `https://token2049-origins.onrender.com/mcp`; Authentication: **OAuth** (leave client ID/secret empty; ChatGPT registers itself).
-- Select Create as a plugin → the Capsule consent page opens → enter the access code from Min Htet → Approve.
-- Install Capsule, start a chat and select **@Capsule**, e.g. *"Find me an international travel adapter."* ChatGPT should show 3 options with one Recommended, wait for your pick, use the saved customer profile, show exact terms and both funding options, and only call `buy` after you explicitly select a rail and approve. `buy` is declared destructive, so ChatGPT will also show its own confirmation.
+- Complete the host's current connection flow; enter the protected access code only on Capsule's OAuth consent screen and approve the requested scope.
+- Select **@Capsule** in the host, e.g. *"Find me an international travel adapter."* The assistant presents up to three options with one grounded recommendation, waits for your pick, shows exact quote terms and registered eligible sources, and calls `buy` only after explicit funding-option/source approval. Host confirmation behavior must be observed, not assumed.
 
 ## Public demo console
 
@@ -146,7 +161,7 @@ Set `MCP_PUBLIC_CONSOLE_READ_ONLY=true` on the hosted gateway to publish the fix
 - The text shows only a delivery line ("Delivering to Marina Bay Sands, Singapore"); DOB, passport, phone and email are never emitted in text, logs or proof.
 - The Shopify executor's buyer guard accepts exactly two identities: the legacy Test Buyer (no phone) or the saved demo customer (its own phone); the email must stay on example.com.
 
-## Free hosted Solana and shared readiness
+## Historical separate Solana runtime and readiness
 
 `Dockerfile.solana` / `clients/solana/hosted.ts` run a third free public web service. Its only HTTP routes are `GET /health`, authenticated `GET /status`, and authenticated `POST /pay {purchaseId}` under the same HTTPS/Host/Origin/rate-limit guards as Cardano. The gateway holds no payer or sponsor key. Internal sponsor preparation is not exposed as an HTTP signing API.
 
@@ -156,4 +171,4 @@ Migration `0008_hosted_solana_ledger.sql` separates payer and sponsor roles. Sta
 
 Provisioning reuses the existing Render CLI credential and gateway PostgreSQL. `npm run provision:hosted-solana -- --dry-run --policy-file <protected policy> --payer-ledger <preserved payer file> --sponsor-ledger <preserved sponsor file>` reads only and never generates wallets. `--apply` is the final approved migration/configuration checkpoint and may trigger Render deploys; do not run it before approval. It refuses unprotected keys, incomplete history, exhausted caps, a paid/private service or disk, and reused rail credentials. No payment is part of provisioning. Verify deployed imports, both sources and restart behavior before authorizing one funding-only proof.
 
-Both rails use `BridgeClient.status()`: one in-flight probe, fixed safe diagnostics, one awaited health request only after a classified transient status failure, and at most two retries within the original status budget. Authentication, malformed JSON/schema and rail errors never trigger recovery; `/pay` is never retried by this flow. Old fire-and-forget `wake()` is removed. MCP background collection retains the same operation. The smoke uses `{category:'retail'}` and Singapore shipping; optional payer probes run after the MCP flow to avoid pre-warming acceptance.
+The retained separate-payer baseline used `BridgeClient.status()`: one in-flight probe, fixed safe diagnostics, one awaited health request only after a classified transient status failure, and at most two retries within the original status budget. Authentication, malformed JSON/schema and rail errors never trigger recovery; `/pay` is never retried by this flow. Old fire-and-forget `wake()` is removed. MCP background collection retains the same operation. The smoke uses `{category:'retail'}` and Singapore shipping; optional payer probes run after the MCP flow to avoid pre-warming acceptance.

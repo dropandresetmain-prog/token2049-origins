@@ -354,6 +354,7 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
       }
     }
     let payer: string | null = typeof verifyRes.payer === 'string' && CARDANO_ADDRESS_REGEX.test(verifyRes.payer) ? verifyRes.payer : null;
+    if (input.expectedPayer && payer !== input.expectedPayer) return { ...invalid('facilitator payer differs from approved wallet'), settlementAttempted: false };
     if (!verifyRes.isValid) {
       return { ...invalid(`facilitator rejected payment: ${safeCode(verifyRes.invalidReason, 'verification_failed')}`), settlementAttempted: false };
     }

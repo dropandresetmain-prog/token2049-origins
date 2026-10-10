@@ -125,6 +125,8 @@ export interface CommerceExecutor {
 /* ---------------- Funding adapter ---------------- */
 
 export interface FundingRequirementInput {
+  /** Canonical selected wallet; omitted on historical externally funded purchases. */
+  expectedPayer?: string;
   /** Absent only for legacy obligations, whose stored amounts remain authoritative. */
   settlement?: SettlementBreakdown;
   purchaseId: string;

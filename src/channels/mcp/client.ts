@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { FundingSource } from '../../contracts/presentation.js';
 import { Approval, PurchaseView, PaymentAttempt } from '../../contracts/commerce.js';
 import { CompletePaymentAttempt } from '../../contracts/api.js';
 import { ErrorBody } from '../../contracts/common.js';
@@ -77,6 +78,10 @@ export class GatewayClient {
     const r = schema.safeParse(json);
     if (!r.success) throw new GatewayError('gateway_contract_violation', 'gateway response did not match the v1 contract', null, null);
     return r.data;
+  }
+
+  async fundingSources() {
+    return GatewayClient.parse(z.object({ sources: z.array(FundingSource) }).strict(), await this.call('GET', '/v1/funding-sources'));
   }
 
   async searchOffers(intent: unknown) {

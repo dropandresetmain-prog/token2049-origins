@@ -1,5 +1,14 @@
 # Capsule decisions log
 
+## 10 October 2026 — keep Render; consolidate payer ownership
+
+Status: implemented in isolated candidate, hosted cutover pending owner authorization.
+
+The corrected architecture keeps existing Render PostgreSQL 18, gateway/MCP/OAuth, console, providers and Playwright. It supersedes the proposed Neon/Cloudflare replacement. Reuse the existing Cardano service for one payer with three internal rails and multiple owned wallet sources; no per-wallet/service deployment and no wake orchestration.
+
+Bind exact approval to `selectedSourceId` and immutable quote/funding option; list registrations without chain fan-out. Keep keys outside gateway, persist before signing/submission, preserve original Cardano/Solana/Sui histories and independent caps. Sui's durable hosted history uses PostgreSQL with signature-verified import. Legacy runtimes require explicit process/credential fencing; new database grants cannot fence old images. No cap increase or history reset is implied. Details: [consolidated payer record](architecture/CONSOLIDATED_PAYER.md).
+
+
 Current decisions that supersede or extend the pinned launch planning snapshot.
 
 ## Product

@@ -2,7 +2,7 @@ import { z } from 'zod';
 import { SourceOffer, SandboxExecution } from '../contracts/provenance.js';
 import type { Db } from '../infrastructure/db.js';
 import { Money } from '../contracts/money.js';
-import { HumanProgress, projectProgress, maskAddress } from '../contracts/presentation.js';
+import { HumanProgress, projectProgress, maskAddress, FundingSource } from '../contracts/presentation.js';
 import { FundingOption, type QuoteView } from '../contracts/commerce.js';
 import { buildPurchaseView } from '../core/views.js';
 import { getQuoteRow, type PurchaseRow, type FundingEvidenceRow } from '../core/store.js';
@@ -10,6 +10,7 @@ import { redactString } from '../infrastructure/redact.js';
 
 export const PurchaseProof = z.object({
   sourceOffer: SourceOffer.optional(), sandboxExecution: SandboxExecution.optional(),
+  selectedSource: FundingSource.optional(),
   purchaseId: z.string(), quoteId: z.string(), summary: z.string(), commercialAmount: Money,
   progress: HumanProgress,
   timeline: z.array(z.object({ step: z.enum(['requested', 'quote_confirmed', 'approved', 'funded', 'merchant_execution', 'result_verified']),
@@ -51,6 +52,7 @@ export async function purchaseProof(db: Db, p: PurchaseRow): Promise<PurchasePro
   return PurchaseProof.parse({
     ...(qv.sourceOffer ? { sourceOffer: qv.sourceOffer } : {}),
     ...(qv.sandboxRepresentation ? { sandboxExecution: { ...qv.sandboxRepresentation, quotedTotal: qv.merchantTotal, orderReference: p.provider_reference, paymentStatus: p.merchant_payment_status, evidenceMode: purchase.receipt?.evidenceMode ?? null } } : {}),
+    ...(purchase.selectedSource ? { selectedSource: purchase.selectedSource } : {}),
     purchaseId: p.id, quoteId: q.id, summary: `${q.category} purchase via ${q.route}`, commercialAmount: qv.payablePrincipal, progress,
     timeline: [
       step('requested', 'Requested', !!requested, requested?.created_at ?? null, 'Purchase request received.', null),

@@ -186,7 +186,7 @@ describe('Sui payer', () => {
     const s = await setup(options);
     const old = new Date(Date.now() - 24 * 60 * 60 * 1000 - 1000).toISOString();
     if (_name === 'rolling-day') await store(s.ledger, reservation('prior-day', { createdAt: new Date().toISOString() }));
-    if (_name === 'cumulative') await store(s.ledger, reservation('prior-total', { createdAt: old }));
+    if (_name === 'cumulative') await store(s.ledger, reservation('prior-total', { createdAt: old, status: 'accepted', header: s.candidate.header, digest: s.candidate.digest }));
     if (_name === 'gas total') await store(s.ledger, reservation('prior-gas', { createdAt: old }));
 
     await expect(s.pay()).rejects.toThrow(error);

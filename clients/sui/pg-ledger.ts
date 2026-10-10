@@ -39,7 +39,7 @@ export class PgSuiLedger implements SuiLedgerPort {
     await this.assertReady();
     await this.db.run(`INSERT INTO hosted_sui_ledger(owner,id,amount,gas_budget,header,digest,created_at,status)
       VALUES($1,$2,$3,$4,$5,$6,$7,$8)
-      ON CONFLICT(owner,id) DO UPDATE SET header=EXCLUDED.header,digest=EXCLUDED.digest,status=EXCLUDED.status`,
+      ON CONFLICT(owner,id) DO UPDATE SET amount=EXCLUDED.amount,gas_budget=EXCLUDED.gas_budget,created_at=EXCLUDED.created_at,header=EXCLUDED.header,digest=EXCLUDED.digest,status=EXCLUDED.status`,
       this.owner, entry.id, entry.amount, entry.gasBudget, entry.header, entry.digest, entry.createdAt, entry.status);
   }
 
@@ -48,7 +48,7 @@ export class PgSuiLedger implements SuiLedgerPort {
   }
 
   async exclusive<T>(fn: () => Promise<T>): Promise<T> {
-    const result = await this.db.withExclusiveLock('hosted_sui:' + this.owner, async () => {
+    const result = await this.db.withExclusiveLock('hosted-sui:' + this.owner, async () => {
       await this.assertReady();
       return fn();
     });
