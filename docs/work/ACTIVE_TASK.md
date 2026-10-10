@@ -104,8 +104,10 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - Ignore / Accept Risk: Free sleep/cold starts with durable idempotency/readback; sandbox/testnet/notional disclosures retained.
 - Existing Cardano:5accepted/94,820; Solana payer7/2blocked/94,220, sponsor6/25,002lamports.
 - Sui file retained hash3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0,2signed/35,900/gas20,000,000.
-- Existing payment authority remains with the two legacy hosted payers; consolidated authority not enabled.
-- Current checkpoint: authorized consolidation active; fresh backup/PG18 restore and actual Sui retirement pass; legacy hosted payers still active.
+- All apps quiesced; original cloud payer clients revoked, original cloud key files removed, local retirement/hash/import guards verified. Consolidated authority not enabled.
+- Current checkpoint: additive0010-0012 applied, original Sui history imported, three sources registered disabled. Gateway candidate3a88 build pending; payer startup command rejected before signer initialization.
+- Final quiesced Neon backup/PG18 restore SHA9d7947be883f58b80bec9fff9ed683c309ee6e62f50acaffb8575dc920409477 PASS31tables/560rows. Original histories unchanged after import; only reviewed additive/auth changes.
+- Next: use explicit Node operator runtime entrypoint instead of rejected composed Render Docker command; reverify exact narrow replacement candidate and retry disabled build.
 
 ## Evidence links
 - docs/architecture/NEON_DATABASE_MIGRATION.md: runtime/restore/cutover/Free-budget record.

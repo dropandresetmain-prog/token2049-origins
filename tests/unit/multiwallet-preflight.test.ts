@@ -18,3 +18,6 @@ describe('operator-only source preflight',()=>{
  it('readiness initializes and checks only the selected rail with its own environment',async()=>{const env={DEMO_SOLANA_SOLANA_PAYER_ADDRESS:wallet.public_address,DEMO_SUI_SUI_PAYER_ADDRESS:'unrelated'};const r=await readSourceReadiness(db(),env,id);expect(r.noSpend).toBe(true);expect(hooks.config).toHaveBeenCalledWith({SOLANA_PAYER_ADDRESS:wallet.public_address},{ledger:'external'});expect(hooks.balance).toHaveBeenCalledOnce();expect(hooks.load).toHaveBeenCalledOnce();});
  it('a selected-chain failure fails closed without another source attempt',async()=>{hooks.balance.mockResolvedValue({verified:false});await expect(readSourceReadiness(db(),{},id)).rejects.toThrow('Devnet readiness unavailable');expect(hooks.balance).toHaveBeenCalledOnce();expect(hooks.load).toHaveBeenCalledOnce();});
 });
+
+import {operatorSources} from '../../scripts/multiwallet/runtime-check.js';
+it('runtime acceptance is explicitly bounded and refuses signing activation',()=>{expect(operatorSources({MULTIWALLET_SIGNING_ENABLED:'false',MULTIWALLET_OPERATOR_SOURCE_IDS:id})).toEqual([id]);for(const e of [{MULTIWALLET_SIGNING_ENABLED:'true',MULTIWALLET_OPERATOR_SOURCE_IDS:id},{MULTIWALLET_SIGNING_ENABLED:'false'},{MULTIWALLET_SIGNING_ENABLED:'false',MULTIWALLET_OPERATOR_SOURCE_IDS:id+','+id}])expect(()=>operatorSources(e)).toThrow();});
