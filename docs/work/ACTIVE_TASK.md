@@ -57,7 +57,7 @@ Updated: 10 October 2026 (Singapore). Re-read before major phases and completion
 - Console tests: 9 files / 89 passed; root and console typechecks passed.
 - Final gateway/console build and root/console typechecks passed.
 - Actual Node24 Linux production payer image: disposable 3-rail signing/serialization PASS8checks.
-- Network disabled, read-only filesystem, 512MiB/0.1CPU; peak RSS136.6MiB, Node24.21.0.
+- Network disabled, read-only filesystem, 512MiB/0.1CPU; peak RSS137.2MiB, Node24.21.0.
 - Independent reviewer found legacy wallet history bypass via fresh namespace; fixed runtime/DB guards.
 - Independent review complete: namespace bypass fixed, no unresolved code blocker; owner boundaries retained.
 - Read-only Cardano status: 5 accepted, 94,820 committed, headroom5,005,180; import4/66,830.
@@ -73,9 +73,10 @@ Updated: 10 October 2026 (Singapore). Re-read before major phases and completion
 
 ## Release state
 - READY_FOR_OWNER_AUTHORIZATION; candidate local, not hosted payment-test ready.
-- Implementation SHA/fingerprint: run scripts/multiwallet/release-plan.mjs on clean branch.
+- Implementation commit: 454bf66309694580a42cb332e97461191cf08b7a, pushed and verified.
+- Final release SHA/fingerprint: run scripts/multiwallet/release-plan.mjs on clean branch (includes this evidence checkpoint).
 - Production Docker artifact: sha256:0b80b5028f6efb06236ddb5e734cea308d8d925a1828ac4ce596db8ebf1d3b04.
-- Branch push is verified by matching origin branch SHA after checkpoint; main unchanged.
+- Implementation push verified against remote SHA; main remains7c09b37. Final evidence checkpoint pushed and matched before handoff.
 - Exact resource/secret names/actions: deploy/consolidated-payer-release.json.
 - Cutover/rollback/independent review: docs/architecture/CONSOLIDATED_PAYER.md.
 - Act Now: old authority fencing, approved consistent private backup/restore before expiry.

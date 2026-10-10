@@ -49,7 +49,7 @@ MCP progress is optional. A client includes a unique `progressToken`; a server m
 
 ## Local production-image check
 
-The actual Node24 Linux production payer image passed eight disposable-key signing/serialization checks: Cardano Evolution/x402 signatures and metadata, Solana transfer/memo/signatures, Sui transaction/candidate/replay-bound nonce. Docker used `--network none --memory 512m --cpus 0.1 --read-only` and a16MiB temporary filesystem; no chain broadcast/provider write or existing-key access. Node24.21.0, Evolution0.5.14, x402Cardano2.26.0, SolanaKit5.1.0, MystenSui2.35.0. Measured peak RSS136.6MiB. This establishes local Linux cryptography compatibility, not hosted network, cold-start or merchant-checkout memory acceptance. Fixture provider data does not establish live chain readiness.
+The actual Node24 Linux production payer image passed eight disposable-key signing/serialization checks: Cardano Evolution/x402 signatures and metadata, Solana transfer/memo/signatures, Sui transaction/candidate/replay-bound nonce. Docker used `--network none --memory 512m --cpus 0.1 --read-only` and a16MiB temporary filesystem; no chain broadcast/provider write or existing-key access. Node24.21.0, Evolution0.5.14, x402Cardano2.26.0, SolanaKit5.1.0, MystenSui2.35.0. Measured peak RSS137.2MiB. This establishes local Linux cryptography compatibility, not hosted network, cold-start or merchant-checkout memory acceptance. Fixture provider data does not establish live chain readiness.
 
 ## Verification boundary
 
