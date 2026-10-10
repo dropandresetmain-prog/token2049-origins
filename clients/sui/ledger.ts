@@ -4,7 +4,7 @@ import { z } from 'zod';
 import { NETWORK, USDC_TYPE } from '../../src/funding/sui/config.js';
 import { SolanaLedger, syncDirectory } from '../solana/ledger.js';
 
-const Entry = z.object({
+export const SuiLedgerEntrySchema = z.object({
   id: z.string().min(1),
   amount: z.string().regex(/^[1-9][0-9]*$/),
   gasBudget: z.string().regex(/^[1-9][0-9]*$/),
@@ -16,12 +16,12 @@ const Entry = z.object({
   .refine(entry => entry.status !== 'reserved' || (entry.header === null && entry.digest === null), 'reserved entries cannot contain a header or digest')
   .refine(entry => entry.status === 'reserved' || (entry.header !== null && entry.digest !== null), 'signed entries require a header and digest');
 
-const Snapshot = z.object({
+export const SuiLedgerSnapshotSchema = z.object({
   version: z.literal(1),
   owner: z.string().min(1),
   network: z.literal(NETWORK),
   asset: z.literal(USDC_TYPE),
-  entries: z.array(Entry),
+  entries: z.array(SuiLedgerEntrySchema),
 }).strict().superRefine((snapshot, ctx) => {
   const ids = new Set<string>();
   const digests = new Set<string>();
@@ -35,8 +35,9 @@ const Snapshot = z.object({
   }
 });
 
-export type SuiLedgerEntry = z.infer<typeof Entry>;
-export type SuiLedgerSnapshot = z.infer<typeof Snapshot>;
+export type SuiLedgerEntry = z.infer<typeof SuiLedgerEntrySchema>;
+export type SuiLedgerSnapshot = z.infer<typeof SuiLedgerSnapshotSchema>;
+const Entry = SuiLedgerEntrySchema, Snapshot = SuiLedgerSnapshotSchema;
 export interface SuiSpendPolicy {
   maxPerPayment: bigint;
   maxDaily: bigint;
@@ -50,6 +51,33 @@ const positive = (value: bigint, label: string): void => {
 };
 
 const rank: Record<SuiLedgerEntry['status'], number> = { reserved: 0, signed: 1, accepted: 2 };
+
+/** Ledger operations may be synchronous for the local file ledger or asynchronous for hosted storage. */
+export interface SuiLedgerPort {
+  read(): SuiLedgerEntry[] | Promise<SuiLedgerEntry[]>;
+  upsert(entry: SuiLedgerEntry): void | Promise<void>;
+  assertCaps(amount: bigint, gasBudget: bigint, policy: SuiSpendPolicy, now: Date): void | Promise<void>;
+  exclusive<T>(fn: () => Promise<T>): Promise<T>;
+}
+
+/** Pure shared cap calculation. Reservations count as committed exposure, including gas. */
+export function assertSuiCaps(entries: SuiLedgerEntry[], amount: bigint, gasBudget: bigint, policy: SuiSpendPolicy, now: Date): void {
+  positive(amount, 'Sui payment amount');
+  positive(gasBudget, 'Sui gas budget');
+  for (const [name, cap] of Object.entries(policy)) positive(cap, `Sui ${name} cap`);
+  const nowMs = now.getTime();
+  if (!Number.isFinite(nowMs)) throw new Error('valid Sui cap reference time required');
+  if (amount > policy.maxPerPayment) throw new Error('Sui per-payment cap exceeded');
+  if (gasBudget > policy.maxGasPerPayment) throw new Error('Sui per-payment gas cap exceeded');
+
+  const committed = entries.reduce((sum, entry) => sum + BigInt(entry.amount), 0n);
+  const committedGas = entries.reduce((sum, entry) => sum + BigInt(entry.gasBudget), 0n);
+  const cutoff = nowMs - 24 * 60 * 60 * 1000;
+  const daily = entries.reduce((sum, entry) => Date.parse(entry.createdAt) >= cutoff ? sum + BigInt(entry.amount) : sum, 0n);
+  if (daily + amount > policy.maxDaily) throw new Error('Sui rolling 24-hour cap exceeded');
+  if (committed + amount > policy.maxTotal) throw new Error('Sui cumulative spend cap exceeded');
+  if (committedGas + gasBudget > policy.maxGasTotal) throw new Error('Sui cumulative gas cap exceeded');
+}
 
 /** A fail-closed local Sui payer history. Reservations are durable before any transaction is submitted. */
 export class SuiLedger {
@@ -141,21 +169,6 @@ export class SuiLedger {
   }
 
   assertCaps(amount: bigint, gasBudget: bigint, policy: SuiSpendPolicy, now: Date): void {
-    positive(amount, 'Sui payment amount');
-    positive(gasBudget, 'Sui gas budget');
-    for (const [name, cap] of Object.entries(policy)) positive(cap, `Sui ${name} cap`);
-    const nowMs = now.getTime();
-    if (!Number.isFinite(nowMs)) throw new Error('valid Sui cap reference time required');
-    if (amount > policy.maxPerPayment) throw new Error('Sui per-payment cap exceeded');
-    if (gasBudget > policy.maxGasPerPayment) throw new Error('Sui per-payment gas cap exceeded');
-
-    const entries = this.read();
-    const committed = entries.reduce((sum, entry) => sum + BigInt(entry.amount), 0n);
-    const committedGas = entries.reduce((sum, entry) => sum + BigInt(entry.gasBudget), 0n);
-    const cutoff = nowMs - 24 * 60 * 60 * 1000;
-    const daily = entries.reduce((sum, entry) => Date.parse(entry.createdAt) >= cutoff ? sum + BigInt(entry.amount) : sum, 0n);
-    if (daily + amount > policy.maxDaily) throw new Error('Sui rolling 24-hour cap exceeded');
-    if (committed + amount > policy.maxTotal) throw new Error('Sui cumulative spend cap exceeded');
-    if (committedGas + gasBudget > policy.maxGasTotal) throw new Error('Sui cumulative gas cap exceeded');
+    assertSuiCaps(this.read(), amount, gasBudget, policy, now);
   }
 }

@@ -8,7 +8,7 @@ import { NETWORK, USDC_TYPE, SUI_TYPE, Address, PositiveUnits, TESTNET_GENESIS }
 import { SuiRpc, suiClient } from '../../src/funding/sui/rpc.js';
 import { validateSettlement } from '../../src/contracts/settlement.js';
 import { readSecretFile } from '../payer/config.js';
-import { SuiLedger } from './ledger.js';
+import { SuiLedger, type SuiLedgerPort } from './ledger.js';
 import { loadSigner } from './signer.js';
 import { loadSuiPayerConfig, type SuiPayerConfig } from './config.js';
 
@@ -73,13 +73,14 @@ export async function buildPayment(cfg: SuiPayerConfig, input: FundingRequiremen
   return header;
 }
 
-export interface SuiPaymentDeps { fetchImpl?: typeof fetch; ledger?: SuiLedger; build?: (input: FundingRequirementInput) => Promise<string>; }
+export interface SuiPaymentDeps { fetchImpl?: typeof fetch; ledger?: SuiLedgerPort; build?: (input: FundingRequirementInput) => Promise<string>; }
 export async function paySuiPurchase(cfg: SuiPayerConfig, purchaseId: string, deps: SuiPaymentDeps = {}): Promise<{ status: number; digest: string; resumed: boolean }> {
   if (!/^pur_[A-Za-z0-9]{10,40}$/.test(purchaseId)) throw new Error('invalid purchase id');
-  const ledger = deps.ledger ?? new SuiLedger(cfg.ledger, cfg.payer), request = deps.fetchImpl ?? fetch;
+  const ledger = deps.ledger ?? (cfg.ledger ? new SuiLedger(cfg.ledger, cfg.payer) : undefined), request = deps.fetchImpl ?? fetch;
+  if (!ledger) throw new Error('Sui ledger implementation required for external ledger configuration');
   const resource = `${cfg.gatewayUrl}/v1/purchases/${purchaseId}/fund`, token = readSecretFile(cfg.tokenFile, 'SUI_GATEWAY_TOKEN_FILE');
   return ledger.exclusive(async () => {
-    let entry = ledger.read().find(e => e.id === purchaseId);
+    let entry = (await ledger.read()).find(e => e.id === purchaseId);
     const resumed = !!entry;
     if (!entry) {
       const challenge = await request(resource, { method: 'POST', headers: { authorization: 'Bearer ' + token }, redirect: 'error', signal: AbortSignal.timeout(15000) });
@@ -87,11 +88,11 @@ export async function paySuiPurchase(cfg: SuiPayerConfig, purchaseId: string, de
       const input = validateChallenge(await challenge.json(), cfg, purchaseId);
       ledger.assertCaps(BigInt(input.amount.amountBaseUnits), cfg.maxGasBudget, cfg.policy, new Date());
       entry = { id: purchaseId, amount: input.amount.amountBaseUnits, gasBudget: cfg.maxGasBudget.toString(), header: null, digest: null, createdAt: new Date().toISOString(), status: 'reserved' };
-      ledger.upsert(entry);
-      const nonce = ledger.read().length;
+      await ledger.upsert(entry);
+      const nonce = (await ledger.read()).length;
       const header = await (deps.build ?? (i => buildPayment(cfg, i, undefined, nonce)))(input), decoded = await readCandidate(header, input, cfg);
       if (decoded.transfer.payer !== cfg.payer || decoded.transfer.gasBudget !== entry.gasBudget) throw new Error('Sui payer identity or reserved gas mismatch');
-      entry = { ...entry, header, digest: decoded.candidate.digest, status: 'signed' }; ledger.upsert(entry);
+      entry = { ...entry, header, digest: decoded.candidate.digest, status: 'signed' }; await ledger.upsert(entry);
     }
     if (!entry.header || !entry.digest) throw new Error('reserved Sui payment has no signed candidate; operator recovery required');
     // Repeated requests first read purchase state. A missing response never causes a new candidate or new reservation.
@@ -103,7 +104,7 @@ export async function paySuiPurchase(cfg: SuiPayerConfig, purchaseId: string, de
     if (purchase.paymentState !== 'not_received' || purchase.state !== 'awaiting_funding') return { status: 202, digest: entry.digest, resumed: true };
     if (entry.status === 'accepted') throw new Error('accepted Sui candidate requires reconciliation');
     const response = await request(resource, { method: 'POST', headers: { authorization: 'Bearer ' + token, 'sui-payment': entry.header }, redirect: 'error', signal: AbortSignal.timeout(60000) });
-    if (response.status === 202) ledger.upsert({ ...entry, status: 'accepted' });
+    if (response.status === 202) await ledger.upsert({ ...entry, status: 'accepted' });
     return { status: response.status, digest: entry.digest, resumed };
   });
 }
