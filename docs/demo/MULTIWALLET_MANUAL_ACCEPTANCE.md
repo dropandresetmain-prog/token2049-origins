@@ -1,6 +1,6 @@
 # Multiwallet owner acceptance
 
-**REPAIR IN PROGRESS.** The replacement gateway is deployed; cold payer retest and activation remain pending. All nine live rows are NOT RUN on the repaired candidate.
+**BLOCKED_TECHNICAL — do not start purchase testing yet.** Render cold admission returns429 hibernate-rate-limited. The candidate is deployed with signing/wallet grants/customer writes disabled; activation awaits supported Free resolution and cold proof. All nine live rows are NOT RUN on the repaired candidate.
 
 Use the existing `https://token2049-origins.onrender.com/mcp` with its existing OAuth implementation. Consult [current official connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt); account/workspace controls and UI wording may differ. Copy the exact redirect URI from the host's MCP/OAuth setup interface into the allowed configuration when needed. Retrieve the existing access code through its protected owner method; do not paste it into chat, logs or proof artifacts. No new OAuth provider is required. Console: [Capsule](https://token2049-origins.onrender.com/console/).
 

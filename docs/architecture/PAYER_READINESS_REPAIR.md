@@ -1,5 +1,7 @@
 # Payment readiness and cap repair — 11 October 2026
 
+**BLOCKED_TECHNICAL — Render hibernation admission prevents cold payer readiness. Payments/customer writes remain disabled.**
+
 Owner scope: repair through hosted non-spending readiness; the owner runs fresh live purchases. Existing MCP/OAuth, Render Free services, PostgreSQL histories and merchant integrations remain canonical.
 
 The three failed owner purchases are expired with unsafe failed handoffs. Their financial table hashes match the preceding snapshot; independent chain reads found no incident settlement, and merchant execution never started. The exact historical bridge HTTP status was not retained. An inactive payer/ingress failure is the leading explanation, with moderate confidence; it is not a proved HTTP 502/503 diagnosis. Existing report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
@@ -46,4 +48,25 @@ Actual idle test (978.981s without app requests) restarted the gateway, then rec
 
 Replacement gateway966b5a486ff821bca0a7a280d59f15a8c77cdb74 deployed live at22:06:30UTC; payer3945 remains disabled under capsule_3945f9c52cf7. Gateway canonicalGitfingerprint d836493de1f102222f5e3a9381e8dcd91bcd1bd7e8c8800e22b6b301f066f7ed. Full44-table/776-row snapshot/restore SHA bc8efcc23d4ad4ee956615c107d2652eb138ba2809e83b5f664abaace57234d0.85affectedtests/typecheck/build PASS. OAuth/MCP16 PASS; every non-OAuth table unchanged. Payer cold retest pending after22:16:02UTC; no authority restored yet.
 
-Second cold test976.568s idle failed safely after79.937s: all12read-onlyGETs returned429/non-JSON; payer had no startup logs. No payment claim/signing/provider execution occurred. Retry-only correction is insufficient. One narrowly identified Capsule/0.1 preparation request compatibility experiment is pending; it neither impersonates a browser nor changes custody/authority. If unresolved, report the precise runtime blocker without enabling payment.
+Second cold test976.568s idle failed safely after79.937s: all 12 read-only GETs returned429/non-JSON; payer had no startup logs. No payment claim/signing/provider execution occurred. Retry-only correction is insufficient. One narrowly identified Capsule/0.1 preparation request compatibility experiment is pending; it neither impersonates a browser nor changes custody/authority. If unresolved, report the precise runtime blocker without enabling payment.
+
+## Final bounded runtime finding and owner support packet
+
+Gateway fe8abb7a82eb6e610445b40459137b5735647f39 (canonicalGitfingerprint 5b3a6e5b14106b2f3094b68cfd881371eb9dcf46004a9d50541a8f60243068cc), payer 3945f9c52cf76e1960569d53416361bcd42de175, instance capsule_3945f9c52cf7. Gateway restored to ordinary Dockerfile command, deployment dep-db5bnajrjlhs73d40vng LIVE; temporary health probe removed. Owner scopes offers:read/purchases:read only; all three wallets and grants and payer signing disabled. OldSolana remains suspended. Final 16 OAuth/MCP checks PASS. Every non-OAuth table still matches the fresh44-table, 785-row source snapshot; full restore SHA332a542ac4b988e9207b5d21419252a3bf3fd29a238a7e5b66dc4573feaea78a. No agent chain broadcast, payment, new quote, purchase or provider write.
+
+| Actual check | Result | Payment effect |
+|---|---|---|
+|3945,978.981s idle; gateway actual cold restart | Payer GET429, diagnostic503 | None; no payment claim |
+|966b5a4,976.568s payer idle; bounded429 retries |12 non-JSON HTTP 429 responses,79.937s; no payer startup | None |
+|fe8abb7,identified Capsule/0.1 request |12 non-JSON HTTP 429 responses,80.737s; no payer startup | None |
+|One temporary unauthenticated GET/health from actual gateway runtime | HTTP429; x-render-routing: hibernate-rate-limited | None; no wallet engine |
+
+This verifies a Render hibernation/ingress admission failure, rather than a payer application policy rejection. It does not establish the limiter scope, window, reset time, account rule or the exact historical three incident responses. Published [Render Free documentation](https://render.com/docs/free) describes automatic HTTP spin-up, but does not document this observed routing reason. Current source/target plans remainFree; no-card/no-paid constraints unchanged. Repeated retries or manual warming are not accepted fixes.
+
+**Owner support request (reviewable; not sent):**
+
+> Existing Free services in Singapore: gateway srv-db2jgqnavr4c73e9blrg (token2049-origins.onrender.com), payer srv-db2mnk1srm7s73c1f5c0 (t2o-cardano-payer.onrender.com), workspace tea-db1tjj1srm7s73d6vra0. Between 22:16 and 22:26 UTC on 10 October 2026, gateway-origin read-only GET/status and one unauthenticated GET/health received HTTP429/non-JSON without starting the payer. The health response explicitly carried x-render-routing: hibernate-rate-limited. Warm gateway-to-payer authenticated transport succeeds. Please identify the hibernation admission rule, its scope/reset period and a supported zero-cost correction for these existing services. We require on-demand Free operation, no keep-alive, paid plan/card enrollment or manual warming. Tokens/keys/transaction data are omitted.
+
+Available service-management APIs do not expose a documented hibernation-admission/reset setting; do not guess an override. Owner sends this packet via their Render support channel or explicitly authorizes a support message. No message was sent. If Render cannot support this Free service-to-service path, any infrastructure exception requires a material owner decision before implementation.
+
+**Exact resume:** remain in this chat; read ledger/protected repair-release-state.json (phase blocked-render-hibernation), verify deployed SHAs/fences/history. Once the platform issue is resolved, run one fixed non-spending cold transport check. Only after PASS, create new exact-artifact disabled/cold proofs, use the reviewed activation/authority gates, verify preserved history and hosted reads, then stop for the owner’s nine E2E tests. Never retry the3expired incident IDs or enable authority from a warm-only result. All nine live rows remain NOT RUN.

@@ -1,5 +1,7 @@
 # Render to Neon database migration
 
+This is the retained database-only cutover record. Subsequent consolidated-payer implementation and the current disabled release are recorded in [consolidated payer](CONSOLIDATED_PAYER.md) and [payment repair](PAYER_READINESS_REPAIR.md). Historical service SHAs below do not describe today’s deployment.
+
 Owner authorization: 11 October 2026 (Singapore), attached migration request. Application hosting, public MCP/OAuth issuer, console, providers, wallets and signing keys remain on Render. Migration lane derives from consolidated candidate 7785c6674b1dd0b1b0a81c8ee48cd794abbb7019.
 
 ## Verified isolated restore

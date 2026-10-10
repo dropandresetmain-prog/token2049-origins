@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- ACTIVE: owner-authorized payment readiness/diagnostics repair and Solana/Sui cap alignment. Stop at hosted non-spending readiness; owner runs fresh live purchases.
+- BLOCKED_TECHNICAL: owner-authorized readiness/cap repair implemented; Render cold admission returns429 hibernate-rate-limited. No activation; owner E2E NOT RUN.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -13,10 +13,10 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Remote: https://github.com/dropandresetmain-prog/token2049-origins.git.
 - Main verified unchanged: 7c09b37eaaeda2bf3eec94fc1e3456118962f636.
 - Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
-- Gateway deployed 966b5a486ff821bca0a7a280d59f15a8c77cdb74; retained payer 3945f9c52cf76e1960569d53416361bcd42de175, pushed; signing/grants disabled pending cold retest/activation.
-- Canonical gateway Git fingerprint: d836493de1f102222f5e3a9381e8dcd91bcd1bd7e8c8800e22b6b301f066f7ed; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
+- Gateway deployed fe8abb7a82eb6e610445b40459137b5735647f39; retained payer 3945f9c52cf76e1960569d53416361bcd42de175, pushed; signing/grants disabled pending cold retest/activation.
+- Canonical gateway Git fingerprint: 5b3a6e5b14106b2f3094b68cfd881371eb9dcf46004a9d50541a8f60243068cc; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
 - Later documentation-only HEAD: resolve git rev-parse HEAD. It is not another deployed artifact.
-- Replacement gateway dep-db5bd2qd0e5s73es5ejg live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation pending.
+- Normal gateway dep-db5bnajrjlhs73d40vng live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation blocked.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
@@ -40,7 +40,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
 - [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
 - [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: repair3945f9c live disabled. Actual978.981s idle check restarted gateway but payer GET429 failed safely before claim. Follow-up GET-only429/Retry-After90s readiness correction:85affectedtests/typecheck/build PASS; independent diff review no blocker. Gateway966b5a4 live; OAuth16/44-table history PASS. Payer3945andinstance retained. Retest976.568s idle FAILED safely:12GETs all429/non-JSON over79.937s, no payer startup. Next: one identified Capsule user-agent cold compatibility experiment; no authority until PASS.
+- Current checkpoint: gatewayfe8abb7/payer3945live normal/disabled. Cold429 retries and identified UA fail; unauthenticatedhealth confirms x-render-routing hibernate-rate-limited.175integrated/85affected/8finaltests,6gateassertions,builds and OAuth16PASS;44table history unchanged.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
@@ -110,12 +110,13 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - No card confirmed: excess use stops builds/suspends Free apps. These are shared snapshot balances, not exact current meters.
 - Neon Free confirmed free_v3:1GiB/project,100CUh/month,6hrestore; API reports1542CU-seconds (0.4283CUh),21,717,126transfer bytes. Zero storage/writes counters are not zero-usage proof.
 - Conservative empty-queue estimate43.4CUh/month using7min active windows; reserve20CUh for owner. Actual idle/reconnect PASS.
-- Investigate Now: owner nine live rows, Chromium checkout memory/timing and real host disconnect/cold-start behavior.
+- Act Now: Render429 hibernate-rate-limited blocks hosted payment testing; all authority and customer writes remain disabled. Owner support packet prepared, not sent.
+- Investigate Now: owner9live rows/browser timing/disconnects and undocumented limiter scope/reset.
 - Investigate Now: periodic protected backups and shared quotas; no paid/provider retention change without approval.
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: complete the repair checklist, preserve all failed IDs/history, then hand fresh owner acceptance rows back.
+- Next action OWNER: send the prepared Render support packet in PAYER_READINESS_REPAIR.md for a supported Free cold-admission correction. PRIMARY then verifies drift/history and cold transport before any activation. No further retry/deploy loop.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 

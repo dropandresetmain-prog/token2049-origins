@@ -254,9 +254,9 @@
       "chainBroadcasts": 0
     },
     "quotaEvidence": "Owner screenshot 11 October: 668.15 Free hours, 447 build minutes, 4.895GB bandwidth remaining; no card owner confirmed. Current services API plan free. Browser quota refresh unavailable; snapshot is not live accounting.",
-    "status": "DEPLOYED_DISABLED_COLD_RETEST_PENDING",
-    "candidateSha": "966b5a486ff821bca0a7a280d59f15a8c77cdb74",
-    "canonicalGitSourceFingerprint": "d836493de1f102222f5e3a9381e8dcd91bcd1bd7e8c8800e22b6b301f066f7ed",
+    "status": "BLOCKED_TECHNICAL_RENDER_HIBERNATION",
+    "candidateSha": "fe8abb7a82eb6e610445b40459137b5735647f39",
+    "canonicalGitSourceFingerprint": "5b3a6e5b14106b2f3094b68cfd881371eb9dcf46004a9d50541a8f60243068cc",
     "fingerprintBasis": "sorted tracked path NUL canonical Git blob bytes NUL",
     "authorityRunner": "scripts/multiwallet/activate-repair-authority.mjs",
     "finalBackupSha256": "c36c8b2db86e79dcdb30653404c3bc1dd53baca57a98f0770c3e4a5c1e441ffc",
@@ -272,7 +272,7 @@
     },
     "payerSha": "3945f9c52cf76e1960569d53416361bcd42de175",
     "payerCanonicalGitSourceFingerprint": "addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46",
-    "gatewayDeployId": "dep-db5bd2qd0e5s73es5ejg",
+    "gatewayDeployId": "dep-db5bnajrjlhs73d40vng",
     "coldFirstCheck": {
       "idleSeconds": 978.981,
       "outerHttpStatus": 503,
@@ -280,8 +280,28 @@
       "paymentAttempted": false,
       "result": "SAFE FAILURE; GET-only429 retry correction applied; retest pending"
     },
-    "replacementBackupSha256": "bc8efcc23d4ad4ee956615c107d2652eb138ba2809e83b5f664abaace57234d0",
-    "affectedFollowupTests": 85
+    "replacementBackupSha256": "332a542ac4b988e9207b5d21419252a3bf3fd29a238a7e5b66dc4573feaea78a",
+    "affectedFollowupTests": 85,
+    "authority": {
+      "payerSigningEnabled": false,
+      "walletsEnabled": 0,
+      "instanceGrantsEnabled": 0,
+      "customerWritesEnabled": false
+    },
+    "coldIngress": {
+      "status": "FAIL",
+      "httpStatus": 429,
+      "renderRouting": "hibernate-rate-limited",
+      "unauthenticatedHealthAlsoFails": true,
+      "boundedRetriesResult": "12non-JSON429",
+      "identifiedUserAgentResult": "12non-JSON429",
+      "payerStartupObserved": false,
+      "temporaryHealthProbeRemoved": true,
+      "normalGatewayCommandRestored": true,
+      "paymentAttempted": false
+    },
+    "finalBoundaryTests": 8,
+    "lastVerifiedAt": "2026-10-10T22:27:58.399Z"
   },
   "previousHostedAcceptance": {
     "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",

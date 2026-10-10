@@ -1,8 +1,12 @@
 # Capsule — current handoff
 
-## Narrow owner-authorized repair — in progress
+## Current repair — BLOCKED_TECHNICAL
 
-Owner requested readiness repair and Solana/Sui token caps match Cardano. Local175tests/typecheck/build PASS; independent review release-gate findings corrected with6focusedassertions. Gated existing-service deployment and hosted transport proof remain pending. See [repair record](architecture/PAYER_READINESS_REPAIR.md). No actual payment/provider operation is authorized.
+Gateway fe8abb7a82eb6e610445b40459137b5735647f39; retained payer 3945f9c52cf76e1960569d53416361bcd42de175; branch codex/capsule-neon-migration. Original3wallet identities/histories preserved; Solana/Sui token caps now match Cardano5,100,000 base units per payment, daily and cumulative at 1:1000. Sponsor/gas limits unchanged.175 integrated tests, 85 affected tests, eight final boundary tests, six runner assertions, typecheck and build PASS. Independent review found no source blocker.
+
+Actual cold requests failed before payment claims. Bounded retries and identified request both return429; one actual gateway-runtime unauthenticatedhealth probe confirms Render x-render-routing: hibernate-rate-limited. Payer did not start. Temporary probe removed; normal gateway restored. OAuth/MCP16 and44-table financial/history preservation PASS.
+
+Payer signing,three wallet grants and customer writes remain disabled. OldSolana/local signers remain fenced. No new quote/purchase/payment/provider operation. All repaired live rows NOT RUN; do not start E2E yet. [Evidence, reviewed support request and exact resume](architecture/PAYER_READINESS_REPAIR.md). Owner must obtain a supported Free cold-admission resolution or explicitly decide a material architecture exception; no paid/keep-alive/manual-warm fallback is authorized. Same chat for narrow resume. No stale rollback orretrying the three incident IDs.
 
 ## Previous hosted checkpoint — historical, superseded by repair
 

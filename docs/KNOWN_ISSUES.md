@@ -2,11 +2,15 @@
 
 ## Payment repair triage — 11 October 2026
 
-| Classification | Finding / action | Blocker |
+| Classification | Finding / action | Risk / blocker |
 |---|---|---|
-| Act Now | Pre-claim readiness and audited cap alignment implemented; backup freshness/original-scope interruption gates fixed.175tests and6gate assertions PASS. | Fixes complete locally; hosted verification pending. |
-| Investigate Now | Historical HTTP status is unknown; verify fixed gateway-to-payer transport and cold start on candidate. | Blocks release until actual proof. |
-| Ignore / Accept Risk | Three expired unsafe failed handoffs and historical Sui candidates retained. No incident funds/merchant execution found. | Fresh quotes only; no reset or blind retry. |
+| Act Now | Render cold ingress returns429 with x-render-routing hibernate-rate-limited even on unauthenticatedhealth. Send the prepared owner support packet for a supported Free correction. | Blocks hosted payments; keep signing/grants/customer writes disabled. No paid/keepalive/manualwarming fallback. |
+| Act Now | Pre-claim readiness, sanitized errors and audited Cardano-equivalent cap alignment implemented/deployed.175integrated/85affected/8finaltests and6gate assertions PASS. | Code fixes complete; not cold-ready. Histories/caps remain authoritative. |
+| Investigate Now | Limiter scope/window/reset and exact historical incident status are not documented/retained. | Do not infer source-IP ban, quota exhaustion or automatic reset. Support/runtime evidence required. |
+| Investigate Now | Owner’s nine live E2E tests, actual browser checkout timing/memory and host disconnect behavior. | All NOT RUN on the repaired candidate; non-spending readiness cannot substitute. |
+| Ignore / Accept Risk | Three expired unsafe failed handoffs and prior Sui signed exposure preserved. | No reset/blindretry; fresh quotes after release only. |
+
+[Actual runtime evidence and support packet](architecture/PAYER_READINESS_REPAIR.md).
 
 ## Previous consolidated checkpoint — historical
 
