@@ -19,7 +19,7 @@ describe('production composition boundaries (offline)',()=>{
     const url='http://127.0.0.1:'+(server.address() as AddressInfo).port;
     try {
       expect(parts.executors.map(e=>e.route).sort()).toEqual(['atlas','nuitee','shopify']);
-      expect(parts.fundingAdapters.map(f=>f.rail)).toEqual(['cardano','solana','masumi']);
+      expect(parts.fundingAdapters.map(f=>f.rail)).toEqual(['cardano','solana','sui','masumi']);
       for(const c of [...parts.executors,...parts.fundingAdapters,...parts.bankAdapters]) expect((await c.readiness()).status).toBe('MISSING_CONFIG');
       expect((await fetch(url+'/inspect')).status).toBe(200);
       // Hosted MCP is opt-in: without MCP_HOSTED_ENABLED neither /mcp nor any OAuth endpoint exists.

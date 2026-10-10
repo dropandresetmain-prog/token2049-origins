@@ -165,10 +165,12 @@ export type FundingVerification =
       reason: string;
       /** False proves settlement was never invoked. Omission retains durable recovery. */
       settlementAttempted?: boolean;
+      /** Independent finalized proof that this exact transaction failed without receiving principal. */
+      definitiveFailure?: boolean;
     };
 
 export type FundingPreparation =
-  | { ok: true; transferReference: string }
+  | { ok: true; transferReference: string; recoveryPayload?: Record<string, unknown> }
   | Extract<FundingVerification, { ok: false }>;
 
 export interface FundingAdapter {
@@ -182,9 +184,11 @@ export interface FundingAdapter {
   /** Header the client sends the payment payload in. */
   readonly paymentHeaderName: string;
   /** Decode and bind a candidate without external side effects, so core can persist its recovery reference. */
-  prepare?(paymentHeaderValue: string, input: FundingRequirementInput): FundingPreparation;
+  prepare?(paymentHeaderValue: string, input: FundingRequirementInput): FundingPreparation | Promise<FundingPreparation>;
   /** Read an already-persisted candidate independently; never submit or settle another transfer. */
   recover?(transferReference: string, input: FundingRequirementInput): Promise<FundingVerification>;
+  /** Resume only the exact durable signed candidate; never construct another payment. recover() itself stays read-only. */
+  resume?(transferReference: string, input: FundingRequirementInput, recoveryPayload: Record<string, unknown>): Promise<FundingVerification>;
   /** Independently verify (and settle if the protocol requires) the payment for this exact requirement. */
   verify(paymentHeaderValue: string, input: FundingRequirementInput): Promise<FundingVerification>;
   /**

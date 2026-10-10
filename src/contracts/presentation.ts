@@ -70,13 +70,17 @@ export function projectProgress(p: PurchaseView): HumanProgress {
 
 /**
  * Connected payer identity, a closed union per rail. Addresses and networks are validated per rail so a
- * Cardano address can never be presented as Solana (or the reverse). Masumi is deliberately absent: Masumi
+ * Cardano, Solana and Sui addresses cannot be presented as belonging to another rail. Masumi is deliberately absent: Masumi
  * task remuneration is never a connected purchase-principal payer.
  * The Solana literals mirror src/funding/solana/wire.ts (NETWORK / TEST_MINT); a unit test pins them.
  */
 export const SOLANA_DEVNET_NETWORK = 'solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1' as const;
 export const SOLANA_DEVNET_USDC_MINT = '4zMMC9srt5Ri5X14GAgXhaHii3GnPAEERYPJgZJDncDU' as const;
+export const SUI_TESTNET_NETWORK = 'sui:testnet' as const;
+// Circle's canonical native USDC package and type on Sui testnet.
+export const SUI_TESTNET_USDC_TYPE = '0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC' as const;
 const SOLANA_ADDRESS = /^[1-9A-HJ-NP-Za-km-z]{32,44}$/;
+const SUI_ADDRESS = /^0x[0-9a-f]{64}$/i;
 const sourceBase = {
   sourceId: z.string().regex(/^src_[0-9a-f]{32}$/),
   displayAddress: z.string().max(40),
@@ -92,7 +96,12 @@ export const SolanaFundingSource = z.object({
   publicAddress: z.string().regex(SOLANA_ADDRESS),
   assetId: z.literal(SOLANA_DEVNET_USDC_MINT),
 }).strict();
-export const FundingSource = z.discriminatedUnion('rail', [CardanoFundingSource, SolanaFundingSource]);
+export const SuiFundingSource = z.object({
+  ...sourceBase, rail: z.literal('sui'), network: z.literal(SUI_TESTNET_NETWORK),
+  publicAddress: z.string().regex(SUI_ADDRESS),
+  assetId: z.literal(SUI_TESTNET_USDC_TYPE),
+}).strict();
+export const FundingSource = z.discriminatedUnion('rail', [CardanoFundingSource, SolanaFundingSource, SuiFundingSource]);
 export type FundingSource = z.infer<typeof FundingSource>;
 
 /** Stable mask shown to humans: first 14 and last 6 characters of a public address. */

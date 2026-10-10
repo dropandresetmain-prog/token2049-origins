@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-export type PayerRail = 'cardano' | 'solana';
-export const PAYER_RAILS: readonly PayerRail[] = ['cardano', 'solana'];
+export type PayerRail = 'cardano' | 'solana' | 'sui';
+export const PAYER_RAILS: readonly PayerRail[] = ['cardano', 'solana', 'sui'];
 export interface BridgeEndpoint { url: string; token: string }
 
 /**
@@ -72,6 +72,7 @@ function requireHttpUrl(value: string | undefined, label: string, loopbackOnly =
 const BRIDGE_VARS: Record<PayerRail, { url: string; token: string }[]> = {
   cardano: [{ url: 'CARDANO_PAYER_BRIDGE_URL', token: 'CARDANO_PAYER_BRIDGE_TOKEN_FILE' }, { url: 'PAYER_BRIDGE_URL', token: 'PAYER_BRIDGE_TOKEN_FILE' }],
   solana: [{ url: 'SOLANA_PAYER_BRIDGE_URL', token: 'SOLANA_PAYER_BRIDGE_TOKEN_FILE' }],
+  sui: [{ url: 'SUI_PAYER_BRIDGE_URL', token: 'SUI_PAYER_BRIDGE_TOKEN_FILE' }],
 };
 
 function loadBridges(env: NodeJS.ProcessEnv): Partial<Record<PayerRail, BridgeEndpoint>> {
@@ -85,8 +86,15 @@ function loadBridges(env: NodeJS.ProcessEnv): Partial<Record<PayerRail, BridgeEn
     if (!env[v.url] || !env[v.token]) throw new ConfigError(`${v.url} and ${v.token} must be set together`);
     bridges[rail] = { url: requireHttpUrl(env[v.url], v.url, true), token: readTokenFile(env[v.token]!, v.token) };
   }
-  // One bridge process per rail: the same endpoint under two rails would make the payer identity ambiguous.
-  if (bridges.cardano && bridges.solana && bridges.cardano.url === bridges.solana.url) throw new ConfigError('Cardano and Solana payer bridges must use different URLs');
+  // One bridge process per rail: a shared endpoint would make the payer identity ambiguous.
+  const configured = PAYER_RAILS.flatMap((rail) => bridges[rail] ? [{ rail, url: bridges[rail]!.url }] : []);
+  for (let i = 0; i < configured.length; i++) {
+    for (let j = i + 1; j < configured.length; j++) {
+      if (configured[i]!.url === configured[j]!.url) {
+        throw new ConfigError(`${configured[i]!.rail} and ${configured[j]!.rail} payer bridges must use different URLs`);
+      }
+    }
+  }
   return bridges;
 }
 

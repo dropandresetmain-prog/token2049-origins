@@ -145,9 +145,9 @@ describe('asset labels never guess', () => {
 describe('connections presentation', () => {
   const vm = presentConnections(sampleConnections(NOW), ctx);
 
-  it('lists Cardano, Solana, Masumi, Shopify, Nuitée, Atlas and OCBC', () => {
+  it('lists Cardano, Solana, Sui, Masumi, Shopify, Nuitée, Atlas and OCBC', () => {
     const names = [...vm.groups.flatMap((g) => g.items), vm.bank.connection].map((i) => i.name);
-    expect(names).toEqual(['Cardano', 'Solana', 'Masumi', 'Shopify', 'Nuitée', 'Atlas', 'OCBC']);
+    expect(names).toEqual(['Cardano', 'Solana', 'Sui', 'Masumi', 'Shopify', 'Nuitée', 'Atlas', 'OCBC']);
   });
 
   it('maps readiness without upgrading it', () => {

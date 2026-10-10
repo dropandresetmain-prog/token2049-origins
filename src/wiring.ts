@@ -8,6 +8,7 @@ import { createAtlasExecutor } from './execution/atlas/index.js';
 import { createNuiteeExecutor } from './execution/nuitee/index.js';
 import { createCardanoFundingAdapter } from './funding/cardano/index.js';
 import { createSolanaFundingAdapter } from './funding/solana/index.js';
+import { createSuiFundingAdapter } from './funding/sui/index.js';
 import { createMasumiFundingAdapter } from './funding/masumi/index.js';
 import { createOcbcAdapter } from './banking/ocbc/adapter.js';
 import { createEvidenceRouter, createInspectRouter } from './evidence/router.js';
@@ -49,7 +50,7 @@ export function realParts(env: NodeJS.ProcessEnv, log: (line: Record<string,unkn
   return {
     ...(hosted?.publicConsoleReadOnly ? { publicConsoleCustomerId: hosted.customerId } : {}),
     executors:[createGlobalSandboxExecutor(env,()=>{ if(!runtimeDb) throw new Error('gateway_not_initialized'); return runtimeDb; },{sink:step=>log({component:'shopify',step})}),createAtlasExecutor(env),createNuiteeExecutor(env)],
-    fundingAdapters:[createCardanoFundingAdapter(env,{log}),createSolanaFundingAdapter(env),createMasumiFundingAdapter(env)],bankAdapters,
+    fundingAdapters:[createCardanoFundingAdapter(env,{log}),createSolanaFundingAdapter(env),createSuiFundingAdapter(env),createMasumiFundingAdapter(env)],bankAdapters,
     buildRouters:core=>{
       runtimeDb = core.deps.db;
       const routers:NonNullable<GatewayParts['extraRouters']>=[

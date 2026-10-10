@@ -27,7 +27,7 @@ export const PurchaseProof = z.object({
 export type PurchaseProof = z.infer<typeof PurchaseProof>;
 
 /** Payer formats a proof may display, per rail. Anything else (including Masumi remuneration) shows no source. */
-const PAYER_FORMAT: Record<string, RegExp> = { cardano: /^addr_test1[0-9a-z]{10,200}$/, solana: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/ };
+const PAYER_FORMAT: Record<string, RegExp> = { cardano: /^addr_test1[0-9a-z]{10,200}$/, solana: /^[1-9A-HJ-NP-Za-km-z]{32,44}$/, sui: /^0x[0-9a-f]{64}$/i };
 
 /** Curated projection of durable facts. No provider prose, PII, checkpoints, bank data or journal internals. */
 export async function purchaseProof(db: Db, p: PurchaseRow): Promise<PurchaseProof> {

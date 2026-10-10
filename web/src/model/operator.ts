@@ -64,6 +64,9 @@ export function describeAsset(asset: string): AssetInfo {
     // The Solana adapter only accepts 6-decimal mints (src/funding/solana/adapter.ts).
     return { kind: 'crypto', label: `${op.asset.network('solana', test)}, ${shortAsset(id)}`, unit: op.asset.token(test), decimals: 6 };
   }
+  if (network.startsWith('sui:')) {
+    return { kind: 'crypto', label: `Sui${test ? ' test' : ''} network, ${shortAsset(id)}`, unit: op.asset.token(test), decimals: 6 };
+  }
   return { kind: 'crypto', label: shortAsset(asset), unit: op.asset.baseUnits, decimals: null };
 }
 
@@ -325,7 +328,7 @@ export interface ConnectionsVM {
   technical: { capabilities: CapabilitiesResponse; bank: BankResponse };
 }
 
-const FUNDING = ['cardano', 'solana', 'masumi'] as const;
+const FUNDING = ['cardano', 'solana', 'sui', 'masumi'] as const;
 const MERCHANTS = ['shopify', 'nuitee', 'atlas'] as const;
 
 export function environmentLabel(env: string): string {

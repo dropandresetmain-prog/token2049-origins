@@ -114,6 +114,7 @@ export function inSentence(name: string): string {
 export const paymentMethod: Record<FundingRail, string> = {
   cardano: 'Cardano',
   solana: 'Solana',
+  sui: 'Sui',
   masumi: 'Masumi',
 };
 export const testNetwork = 'Test network';

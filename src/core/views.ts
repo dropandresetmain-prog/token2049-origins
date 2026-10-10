@@ -56,10 +56,12 @@ export async function buildPurchaseView(db: Db, p: PurchaseRow, publicBaseUrl: s
     fundingInstructions: awaiting
       ? {
           fundUrl: `${publicBaseUrl}/v1/purchases/${p.id}/fund`,
-          protocol: 'x402',
+          protocol: req.rail === 'sui' ? 'sui-usdc-transfer' : 'x402',
           options: [fundingRequirementView(req)],
           expiresAt: req.expiresAt,
-          note: 'POST the fund URL without a payment header to receive the x402 challenge; pay with a bounded payer client. No merchant spend occurs until funding is independently verified and confirmed.',
+          note: req.rail === 'sui'
+            ? 'POST the fund URL without a payment header to receive the Sui payment requirement; pay with a bounded payer client. No merchant spend occurs until funding is independently verified and confirmed.'
+            : 'POST the fund URL without a payment header to receive the x402 challenge; pay with a bounded payer client. No merchant spend occurs until funding is independently verified and confirmed.',
         }
       : null,
     funding: (await fundingSummaries(db, p.id)),

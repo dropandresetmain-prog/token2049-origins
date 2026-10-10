@@ -40,12 +40,17 @@
     "payer:solana:hosted": "tsx clients/solana/hosted.ts",
     "payer:solana:hosted:preflight": "node dist/scripts/solana/hosted-preflight.js",
     "provision:hosted-solana": "tsx scripts/provision-hosted-solana-render.mjs",
-    "cdp:treasury": "tsx src/integrations/coinbase-cdp/cli.ts"
+    "cdp:treasury": "tsx src/integrations/coinbase-cdp/cli.ts",
+    "payer:sui": "tsx clients/sui/pay.ts",
+    "payer:sui:bridge": "tsx clients/sui/bridge.ts",
+    "payer:sui:setup": "tsx scripts/sui/setup.ts",
+    "e2e:sui": "tsx scripts/sui/live-e2e.ts"
   },
   "dependencies": {
     "@coinbase/cdp-sdk": "1.57.0",
     "@evolution-sdk/evolution": "0.5.14",
     "@modelcontextprotocol/sdk": "1.32.1",
+    "@mysten/sui": "2.35.0",
     "@solana/kit": "5.1.0",
     "@x402/cardano": "2.26.0",
     "@x402/core": "2.26.0",

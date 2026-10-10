@@ -595,7 +595,7 @@ export class CommerceCore {
   }
 
   /**
-   * x402-protected funding resource. Without a payment header returns the protocol challenge.
+   * Funding resource. Without a payment header returns the rail's protocol challenge.
    * With one: verify via the rail adapter, then persist evidence + journal + execution job atomically.
    * Never executes commerce in the request path.
    */
@@ -637,10 +637,11 @@ export class CommerceCore {
           throw new CoreError('conflict', 'purchase no longer accepts a new funding transfer');
         }
         if (adapter.prepare) {
-          const candidate = adapter.prepare(paymentHeader, input);
+          // Preparation may read chain state; persist its candidate before verify can settle externally.
+          const candidate = await adapter.prepare(paymentHeader, input);
           if (!candidate.ok) throw new CoreError(candidate.code, candidate.reason);
           if (!adapter.recover) throw new CoreError('route_unavailable', 'funding adapter has no durable recovery');
-          await this.persistFundingCandidate(purchaseId, adapter.rail, input.amount.network, candidate.transferReference);
+          await this.persistFundingCandidate(purchaseId, adapter.rail, input.amount.network, candidate.transferReference, candidate.recoveryPayload);
         }
         return await this.verifyAndRecord(purchaseId, adapter, paymentHeader, input);
       });
@@ -655,6 +656,7 @@ export class CommerceCore {
     let p = (await getPurchaseRow(this.d.db, purchaseId))!;
     const verification = await adapter.verify(paymentHeader, input);
     if (!verification.ok) {
+      if (verification.definitiveFailure) await this.closeFailedFunding(purchaseId, verification.reason);
       const nowIso = this.now();
       await this.d.db.tx(async () => {
         await appendEvent(this.d.db,p.id,'funding.rejected',{code:verification.code,reason:verification.reason},nowIso);
@@ -730,15 +732,18 @@ export class CommerceCore {
     };
   }
 
-  private async persistFundingCandidate(purchaseId: string, rail: FundingRail, network: string, reference: string): Promise<void> {
+  private async persistFundingCandidate(purchaseId: string, rail: FundingRail, network: string, reference: string, recoveryPayload?: Record<string, unknown>): Promise<void> {
     if (!reference || reference.length > 256) throw new CoreError('payment_invalid', 'invalid funding recovery reference');
     const nowIso = this.now();
     await this.d.db.tx(async () => {
       const prior = await this.d.db.get<{purchase_id:string;transfer_reference:string}>('SELECT purchase_id, transfer_reference FROM funding_attempts WHERE rail = $1 AND network = $2 AND transfer_reference = $3',rail,network,reference);
       if (prior && prior.purchase_id !== purchaseId) throw new CoreError('payment_replayed','this transfer is already bound to another purchase');
-      const current = await this.d.db.get<{transfer_reference:string}>('SELECT transfer_reference FROM funding_attempts WHERE purchase_id = $1',purchaseId);
+      const payloadJson = recoveryPayload ? JSON.stringify(recoveryPayload) : null;
+      if (payloadJson && payloadJson.length > 40000) throw new CoreError('payment_invalid', 'funding recovery payload too large');
+      const current = await this.d.db.get<{transfer_reference:string;recovery_payload_json:string|null}>('SELECT transfer_reference,recovery_payload_json FROM funding_attempts WHERE purchase_id = $1',purchaseId);
       if (current && current.transfer_reference !== reference) throw new CoreError('conflict','a different payment is already pending recovery');
-      await this.d.db.run("INSERT INTO funding_attempts(id,purchase_id,rail,network,transfer_reference,status,created_at,updated_at) VALUES($1,$2,$3,$4,$5,'pending',$6,$7) ON CONFLICT(purchase_id) DO NOTHING",newId('fat'),purchaseId,rail,network,reference,nowIso,nowIso);
+      if (current && current.recovery_payload_json !== payloadJson) throw new CoreError('conflict', 'funding recovery candidate is immutable');
+      await this.d.db.run("INSERT INTO funding_attempts(id,purchase_id,rail,network,transfer_reference,status,created_at,updated_at,recovery_payload_json) VALUES($1,$2,$3,$4,$5,'pending',$6,$7,$8) ON CONFLICT(purchase_id) DO NOTHING",newId('fat'),purchaseId,rail,network,reference,nowIso,nowIso,payloadJson);
       await this.d.db.run("UPDATE purchases SET payment_state = 'unknown', updated_at = $1 WHERE id = $2 AND state = 'awaiting_funding'",nowIso,purchaseId);
       const candidate=(await this.d.db.get<{id:string}>('SELECT id FROM funding_attempts WHERE purchase_id = $1',purchaseId))!;
       await this.enqueueJob('recover_funding',purchaseId,'recover_funding:'+candidate.id,new Date(Date.parse(nowIso)+15_000).toISOString());
@@ -746,20 +751,39 @@ export class CommerceCore {
     });
   }
 
-  /** Only durable candidate references can enter this read-only recovery path. */
+  /** Recover durable candidates; optional resume can only resend the exact stored signed transaction. */
   async recoverPendingFunding(purchaseId: string): Promise<boolean> {
-    const candidate=await this.d.db.get<{rail:FundingRail;transfer_reference:string}>("SELECT rail, transfer_reference FROM funding_attempts WHERE purchase_id = $1 AND status = 'pending'",purchaseId);
+    const candidate=await this.d.db.get<{rail:FundingRail;transfer_reference:string;recovery_payload_json:string|null}>("SELECT rail, transfer_reference,recovery_payload_json FROM funding_attempts WHERE purchase_id = $1 AND status = 'pending'",purchaseId);
     if(!candidate) return true;
     const p=(await getPurchaseRow(this.d.db,purchaseId))!;
     const adapter=this.d.fundingAdapters.get(candidate.rail);
     if(!adapter?.recover) throw new Error('funding adapter recovery unavailable');
     const input=this.requirementInput(p);
     if(p.state==='awaiting_funding' && Date.parse(input.expiresAt)<=this.d.clock.now().getTime()) await this.expirePurchase(p.id,'quote expired during funding recovery');
-    const verification=await adapter.recover(candidate.transfer_reference,input);
-    if(!verification.ok) return false;
+    const verification=candidate.recovery_payload_json && adapter.resume
+      ? await adapter.resume(candidate.transfer_reference,input,JSON.parse(candidate.recovery_payload_json))
+      : await adapter.recover(candidate.transfer_reference,input);
+    if(!verification.ok) {
+      if (verification.definitiveFailure) { await this.closeFailedFunding(purchaseId,verification.reason); return true; }
+      return false;
+    }
     if(verification.funding.transferReference!==candidate.transfer_reference) throw new Error('funding recovery reference mismatch');
     await this.recordVerifiedFunding(purchaseId,verification.funding,input);
     return true;
+  }
+
+  /** Terminal only after independent finalized failure, never after a timeout or absent response. */
+  private async closeFailedFunding(purchaseId: string, reason: string): Promise<void> {
+    const nowIso = this.now();
+    await this.d.db.tx(async () => {
+      const p = (await getPurchaseRow(this.d.db,purchaseId))!;
+      if (!['awaiting_funding','expired'].includes(p.state) || p.payment_state !== 'unknown') return;
+      await this.d.db.run("UPDATE funding_attempts SET status='failed',updated_at=$1 WHERE purchase_id=$2 AND status='pending'",nowIso,purchaseId);
+      await this.d.db.run("UPDATE purchases SET state=$1,payment_state='invalid',status_reason=$2,updated_at=$3 WHERE id=$4",p.state==='expired'?'expired':'failed',reason,nowIso,purchaseId);
+      await setReservationStatus(this.d.db,purchaseId,['active'],'released',nowIso);
+      await appendEvent(this.d.db,purchaseId,'funding.failed_finalized',{reason},nowIso);
+      await appendEvent(this.d.db,purchaseId,'capacity.released',{reason:'finalized funding transaction failure'},nowIso);
+    });
   }
 
   private assertFundingMatches(f: VerifiedFunding, input: FundingRequirementInput): void {
