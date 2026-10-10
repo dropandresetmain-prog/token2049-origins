@@ -13,10 +13,10 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Remote: https://github.com/dropandresetmain-prog/token2049-origins.git.
 - Main verified unchanged: 7c09b37eaaeda2bf3eec94fc1e3456118962f636.
 - Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
-- Both deployed services: cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78, pushed.
-- Deployed source fingerprint: f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a.
+- Both deployed services: 3945f9c52cf76e1960569d53416361bcd42de175, pushed; normal signing/grants currently disabled pending cold/activation gate.
+- Canonical Git source fingerprint: addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46 (sorted tracked path NUL blob bytes NUL).
 - Later documentation-only HEAD: resolve git rev-parse HEAD. It is not another deployed artifact.
-- Gateway deployment: dep-db592kflk1mc7395p2mg. Payer activation: dep-db595f3rjlhs73crrsa0.
+- Repair gateway: dep-db5avnvlot8c73eat9j0; normal disabled payer: dep-db5b0o5ckfvc739j3l60. Activation pending.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
@@ -38,9 +38,9 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Fixed-field HTTP diagnostics and sanitized payer receipt/result logs; no automatic POST retries.
 - [x] Explicit additive audited cap amendment; original identities/history/blocked exposure retained.
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
-- [ ] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
+- [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
 - [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: local repair175PASS/typecheckPASS; livecb7b96e. Next action: checkpoint/build and execute gated narrow release.
+- Current checkpoint: repair3945f9c live disabled;175tests/6gate assertions/builds PASS. OAuth16/warm fixed transport/3rail runtime/history PASS. Next: cold check after21:56:53UTC, then gated activation.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
@@ -93,6 +93,10 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Owning docs, manifest, ledger and manual sheet updated; no unresolved implementation blocker.
 - New purchases0, payments0, provider writes0. One original hosted purchase retained. All nine owner rows NOT RUN.
 
+- Repair final quiesced43/759 snapshot/restore SHA c36c8b2db86e79dcdb30653404c3bc1dd53baca57a98f0770c3e4a5c1e441ffc; all financial/history hashes retained.
+- Actual repaired Render3rail checks PASS, Node24.21.0/146300KiB peak; operator list removed; all caps pinned5.1m.
+- Fresh review: two runner gates corrected/six assertions PASS; final authority runner no blocker. No live purchases performed.
+
 ## Preserved histories
 - Cardano:5accepted/94,820; importSHA0909a33e5de6296ebccb5df2a5f700c67e16a800cc3d195d8465fb25d46b9381.
 - Solana payer:7entries/2blocked/94,220; importSHA19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664.
@@ -104,7 +108,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 ## Risks, quotas and next action
 - Owner capture11Oct:668.15/750Free hours remaining,~4.895/5GBbandwidth,447/500build minutes;6/25included services.
 - No card confirmed: excess use stops builds/suspends Free apps. These are shared snapshot balances, not exact current meters.
-- Neon Free:1GiB/project,100CUh/month,6hrestore history. Exact consumption unavailable; reported zeros are not accounting proof.
+- Neon Free confirmed free_v3:1GiB/project,100CUh/month,6hrestore; API reports1542CU-seconds (0.4283CUh),21,717,126transfer bytes. Zero storage/writes counters are not zero-usage proof.
 - Conservative empty-queue estimate43.4CUh/month using7min active windows; reserve20CUh for owner. Actual idle/reconnect PASS.
 - Investigate Now: owner nine live rows, Chromium checkout memory/timing and real host disconnect/cold-start behavior.
 - Investigate Now: periodic protected backups and shared quotas; no paid/provider retention change without approval.

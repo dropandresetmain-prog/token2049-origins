@@ -254,7 +254,22 @@
       "chainBroadcasts": 0
     },
     "quotaEvidence": "Owner screenshot 11 October: 668.15 Free hours, 447 build minutes, 4.895GB bandwidth remaining; no card owner confirmed. Current services API plan free. Browser quota refresh unavailable; snapshot is not live accounting.",
-    "status": "LOCAL_VERIFIED_HOSTED_PENDING"
+    "status": "DEPLOYED_DISABLED_COLD_GATE_PENDING",
+    "candidateSha": "3945f9c52cf76e1960569d53416361bcd42de175",
+    "canonicalGitSourceFingerprint": "addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46",
+    "fingerprintBasis": "sorted tracked path NUL canonical Git blob bytes NUL",
+    "authorityRunner": "scripts/multiwallet/activate-repair-authority.mjs",
+    "finalBackupSha256": "c36c8b2db86e79dcdb30653404c3bc1dd53baca57a98f0770c3e4a5c1e441ffc",
+    "hostedReadOnlyChecks": 16,
+    "operatorPeakRssKiB": 146300,
+    "warmTransportContract": "PASS; fixed invalid ID canonical HTTP400, no payment attempted",
+    "neonQuota": {
+      "plan": "free_v3",
+      "reportedAt": "2026-10-10T21:44:00Z",
+      "computeSeconds": 1542,
+      "transferBytes": 21717126,
+      "preRepairDatabaseBytes": 12836864
+    }
   },
   "previousHostedAcceptance": {
     "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",
