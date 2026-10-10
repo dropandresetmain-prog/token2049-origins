@@ -30,7 +30,7 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - New attachment authorizes Neon Free creation/export/restore, coordinated DATABASE_URL-only cutover and minimal required polling compatibility.
 - Owner reply11October explicitly authorizes temporary SOURCE read-only fence before resume/redeploy.
 - No provider holds/prebooks/orders/bookings/payments/ticketing, chain broadcast, main promotion or paid plan.
-- Existing keys were not moved/read during database migration; consolidated custody/authority changes wait for retained gates.
+- Existing keys were not moved/read during database migration; conditional custody/authority actions now authorized after passed gates.
 - Owner performs all nine live tests after hosted consolidated readiness; every live matrix row NOT RUN.
 
 ## Implementation verified before migration
@@ -46,7 +46,7 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - Final affected multiwallet/registration/hostedpayer35passed; walletledger5passed.
 - Retirement affected4files/38distinct tests passed; typecheck/rebuilt image passed.
 - Node24.21 Linux512MiB/0.1CPU, network disabled/read-only FS: three-rail fixture signing/serialization8PASS, peak137.2MiB.
-- Permanent Sui retirement fixture4PASS, peak76,008KiB; actual old local signer retirement not performed.
+- Permanent Sui retirement fixture4PASS, peak76,008KiB; actual retirement now passes: unchanged source hash, permanent marker/lock, modern read denied and older binary callback denied.
 - Local payer artifact sha256:6b9d656776c66ea06c8f28c942561bae12f34052cd37e373cef83a5a809eeb05.
 
 ## Database migration and deployed checkpoint
@@ -87,15 +87,17 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - Resolve current clean HEAD/source fingerprint from release-plan; final completion output records verified push.
 - Owner screenshot11Oct verifies668.15/750Free hours remaining, ~4.895GB/5GB bandwidth remaining,447/500build minutes remaining.
 - Matching workspace tea-db1tjj1srm7s73d6vra0;6/25included services. Shared capacity is not a permanent allocation to Capsule.
-- Resume consolidated cutover ONLY after remaining pipeline spend-limit/payment-method evidence passes the retained no-paid gate.
-- Then reverify authority/gates; quiesce existingwriters, fresh Neon snapshot, actual Sui fencing, additive0010-0012/import/disabledregistration.
+- Owner confirms no payment method ("No card"); Render stops builds/suspends Free apps at overages instead of billing. Gate passes for bounded consolidation.
+- Fresh Neon backup bedebf56b9dc1b5f2bcc6195aea4fc9afe13c2d53efd84fb8b979ff53c68006f:31tables/560rows, all restore/catalog/ACL grant-set comparisons PASS. Financial hashes unchanged.
+- Original Sui source permanently retired; offline signatures/hash PASS, old binary callback denied. Readback: one successful digest, one absent; both validity windows expired at current epoch1248. Counts/exposure remain unchanged.
+- Next reverify authority/gates; quiesce existingwriters, fresh Neon snapshot, actual Sui fencing, additive0010-0012/import/disabledregistration.
 - Only previously approved custody/deployment/activation steps after every retained gate passes; no live purchases.
 - Source has become stale after target OAuth writes; no blind complete-service rollback. Prefer target roll-forward/reconciliation.
 - Gateway compatibility rollback must retain idle-aware behavior or suspend gateway; no permanent1secondhotpoll.
 
 ## Risks and evidence limits
 - Act Now: actual old process/credential fencing and fresh canonical Neon snapshot before consolidated authority.
-- Investigate Now/blocker: pipeline spend limit and payment-method presence; actual capacity now verified by owner screenshot.
+- Ignore / Accept Risk: owner confirms no card; published overage behavior denies excess use. Shared quotas remain finite.
 - Investigate Now: actual consolidated Render signer initialization/memory and selected-rail hosted acceptance not yet run.
 - Investigate Now: exact Neon billed usage unavailable through Free consumption-history connector; observe idle/bound usage.
 - Park for Later: public onboarding/advanced orchestration; no new work introduced.
@@ -103,7 +105,7 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - Existing Cardano:5accepted/94,820; Solana payer7/2blocked/94,220, sponsor6/25,002lamports.
 - Sui file retained hash3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0,2signed/35,900/gas20,000,000.
 - Existing payment authority remains with the two legacy hosted payers; consolidated authority not enabled.
-- Current release boundary: BLOCKED_REQUIRES_OWNER_INPUT for retained pipeline spend-limit/payment-method gate only.
+- Current checkpoint: authorized consolidation active; fresh backup/PG18 restore and actual Sui retirement pass; legacy hosted payers still active.
 
 ## Evidence links
 - docs/architecture/NEON_DATABASE_MIGRATION.md: runtime/restore/cutover/Free-budget record.

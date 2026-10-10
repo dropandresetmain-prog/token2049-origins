@@ -168,7 +168,6 @@
     "automatic rollback after signing or unknown outcome"
   ],
   "unknowns": [
-    "pipeline spend limit and whether a payment method is attached (actual usage screenshot verified)",
     "actual consolidated Render Free signer memory/initialization and outbound compatibility",
     "new live merchant/chain acceptance"
   ],
@@ -178,7 +177,7 @@
     "backup": "protected authoritative export with integrity and isolated PG18 restore BEFORE authoritative mutation or existing-service replacement",
     "quotas": "actual remaining workspace hours/build/bandwidth and billing/spend settings; published Free limits are insufficient",
     "suiRetirement": "verified permanent owner/hash-bound .retired AND .lock; quiesce all old signers; partial or conflicting fences require manual reconciliation",
-    "status": "backup/PG18 restore and actual capacity verified; consolidated release waits for pipeline spend-limit/payment-method evidence and final signer fencing"
+    "status": "capacity/no-card gate and fresh Neon backup/disposable PG18 restore PASS; original Sui permanent retirement/older-binary denial PASS; perform controlled legacy cloud cutover next"
   },
   "databaseMigration": {
     "status": "authoritative-cutover-hosted-verified; automatic-idle-and-hosted-reconnect-pass",
@@ -230,7 +229,8 @@
       "used": 6,
       "included": 25
     },
-    "pipelineSpendLimit": "not visible; pending",
-    "paymentMethodPresent": "not visible; pending"
+    "pipelineSpendLimit": "not measured; owner confirms no payment method; overage builds stop without billing",
+    "paymentMethodPresent": false,
+    "paymentMethodEvidence": "Owner reply 11 October 2026: No card"
   }
 }

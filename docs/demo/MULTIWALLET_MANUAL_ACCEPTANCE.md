@@ -4,6 +4,13 @@ All nine new live rows are **NOT RUN**. This sheet is for the owner after approv
 
 Use the existing `https://token2049-origins.onrender.com/mcp` with its existing OAuth implementation. Consult [current official connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt); account/workspace controls and UI wording may differ. Copy the exact redirect URI from the host's MCP/OAuth setup interface into the allowed configuration when needed. Retrieve the existing access code through its protected owner method; do not paste it into chat, logs or proof artifacts. No new OAuth provider is required. Console: [Capsule](https://token2049-origins.onrender.com/console/).
 
+### Owner connection preflight
+
+- In ChatGPT on the web, use the account and personal/workspace context intended for acceptance. Confirm that its workspace policies allow adding and using custom MCP servers; ask the workspace administrator to enable access if policy blocks it.
+- Add a custom MCP server using the URL above and OAuth, then create and install the resulting plugin in that same context. Confirm Capsule's tools are visible before continuing.
+- On first tool use, complete Capsule's OAuth consent flow. If setup requires an allowed redirect, copy the exact production URI shown by Capsule's MCP/OAuth setup interface into its allowlist; do not guess the redirect value.
+- Enter the existing access code only in Capsule's OAuth consent screen, using the protected owner method to retrieve it. Never put it in chat, logs or acceptance evidence.
+
 ## Preparation and explicit approval
 
 The account links to the hosted demo customer and protected test wallets, not each visitor's personal wallet. Confirm the displayed registered source label/ID/public identity. Listing is configuration capability only; current balance is checked for the selected source when preparing payment. Never assume readiness from another wallet.
