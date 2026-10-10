@@ -1,3 +1,4 @@
+import {disposeRuntimeSecrets} from './secret-files.js';
 import { pathToFileURL } from 'node:url';
 import { Db } from '../../src/infrastructure/db.js';
 import { createBridge, listenHosted } from '../payer/bridge.js';
@@ -22,8 +23,8 @@ export async function startMultiWalletPayer(env:NodeJS.ProcessEnv,opts:{db?:Db;p
   const payer=new MultiWalletPayer({db,enabled:env.MULTIWALLET_SIGNING_ENABLED==='true',instanceId,load:w=>loadWalletEngine(db,env,w)});
   const server=createBridge({payer,token,serializePayments:false,access:{mode:'hosted',allowedHosts}});
   await listenHosted(server,port);
-  return {server,db,close:async()=>{await new Promise<void>(resolve=>server.close(()=>resolve()));if(!opts.db)await db.close();}};
- }catch(error){if(!opts.db)await db.close();throw error;}
+  return {server,db,close:async()=>{await new Promise<void>(resolve=>server.close(()=>resolve()));if(!opts.db)await db.close();disposeRuntimeSecrets();}};
+ }catch(error){if(!opts.db)await db.close();disposeRuntimeSecrets();throw error;}
 }
 if(process.argv[1]&&import.meta.url===pathToFileURL(process.argv[1]).href){
  startMultiWalletPayer(process.env).then(h=>{console.log('Consolidated payer listening');for(const signal of ['SIGINT','SIGTERM'] as const)process.on(signal,()=>void h.close().then(()=>process.exit(0)));})

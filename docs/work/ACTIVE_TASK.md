@@ -6,7 +6,7 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - Owner authorized existing Render PG18 -> Neon Free PG18; this supersedes the earlier database-provider prohibition.
 - One consolidated Render Free payer candidate: Cardano Preprod, Solana Devnet, Sui Testnet modules.
 - Authenticated customer -> logical payer profile -> multiple registered wallets; demo owner cus_HOSTEDMCPDEMO.
-- Existing two payers still deployed. Consolidation is implemented locally, not hosted or activated.
+- Gateway consolidated candidate is live read-only; consolidated payer disabled runtime acceptance in progress; old Solana suspended.
 
 ## Repository/checkpoint
 - Remote https://github.com/dropandresetmain-prog/token2049-origins.git; main verified7c09b37eaaeda2bf3eec94fc1e3456118962f636.
@@ -90,24 +90,25 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - Owner confirms no payment method ("No card"); Render stops builds/suspends Free apps at overages instead of billing. Gate passes for bounded consolidation.
 - Fresh Neon backup bedebf56b9dc1b5f2bcc6195aea4fc9afe13c2d53efd84fb8b979ff53c68006f:31tables/560rows, all restore/catalog/ACL grant-set comparisons PASS. Financial hashes unchanged.
 - Original Sui source permanently retired; offline signatures/hash PASS, old binary callback denied. Readback: one successful digest, one absent; both validity windows expired at current epoch1248. Counts/exposure remain unchanged.
-- Next reverify authority/gates; quiesce existingwriters, fresh Neon snapshot, actual Sui fencing, additive0010-0012/import/disabledregistration.
+- Quiescence/final snapshot/restore, actual old-signer fencing, additive0010-0012/import/disabled registration completed; retain proof in protected journal.
 - Only previously approved custody/deployment/activation steps after every retained gate passes; no live purchases.
 - Source has become stale after target OAuth writes; no blind complete-service rollback. Prefer target roll-forward/reconciliation.
 - Gateway compatibility rollback must retain idle-aware behavior or suspend gateway; no permanent1secondhotpoll.
 
 ## Risks and evidence limits
-- Act Now: actual old process/credential fencing and fresh canonical Neon snapshot before consolidated authority.
+- Act Now: complete disabled three-rail hosted acceptance before exact-instance activation; old authority fencing and fresh snapshot/restore PASS.
 - Ignore / Accept Risk: owner confirms no card; published overage behavior denies excess use. Shared quotas remain finite.
-- Investigate Now: actual consolidated Render signer initialization/memory and selected-rail hosted acceptance not yet run.
+- Investigate Now: rerun disabled hosted acceptance after bounded secret-mount correction; Cardano/Solana passed, Sui permission failure isolated.
 - Investigate Now: exact Neon billed usage unavailable through Free consumption-history connector; observe idle/bound usage.
 - Park for Later: public onboarding/advanced orchestration; no new work introduced.
 - Ignore / Accept Risk: Free sleep/cold starts with durable idempotency/readback; sandbox/testnet/notional disclosures retained.
 - Existing Cardano:5accepted/94,820; Solana payer7/2blocked/94,220, sponsor6/25,002lamports.
 - Sui file retained hash3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0,2signed/35,900/gas20,000,000.
 - All apps quiesced; original cloud payer clients revoked, original cloud key files removed, local retirement/hash/import guards verified. Consolidated authority not enabled.
-- Current checkpoint: additive0010-0012 applied, original Sui history imported, three sources registered disabled. Gateway candidate3a88 build pending; payer startup command rejected before signer initialization.
+- Current checkpoint: additive0010-0012 applied, original Sui history imported, three sources registered disabled. Gateway candidate3a88 live, read-only OAuth/MCP16PASS; payer Node operator startup verified Cardano/Solana, Sui mount compatibility correction pending.
 - Final quiesced Neon backup/PG18 restore SHA9d7947be883f58b80bec9fff9ed683c309ee6e62f50acaffb8575dc920409477 PASS31tables/560rows. Original histories unchanged after import; only reviewed additive/auth changes.
-- Next: use explicit Node operator runtime entrypoint instead of rejected composed Render Docker command; reverify exact narrow replacement candidate and retry disabled build.
+- Node operator candidatec7e36 passed actual Render Cardano/Solana initialization and read-only chain checks, peak141596KiB. Sui refused mounted secret permissions (lstat0777). Payer suspended to stop retries; gateway read-only OAuth/MCP16PASS.
+- Next: deploy verified bounded selected-secret staging correction (affected10PASS, typecheck/payer compile PASS); operator checks signing false, then remove operator startup before activation. Independent narrow review reports no blocker; controlled platform symlinks accepted with opened-file bound and downstream identity guard.
 
 ## Evidence links
 - docs/architecture/NEON_DATABASE_MIGRATION.md: runtime/restore/cutover/Free-budget record.
@@ -116,3 +117,4 @@ Updated 11 October 2026 Singapore. Re-read before major phases and completion.
 - docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md: nine owner rows, all NOT RUN.
 - docs/work/CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md: preserved detailed previous candidate evidence.
 - docs/work/SUI_FUNDING.md and docs/demo/: historical local/live Sui evidence, not candidate hosted acceptance.
+
