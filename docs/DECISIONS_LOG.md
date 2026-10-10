@@ -1,8 +1,14 @@
 # Capsule decisions log
 
+## 11 October 2026 — authorized database exception and consolidated hosted activation
+
+Status: owner-approved cutover complete; owner live purchase acceptance NOT RUN. The subsequent explicit Render-to-Neon authorization supersedes the 10 October database-retention decision below. Canonical state is Neon Free PG18 Singapore, direct/unpooled verified TLS; original Render source remains read-only with restored original access restrictions. Application gateway/MCP/OAuth/console/providers/Playwright remain on existing Render infrastructure.
+
+One reused Free payer runs all three rails with exact-instance grants and preserved histories. Actual Render secret mounts are symlinks (lstat0777, resolved0640); Sui correctly refused them. A bounded selected-only private-file staging correction preserves downstream key identity and permission guards; normal startup/listing never initializes all signers. Both services are live at `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78`. No Cloudflare, queue, new service or paid plan. [Evidence and rollback boundary](architecture/CONSOLIDATED_PAYER.md).
+
 ## 10 October 2026 — keep Render; consolidate payer ownership
 
-Status: implemented in isolated candidate, hosted cutover pending owner authorization.
+Status: historical architecture correction; superseded only for the database by the explicit 11 October authorization above.
 
 The corrected architecture keeps existing Render PostgreSQL 18, gateway/MCP/OAuth, console, providers and Playwright. It supersedes the proposed Neon/Cloudflare replacement. Reuse the existing Cardano service for one payer with three internal rails and multiple owned wallet sources; no per-wallet/service deployment and no wake orchestration.
 

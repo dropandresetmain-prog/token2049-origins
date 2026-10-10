@@ -168,8 +168,9 @@
     "automatic rollback after signing or unknown outcome"
   ],
   "unknowns": [
-    "actual consolidated Render Free signer memory/initialization and outbound compatibility",
-    "new live merchant/chain acceptance"
+    "new live merchant/chain acceptance through ChatGPT",
+    "actual browser checkout memory/timing and host-disconnect behavior during owner purchases",
+    "current exact shared Free usage meters"
   ],
   "manualLiveRows": "docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md",
   "preCutoverGates": {
@@ -177,7 +178,7 @@
     "backup": "protected authoritative export with integrity and isolated PG18 restore BEFORE authoritative mutation or existing-service replacement",
     "quotas": "actual remaining workspace hours/build/bandwidth and billing/spend settings; published Free limits are insufficient",
     "suiRetirement": "verified permanent owner/hash-bound .retired AND .lock; quiesce all old signers; partial or conflicting fences require manual reconciliation",
-    "status": "capacity/no-card gate and fresh Neon backup/disposable PG18 restore PASS; original Sui permanent retirement/older-binary denial PASS; perform controlled legacy cloud cutover next"
+    "status": "PASS: quotas/no card; protected final full PG18 backup/restore; actual permanent old-signer fences; preserved histories and disabled hosted readiness; owner-approved activation complete"
   },
   "databaseMigration": {
     "status": "authoritative-cutover-hosted-verified; automatic-idle-and-hosted-reconnect-pass",
@@ -232,5 +233,29 @@
     "pipelineSpendLimit": "not measured; owner confirms no payment method; overage builds stop without billing",
     "paymentMethodPresent": false,
     "paymentMethodEvidence": "Owner reply 11 October 2026: No card"
+  },
+  "runtimeConfiguration": {
+    "renderSecretStaging": "MULTIWALLET_RENDER_SECRET_FILES=true in Render payer only; selected controlled mount privately staged",
+    "operatorSourceIds": "removed from normal deployed startup",
+    "instanceId": "capsule_cb7b96e9e43a"
+  },
+  "hostedAcceptance": {
+    "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",
+    "candidateSha": "cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78",
+    "sourceFingerprintSha256": "f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a",
+    "verifiedAt": "2026-10-10T19:34:42.362Z",
+    "signingEnabledByExplicitOwnerAuthorization": true,
+    "registeredSources": 3,
+    "legacyClientsRevoked": true,
+    "oldSolanaSuspended": true,
+    "renderThreeRailReadOnlyChecks": "PASS",
+    "operatorPeakRssKiB": 145856,
+    "mcpReadonlyChecks": 16,
+    "postCutoverBackupSha256": "f1fe714b075f1d294d1927dbf3b4a4561462d2f16cdcbad47c262068d579ffa7",
+    "backupRestoreTables": 43,
+    "backupRestoreRows": 602,
+    "liveRows": "all nine NOT RUN",
+    "gatewayDeployId": "dep-db592kflk1mc7395p2mg",
+    "payerDeployId": "dep-db595f3rjlhs73crrsa0"
   }
 }

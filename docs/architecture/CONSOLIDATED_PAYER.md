@@ -1,6 +1,6 @@
 # Consolidated payer candidate
 
-Updated 11 October 2026. Candidate branch: `codex/capsule-neon-migration`; exact release SHA comes from `git rev-parse HEAD` and the release manifest. This is an implementation and cutover record, not hosted acceptance.
+Updated 11 October 2026. Candidate branch: `codex/capsule-neon-migration`; deployed release SHA is `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78`; fingerprint `f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a`. This record distinguishes local fixtures, actual hosted non-spending acceptance and pending owner live purchases.
 
 ## Architecture and authority
 
@@ -48,7 +48,7 @@ Use a dedicated funding client `cli_HOSTEDMULTIWALLETPAYER` with gateway hash `M
 
 Gateway uses `MULTIWALLET_PAYER_URL` and `MULTIWALLET_PAYER_TOKEN_FILE`; remove legacy Cardano/Solana bridge configuration in consolidated mode. Payer uses `DATABASE_URL`, `MULTIWALLET_INSTANCE_ID`, `MULTIWALLET_ALLOWED_HOSTS`, `MULTIWALLET_PAYER_TOKEN_FILE` and prefixed signer configuration. Protected signer references select approved configuration, not caller URLs.
 
-No deployment, authoritative migration, key upload, grant activation, provider write or broadcast is authorized by the local candidate. Exact resource IDs, secret **names**, migrations, fingerprints and approved actions belong in the release manifest; never include secret values or raw signed payloads.
+The local candidate alone authorizes no deployment, authoritative migration, key upload, grant activation, provider write or broadcast. Subsequent explicit owner authorization and passed gates permit the recorded cutover; provider writes/broadcasts remain excluded from agent execution. Exact resource IDs, secret **names**, migrations, fingerprints and approved actions belong in the release manifest; never include secret values or raw signed payloads.
 
 The checked-in [release manifest](../../deploy/consolidated-payer-release.json) names existing resources and secret names. After a clean checkpoint, run `node scripts/multiwallet/release-plan.mjs` to produce the exact SHA and source fingerprint; it has no apply mode. Protected registration/import tools default to validation. During approved disabled deployment, `node dist/scripts/multiwallet/preflight.js SOURCE_ID` initializes only that registered demo source and verifies key identity/pinned policy/preserved history without signing or checking balances. This operator step is outside the customer demo path.
 
@@ -105,4 +105,17 @@ The original Sui file is now permanently retired: source hash unchanged, modern 
 
 Actual disabled Render acceptance initialized Cardano and Solana and passed their read-only chain checks (peak141,596KiB). Sui rejected its mounted key path permission guard. The payer was suspended immediately to prevent repeated checks. Render's platform-controlled consolidated secret mount now opts into `MULTIWALLET_RENDER_SECRET_FILES=true`: only the selected module's key files are read from `/etc/secrets/consolidated-*`, with an opened-file8192-byte bound/change check, and staged in process-private0700 directories/0600 files. Existing rail identity and protected-file checks remain enforced; histories stay in PostgreSQL. Mounted symlinks are accepted as part of Render's trusted secret delivery, not caller-controlled paths. Copies are cleaned on close/failure. No new signing or history migration occurs in this glue.
 
-Affected tests10PASS, root typecheck and payer compile PASS. Fresh narrow independent review found no blocker; its bounded-read suggestion was applied. Actual Sui hosted acceptance remains pending the replacement build. The operator-only entrypoint is removed after acceptance so normal startup and source listing never probe every wallet.
+Affected tests10PASS, root typecheck and payer compile PASS. Fresh narrow independent review found no blocker; its bounded-read suggestion was applied. Actual Sui hosted initialization and read-only readiness now pass at the replacement build. The operator-only entrypoint is removed after acceptance so normal startup and source listing never probe every wallet.
+
+
+## Completed owner-approved hosted release — 11 October 2026
+
+Both existing Free services run `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78`; payer instance `capsule_cb7b96e9e43a`. Cardano, Solana and Sui original identities/policies initialize on actual Render Node24.21.0 with peak145,856KiB; read-only chain network/asset checks pass. Cardano spendability is deferred to a selected purchase, not invented from network readiness. Sui mount is a platform symlink0777 to0640 file, now privately staged with original identity guard. Normal payer entrypoint is `node dist/clients/multiwallet/hosted.js`; operator source IDs are removed. Disabled and activated restarts pass with no operator fan-out.
+
+Canonical ownership/policy/history checks passed before activation. All25 original financial tables match final snapshot (nullable recovery column normalized); pending jobs/purchases/funding/merchant/handoffs zero. Original Cardano5accepted/94,820, Solana payer7entries/2blocked/94,220 and sponsor6entries/25,002lamports retained. Sui source hash3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0 retains2signed candidates/35,900token units/20,000,000MIST. Their expired validity windows/readback do not erase blocked exposure or signed bytes. Old local histories/proof schemas remain protected and recoverable.
+
+Old cloud clients return401 with their actual retained tokens; original cloud key paths return404, old Solana service remains suspended. Original local Cardano/Solana/Sui fences are permanent, with actual old Sui binary lock denial. Three canonical source grants match the exact new instance. Signing was enabled only after all gates passed; demo commerce scopes restored last. No new purchase/payment/provider action was performed. Hosted OAuth/MCP16checks and console/historical receipt/proof/owned-source GETs pass after activation.
+
+Final pre-consolidation archive `9d7947be883f58b80bec9fff9ed683c309ee6e62f50acaffb8575dc920409477` restored31tables/560rows. Post-cutover archive `f1fe714b075f1d294d1927dbf3b4a4561462d2f16cdcbad47c262068d579ffa7` restored43tables/602rows, complete hashes/catalogs/ACL grant sets/app role, into a newly named disposable PG18 database. Protected directory `~/.capsule/neon-migration-20261011` contains consistent archives/journal/retirement/import/runtime proofs; no values or raw candidates are committed.
+
+Fresh integrated independent review found one namespace bypass, fixed and covered natively; narrow runtime review found no blocker, bounded-read improvement applied. Final correction10affected tests/typecheck/payer compile PASS. **READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED**. Owner setup/manual rows live in the linked sheet. No additional autonomous test follows this checkpoint.

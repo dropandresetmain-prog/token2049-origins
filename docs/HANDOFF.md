@@ -1,10 +1,16 @@
 # Capsule — current handoff
 
-## Current consolidated-payer candidate — 10 October 2026
+## Ready for owner MCP test — 11 October 2026
 
-Worktree: `C:/Dev/token2049-origins-on-demand`; branch: `codex/capsule-on-demand-multiwallet`; base: `7c09b37eaaeda2bf3eec94fc1e3456118962f636`. Resolve exact checkpoint SHA/state from [ACTIVE_TASK](work/ACTIVE_TASK.md) and `git rev-parse HEAD`; do not resume from the historical baseline below.
+Branch `codex/capsule-neon-migration`; worktree `C:/Dev/token2049-origins-neon-migration`. Both Render Free gateway and consolidated payer are live at `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78`, source fingerprint `f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a`. Main is unchanged at `7c09b37eaaeda2bf3eec94fc1e3456118962f636`. Later documentation-only checkpoint HEAD is recorded by Git and the task ledger; it is not a different deployed artifact.
 
-The candidate reuses existing Render infrastructure and integrates Sui with one customer-linked multi-wallet payer. Keys, canonical history, live deployments and old authority remain untouched until approval. Read [cutover/rollback](architecture/CONSOLIDATED_PAYER.md), [runtime evidence](architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md) and [owner manual tests](demo/MULTIWALLET_MANUAL_ACCEPTANCE.md). Finish the ledger's recorded next action in the same coding chat. No live purchases are authorized; all nine new live rows are NOT RUN.
+Owner-approved Neon migration and consolidated cutover are complete. Three original wallets are enabled for `capsule_cb7b96e9e43a`; all old cloud payer clients are revoked, original cloud signing-key files removed after protected backup, local ledgers permanently retired, old Solana service suspended. No new wallet, cap increase, history reset, chain payment or provider write occurred.
+
+Actual Render three-rail initialization/read-only checks PASS (Node24.21.0, peak145,856KiB), normal restart/source listing has no operator RPC fan-out, hosted OAuth/MCP16PASS, console/historical proof/source GET checks PASS. All25 original financial tables match the final pre-consolidation snapshot after accounting for the additive nullable recovery column. Sui2signed/35,900token units/20,000,000MIST remain intact. Post-cutover backup `f1fe714b075f1d294d1927dbf3b4a4561462d2f16cdcbad47c262068d579ffa7` restores all43tables/602rows plus catalogs/ACLs into disposable PG18. Protected evidence stays outside Git.
+
+**Next action belongs to the owner:** connect/refresh the existing [MCP](https://token2049-origins.onrender.com/mcp) using OAuth, retrieve the existing consent code locally, and execute [nine-row manual acceptance](demo/MULTIWALLET_MANUAL_ACCEPTANCE.md). Every live row is NOT RUN. [Console](https://token2049-origins.onrender.com/console/) remains public read-only. The local `console-access-key` copy does not match the existing deployed reader hash; it was not changed. Public demo receipt/proof access passes without it.
+
+No additional deployment, review cycle, feature or payment test is authorized by this handoff. Use the same chat for narrow owner test failures, retaining purchase IDs and unknown liabilities. Never repeat buy/switch wallet after ambiguity. No stale Render/Neon backup rollback after new signing; fence authority and reconcile canonical history first. [Runbook](architecture/CONSOLIDATED_PAYER.md), [runtime evidence](architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md), [ledger](work/ACTIVE_TASK.md).
 
 The following older handoff remains retained integration history, not a current deployment claim.
 

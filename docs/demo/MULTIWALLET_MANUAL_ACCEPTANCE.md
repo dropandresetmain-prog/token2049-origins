@@ -1,15 +1,26 @@
 # Multiwallet owner acceptance
 
-All nine new live rows are **NOT RUN**. This sheet is for the owner after approved deployment and non-spending hosted readiness. Fixture E2E, historical live evidence and a local Docker build do not establish candidate live acceptance.
+**READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED.** Both existing Render services are live at `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78`. Non-spending hosted checks pass and owner-approved activation is complete. All nine new live rows are **NOT RUN**. This sheet is for the owner. Fixture E2E, historical live evidence and a local Docker build do not establish candidate live acceptance.
 
 Use the existing `https://token2049-origins.onrender.com/mcp` with its existing OAuth implementation. Consult [current official connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt); account/workspace controls and UI wording may differ. Copy the exact redirect URI from the host's MCP/OAuth setup interface into the allowed configuration when needed. Retrieve the existing access code through its protected owner method; do not paste it into chat, logs or proof artifacts. No new OAuth provider is required. Console: [Capsule](https://token2049-origins.onrender.com/console/).
 
 ### Owner connection preflight
 
-- In ChatGPT on the web, use the account and personal/workspace context intended for acceptance. Confirm that its workspace policies allow adding and using custom MCP servers; ask the workspace administrator to enable access if policy blocks it.
-- Add a custom MCP server using the URL above and OAuth, then create and install the resulting plugin in that same context. Confirm Capsule's tools are visible before continuing.
-- On first tool use, complete Capsule's OAuth consent flow. If setup requires an allowed redirect, copy the exact production URI shown by Capsule's MCP/OAuth setup interface into its allowlist; do not guess the redirect value.
-- Enter the existing access code only in Capsule's OAuth consent screen, using the protected owner method to retrieve it. Never put it in chat, logs or acceptance evidence.
+The [official OpenAI setup guide](https://developers.openai.com/plugins/deploy/connect-chatgpt), fetched 11 October 2026, gives this flow:
+
+1. Open [ChatGPT Plugins](https://chatgpt.com/plugins) in the intended account/workspace; select the plus button, then **Add custom MCP server**.
+2. Name it Capsule, describe it as sandbox/testnet commerce, and use public connection URL `https://token2049-origins.onrender.com/mcp`. Choose OAuth. Existing metadata supports dynamic client registration; leave manual client ID/secret blank when using that option.
+3. Review the host warning, select **I understand and want to continue**, then **Create as a plugin**. Review discovered tools: find_offers, create_quote, buy, get_purchase. Install the result in that same context.
+4. If Capsule is already installed, open its connection and **Refresh**, then start a new conversation. Reconnect OAuth if cached permission remains read-only from cutover; the current customer grant allows search/quote/buy/read, never direct funding.
+5. Type `@` and select Capsule. Complete Capsule's OAuth consent using the existing code, only on its consent page. If the host requires a redirect allowlist update, copy its exact production URI; do not guess it. Account/workspace/Lockdown policy may block custom MCP access and needs the owner's/admin's browser action.
+
+Owner-only local code retrieval (copies directly to the clipboard; does not print or put the code in chat):
+
+```powershell
+Get-Content -Raw -LiteralPath 'C:/Dev/token2049-setup/secrets/hosted-demo/mcp-owner-passcode' | Set-Clipboard
+```
+
+Paste only into Capsule's consent screen, then clear the clipboard. The [console](https://token2049-origins.onrender.com/console/) is public read-only and needs no key. The local console-access-key copy is stale against the unchanged deployed reader hash; it is not needed for this demo view.
 
 ## Preparation and explicit approval
 
@@ -21,11 +32,19 @@ Say explicitly: “I approve quote [ID/digest], total at most [amount/currency],
 
 The existing testnet scale is **1:1000**, not exchange-rate or production-money settlement. Keep per-rail policies separate:
 
-| Source | Current recorded policy, before final cutover recheck |
+| Source | Verified retained policy and exposure at 11 October hosted readiness |
 |---|---|
-| Cardano Preprod demo wallet | Per-payment/daily/cumulative 5,100,000 token base units; fee cap 2,500,000,000 lovelace; ADA output cap 10,000,000,000 lovelace. Read-only 10 Oct status: 94,820 committed, 5,005,180 per-payment headroom. Balance/fee availability is not established by those counters. |
-| Solana Devnet demo wallet | 250,000 base units/payment; 500,000 cumulative; USD 250 commercial cap; shared sponsor fee cap 100,000 lamports. Current remaining exposure/balance is unverified. Payer token funds and sponsor fees are separate. |
+| Cardano Preprod demo wallet | Per-payment/daily/cumulative 5,100,000 token base units; fee cap 2,500,000,000 lovelace; ADA output cap 10,000,000,000 lovelace. Retained 5 entries/94,820 committed; cumulative headroom 5,005,180. Balance/fee availability is not established by those counters. |
+| Solana Devnet demo wallet | 250,000 base units/payment; 500,000 cumulative; USD 250 commercial cap; shared sponsor fee cap 100,000 lamports. Retained 7 entries/2 blocked,94,220 committed; cumulative headroom 405,780 and sponsor headroom 74,998 lamports. Read-only finalized balance check passed at 19:27 UTC 10 Oct; balances can change. Payer token funds and sponsor fees are separate. |
 | Sui Testnet demo wallet | 100,000 base units/payment; 500,000 daily; 1,000,000 cumulative; USD 100 commercial cap; 10,000,000 MIST gas/payment and 500,000,000 MIST cumulative gas. Retained history counts 35,900 token units and 20,000,000 MIST, including two signed records. |
+
+Use these exact registered source IDs (the same ID applies to that rail in every row):
+
+| Rail | Registered source ID | Public identity to check |
+|---|---|---|
+| Cardano Preprod | `src_21f098873f368133fc671af8b3716703` | `addr_test1qrwg…tthyxm` |
+| Solana Devnet | `src_5f44db62376459a75a564e4d3bc8099a` | `5iSWoZSucVSaNj…2X5MZ6` |
+| Sui Testnet | `src_fb5d190ec0b7abf66d5ff65f2e37af86` | `0x99eb4437d493…86d20b` |
 
 Select legitimate fresh offers within exact quote and remaining caps; do not increase caps or pretend an expensive itinerary is affordable. If no suitable offer/balance exists, mark the row **BLOCKED** with evidence. Dates below are relative to the actual test date.
 

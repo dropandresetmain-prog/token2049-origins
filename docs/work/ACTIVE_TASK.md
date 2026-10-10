@@ -1,120 +1,111 @@
 # Capsule consolidated payer and database migration
-Updated 11 October 2026 Singapore. Re-read before major phases and completion.
+Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
-## Objective and current architecture
-- Existing Render Free gateway/MCP/OAuth, console, providers and Playwright unchanged except reviewed idle worker glue.
-- Owner authorized existing Render PG18 -> Neon Free PG18; this supersedes the earlier database-provider prohibition.
-- One consolidated Render Free payer candidate: Cardano Preprod, Solana Devnet, Sui Testnet modules.
-- Authenticated customer -> logical payer profile -> multiple registered wallets; demo owner cus_HOSTEDMCPDEMO.
-- Gateway consolidated candidate is live read-only; consolidated payer disabled runtime acceptance in progress; old Solana suspended.
+## Objective and current state
+- READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED. The owner connects MCP and runs the live rows; the agent stops here.
+- Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
+- Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
+- Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
+- Demo ownership: cus_HOSTEDMCPDEMO -> payer_HOSTEDMCPDEMO -> three original registered wallets.
+- Listing reads registrations. A payment initializes only its selected chain and genuinely required sponsor; no alternative wallet after failure.
 
-## Repository/checkpoint
-- Remote https://github.com/dropandresetmain-prog/token2049-origins.git; main verified7c09b37eaaeda2bf3eec94fc1e3456118962f636.
-- Branch codex/capsule-neon-migration; worktree C:/Dev/token2049-origins-neon-migration.
-- Parent candidate7785c6674b1dd0b1b0a81c8ee48cd794abbb7019, original lane preserved clean.
-- Previous migration checkpoint cef5d17124216f5508e5317ca04c8d3e5be705ce; this checkpoint records verified hosted database cutover.
-- Exact final SHA/source fingerprint: clean scripts/multiwallet/release-plan.mjs output after exact-file commit.
-- Gateway-only compatibility branch codex/capsule-neon-idle-gateway, pushed/livead3d675cdeb1774c2f2a961823d6cb7107ee948e.
-- Shared checkout codex/console-source-store and unrelated changes untouched; no main promotion.
-- Prior ledgers preserved PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md.
-- Sui feature bae2f623dccc47d7604a48919c969e2229bce340 integrated asd7cd82c after overlap review.
+## Repository and checkpoint
+- Remote: https://github.com/dropandresetmain-prog/token2049-origins.git.
+- Main verified unchanged: 7c09b37eaaeda2bf3eec94fc1e3456118962f636.
+- Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
+- Both deployed services: cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78, pushed.
+- Deployed source fingerprint: f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a.
+- Later documentation-only HEAD: resolve git rev-parse HEAD. It is not another deployed artifact.
+- Gateway deployment: dep-db592kflk1mc7395p2mg. Payer activation: dep-db595f3rjlhs73crrsa0.
+- Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
+- Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
+- Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
 
 ## Constraints and authorization
-- One payer runtime, many profiles/wallets; no service per customer/rail/wallet; no new queue/framework/runtime.
-- Keys remain outside gateway. Listing/quoting reads registration, only selected source probes its required chain/sponsor.
-- Approval binds owner, quote/digest/amount/expiry, funding option and source; never fall back after failure.
-- Preserve reservations, signed candidates, independent caps, histories, sponsor separation and unknown outcomes.
-- Immutable applied migrations; additive changes only; no historical owner reassignment or namespace resets.
-- Fixture signing/native disposable tests/exact-file commits and task-branch pushes authorized.
-- Conditional consolidated authorization for968807b/source05c1ff09 retains quota/backup/Sui fencing gates.
-- New attachment authorizes Neon Free creation/export/restore, coordinated DATABASE_URL-only cutover and minimal required polling compatibility.
-- Owner reply11October explicitly authorizes temporary SOURCE read-only fence before resume/redeploy.
-- No provider holds/prebooks/orders/bookings/payments/ticketing, chain broadcast, main promotion or paid plan.
-- Existing keys were not moved/read during database migration; conditional custody/authority actions now authorized after passed gates.
-- Owner performs all nine live tests after hosted consolidated readiness; every live matrix row NOT RUN.
+- No Cloudflare, replacement OAuth, queue, wake system, paid plan or service per customer/wallet/rail.
+- Keys only in payer. Original identities, caps, histories and sponsor roles preserved. Exact quote/digest/funding option/source bind approval.
+- Reservations and signed candidates persist before irreversible calls. Unknown outcomes reconcile the same candidate; merchant attempts are not duplicated.
+- Rail caps remain separate. Applied migrations immutable and additive; historical purchase owners are not reassigned.
+- Conditional authorization968807b/source05c1ff09 permits verified narrow replacement candidates and cutover after mandatory gates.
+- Subsequent explicit Neon authorization permits Free PG18 Singapore export/import and minimal idle-aware worker glue.
+- Owner explicitly permitted the early source read-only fence; quota screenshot and No card confirmation passed the bounded no-paid gate.
+- Conditional activation permission exercised only after history, ownership, fencing and hosted readiness passed.
+- No agent broadcast, funding, cap increase, provider hold/prebook/order/booking/ticketing or merchant payment permitted.
+- Every new live row is NOT RUN. No new feature, broad review or autonomous payment test follows this handoff.
 
-## Implementation verified before migration
-- [x] Inspect instructions/refs/code/legacy ledgers/Sui evidence; isolate lane and preserve submission.
-- [x] Customer/profile/source ownership, exact approval/persisted source and selected-only dispatch.
-- [x] Default-disabled single service three-rail payer; preserved legacy namespaces and immutable policies.
-- [x] Native PostgreSQL history/import/idempotency/concurrency/recovery and synthetic nine-provider/rail matrix.
-- [x] Sui durable hosted ledger/import tooling; permanent file retirement guards and old-binary lock denial.
-- [x] Console/progress/payment plus merchant proof contracts; release manifest/manual matrix/runbook.
-- [x] One fresh independent integrated review; legacy wallet namespace bypass fixed with DB/runtime guards.
-- Integrated gate55files/732tests:729 passed; three changed expectations fixed, affected8files/150passed.
-- Selected-source contracts3files/126passed; console9files/89passed; root/console typechecks/build passed.
-- Final affected multiwallet/registration/hostedpayer35passed; walletledger5passed.
-- Retirement affected4files/38distinct tests passed; typecheck/rebuilt image passed.
-- Node24.21 Linux512MiB/0.1CPU, network disabled/read-only FS: three-rail fixture signing/serialization8PASS, peak137.2MiB.
-- Permanent Sui retirement fixture4PASS, peak76,008KiB; actual retirement now passes: unchanged source hash, permanent marker/lock, modern read denied and older binary callback denied.
-- Local payer artifact sha256:6b9d656776c66ea06c8f28c942561bae12f34052cd37e373cef83a5a809eeb05.
+## Implementation and local verification
+- [x] Instructions, refs, implementations and histories inspected; isolated lane and known-good checkpoint preserved.
+- [x] Customer/profile/source contracts; synthetic two-customer, multiple-wallet and same-rail isolation.
+- [x] Exact approval and source persistence; selected-only three-rail dispatch; canonical purchase API with no signing oracle.
+- [x] Persistent rail histories, independent caps, concurrency/idempotency and conservative reservation/candidate recovery.
+- [x] Nine provider/rail combinations through shared contracts with labeled fixtures.
+- [x] Sui PostgreSQL history/import and permanent retirement; actual older-binary lock denial.
+- [x] Console source/progress/provider receipt/independent proof and visibility-aware polling.
+- [x] Independent integrated review: legacy namespace bypass fixed with native tests and cross-table identity guards.
+- Integrated gate:55files/732tests,729PASS; three changed expectations fixed, affected8files/150PASS.
+- Selected-source126PASS; console89PASS; final affected35PASS; wallet ledger5PASS; retirement38distinctPASS.
+- Root/console typechecks and builds PASS. Local Node24Linux512MiB/0.1CPU/network-none signing fixtures8PASS.
+- Narrow Render mount correction:10affected tests, root typecheck and payer compile PASS.
+- Fresh narrow independent review found no blocker; bounded opened-file read improvement applied.
 
-## Database migration and deployed checkpoint
-- [x] Neon orgfree_v3 verified; projectcool-paper-95079645, AWSaws-ap-southeast-1, actualPG18.6.
-- [x] Direct/unpooled verified TLS,0.25CU min/max,112connections,1GiB/project,100CUh/month documented.
-- [x] Protected initial completePG18 archive31tables/705rows; full hash/schema/role/ACL restore verified.
-- Initial SHA b7064e44c69fec67333479bebdac998be5a11b0dc36e63346c1a9eb8ecc170ee.
-- [x] Seven native Neon session/lock/interruption/tx/savepoint/postcommit/row-lock/idempotency checks PASS.
-- [x] Validation automatic suspension/resume PASS1.8s; nine applied migration checksums match7c09b37.
-- [x] Quiesce all three source writers; fresh final full snapshot31tables/707rows; complete clean authoritative restore PASS.
-- Final SHA1a5a444c7084d82e04c713bc00a9744c0c503d4295051633457de29366606622.
-- Final archive: one succeeded purchase/merchant/funding handoff; two done jobs; consumed reservation; no active/unknown work.
-- Source snapshot session inventory only migration client; full archive retains all histories/signed headers/import/blocked records.
-- [x] Source/target full table hashes still matched after re-quiescence; owner-approved source role read-only fence applied.
-- [x] New source session UPDATE denied SQLSTATE25006; original Render allowlist restored and independently GET-verified.
-- Render rejects deploy while suspended; resume alone retained old environment. Explicit unchanged-artifact deployment required.
-- [x] Only DATABASE_URL changed across existingthree services; all other env hashes unchanged; all known-good7c artifacts verified live on Neon.
-- [x] OAuth/PKCE/resource metadata/foreign Origin/code replay/MCP initialize/discovery/historical get_purchase16checks PASS.
-- [x] Cardano and Solana hosted health/authenticated status PASS; original identities, histories and caps retained.
-- [x] Console/treasury/historical purchase/receipt/proof GETs200; no merchant or chain write.
-- Only four OAuth bookkeeping tables differ from final source; all other financial/history hashes unchanged.
-- Target authoritative branchbr-royal-leaf-b32j7xx6; endpoint ep-young-recipe-b3jx46ll; validationbr-floral-glade-b30iu8nk.
-- Source retaineddpg-db29mujncjis73dtvf70-a; expiry2026-11-05T06:55:54.699333Z (Nov5 14:55:54SG).
-- Protected owner-only backups/journal/credentials outsideGit at ~/.capsule/neon-migration-20261011.
-- Four future-object default ACL creator/owner/grantor labels mapped Renderpostgres->Neonadmin; original archive immutable.
-- Explicit schema bootstrap privileges preserved; allowners/app role flags/table hashes/catalog comparisons PASS.
-- [x] Minimal idle-aware worker: immediate local committed wake, persisted deadlines/lease/reconciliation, empty queue every 30 minutes.
-- Migration focused44PASS then19affectedPASS; gateway-only45PASS/typecheck/build; access failure-recovery5PASS/typecheck.
-- Fresh bounded independent migration review completed: reservation wake, env example, recovery journal issues fixed.
-- [x] Deployed automatic idle at17:43:17UTC; hosted purchase read resumed in0.965s; post-idle OAuth/MCP16checks PASS.
-- Compute usage fields currently0 are delayed/ambiguous, not exact billed evidence; conservative bounds required.
+## Database migration and protected backups
+- [x] Neon org free_v3; project cool-paper-95079645, AWS aws-ap-southeast-1, actual PG18.6, fixed0.25CU and112connections.
+- [x] Native session locks/transactions/savepoints/interruption/postcommit/row locks/idempotency:7PASS; migration checksums retained.
+- [x] Initial Render31tables/705rows full restore; SHA b7064e44c69fec67333479bebdac998be5a11b0dc36e63346c1a9eb8ecc170ee.
+- [x] Final source31/707 full restore; SHA 1a5a444c7084d82e04c713bc00a9744c0c503d4295051633457de29366606622.
+- [x] Database-only cutover initially changed only DATABASE_URL across three services; exact old identities retained.
+- [x] Source new-session write denied SQLSTATE25006; original access restriction restored and final GET verified.
+- [x] Idle-aware worker preserves committed wake, durable queue/lease/reconciliation; empty queue checks every30min.
+- [x] Actual automatic idle17:43:17UTC and hosted read reconnect0.965s; post-idle OAuth/MCP16PASS.
+- [x] Fresh quiesced Neon31/560 full restore; SHA 9d7947be883f58b80bec9fff9ed683c309ee6e62f50acaffb8575dc920409477.
+- [x] Post-cutover43tables/602rows full restore; SHA f1fe714b075f1d294d1927dbf3b4a4561462d2f16cdcbad47c262068d579ffa7.
+- Complete table hashes, schemas/functions/triggers/indexes/constraints/policies/sequences/default ACL grant sets/app role PASS.
+- Canonical branch br-royal-leaf-b32j7xx6 / endpoint ep-young-recipe-b3jx46ll; validation br-floral-glade-b30iu8nk.
+- Protected archives, credentials, raw history, runtime proof and journal: ~/.capsule/neon-migration-20261011, outside Git.
 
-## Next action / boundaries
-- Post-cutover source remains read-only and all31tables match final snapshot; target differs only in OAuth bookkeeping.
-- Original network restriction independently reverified; target11,796,480bytes; pending jobs/purchases/funding allzero.
-- Conservative empty-queue estimate43.4CUh/month using7minute active windows;20CUh reserved for owner tests.
-- Verification compute upper bound under0.6CUh across both0.25CU endpoints; exact billed meter unavailable.
-- Resolve current clean HEAD/source fingerprint from release-plan; final completion output records verified push.
-- Owner screenshot11Oct verifies668.15/750Free hours remaining, ~4.895GB/5GB bandwidth remaining,447/500build minutes remaining.
-- Matching workspace tea-db1tjj1srm7s73d6vra0;6/25included services. Shared capacity is not a permanent allocation to Capsule.
-- Owner confirms no payment method ("No card"); Render stops builds/suspends Free apps at overages instead of billing. Gate passes for bounded consolidation.
-- Fresh Neon backup bedebf56b9dc1b5f2bcc6195aea4fc9afe13c2d53efd84fb8b979ff53c68006f:31tables/560rows, all restore/catalog/ACL grant-set comparisons PASS. Financial hashes unchanged.
-- Original Sui source permanently retired; offline signatures/hash PASS, old binary callback denied. Readback: one successful digest, one absent; both validity windows expired at current epoch1248. Counts/exposure remain unchanged.
-- Quiescence/final snapshot/restore, actual old-signer fencing, additive0010-0012/import/disabled registration completed; retain proof in protected journal.
-- Only previously approved custody/deployment/activation steps after every retained gate passes; no live purchases.
-- Source has become stale after target OAuth writes; no blind complete-service rollback. Prefer target roll-forward/reconciliation.
-- Gateway compatibility rollback must retain idle-aware behavior or suspend gateway; no permanent1secondhotpoll.
+## Consolidated cutover and actual hosted verification
+- [x] Quiescence and final snapshot; active jobs/purchases/funding/merchant/handoffs all zero before activation.
+- [x] Old payer clients revoked; actual old tokens HTTP401; original cloud signing-key paths404.
+- [x] Cardano/Solana permanent local retirement/import guards. Sui .retired/.lock, old binary callback denied, source hash unchanged.
+- [x] Additive0010-0012 applied; verified Sui import; original three wallets registered disabled before key provisioning.
+- [x] Existing protected keys and restricted new tokens only in payer; gateway has no signing keys or legacy bridges.
+- [x] Both existing Free services live at exactcb7b96e; old Solana srv-db35psid0e5s73f7ltng suspended and retained.
+- [x] Actual Render Node24.21.0 three-rail identity/history/read-only chain checks PASS; peak145,856KiB (~142.4MiB).
+- Sui initially rejected a Render0777symlink ->0640file. Selected-only private0700/0600 staging preserves identity/permission guards.
+- [x] Operator source list removed. Normal disabled and activated restarts have no operator RPC fan-out; payer auth/routes PASS.
+- [x] Owners/policies match.25original financial table hashes unchanged, normalizing the additive nullable recovery column.
+- [x] Three enabled grants match exact instance capsule_cb7b96e9e43a. Signing enabled after gates; demo scopes restored last.
+- [x] Post-activation OAuth/MCP16PASS; unauthenticated source listing401; owned listing shows three configured sources.
+- [x] Console/historical receipt/proof GET200; deployed frontend known-token/private-material checks PASS.
+- [x] Owning docs, manifest, ledger and manual sheet updated; no unresolved implementation blocker.
+- New purchases0, payments0, provider writes0. One original hosted purchase retained. All nine owner rows NOT RUN.
 
-## Risks and evidence limits
-- Act Now: complete disabled three-rail hosted acceptance before exact-instance activation; old authority fencing and fresh snapshot/restore PASS.
-- Ignore / Accept Risk: owner confirms no card; published overage behavior denies excess use. Shared quotas remain finite.
-- Investigate Now: rerun disabled hosted acceptance after bounded secret-mount correction; Cardano/Solana passed, Sui permission failure isolated.
-- Investigate Now: exact Neon billed usage unavailable through Free consumption-history connector; observe idle/bound usage.
-- Park for Later: public onboarding/advanced orchestration; no new work introduced.
-- Ignore / Accept Risk: Free sleep/cold starts with durable idempotency/readback; sandbox/testnet/notional disclosures retained.
-- Existing Cardano:5accepted/94,820; Solana payer7/2blocked/94,220, sponsor6/25,002lamports.
-- Sui file retained hash3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0,2signed/35,900/gas20,000,000.
-- All apps quiesced; original cloud payer clients revoked, original cloud key files removed, local retirement/hash/import guards verified. Consolidated authority not enabled.
-- Current checkpoint: additive0010-0012 applied, original Sui history imported, three sources registered disabled. Gateway candidate3a88 live, read-only OAuth/MCP16PASS; payer Node operator startup verified Cardano/Solana, Sui mount compatibility correction pending.
-- Final quiesced Neon backup/PG18 restore SHA9d7947be883f58b80bec9fff9ed683c309ee6e62f50acaffb8575dc920409477 PASS31tables/560rows. Original histories unchanged after import; only reviewed additive/auth changes.
-- Node operator candidatec7e36 passed actual Render Cardano/Solana initialization and read-only chain checks, peak141596KiB. Sui refused mounted secret permissions (lstat0777). Payer suspended to stop retries; gateway read-only OAuth/MCP16PASS.
-- Next: deploy verified bounded selected-secret staging correction (affected10PASS, typecheck/payer compile PASS); operator checks signing false, then remove operator startup before activation. Independent narrow review reports no blocker; controlled platform symlinks accepted with opened-file bound and downstream identity guard.
+## Preserved histories
+- Cardano:5accepted/94,820; importSHA0909a33e5de6296ebccb5df2a5f700c67e16a800cc3d195d8465fb25d46b9381.
+- Solana payer:7entries/2blocked/94,220; importSHA19483c72bfed83abb04fd3bedaf569e0eb33d1806424ac14cb83066122808664.
+- Solana sponsor:6entries/25,002lamports; importSHA1966603b4d08fdfc7f8776f3040346b928c2e94694c5259ab394ac129356f9d4.
+- Sui:2signed/35,900token units/20,000,000MIST; sourceSHA3db74885426ee2e7e42226d3a4ebb64b0ab8834babc09ea35049fdcfee7817f0.
+- Sui readback: one expired candidate absent, one confirmed. Both signed payloads/digests/exposure retained, no replay or reset.
+- Exact source IDs, public identities, caps and approval requirements in manifest/manual sheet. Old local proof stores retained.
+
+## Risks, quotas and next action
+- Owner capture11Oct:668.15/750Free hours remaining,~4.895/5GBbandwidth,447/500build minutes;6/25included services.
+- No card confirmed: excess use stops builds/suspends Free apps. These are shared snapshot balances, not exact current meters.
+- Neon Free:1GiB/project,100CUh/month,6hrestore history. Exact consumption unavailable; reported zeros are not accounting proof.
+- Conservative empty-queue estimate43.4CUh/month using7min active windows; reserve20CUh for owner. Actual idle/reconnect PASS.
+- Investigate Now: owner nine live rows, Chromium checkout memory/timing and real host disconnect/cold-start behavior.
+- Investigate Now: periodic protected backups and shared quotas; no paid/provider retention change without approval.
+- Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
+- Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
+- Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
+- Next action OWNER: install/refresh existing MCP OAuth, enter code only on consent, test fresh quotes/all nine rows, retain purchase IDs.
+- Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
+- Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 
 ## Evidence links
-- docs/architecture/NEON_DATABASE_MIGRATION.md: runtime/restore/cutover/Free-budget record.
-- docs/architecture/CONSOLIDATED_PAYER.md and deploy/consolidated-payer-release.json: approved release/gates/rollback.
-- docs/architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md: actual local image and account proof boundaries.
-- docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md: nine owner rows, all NOT RUN.
-- docs/work/CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md: preserved detailed previous candidate evidence.
-- docs/work/SUI_FUNDING.md and docs/demo/: historical local/live Sui evidence, not candidate hosted acceptance.
-
+- docs/architecture/CONSOLIDATED_PAYER.md — implementation, cutover, rollback and complete hosted record.
+- docs/architecture/RENDER_MULTIWALLET_RUNTIME_EVIDENCE.md — fixtures vs hosted checks vs owner live boundary.
+- docs/architecture/NEON_DATABASE_MIGRATION.md — native PostgreSQL, full restores, idle and retention record.
+- deploy/consolidated-payer-release.json — deployed SHA/fingerprint/resources/secret NAMES and authorization boundaries.
+- docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md — official setup, protected code retrieval, IDs/caps/nine NOT RUN rows/recovery.
+- docs/HANDOFF.md — completed state and exact owner next action; historical handoff retained.

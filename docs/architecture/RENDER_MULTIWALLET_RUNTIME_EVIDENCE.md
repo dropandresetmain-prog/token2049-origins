@@ -97,3 +97,25 @@ The existing Solana /status was subsequently inspected read-only using only its 
 The earlier BLOCKED/account observations above are historical. Owner screenshot and no-card confirmation pass the bounded Free budget gate:668.15hours, ~4.895GB bandwidth,447build minutes remaining at capture. Fresh final canonical Neon archive SHA9d7947be883f58b80bec9fff9ed683c309ee6e62f50acaffb8575dc920409477 restored all31tables/560rows and catalogs/ACL grant sets in disposable PG18. Actual original Sui permanent retirement and older-binary lock denial pass; original Cardano/Solana clients/keys are fenced and old Solana suspended. Additive0010-0012 applied, unchanged Sui signed history imported, three original sources disabled and zero authority grants. Gateway candidate3a88 passed16 hosted read-only OAuth/MCP checks.
 
 Actual Render operator candidatec7e36 initialized Cardano/Solana and passed read-only chain checks, peak141,596KiB. Sui mounted-key permissions failed the existing guard; service suspended. Narrow selected-only protected staging correction passes10affected tests/typecheck/payer compile and independent code review. Exact replacement candidate will be recorded after commit; hosted Sui/restart acceptance still pending. All9 new live purchases NOT RUN. No payment/provider writes performed.
+
+
+## Final hosted acceptance — 11 October 2026
+
+Candidate `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78`, source fingerprint `f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a`, is live on both existing Free512MB/0.1CPU services. Three original signer modules initialize on Render Node24.21.0; bounded read-only chain network/asset checks PASS. Peak process RSS145,856KiB (~142.4MiB), measured during all-three operator acceptance. No fixture/mock substituted for this runtime check; no transaction was signed or broadcast. Normal restart removes the operator source list and initializes no chain module; actual disabled/activated startup logs confirm no operator fan-out. Selected-only behavior and failures are covered by retained fixture/native-PG tests.
+
+| Gate | Current status | Boundary |
+|---|---|---|
+| Three-rail Render SDK/key identity/PG history initialization | PASS | Actual original identities; signing disabled during operator checks |
+| Read-only network/asset readiness | PASS | Cardano network/tip; Solana finalized balances; Sui network/asset/balances; spendability checked on selected purchase |
+| Normal restart, ownership/source listing and payer auth | PASS | No operator checks, owned3sources, unauth listing401, no generic sign route |
+| Existing hosted MCP/OAuth | PASS |16checks after exact deployment and restored scopes, no buy/quote/search |
+| Console/historical receipt/proof | PASS | Existing public demo GET200; private source GET200; no secret signer references |
+| Full authoritative backup/isolatedPG18restore | PASS | Post-cutover43tables/602rows, hashes/catalogs/ACLs/app role; SHA`f1fe714b075f1d294d1927dbf3b4a4561462d2f16cdcbad47c262068d579ffa7` |
+| Free account capacity/billing | PASS for bounded verification | Owner capture668.15h/~4.895GB/447build-min remaining; no card; not current exact meters or dedicated allocation |
+| Free cold start / host disconnect during real purchase | Owner test pending | Platform sleep accepted; durable/idempotent recovery tested locally; no keep-alive/wake/manualstartup |
+| Playwright merchant checkout memory/timing | Owner test pending | Existing browser path unchanged; operator payer RSS is not Chromium proof |
+| Nine new live purchases | NOT RUN | Owner manual sheet only |
+
+No paid resource, new service, billing enrollment or browser provider introduced. Independent integrated review and narrow mount review completed; blockers fixed. Source Render database expiry/restriction still GET-verified; no stale-history rollback after target writes.
+
+Actual deployed console artifact `/console/assets/index-BBTWYUDe.js`, SHA256 `1a97be6dcc76bfd921c54ca4744c2caf44167b2496c1b9fd084db75d9339588e`, passed known consent/service-token absence and private signer-material pattern checks. This is a bounded artifact check, not a universal secret-detection claim.
