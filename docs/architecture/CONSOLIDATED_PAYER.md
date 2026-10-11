@@ -4,6 +4,8 @@ Current status: **COLD_WORKER_DIAGNOSTIC_PASS — INTEGRATED REPEATABILITY PENDI
 
 The retained implementation/cutover evidence below describes the earlier `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78` checkpoint (fingerprint `f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a`), before the owner incident and repair. It is historical acceptance evidence rather than today’s activation state.
 
+**E2E reliability repair (12 October 2026, not deployed).** The consolidated payer artifact changes: Cardano `Payer` sends one signed funding POST per run and reconciles any ambiguous result by read-only GETs; a gateway 202 `confirmationPending` with no funding evidence is pending (ledger entry stays `signed`, caps stay counted). The gateway and the payer must be replaced as a pair (exact SHA and fingerprints in [the handoff](../work/READY_FOR_OWNER_AUTHORIZATION_20261012.md)); signing grants are instance-bound, so a new SHA needs a separately authorized re-grant. Quiesce/rollback: [runbook](../work/RELEASE_ROLLBACK_RUNBOOK_20261012.md). The deployed state described below is unchanged until the owner authorizes that release.
+
 ## Architecture and authority
 
 Keep the existing Render Free gateway, hosted `/mcp` OAuth server, console, provider adapters and Playwright/Chromium checkout. Owner authorization superseded the original database-retention decision: Neon Free PG18 is now authoritative, using direct verified-TLS sessions. Render source `token2049-origins-db` is retained read-only with its original network restriction. See [verified database migration](NEON_DATABASE_MIGRATION.md). No Cloudflare replacement runtime/browser, extra OAuth provider, queue or wake orchestration.
