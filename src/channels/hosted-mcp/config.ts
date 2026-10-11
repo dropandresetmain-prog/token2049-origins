@@ -1,4 +1,5 @@
 import { readFileSync } from 'node:fs';
+import { loadPayerWake, type ConsolidatedBridgeEndpoint } from '../mcp/config.js';
 
 /**
  * Configuration for the hosted MCP endpoint (POST /mcp on the gateway's own public origin). Hosting is opt-in:
@@ -19,7 +20,7 @@ export interface HostedMcpConfig {
   extraRedirectUris: string[];
   /** The single hosted Cardano payer (exact https origin of its free web service), if configured. */
   cardanoBridge?: { url: string; token: string };
-  consolidatedBridge?: { url: string; token: string };
+  consolidatedBridge?: ConsolidatedBridgeEndpoint;
   multiwalletPayerTokenSha256?: string;
   /** SHA-256 (hex) of the hosted payer's gateway token. Only the hash is configured; it registers the payer's gateway client. */
   payerTokenSha256?: string;
@@ -124,6 +125,8 @@ export function loadHostedMcpConfig(env: NodeJS.ProcessEnv): HostedMcpConfig | n
     consolidatedBridge = { url: parsePayerBridgeUrl(env.MULTIWALLET_PAYER_URL, 'MULTIWALLET_PAYER_URL', publicUrl.origin), token: readSecret(env.MULTIWALLET_PAYER_TOKEN_FILE, 'MULTIWALLET_PAYER_TOKEN_FILE', 24) };
     if (cardanoBridge || solanaBridge) throw new HostedConfigError('Consolidated and legacy bridge authority cannot be enabled together');
   }
+  try { loadPayerWake(env, consolidatedBridge, [ownerPasscode]); }
+  catch (error) { throw new HostedConfigError((error as Error).message); }
   const consoleKeySha256 = env.MCP_CONSOLE_KEY_SHA256?.trim().toLowerCase();
   if (consoleKeySha256 !== undefined && !/^[0-9a-f]{64}$/.test(consoleKeySha256)) throw new HostedConfigError('MCP_CONSOLE_KEY_SHA256 must be a 64-character hex SHA-256');
   const payerTokenSha256 = env.MCP_PAYER_GATEWAY_TOKEN_SHA256?.trim().toLowerCase();

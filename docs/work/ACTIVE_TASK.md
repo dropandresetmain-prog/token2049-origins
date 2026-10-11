@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- WAKE_EXPERIMENT_IN_PROGRESS: owner explicitly authorized one Free authenticated Cloudflare Worker for fixed payer GET/health. Existing cold blocker persists until genuine proof; all payment/customer authority remains disabled.
+- WAKE_INTEGRATION_IN_PROGRESS: first genuine Cloudflare-origin cold PASS; opt-in gateway integration locally verified. Payment/customer authority remains disabled until repeated hosted gates.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -15,7 +15,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
 - Gateway deployed fe8abb7a82eb6e610445b40459137b5735647f39; retained payer 3945f9c52cf76e1960569d53416361bcd42de175, pushed; signing/grants disabled pending cold retest/activation.
 - Canonical gateway Git fingerprint: 5b3a6e5b14106b2f3094b68cfd881371eb9dcf46004a9d50541a8f60243068cc; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
-- Later documentation-only HEAD: resolve git rev-parse HEAD. It is not another deployed artifact.
+- Worker checkpoint9ee0e7d pushed; gateway integration replacement resolve git rev-parse HEAD. Worker deployed versionf416f62f, canonical moduleSHAe40e3110bdf403c1e0acb60b5493894aa27a3c28d10167e33a17b53775ac1450.
 - Normal gateway dep-db5bnajrjlhs73d40vng live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation blocked.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
@@ -45,6 +45,8 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
 - UNKNOWN: exact historical ingress HTTP status; inactive payer is leading hypothesis, not definitive cause.
+
+- [x] Wake boundary19tests/local workerd/independent review; gateway135affected unit tests and68native PostgreSQL/MCP integration tests/typecheck/build PASS; independent extension no code blocker, including9fixture combinations and unclaimed wake failure/ambiguousPOST protection.
 
 ## Implementation and local verification
 - [x] Instructions, refs, implementations and histories inspected; isolated lane and known-good checkpoint preserved.
@@ -106,17 +108,17 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Exact source IDs, public identities, caps and approval requirements in manifest/manual sheet. Old local proof stores retained.
 
 ## Risks, quotas and next action
-- Owner capture11Oct:668.15/750Free hours remaining,~4.895/5GBbandwidth,447/500build minutes;6/25included services.
-- No card confirmed: excess use stops builds/suspends Free apps. These are shared snapshot balances, not exact current meters.
+- Current authenticated Render dashboard13:55SG:77.23/750hours used (672.77remaining),66/500build minutes used (434remaining),115MB/5GBused (~4.885GBremaining);6/25services; Hobby/no card, current/projected chargesUSD0. Rounded shared counters.
+- No card on file verified: excess use stops builds/suspends Free apps. Worker Free/$0 verified; budget20Worker requests/3health wakes,30build minutes/2instance hours. No exact account-wide Worker request meter.
 - Neon Free confirmed free_v3:1GiB/project,100CUh/month,6hrestore; API reports1542CU-seconds (0.4283CUh),21,717,126transfer bytes. Zero storage/writes counters are not zero-usage proof.
 - Conservative empty-queue estimate43.4CUh/month using7min active windows; reserve20CUh for owner. Actual idle/reconnect PASS.
-- Act Now: Render429 hibernate-rate-limited blocks hosted payment testing; all authority and customer writes remain disabled. Owner support packet prepared, not sent.
+- Investigate Now: repeated integrated cold acceptance and activation gates pending. First cold PASS at05:43UTC after982.281s idle: Worker200/upstream200 in32.441s, independent payer startup; authenticated gateway readiness subsequently PASS. Histories unchanged.
 - Investigate Now: owner9live rows/browser timing/disconnects and undocumented limiter scope/reset.
 - Investigate Now: periodic protected backups and shared quotas; no paid/provider retention change without approval.
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: verify existing Cloudflare access and actual Free plan; deploy fixed-health diagnostic Worker only; genuine >=15min idle test with independent startup evidence. If FAIL stop disabled. If PASS integrate opt-in preclaim wake, repeat cold proof, narrow independent review and existing conditional activation gates.
+- Next action PRIMARY: finish narrow integration review/build; fresh protected backup/restore; deploy gateway-only replacement with dedicated wake secret; two >=16min idle-to-active integrated checks; resume inspected conditional activation gates. No purchase.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 

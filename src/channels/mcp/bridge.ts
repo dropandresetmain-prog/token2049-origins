@@ -1,5 +1,5 @@
 import { z } from 'zod';
-import { PAYER_RAILS, type McpConfig, type PayerRail } from './config.js';
+import { PAYER_RAILS, type BridgeEndpoint, PAYER_WAKE_URL, PAYER_WAKE_DESTINATION, type McpConfig, type PayerRail } from './config.js';
 import { FundingSource } from '../../contracts/presentation.js';
 
 /** Outcome of asking the payer bridge to fund a purchase. Never throws; failures are values. */
@@ -36,7 +36,7 @@ export class BridgeClient {
   private pendingStatus?: Promise<Status | null>;
   private pendingPreparation?: Promise<boolean>;
 
-  constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; fetch?: typeof fetch; timeoutMs?: number; statusTimeoutMs?: number; diag?: BridgeDiag; wait?: (ms: number) => Promise<void> }) {
+  constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; wake?: BridgeEndpoint; fetch?: typeof fetch; timeoutMs?: number; statusTimeoutMs?: number; diag?: BridgeDiag; wait?: (ms: number) => Promise<void> }) {
     this.f = cfg.fetch ?? fetch;
   }
 
@@ -141,8 +141,35 @@ export class BridgeClient {
     try { (this.cfg.diag ?? stderrDiag)({ type, ...event, ms: Date.now() - started }); } catch { /* Logging never changes payment authority. */ }
   }
 
+  private async wakePayer(deadline: number): Promise<boolean> {
+    const wake = this.cfg.wake;
+    // Defence in depth for direct construction: credentials cannot leave the approved health-only boundary.
+    if (!wake || wake.url !== PAYER_WAKE_URL || this.cfg.url !== PAYER_WAKE_DESTINATION ||
+        !/^[0-9a-f]{64}$/.test(wake.token) || wake.token === this.cfg.token) return false;
+    const started = Date.now();
+    try {
+      const response = await this.f(PAYER_WAKE_URL, {
+        method: 'POST', headers: { authorization: 'Bearer ' + wake.token },
+        redirect: 'error', signal: AbortSignal.timeout(Math.max(1, Math.min(75_000, deadline - Date.now()))),
+      });
+      if (!response.ok) {
+        void response.body?.cancel().catch(() => undefined);
+        this.report('payer_wake', started, { outcome: 'http_error', status: response.status });
+        return false;
+      }
+      const result = z.object({
+        ok: z.literal(true), category: z.literal('upstream_2xx'), upstreamStatus: z.number().int().min(200).max(299),
+        contentType: z.enum(['json', 'html', 'other']), renderRouting: z.enum(['none', 'other', 'hibernate-rate-limited']),
+        durationMs: z.number().nonnegative(), paymentAttempted: z.literal(false),
+      }).strict().safeParse(await response.json());
+      this.report('payer_wake', started, { outcome: result.success ? 'health_response' : 'schema_mismatch', status: response.status });
+      return result.success;
+    } catch (error) { this.report('payer_wake', started, fetchOutcome(error)); return false; }
+  }
+
   private async prepareTransport(): Promise<boolean> {
     const started = Date.now(), budget = this.cfg.statusTimeoutMs ?? 90_000, deadline = started + budget;
+    let wakeAttempted = false;
     // Only safe GETs are repeated. A platform refusal never authorizes a repeated POST /pay.
     for (let attempt = 0; attempt < 12 && Date.now() < deadline; attempt++) {
       let transient = false, retryAfterMs = 0;
@@ -158,6 +185,11 @@ export class BridgeClient {
           else if (rawRetryAfter) { const at = Date.parse(rawRetryAfter); if (Number.isFinite(at)) retryAfterMs = Math.max(0, at - Date.now()); }
           this.report('payer_transport', started, { outcome: 'http_error', status: res.status, attempt, contentType: (res.headers.get('content-type') ?? '').includes('application/json') ? 'json' : 'other' });
           transient = PREPARATION_TRANSIENT_HTTP.has(res.status);
+          if (res.status === 429 && res.headers.get('x-render-routing') === 'hibernate-rate-limited' && this.cfg.wake && !wakeAttempted) {
+            // A wake changes availability only. Direct authenticated status must still pass before a durable claim.
+            wakeAttempted = true;
+            if (retryAfterMs >= deadline - Date.now() || !await this.wakePayer(deadline)) return false;
+          }
         } else {
           let json: unknown;
           try { json = await res.json(); } catch { this.report('payer_transport', started, { outcome: 'invalid_json', attempt }); return false; }

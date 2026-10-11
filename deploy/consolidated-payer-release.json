@@ -253,8 +253,8 @@
       "providerWrites": 0,
       "chainBroadcasts": 0
     },
-    "quotaEvidence": "Owner screenshot 11 October: 668.15 Free hours, 447 build minutes, 4.895GB bandwidth remaining; no card owner confirmed. Current services API plan free. Browser quota refresh unavailable; snapshot is not live accounting.",
-    "status": "BLOCKED_TECHNICAL_RENDER_HIBERNATION",
+    "quotaEvidence": "Authenticated Render billing dashboard 11 October13:55SG: Hobby/no card/USD0,672.77hours/434pipeline minutes/~4.885GB remaining; shared rounded counters.",
+    "status": "WAKE_INTEGRATION_IN_PROGRESS_SIGNING_DISABLED",
     "candidateSha": "fe8abb7a82eb6e610445b40459137b5735647f39",
     "canonicalGitSourceFingerprint": "5b3a6e5b14106b2f3094b68cfd881371eb9dcf46004a9d50541a8f60243068cc",
     "fingerprintBasis": "sorted tracked path NUL canonical Git blob bytes NUL",
@@ -323,7 +323,7 @@
     "payerDeployId": "dep-db595f3rjlhs73crrsa0"
   },
   "wakeExperiment": {
-    "status": "PREPARED_LOCAL_COLD_NOT_RUN",
+    "status": "PHASE1_COLD_PASS_INTEGRATION_PENDING",
     "authorization": "owner attachment8577f52b, 11 October2026",
     "workerName": "capsule-payer-wake-experiment",
     "accountId": "c9e98d4cf5ad6e4eee3a5851d19639a8",
@@ -340,8 +340,36 @@
     "additionalStorageResources": 0,
     "requestBudget": {
       "maxWorkerRequests": 20,
-      "maxRenderHealthRequests": 2,
+      "maxRenderHealthRequests": 3,
       "newPremiumResources": 0
-    }
+    },
+    "workerUrl": "https://capsule-payer-wake-experiment.dropandreset-main.workers.dev",
+    "versionId": "f416f62f-6fb2-4026-851a-caafca88c33b",
+    "deployedModuleSha256": "e40e3110bdf403c1e0acb60b5493894aa27a3c28d10167e33a17b53775ac1450",
+    "firstCold": {
+      "started": "2026-10-11T05:43:50.508Z",
+      "idleSeconds": 982.281,
+      "workerHttpStatus": 200,
+      "upstreamHttpStatus": 200,
+      "durationMs": 32441,
+      "independentPayerStartup": true,
+      "paymentAttempted": false
+    },
+    "gatewaySecretNames": [
+      "MCP_PAYER_WAKE_URL",
+      "MCP_PAYER_WAKE_TOKEN_FILE",
+      "capsule-payer-wake-token"
+    ],
+    "gatewayIntegration": "optional; only Render hibernation429 before claim; direct authenticated status required",
+    "review": "Independent narrow extension: no Act Now code blocker; deployed cold gate pending",
+    "releaseSteps": [
+      "consistent protected backup with isolated PostgreSQL18 restore",
+      "verify exact disabled gateway/payer, zero in-flight work, old signer fencing, all financial hashes",
+      "upload only new dedicated gateway wake secret and opt-in fixed URL/file",
+      "deploy pinned gateway replacement; payer remains3945 disabled",
+      "two genuine>=960s idle checks: trigger gateway readiness, observe specific429 then Worker200 and direct authenticated status/invalid-ID400",
+      "archive protected proofs and verify exact candidate/history/ownership before conditional activation; restore owner scope last",
+      "non-spending MCP/console/proof check; owner performs all nine live rows"
+    ]
   }
 }

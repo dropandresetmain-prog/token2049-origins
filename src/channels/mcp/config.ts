@@ -3,6 +3,21 @@ import { readFileSync } from 'node:fs';
 export type PayerRail = 'cardano' | 'solana' | 'sui';
 export const PAYER_RAILS: readonly PayerRail[] = ['cardano', 'solana', 'sui'];
 export interface BridgeEndpoint { url: string; token: string }
+export const PAYER_WAKE_URL = 'https://capsule-payer-wake-experiment.dropandreset-main.workers.dev/wake';
+export const PAYER_WAKE_DESTINATION = 'https://t2o-cardano-payer.onrender.com';
+export interface ConsolidatedBridgeEndpoint extends BridgeEndpoint { wake?: BridgeEndpoint }
+
+/** This optional credential only authorizes a fixed health wake, never payment or a caller-selected destination. */
+export function loadPayerWake(env: NodeJS.ProcessEnv, bridge: ConsolidatedBridgeEndpoint | undefined, otherSecrets: string[]): void {
+  if (!env.MCP_PAYER_WAKE_URL && !env.MCP_PAYER_WAKE_TOKEN_FILE) return;
+  if (!env.MCP_PAYER_WAKE_URL || !env.MCP_PAYER_WAKE_TOKEN_FILE) throw new ConfigError('MCP_PAYER_WAKE_URL and MCP_PAYER_WAKE_TOKEN_FILE must be set together');
+  if (!bridge || bridge.url !== PAYER_WAKE_DESTINATION) throw new ConfigError('Payer wake requires the fixed consolidated payer destination');
+  if (env.MCP_PAYER_WAKE_URL !== PAYER_WAKE_URL) throw new ConfigError('MCP_PAYER_WAKE_URL must equal the fixed wake endpoint');
+  const token = readTokenFile(env.MCP_PAYER_WAKE_TOKEN_FILE, 'MCP_PAYER_WAKE_TOKEN_FILE');
+  if (!/^[0-9a-f]{64}$/.test(token)) throw new ConfigError('MCP_PAYER_WAKE_TOKEN_FILE must contain a dedicated 64-character hex secret');
+  if ([bridge.token, ...otherSecrets].includes(token)) throw new ConfigError('Payer wake must use a distinct dedicated secret');
+  bridge.wake = { url: PAYER_WAKE_URL, token };
+}
 
 /**
  * Resolved runtime configuration for the MCP channel. Secrets are held as plain strings in memory
@@ -15,7 +30,7 @@ export interface McpConfig {
   gatewayToken: string;
   /** Optional separate bounded payer processes, at most one per rail. Absent => `buy` returns action_required. */
   bridges?: Partial<Record<PayerRail, BridgeEndpoint>>;
-  consolidatedBridge?: BridgeEndpoint;
+  consolidatedBridge?: ConsolidatedBridgeEndpoint;
   /** Optional streamable-HTTP listener port on 127.0.0.1. Absent => stdio. */
   httpPort?: number;
   /** Test seam: replaces global fetch for gateway and bridge calls. */
@@ -111,6 +126,7 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConf
     if (!env.MULTIWALLET_PAYER_URL || !env.MULTIWALLET_PAYER_TOKEN_FILE) throw new ConfigError('MULTIWALLET_PAYER_URL and MULTIWALLET_PAYER_TOKEN_FILE must be set together');
     cfg.consolidatedBridge = { url: requireHttpUrl(env.MULTIWALLET_PAYER_URL, 'MULTIWALLET_PAYER_URL', true), token: readTokenFile(env.MULTIWALLET_PAYER_TOKEN_FILE, 'MULTIWALLET_PAYER_TOKEN_FILE') };
   }
+  loadPayerWake(env, cfg.consolidatedBridge, [gatewayToken]);
   const bridges = loadBridges(env);
   if (cfg.consolidatedBridge && Object.keys(bridges).length) throw new ConfigError('Consolidated and legacy bridges cannot be enabled together');
   if (Object.keys(bridges).length) cfg.bridges = bridges;
@@ -125,5 +141,5 @@ export function loadConfigFromEnv(env: NodeJS.ProcessEnv = process.env): McpConf
 
 /** All secret strings in a config, for output scrubbing. */
 export function secretsOf(cfg: McpConfig): string[] {
-  return [cfg.gatewayToken, ...(cfg.consolidatedBridge ? [cfg.consolidatedBridge.token] : []), ...Object.values(cfg.bridges ?? {}).map((b) => b.token)];
+  return [cfg.gatewayToken, ...(cfg.consolidatedBridge ? [cfg.consolidatedBridge.token, ...(cfg.consolidatedBridge.wake ? [cfg.consolidatedBridge.wake.token] : [])] : []), ...Object.values(cfg.bridges ?? {}).map((b) => b.token)];
 }
