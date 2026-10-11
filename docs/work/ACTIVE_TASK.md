@@ -31,16 +31,21 @@ Implement the repairs from the completed owner E2E investigation through code, f
 - Preserve existing Render Free gateway/MCP/OAuth/console, one consolidated Render Free payer, existing Neon database, narrow health-only Cloudflare wake Worker, Atlas/Nuitée/Shopify integrations, original wallet identities/histories/sponsor roles/signer fences, existing 1:1000 scaling and aligned caps, and quote digest/selected source/explicit approval binding. No infrastructure migration, new application service, paid plan, keep-alive job, general retries or manual wake requirement.
 
 ## Task ledger
-- [x] Isolated repair worktree at 51ff776; prior ledger preserved as dated checkpoint; this compact ledger written.
+- [x] Isolated repair worktree at 51ff776; prior ledger preserved as dated checkpoint; this compact ledger written (564c9ac).
 - [x] Investigated payment-state and quote-continuation code paths; WS1 misclassification chain fully traced (see evidence below).
-- [ ] WS1 payment-state semantics repair + fixtures.
-- [ ] WS2 durable idempotent quote continuation + fixtures.
+- [x] WS1 payment-state semantics repair + fixtures (6f280f3): nondefinitive settlement -> confirmation_pending (202) across service.ts verifyAndRecord/FundResult, app.ts fund route, MCP buy presentation; definitive rejection + settlementAttempted===false unchanged; stale failed handoff never overrides canonical state. Tests: sui-funding integration, presentation unit, mcp-dual-rail confirmation-pending e2e. Typecheck 0.
+- [x] WS2 durable idempotent quote continuation + fixtures (597dded): G2 transient payer-probe failure no longer reported as "no payment source" (BridgeClient StatusOutcome.transient + describeQuote); G1 durable join-or-return quote widened from live-retail to all retail (advisory lock + existing-quote lookup, quote_changed/quote_expired), so repeat/restart collects the same quote and never re-invokes the provider quote. Shopify shadow prep already idempotent (unchanged). Tests: mcp-background, mcp-stall-recovery, shopify-global-sandbox, fx-budget. Typecheck 0; 74/74 affected tests pass.
 - [ ] WS3 grounded confirmation + receipt/proof links + fixtures.
 - [ ] WS4 currency contract + authorization UX alignment + fixtures.
 - [ ] WS5 bounded discovery/latency improvements + fixtures.
 - [ ] Verification: affected tests during implementation, then one justified integrated fixture gate; native PostgreSQL for changed persistence/locking; typecheck.
 - [ ] One fresh independent review (financial states/authorization/idempotency/recovery/customer-facing claims), findings classified Act Now / Investigate Now / Park for Later / Ignore / Accept Risk.
 - [ ] Documentation, ledger, manual sheet, READY_FOR_OWNER_AUTHORIZATION handoff.
+
+## Pre-existing baseline failures at 51ff776 (NOT caused by WS1/WS2; proven by detached checkout of base)
+Verified: with WS2 stashed and HEAD detached at base 51ff776, the same 4 tests fail identically. They are inherited from the "verified" investigation checkpoint and are outside the five workstreams. Root causes:
+- tests/integration/postgres.test.ts:36 asserts `COUNT(*) FROM schema_migrations` is 12, but 13 migration files exist (0001..0013, incl. 0013_wallet_policy_amendments.sql). Stale count; 1-char fix (12->13) available if the owner wants it in scope.
+- tests/integration/human-orchestration.test.ts:54-70 (3 tests: excludes MISSING_CONFIG / excludes ACCESS_BLOCKED / fixture rails not selectable in demo runtime) assert the QUOTE's fundingOptions is [] when adapter readiness is MISSING_CONFIG/ACCESS_BLOCKED or appEnv=sandbox. But fundingOptionsFor (service.ts:360-384) builds quote options from acceptedAsset() CONFIG only (comment service.ts:364: "only the selected rail is checked live before payment"); fundingReady is invoked only at createPurchase (service.ts:438). The tests encode quote-time readiness filtering that the code deliberately moved to purchase time. Owner to adjudicate: update the tests to the current design, or restore quote-time filtering. Classification pending owner review; not modified here to avoid altering financial-readiness behavior outside scope.
 
 ## WS1 evidence (traced at 51ff776)
 - src/funding/sui/adapter.ts:9 pending() = {ok:false, code:'payment_required', reason:'Sui outcome retained for independent recovery', settlementAttempted:true}; :30 definitive failure adds definitiveFailure:true.
@@ -51,7 +56,7 @@ Implement the repairs from the completed owner E2E investigation through code, f
 - src/core/views.ts:40,77 retains the historical failed handoff as audit evidence; it must not overrule canonical payment confirmation.
 
 ## Next action
-Implement WS1 in the worktree: classify the nondefinitive funding result as confirmation-pending across service.ts (verifyAndRecord + FundResult), app.ts (202), and MCP presentation; keep definitive rejection and settlementAttempted===false unchanged; add fixtures (inconclusive funding then same-digest confirmation: one candidate, no retry, one merchant execution, pending then final headline; plus lost-response and stale-failed-handoff display). Then WS2-WS5, verification, independent review, handoff.
+WS3: align presentation.ts completion gate with the MCP orderConfirmation funding-verification check so a sentence-case "Ticket issued/Booking confirmed/Order confirmed" headline can never emit without independently verified funding; add a safe clickable receipt/proof link that the customer's own scopes can reach and that is already redacted; keep Atlas itineraryDownload (plain HTTP on an IP host) unmodeled/unexposed and never manufacture a ticket; label Nuitée output as a booking confirmation with booking reference only (no voucher/PDF claim). Then WS4, WS5, verification, independent review, handoff.
 
 ## Evidence links
 - docs/work/OWNER_E2E_INVESTIGATION_20261011.md — authoritative investigation, per-journey matrix, findings triage, minimum repair plan.
