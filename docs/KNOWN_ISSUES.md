@@ -4,13 +4,11 @@
 
 | Classification | Finding / action | Risk / blocker |
 |---|---|---|
-| Act Now | Keep signing/grants/customer writes disabled after the single direct cold diagnostic PASS. Done; histories unchanged. | Two complete integrated cold cycles and existing release gates remain required. One successful wake is insufficient for payment readiness. |
-| Investigate Now | Deployed gateway75s wake caller/90s total preparation cannot reliably receive a90s Worker terminal outcome. Review nested gateway budgets within a separately budgeted integrated gate; preserve single-attempt payment rules. | This is a diagnostic budget mismatch, not proof that extending deadlines cures the earlier startup failure. Blocks activation until verified. |
-| Investigate Now | Prior Worker-client timeout has no upstream status; a later payer startup06:32:15UTC was newly observed, trigger unknown. Final independent direct request returned200/routing none in33.135s. | Do not retroactively invent a429 or attribute late startup to a specific request. Retain both failure and success evidence. |
-| Act Now | Pre-claim readiness, sanitized errors and audited Cardano-equivalent cap alignment implemented/deployed.175integrated/85affected/8finaltests and6gate assertions PASS. | Code fixes complete; not cold-ready. Histories/caps remain authoritative. |
-| Investigate Now | Limiter scope/window/reset and exact historical incident status are not documented/retained. | Do not infer source-IP ban, quota exhaustion or automatic reset. Support/runtime evidence required. |
-| Investigate Now | Owner’s nine live E2E tests, actual browser checkout timing/memory and host disconnect behavior. | All NOT RUN on the repaired candidate; non-spending readiness cannot substitute. |
-| Ignore / Accept Risk | Three expired unsafe failed handoffs and prior Sui signed exposure preserved. | No reset/blindretry; fresh quotes after release only. |
+| Act Now | Gateway nesting/terminal diagnostics deployed; two new genuine cold cycles and covered activation PASS. | Resolved release blocker; no payment POST retries. |
+| Investigate Now | Owner nine-row E2E, actual merchant timing and host disconnect recovery. | All NOT RUN. Non-spending checks do not establish live commerce success. |
+| Investigate Now | Prior75s cancellation upstream outcome and late startup trigger remain unknown. | Preserve evidence; do not invent Render limiter rules or promise every future cold request succeeds. Current controlled acceptance passed. |
+| Ignore / Accept Risk | Free cold latency, approximate health limiting and retained unsafe historical exposure. | Fail before claim on readiness failure; no blind retry or wallet switching after ambiguity. |
+| Park for Later | Paid hosting, infrastructure replacement, onboarding and generic orchestration. | Outside this continuation. |
 
 [Actual runtime evidence and support packet](architecture/PAYER_READINESS_REPAIR.md).
 

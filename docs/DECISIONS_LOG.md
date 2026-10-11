@@ -1,5 +1,9 @@
 # Capsule decisions log
 
+## 11 October2026 — final integrated cold acceptance
+
+Correct only the demonstrated gateway readiness mismatch:90s fixed Worker,110s wake caller,130s preparation, unchanged45s MCP pending. Two independently cold deployed cycles PASS including authenticated readiness, independent startup and safe invalid-ID400. Existing conditional authorization then restores only unchanged payer signing and original grants/customer scope after backup/history/fencing gates. No agent transaction. Prior failures remain evidence; do not infer undocumented Render rules. [Acceptance](architecture/PAYER_READINESS_REPAIR.md).
+
 ## 11 October2026 — final independent cold diagnostic
 
 Owner authorized one additional direct fixed-health diagnostic, retaining all payment authority disabled. Worker upstream90s and independent caller110s separate terminal classification from client cancellation. Actual cold request after91minutes passed200 with independent startup in33.135s; canonical histories unchanged. This successful duration is below the old75s deadline and does not establish a fix for intermittent ingress. Production gateway remains unchanged; separately budget its nested preparation deadlines and two fresh integrated cold cycles before reconsidering activation. [Exact evidence](architecture/PAYER_READINESS_REPAIR.md).

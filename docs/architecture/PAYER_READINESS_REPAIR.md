@@ -166,3 +166,29 @@ scripts/multiwallet/integrated-cold-acceptance.mjs is default-deny and consumes 
 Gateway-only correction deployed as86f519450b1d61d5c42f8bbadb685b49f01ea798, canonicalGitSHA25650029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3, Renderdep-db5kvf142hec739b8940 LIVE. Payer/Worker unchanged.16hosted read-only OAuth/MCP checks PASS. Worker management access expired during preflight; Wrangler refreshed the existing session. No payer request or cycle marker existed at that preflight stop; it did not consume a cold cycle.
 
 Integrated cycle1:09:01:41.427–09:02:17.481UTC,3418.142s idle; initial429/hibernate-rate-limited122ms; WorkerHTTP200/upstream200/routingnone33,271ms (gatewaycall33,554ms); direct authenticated readiness35,365ms; canonical invalid-ID400425ms; outer20036,054ms. Independent startup VERIFIED. All40non-OAuth table hashes and disabled grants/customer scopes unchanged. Protected wake-final-integrated-cycle-1.json retains exact events. Cycle2 deliberately waits for a fresh idle window beginning09:02:30UTC. No activation or financial write yet.
+
+
+## Final integrated acceptance and covered activation
+
+READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED
+
+Gateway 86f519450b1d61d5c42f8bbadb685b49f01ea798 / Git fingerprint 50029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3 / dep-db5kvf142hec739b8940; payer 3945f9c52cf76e1960569d53416361bcd42de175 / retained fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46 / activation deploy dep-db5la02jnfac73ast890. Worker00ee6d4a-afdd-4807-ad05-f46d33fa1986/moduleSHA dc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15 unchanged.
+
+| Cycle | Started UTC | Idle seconds | Elapsed ms | Verified result |
+|---|---|---:|---:|---|
+| 1 | 2026-10-11T09:01:41.427Z | 3418.142 | 36054 | initial429; Worker upstream200; authenticated ready; canonical invalid-ID400; independent startup; unchanged histories |
+| 2 | 2026-10-11T09:19:00.446Z | 983.989 | 34449 | initial429; Worker upstream200; authenticated ready; canonical invalid-ID400; independent startup; unchanged histories |
+
+Two independently cold integrated cycles PASS before covered activation. Fixed nesting90s Worker/110s gateway caller/130s preparation, unchanged45s MCP pending/repeat joining. Known sanitized upstream classification survives failure; payment POSTs never automatically retry. Controlled repeatability does not guarantee future ingress or explain the prior intermittent failure.
+
+Existing conditional authorization covers exact narrow replacements and activation after gates. Fresh full PG18 restore, canonical histories, original ownership/identities/policies, retained three-rail initializer and old local/cloud fences PASS. Same payer signing enabled only after both cycles; non-spending transport/ownership/proof checks PASS while grants stayed off; exact three source/instance grants and saved customer commerce scope restored last. No key relocation, policy change, history reset, purchase, broadcast or provider write in this continuation.
+
+Final16OAuth/MCP read-only checks PASS; owned source list configured3, unauthenticated401, console/historical receipt/proof200. Histories unchanged except explicitly approved authority/customer configuration and OAuth records. All9live rows NOT RUN. Do not retry the three expired incident purchases.
+
+MCP https://token2049-origins.onrender.com/mcp; existing OAuth issuer https://token2049-origins.onrender.com/ supports dynamic registration. Console https://token2049-origins.onrender.com/console/. Owner refresh/reconnect if cached scope is read-only; use protected clipboard retrieval in docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md. [Current OpenAI guide](https://developers.openai.com/plugins/deploy/connect-chatgpt), checked11October. No manual payer preparation.
+
+Final authenticated Render17:25SG: Hobby/no card,82.75/750hours used (667.25remaining),69/500build minutes (431remaining),119MB/5GB,6/25services, accrued/projectedUSD0. Rounded shared counters can lag. Workers Free remains Active; exact account-wide Worker/Neon remaining compute allowance is not measured. No paid change.
+
+Rollback: fence customer writes/signing/grants and inspect current canonical histories first. Never restore stale history or reactivate old signers after spending/uncertainty. Preserve old receipts/proofs and snapshots. STOP for owner tests; same chat for narrow owner-reported failures only.
+
+Cold startup timestamps: cycle1 2026-10-11T09:02:08.995625573Z; cycle2 2026-10-11T09:19:23.592959176Z. Worker terminal classifications were upstream_2xx/HTTP200/routingnone in both; caller received them before authenticated readiness and safe400.

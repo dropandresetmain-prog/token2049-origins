@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- INTEGRATED_COLD_ACCEPTANCE_IN_PROGRESS: gateway readiness-only correction; exactly two new cold cycles authorized. Signing/grants/customer writes stay disabled until both PASS and existing gates pass.
+- READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED: both new cold cycles and covered activation PASS; owner tests only, all9live rows NOT RUN.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -13,10 +13,10 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Remote: https://github.com/dropandresetmain-prog/token2049-origins.git.
 - Main verified unchanged: 7c09b37eaaeda2bf3eec94fc1e3456118962f636.
 - Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
-- Gateway deployed 86f519450b1d61d5c42f8bbadb685b49f01ea798; retained payer3945f9c52cf76e1960569d53416361bcd42de175; signing/grants/customer writes disabled; second integrated cold failed; final direct90s diagnostic PASS, integrated repeatability still pending.
+- Gateway 86f519450b1d61d5c42f8bbadb685b49f01ea798; payer3945f9c52cf76e1960569d53416361bcd42de175; signing=true,3source/instance grants enabled, saved customer commerce scope restored after gates.
 - Canonical gateway Git fingerprint: 50029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
-- Initial Worker checkpoint9ee0e7d preserved; gateway integration runtime pinnedb122186. Final Worker sourceeeef8952a218b811f193c580d0a2b12bcdb155cd; deployed version00ee6d4a-afdd-4807-ad05-f46d33fa1986; moduleSHAdc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15.
-- Normal gateway dep-db5kvf142hec739b8940 live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation remains stopped; final direct diagnostic PASS is not repeated integrated acceptance.
+- Initial Worker checkpoint9ee0e7d preserved; gateway integration runtime pinned86f519450b1d61d5c42f8bbadb685b49f01ea798. Final Worker sourceeeef8952a218b811f193c580d0a2b12bcdb155cd; deployed version00ee6d4a-afdd-4807-ad05-f46d33fa1986; moduleSHAdc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15.
+- Gateway dep-db5kvf142hec739b8940 and activated same payer dep-db5la02jnfac73ast890 LIVE/Free; final source/proof/OAuth PASS.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
@@ -40,8 +40,8 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Explicit additive audited cap amendment; original identities/history/blocked exposure retained.
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
 - [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
-- [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: integrated cycle1 PASS09:01:41.427UTC after3418.142s idle; outer200/36.054s, initial429/122ms, Workerupstream200/33.271s, directready35.365s, invalid-ID400. Independent startup and40non-OAuth histories unchanged. Cycle2 idle starts09:02:30UTC; no payer requests until>=09:18:30UTC. Authority stays off.
+- [x] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
+- Current checkpoint: new cold cycles 36054ms/3418.142s idle; 34449ms/983.989s idle PASS; covered activation and final16OAuth/source/proof/history gates PASS. No agent purchase/payment/provider write.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
@@ -110,17 +110,17 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Exact source IDs, public identities, caps and approval requirements in manifest/manual sheet. Old local proof stores retained.
 
 ## Risks, quotas and next action
-- Current authenticated Render dashboard13:55SG:77.23/750hours used (672.77remaining),66/500build minutes used (434remaining),115MB/5GBused (~4.885GBremaining);6/25services; Hobby/no card, current/projected chargesUSD0. Rounded shared counters.
+- Final authenticated Render dashboard17:25SG:82.75/750hours used (667.25remaining),69/500build minutes (431remaining),119MB/5GB,6/25services; Hobby/no card/accrued/projectedUSD0. Shared rounded counters may lag. Workers Free Active reverified.
 - No card on file verified: excess use stops builds/suspends Free apps. Worker Free/$0 verified; budget20Worker requests/3health wakes,30build minutes/2instance hours. No exact account-wide Worker request meter.
 - Neon Free confirmed free_v3:1GiB/project,100CUh/month,6hrestore; API06:09:55UTC reportscompute_time_seconds2713,39,889,248transfer bytes; exact remaining Free compute allowance unverified. Zero storage/writes counters are not zero-usage proof.
 - Conservative empty-queue estimate43.4CUh/month using7min active windows; reserve20CUh for owner. Actual idle/reconnect PASS.
-- Act Now: retain signing=false/three disabled sources/grants/read-only customer after direct diagnostic PASS. Investigate Now: prior75s call lacks upstream status; gateway75s/90s versus Worker90s needs a separately budgeted integrated gate. First cold PASS at05:43UTC after982.281s idle: Worker200/upstream200 in32.441s, independent payer startup; authenticated gateway readiness subsequently PASS. Histories unchanged.
+- Act Now: nested gateway preparation/terminal diagnostics and two fresh cold cycles PASS; covered activation complete. No unresolved implementation release blocker. Old75s cancellation upstream outcome remains unknown; retained as evidence, not retrospectively assigned429.
 - Investigate Now: owner9live rows/browser timing/disconnects and undocumented limiter scope/reset.
 - Investigate Now: periodic protected backups and shared quotas; no paid/provider retention change without approval.
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: run only integrated cycle2 after>=09:18:30UTC with management-only idle/artifact/fence verification. Refresh read-only gateway OAuth without payer calls. If PASS, recheck conditional activation/backup/custody gates; if FAIL STOP. No incident retry or purchase.
+- Next action PRIMARY: owner refresh/reconnect existing Capsule OAuth and run nine fresh manual rows. STOP agent work. Same chat only for a narrow owner-reported failure.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 

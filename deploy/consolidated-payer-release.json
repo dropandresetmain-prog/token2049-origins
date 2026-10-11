@@ -234,7 +234,34 @@
     },
     "pipelineSpendLimit": "not measured; owner confirms no payment method; overage builds stop without billing",
     "paymentMethodPresent": false,
-    "paymentMethodEvidence": "Owner reply 11 October 2026: No card"
+    "paymentMethodEvidence": "Owner reply 11 October 2026: No card",
+    "finalReadOnlySnapshot": {
+      "verifiedAt": "2026-10-11T09:25:59.513Z",
+      "source": "authenticated Render billing UI",
+      "plan": "Hobby",
+      "paymentMethodPresent": false,
+      "freeInstanceHours": {
+        "used": 82.75,
+        "included": 750,
+        "remaining": 667.25
+      },
+      "pipelineMinutes": {
+        "used": 69,
+        "included": 500,
+        "remaining": 431
+      },
+      "bandwidth": {
+        "usedMB": 119,
+        "includedGB": 5
+      },
+      "services": {
+        "used": 6,
+        "included": 25
+      },
+      "accruedUsd": 0,
+      "projectedUsd": 0,
+      "limitations": "rounded workspace counters may lag; no billing/settings change"
+    }
   },
   "runtimeConfiguration": {
     "renderSecretStaging": "MULTIWALLET_RENDER_SECRET_FILES=true in Render payer only; selected controlled mount privately staged",
@@ -253,13 +280,13 @@
       "providerWrites": 0,
       "chainBroadcasts": 0
     },
-    "quotaEvidence": "Authenticated Render billing dashboard 11 October13:55SG: Hobby/no card/USD0,672.77hours/434pipeline minutes/~4.885GB remaining; shared rounded counters.",
-    "status": "COLD_WORKER_DIAGNOSTIC_PASS_INTEGRATED_PENDING_SIGNING_DISABLED",
-    "candidateSha": "b122186ceaadc36cb75abb4fb986cde7423a3046",
-    "canonicalGitSourceFingerprint": "ef0291f957939be981e7247b081263820b78c0bf7cac03ae33fb9b6be17fb942",
+    "quotaEvidence": "Authenticated Render17:25SG: Hobby/no card/USD0;667.25hours/431build minutes/~4.881GB remaining; shared rounded counters may lag. Workers Free Active.",
+    "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",
+    "candidateSha": "86f519450b1d61d5c42f8bbadb685b49f01ea798",
+    "canonicalGitSourceFingerprint": "50029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3",
     "fingerprintBasis": "sorted tracked path NUL canonical Git blob bytes NUL",
     "authorityRunner": "scripts/multiwallet/activate-repair-authority.mjs",
-    "finalBackupSha256": "c36c8b2db86e79dcdb30653404c3bc1dd53baca57a98f0770c3e4a5c1e441ffc",
+    "finalBackupSha256": "c635b74c45cf36d28203725edc9f19c83f9b1885c151a932584bf3464c065ae1",
     "hostedReadOnlyChecks": 16,
     "operatorPeakRssKiB": 146300,
     "warmTransportContract": "PASS; fixed invalid ID canonical HTTP400, no payment attempted",
@@ -278,7 +305,7 @@
     },
     "payerSha": "3945f9c52cf76e1960569d53416361bcd42de175",
     "payerCanonicalGitSourceFingerprint": "addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46",
-    "gatewayDeployId": "dep-db5ibrd9fdbs73d067p0",
+    "gatewayDeployId": "dep-db5kvf142hec739b8940",
     "coldFirstCheck": {
       "idleSeconds": 978.981,
       "outerHttpStatus": 503,
@@ -286,13 +313,13 @@
       "paymentAttempted": false,
       "result": "SAFE FAILURE; GET-only429 retry correction applied; retest pending"
     },
-    "replacementBackupSha256": "caf31fb7f1acbc05a4bff030a9020d81fa9a02eb142fdfdb40ae8627ea3020d8",
+    "replacementBackupSha256": "c635b74c45cf36d28203725edc9f19c83f9b1885c151a932584bf3464c065ae1",
     "affectedFollowupTests": 85,
     "authority": {
-      "payerSigningEnabled": false,
-      "walletsEnabled": 0,
-      "instanceGrantsEnabled": 0,
-      "customerWritesEnabled": false
+      "payerSigningEnabled": true,
+      "walletsEnabled": 3,
+      "instanceGrantsEnabled": 3,
+      "customerWritesEnabled": true
     },
     "coldIngress": {
       "status": "FAIL",
@@ -304,10 +331,24 @@
       "payerStartupObserved": false,
       "temporaryHealthProbeRemoved": true,
       "normalGatewayCommandRestored": true,
-      "paymentAttempted": false
+      "paymentAttempted": false,
+      "historical": true,
+      "currentGate": "two new integrated cold cycles PASS"
     },
     "finalBoundaryTests": 8,
-    "lastVerifiedAt": "2026-10-11T08:04:42.017Z"
+    "lastVerifiedAt": "2026-10-11T09:23:26.613Z",
+    "payerActivationDeployId": "dep-db5la02jnfac73ast890",
+    "finalNonSpendingVerification": {
+      "verifiedAt": "2026-10-11T09:23:26.613Z",
+      "oauthMcpChecks": 16,
+      "ownedSourcesConfigured": 3,
+      "unauthenticatedSourcesStatus": 401,
+      "consoleReceiptProofStatus": 200,
+      "historyUnchanged": true,
+      "oldSignersFenced": true,
+      "chainBroadcasts": 0,
+      "providerWrites": 0
+    }
   },
   "previousHostedAcceptance": {
     "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",
@@ -329,7 +370,7 @@
     "payerDeployId": "dep-db595f3rjlhs73crrsa0"
   },
   "wakeExperiment": {
-    "status": "COLD_WORKER_DIAGNOSTIC_PASS_INTEGRATED_REPEATABILITY_PENDING",
+    "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",
     "authorization": "owner attachment8577f52b, 11 October2026",
     "workerName": "capsule-payer-wake-experiment",
     "accountId": "c9e98d4cf5ad6e4eee3a5851d19639a8",
@@ -341,7 +382,7 @@
     ],
     "destination": "https://t2o-cardano-payer.onrender.com/health",
     "gatewayIntegrationEnabled": true,
-    "signingEnabled": false,
+    "signingEnabled": true,
     "scheduledTriggers": [],
     "additionalStorageResources": 0,
     "requestBudget": {
@@ -424,7 +465,7 @@
       "p99MemoryMB": 1.58,
       "exactAccountRequestsRemaining": "not measured"
     },
-    "nextAction": "Deploy only gateway correction with authority off; exactly two new integrated >=960s cold cycles. Either failure stops activation.",
+    "nextAction": "STOP for owner nine fresh live tests, all NOT RUN.",
     "previousVersionId": "f416f62f-6fb2-4026-851a-caafca88c33b",
     "previousDeployedModuleSha256": "e40e3110bdf403c1e0acb60b5493894aa27a3c28d10167e33a17b53775ac1450",
     "finalDiagnostic": {
@@ -458,30 +499,46 @@
       "currentWorkerUpstreamMs": 90000,
       "mcpBackgroundResponseMs": 45000,
       "independentAcceptanceCallerMs": 160000,
-      "integratedNesting": "deployed86f5194; new cold cycle1 PASS, cycle2 pending"
+      "integratedNesting": "two new genuine cold cycles PASS"
     },
     "finalIntegratedAcceptance": {
       "gatewaySha": "86f519450b1d61d5c42f8bbadb685b49f01ea798",
-      "gatewayFingerprint": "50029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3",
-      "gatewayDeployId": "dep-db5kvf142hec739b8940",
       "payerSha": "3945f9c52cf76e1960569d53416361bcd42de175",
-      "cycle1": {
-        "startedAt": "2026-10-11T09:01:41.427Z",
-        "completedAt": "2026-10-11T09:02:17.481Z",
-        "idleSeconds": 3418.142,
-        "durationMs": 36054,
-        "initialHttpStatus": 429,
-        "upstreamStatus": 200,
-        "renderRouting": "none",
-        "directAuthenticatedReady": true,
-        "invalidIdHttpStatus": 400,
-        "startupObserved": true,
-        "historyUnchanged": true,
-        "passed": true
-      },
-      "cycle2": "NOT RUN",
-      "signingDisabled": true,
-      "customerWritesDisabled": true
+      "workerVersion": "00ee6d4a-afdd-4807-ad05-f46d33fa1986",
+      "cycles": [
+        {
+          "cycle": "1",
+          "startedAt": "2026-10-11T09:01:41.427Z",
+          "completedAt": "2026-10-11T09:02:17.481Z",
+          "idleSeconds": 3418.142,
+          "durationMs": 36054,
+          "initialHttpStatus": 429,
+          "upstreamStatus": 200,
+          "invalidIdHttpStatus": 400,
+          "startupObserved": true,
+          "historyUnchanged": true,
+          "passed": true,
+          "startupAt": "2026-10-11T09:02:08.995625573Z"
+        },
+        {
+          "cycle": "2",
+          "startedAt": "2026-10-11T09:19:00.446Z",
+          "completedAt": "2026-10-11T09:19:34.895Z",
+          "idleSeconds": 983.989,
+          "durationMs": 34449,
+          "initialHttpStatus": 429,
+          "upstreamStatus": 200,
+          "invalidIdHttpStatus": 400,
+          "startupObserved": true,
+          "historyUnchanged": true,
+          "passed": true,
+          "startupAt": "2026-10-11T09:19:23.592959176Z"
+        }
+      ],
+      "signingEnabledByOwnerAuthorization": true,
+      "chainBroadcasts": 0,
+      "providerWrites": 0,
+      "manualLiveRows": "all nine NOT RUN"
     }
   }
 }

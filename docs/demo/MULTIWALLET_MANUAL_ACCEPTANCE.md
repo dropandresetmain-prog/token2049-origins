@@ -1,6 +1,6 @@
 # Multiwallet owner acceptance
 
-**COLD_WORKER_DIAGNOSTIC_PASS — INTEGRATED REPEATABILITY PENDING; do not start purchases.** One final direct90s/110s cold diagnostic passed with independent payer startup; it does not replace repeated gateway readiness acceptance. Signing/wallet grants/customer writes remain disabled. All nine live rows are NOT RUN. The sheet below is prepared for a future verified release, not current permission to test.
+**READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED** Both new integrated cold cycles and covered activation gates PASS. Original three source grants/signing and customer commerce scope are enabled. All9owner live rows remain NOT RUN; no agent purchase was performed.
 
 Use the existing `https://token2049-origins.onrender.com/mcp` with its existing OAuth implementation. Consult [current official connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt); account/workspace controls and UI wording may differ. Copy the exact redirect URI from the host's MCP/OAuth setup interface into the allowed configuration when needed. Retrieve the existing access code through its protected owner method; do not paste it into chat, logs or proof artifacts. No new OAuth provider is required. Console: [Capsule](https://token2049-origins.onrender.com/console/).
 
