@@ -7,23 +7,27 @@ const state = vi.hoisted(() => ({
   handlers: [] as Array<(route: any) => Promise<void>>,
 }));
 
+const mocks = vi.hoisted(() => ({ launch: vi.fn() }));
+
 vi.mock('playwright-core', () => ({
   chromium: {
-    launch: vi.fn(async (opts: Record<string, unknown>) => {
-      state.launches.push(opts);
-      state.active++;
-      state.maxActive = Math.max(state.maxActive, state.active);
-      return {
-        newContext: async () => ({
-          setDefaultTimeout: () => undefined,
-          route: async (_pattern: string, handler: (route: any) => Promise<void>) => { state.handlers.push(handler); },
-          newPage: async () => ({}),
-        }),
-        close: async () => { state.active--; },
-      };
-    }),
+    launch: mocks.launch,
   },
 }));
+
+const defaultLaunch = async (opts: Record<string, unknown>) => {
+  state.launches.push(opts);
+  state.active++;
+  state.maxActive = Math.max(state.maxActive, state.active);
+  return {
+    newContext: async () => ({
+      setDefaultTimeout: () => undefined,
+      route: async (_pattern: string, handler: (route: any) => Promise<void>) => { state.handlers.push(handler); },
+      newPage: async () => ({}),
+    }),
+    close: async () => { state.active--; },
+  };
+};
 
 import { PlaywrightCheckoutDriver } from '../../src/execution/shopify/browserCheckout.js';
 
@@ -42,7 +46,7 @@ const makeRoute = (url: string, resourceType: string, navigation = false) => {
 };
 const pageOf = (d: PlaywrightCheckoutDriver, lowMemory: boolean) => (d as unknown as { withPage: <T>(u: string, r: (p: unknown) => Promise<T>) => Promise<T> }).withPage(URL_OK, async () => 'done');
 
-beforeEach(() => { state.launches.length = 0; state.handlers.length = 0; state.active = 0; state.maxActive = 0; });
+beforeEach(() => { state.launches.length = 0; state.handlers.length = 0; state.active = 0; state.maxActive = 0; mocks.launch.mockReset(); mocks.launch.mockImplementation(defaultLaunch); });
 
 describe('low-memory browser mode', () => {
   it('is off by default: no extra flags and resources untouched', async () => {
@@ -71,6 +75,37 @@ describe('low-memory browser mode', () => {
     // ... and nothing outside the allowlist ever does.
     expect(await run('https://evil.example/x.js', 'script')).toEqual(['abort']);
     expect(await run('http://shop.example.test/x', 'script')).toEqual(['abort']);
+  });
+
+  it('scales timeouts by exactly ×2 in low-memory mode and ×1 otherwise (bounded ceilings)', async () => {
+    type Ms = { ms: (base: number) => number };
+    const lean = new PlaywrightCheckoutDriver({ storeDomain: STORE, lowMemory: true }) as unknown as Ms;
+    const normal = new PlaywrightCheckoutDriver({ storeDomain: STORE }) as unknown as Ms;
+    // Base constants: NAV 45s, STEP 20s, CONFIRM 90s. Low-memory ceilings: nav 90s, step 40s, confirm 180s.
+    // The ×2 step ceiling (40s) still exceeds every observed successful step (~20.3s peak), while
+    // bounding the worst case near the ~45s MCP background window instead of the old ×4 (80s/180s/360s).
+    expect(lean.ms(20_000)).toBe(40_000);
+    expect(lean.ms(45_000)).toBe(90_000);
+    expect(lean.ms(90_000)).toBe(180_000);
+    expect(normal.ms(20_000)).toBe(20_000);
+    expect(normal.ms(45_000)).toBe(45_000);
+    expect(normal.ms(90_000)).toBe(90_000);
+  });
+
+  it('sets the low-memory default context timeout to the ×2 step ceiling (40s), not the old ×4 (80s)', async () => {
+    const timeouts: number[] = [];
+    mocks.launch.mockImplementationOnce(async () => ({
+      newContext: async () => ({
+        setDefaultTimeout: (ms: number) => { timeouts.push(ms); },
+        route: async () => undefined,
+        newPage: async () => ({}),
+      }),
+      close: async () => undefined,
+    }));
+    const d = new PlaywrightCheckoutDriver({ storeDomain: STORE, lowMemory: true, sink: () => undefined });
+    const internals = d as unknown as { withPage: <T>(u: string, r: (p: unknown) => Promise<T>) => Promise<T> };
+    await internals.withPage(URL_OK, async () => 'ok');
+    expect(timeouts).toEqual([40_000]);
   });
 
   it.each([false,true])('runs one browser at a time even after failure, lowMemory=%s', async lowMemory => {

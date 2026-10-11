@@ -41,17 +41,21 @@ export const HotelIntent = z
   .object({
     category: z.literal('hotel'),
     ...common,
-    destination: z.union([
-      z.object({ cityName: z.string().min(1).max(100), countryCode: CountryCode }).strict(),
-      z
-        .object({
-          latitude: z.number().min(-90).max(90),
-          longitude: z.number().min(-180).max(180),
-          radiusM: z.number().int().min(100).max(50_000),
-        })
-        .strict(),
-      z.object({ hotelIds: z.array(z.string().min(1).max(64)).min(1).max(20) }).strict(),
-    ]),
+    destination: z
+      .union([
+        z.object({ cityName: z.string().min(1).max(100), countryCode: CountryCode }).strict(),
+        z
+          .object({
+            latitude: z.number().min(-90).max(90),
+            longitude: z.number().min(-180).max(180),
+            radiusM: z.number().int().min(100).max(50_000),
+          })
+          .strict(),
+        z.object({ hotelIds: z.array(z.string().min(1).max(64)).min(1).max(20) }).strict(),
+      ])
+      .describe(
+        'Hotel location. Use {cityName, countryCode} only when just a city is known; for a neighborhood/area/district use the geo variant {latitude, longitude, radiusM} with approximate coordinates for that area (radiusM in metres, 100-50000); use {hotelIds} only for specifically named hotels.',
+      ),
     checkin: IsoDate,
     checkout: IsoDate,
     occupancies: z

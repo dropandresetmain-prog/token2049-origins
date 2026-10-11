@@ -9,10 +9,13 @@ import type { CheckoutDriverInput, CheckoutQuoteInput } from '../../src/executio
 const mocks = vi.hoisted(() => ({ launch: vi.fn() }));
 vi.mock('playwright-core', () => ({ chromium: { launch: mocks.launch } }));
 
-function fixture(observer?: CheckoutObserver, options: { billing?: boolean; failBillingField?: string; singapore?: boolean } = {}) {
+function fixture(observer?: CheckoutObserver, options: { billing?: boolean; failBillingField?: string; singapore?: boolean; gate?: { landsOn: string } } = {}) {
   const clock = new ManualClock();
   const events: string[] = [];
-  let url = 'https://test-shop.myshopify.com/checkouts/fixture';
+  const checkoutUrl = 'https://test-shop.myshopify.com/checkouts/fixture';
+  // With `gate`, the checkout URL first redirects to the storefront password page; the gate
+  // button click lands on `gate.landsOn` (the fake goto never changes the URL itself).
+  let url = options.gate ? 'https://test-shop.myshopify.com/password' : checkoutUrl;
   let text = 'Standard\nBogus Gateway\nTotal USD $32.00';
   const pay = vi.fn(async () => { events.push('click'); url = 'https://test-shop.myshopify.com/checkouts/fixture/thank_you'; text = 'Order #1001'; });
   const fill = vi.fn(async (_value: string) => undefined);
@@ -41,11 +44,13 @@ function fixture(observer?: CheckoutObserver, options: { billing?: boolean; fail
   };
   const generic = { first() { return this; }, fill, selectOption: vi.fn(async () => undefined), count: vi.fn(async () => 0), isVisible: vi.fn(async () => false), click: vi.fn(async () => undefined) };
   const button = { ...generic, click: vi.fn(async ({trial}: {trial?:boolean}) => { expect(trial).toBe(true); }), elementHandle: vi.fn(async () => ({ click: pay })) };
+  // The storefront password gate's "Enter" button: clicking it lands on `gate.landsOn`.
+  const enter = { ...generic, click: vi.fn(async () => { if (options.gate) url = options.gate.landsOn; }) };
   let routeHandler: ((route: Route) => Promise<void>) | undefined;
   const context = { close: vi.fn(async () => undefined), setDefaultTimeout: vi.fn(), newPage: vi.fn(async () => page), route: vi.fn(async (_pattern,handler) => { routeHandler = handler; }) } as unknown as BrowserContext;
   const page = {
     close: vi.fn(async () => undefined),
-    goto: vi.fn(async () => undefined), url: () => url, waitForLoadState: vi.fn(async () => undefined), waitForTimeout: vi.fn(async (ms: number) => clock.advance(ms)),
+    goto: vi.fn(async (_url: string, _opts?: unknown) => undefined), url: () => url, waitForLoadState: vi.fn(async () => undefined), waitForTimeout: vi.fn(async (ms: number) => clock.advance(ms)),
     locator: vi.fn((selector: string) => {
       if (selector === 'body') return {innerText: async () => text};
       if (options.singapore && selector === 'input[name="city"], input[autocomplete~="address-level2"]') return {
@@ -69,8 +74,8 @@ function fixture(observer?: CheckoutObserver, options: { billing?: boolean; fail
       };
       return generic;
     }),
-    getByRole: vi.fn((role: string) => {
-      if (role === 'button') return button;
+    getByRole: vi.fn((role: string, opts?: { name?: RegExp }) => {
+      if (role === 'button') return opts?.name?.source.includes('enter') ? enter : button;
       billingRoles.push(role);
       return {
         ...generic,
@@ -98,15 +103,15 @@ function fixture(observer?: CheckoutObserver, options: { billing?: boolean; fail
   mocks.launch.mockResolvedValue(browser);
   const driver = new PlaywrightCheckoutDriver({storeDomain:'test-shop.myshopify.com',executablePath:'fixture-browser',clock,observer,sink:()=>undefined});
   const input: CheckoutDriverInput = {
-    checkoutUrl:url,expectedTotal:money('USD',3200),shippingTitle:'Standard',storePassword:null,
+    checkoutUrl,expectedTotal:money('USD',3200),shippingTitle:'Standard',storePassword:null,
     fulfillment:{category:'retail',...demoData.buyer},
     checkpoint:vi.fn(async step => { events.push(step); }), log:vi.fn(),
   };
   const quoteInput: CheckoutQuoteInput = {
-    checkoutUrl:url, expectedSubtotal:money('USD',2500), expectedShipping:money('USD',500), shippingTitle:'Standard',
+    checkoutUrl, expectedSubtotal:money('USD',2500), expectedShipping:money('USD',500), shippingTitle:'Standard',
     storePassword:null, fulfillment:{category:'retail',...demoData.buyer}, log:vi.fn(),
   };
-  return {driver,input,quoteInput,pay,fill,events,browser,context,page,button,clock,fields,billingFields,billingSelects,billingRoles,setFieldState:(frameName:string, field:string, patch:Partial<CardFieldState>) => {
+  return {driver,input,quoteInput,pay,fill,events,browser,context,page,button,enter,clock,fields,billingFields,billingSelects,billingRoles,setFieldState:(frameName:string, field:string, patch:Partial<CardFieldState>) => {
     const frameFields = fields.get(frameName) ?? new Map<string, CardFieldState>();
     const state = frameFields.get(field) ?? { value: '', invalid: false, valid: true, acceptsInput: true };
     frameFields.set(field, { ...state, ...patch }); fields.set(frameName, frameFields);
@@ -421,5 +426,63 @@ describe('hosted checkout quote-only boundary', () => {
     expect(s.button.click).not.toHaveBeenCalled();
     expect(s.pay).not.toHaveBeenCalled();
     expect(s.browser.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe('password-gate navigation is conditional on the landed URL', () => {
+  const settled = 'Standard\nBogus Gateway\nSubtotal USD $25.00\nShipping USD $5.00\nTax USD $2.00\nTotal USD $32.00';
+  it('skips the redundant second full goto when the gate already lands on the trusted checkout URL', async () => {
+    const s = fixture(undefined, { gate: { landsOn: 'https://test-shop.myshopify.com/checkouts/fixture' } });
+    s.setText(settled);
+    s.quoteInput.storePassword = 'fixture-store-password';
+    await expect(s.driver.quote(s.quoteInput)).resolves.toMatchObject({ total: money('USD', 3200) });
+    // Exactly one navigation: open_checkout. The gate landing is trusted, so no second goto.
+    expect(s.page.goto).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(s.page.goto).mock.calls[0]![0]).toBe(s.quoteInput.checkoutUrl);
+    expect(s.enter.click).toHaveBeenCalledOnce();
+    expect(s.pay).not.toHaveBeenCalled();
+  });
+  it('still re-navigates to the checkout URL when the gate lands somewhere else', async () => {
+    const s = fixture(undefined, { gate: { landsOn: 'https://test-shop.myshopify.com/' } });
+    s.setText(settled);
+    s.quoteInput.storePassword = 'fixture-store-password';
+    await expect(s.driver.quote(s.quoteInput)).resolves.toMatchObject({ total: money('USD', 3200) });
+    // Two navigations: open_checkout plus the post-gate re-navigation to the trusted checkout.
+    expect(s.page.goto).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(s.page.goto).mock.calls[1]![0]).toBe(s.quoteInput.checkoutUrl);
+    expect(s.enter.click).toHaveBeenCalledOnce();
+  });
+  it('still fails closed with password_gate_failed when the gate persists after the password', async () => {
+    const s = fixture(undefined, { gate: { landsOn: 'https://test-shop.myshopify.com/password' } });
+    s.setText(settled);
+    s.quoteInput.storePassword = 'fixture-store-password';
+    await expect(s.driver.quote(s.quoteInput)).rejects.toMatchObject({ code: 'password_gate_failed' });
+    expect(s.enter.click).toHaveBeenCalledOnce();
+    expect(s.pay).not.toHaveBeenCalled();
+    expect(s.browser.close).toHaveBeenCalledOnce();
+  });
+});
+
+describe('settled-totals stability rule with the shortened poll interval', () => {
+  it('still requires three equal observations: two equal reads then a change never returns the stale total', async () => {
+    const s = fixture();
+    const before = 'Standard\nBogus Gateway\nSubtotal USD $25.00\nShipping USD $5.00\nTax USD $2.00\nTotal USD $32.00';
+    const after = 'Standard\nBogus Gateway\nSubtotal USD $25.00\nShipping USD $5.00\nTax USD $3.00\nTotal USD $33.00';
+    s.setText(before);
+    let waits = 0;
+    vi.mocked(s.page.waitForTimeout).mockImplementation(async (ms: number) => {
+      waits++;
+      s.clock.advance(ms);
+      // After two equal observations of the first total the page changes once: the
+      // three-equal-observations rule must reset and re-settle on the new total.
+      if (waits === 2) s.setText(after);
+    });
+    await expect(s.driver.quote(s.quoteInput)).resolves.toMatchObject({ total: money('USD', 3300), tax: money('USD', 300) });
+    // before,before,after,after,after -> four polls minimum; a two-observation rule would have returned 32.00.
+    expect(waits).toBeGreaterThanOrEqual(4);
+    const calls = vi.mocked(s.page.waitForTimeout).mock.calls.map(c => c[0]);
+    expect(calls.length).toBeGreaterThan(0);
+    expect(calls.every(ms => ms === 400)).toBe(true);
+    expect(s.pay).not.toHaveBeenCalled();
   });
 });

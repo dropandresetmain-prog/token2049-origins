@@ -146,3 +146,32 @@ describe('find_offers shortlist and explicit selection', () => {
     });
   });
 });
+
+describe('hotel discovery guidance: neighborhood geo grounding and guest-bound nationality', () => {
+  it('tells the host to ground neighborhood requests as approximate coordinates with a radius', async () => {
+    const { tools } = await findOffers([offer(1)]);
+    const description = tools.find((t) => t.name === 'find_offers')!.description!;
+    for (const wording of ['{latitude, longitude, radiusM}', 'radiusM in metres, 100-50000', 'approximate', 'never claim unverified district membership as fact']) {
+      expect(INSTRUCTIONS).toContain(wording);
+      expect(description).toContain(wording);
+    }
+    // The city variant remains the instruction when only a city is known.
+    expect(INSTRUCTIONS).toContain('{cityName, countryCode}');
+    expect(description).toContain('{cityName, countryCode}');
+  });
+
+  it('allows guestNationality reuse only from an explicit attribute bound to the same guest', async () => {
+    const { tools } = await findOffers([offer(1)]);
+    const description = tools.find((t) => t.name === 'find_offers')!.description!;
+    expect(INSTRUCTIONS).toContain('bound to the SAME guest');
+    expect(description).toContain('bound to the SAME guest');
+    expect(INSTRUCTIONS).toContain("never copy a different person's nationality");
+    expect(description).toContain("never copy a different person's nationality");
+    // Missing nationality is asked via needs_input, never guessed.
+    expect(INSTRUCTIONS).toMatch(/ask for it via needs_input/);
+    expect(description).toMatch(/never guess/);
+    // A flight passenger's nationality is never assumed for the hotel guest.
+    expect(INSTRUCTIONS).toContain("flight passenger's");
+    expect(description).toContain("flight passenger's");
+  });
+});

@@ -1,5 +1,6 @@
 import { describe, it, expect, beforeAll, afterAll } from 'vitest';
-import { PurchaseIntent, Fulfillment } from '../../src/contracts/intent.js';
+import { z } from 'zod';
+import { PurchaseIntent, Fulfillment, HotelIntent } from '../../src/contracts/intent.js';
 import { QuoteView, PurchaseView, ReceiptView, OfferView, PurchaseEventView } from '../../src/contracts/commerce.js';
 import { CapabilitiesResponse, OPERATIONS } from '../../src/contracts/api.js';
 import { ErrorBody } from '../../src/contracts/common.js';
@@ -16,6 +17,16 @@ describe('v1 contract schemas', () => {
 
   it('operation table is the single source for HTTP paths and MCP tool names', () => {
     expect(Object.values(OPERATIONS).map((o) => o.mcpTool).filter(Boolean).sort()).toEqual(['buy', 'buy', 'create_quote', 'find_offers', 'get_purchase']);
+  });
+
+  it('documents the hotel destination geo variant for neighborhoods in the generated JSON schema', () => {
+    // The geo variant itself parses (the runtime path in execution/nuitee/offers.ts already maps it).
+    expect(HotelIntent.shape.destination.safeParse({ latitude: 1.2838, longitude: 103.8591, radiusM: 1500 }).success).toBe(true);
+    // The .describe() surfaces in z.toJSONSchema, the same generator input.ts uses for needs_input trees.
+    const schema = z.toJSONSchema(HotelIntent, { io: 'input' }) as unknown as { properties: { destination: { description?: string } } };
+    expect(schema.properties.destination.description).toContain('{latitude, longitude, radiusM}');
+    expect(schema.properties.destination.description).toMatch(/neighborhood\/area\/district/);
+    expect(schema.properties.destination.description).toContain('radiusM in metres, 100-50000');
   });
 });
 

@@ -204,9 +204,16 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
     this.clock = opts.clock ?? systemClock;
   }
 
-  /** A small shared-CPU instance renders checkout steps several times slower; its timeouts scale accordingly (same checks, more patience). */
+  /**
+   * A small shared-CPU instance renders checkout steps several times slower; its timeouts scale
+   * accordingly (same checks, more patience). The multiple is ×2 because observed successful
+   * steps peaked near 20.3s against the 20s base, so every scaled ceiling (nav 90s, step 40s,
+   * confirm 180s) still exceeds demonstrated success while bounding the worst case closer to
+   * the ~45s MCP background-job window instead of drifting far past it. Ceilings only: this
+   * never shortens a successful wait and never changes failure semantics.
+   */
   private ms(base: number): number {
-    return this.opts.lowMemory ? base * 4 : base;
+    return this.opts.lowMemory ? base * 2 : base;
   }
 
   async complete(input: CheckoutDriverInput): Promise<CheckoutDriverResult> {
@@ -323,7 +330,11 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
         await page.locator('input[type="password"]').first().fill(input.storePassword!);
         await page.getByRole('button', { name: /enter/i }).first().click();
         await page.waitForLoadState('domcontentloaded');
-        await page.goto(input.checkoutUrl, { waitUntil: 'domcontentloaded', timeout: this.ms(NAV_TIMEOUT_MS) });
+        // Re-navigate only if the gate did not already land on the trusted checkout: on the
+        // throttled small instance a redundant second full navigation costs many seconds.
+        if (!isTrustedCheckoutUrl(page.url(), this.opts.storeDomain)) {
+          await page.goto(input.checkoutUrl, { waitUntil: 'domcontentloaded', timeout: this.ms(NAV_TIMEOUT_MS) });
+        }
       });
       if (await this.onPasswordGate(page)) throw new CheckoutAbort('password_gate_failed');
     }
@@ -513,7 +524,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       // Require three equal observations after shipping selection, excluding intermediate renders.
       if (totals && stable >= 2) return totals;
       if (this.clock.now().getTime() > end) throw new CheckoutAbort('total_mismatch');
-      await page.waitForTimeout(750);
+      await page.waitForTimeout(400);
     }
   }
 
@@ -533,7 +544,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       // A single automatic method still has to expose the quoted title on the checkout page.
       if (await page.getByText(title, { exact: true }).count() === 1) return;
       if (this.clock.now().getTime() > end) throw new CheckoutAbort('total_mismatch');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(250);
     }
   }
   /** Totals settle asynchronously after shipping/tax: poll until equal, else abort before paying. */
@@ -544,7 +555,7 @@ export class PlaywrightCheckoutDriver implements CheckoutDriver {
       const observed = breakdown ? readCheckoutTotals(body, breakdown.subtotal, breakdown.shipping, breakdown.shippingTitle) : null;
       if (displayedTotalMatches(body, expected) && (!breakdown || (observed && sameCheckoutTotals(observed, breakdown)))) return;
       if (this.clock.now().getTime() > end) throw new CheckoutAbort('total_mismatch');
-      await page.waitForTimeout(500);
+      await page.waitForTimeout(250);
     }
   }
 }
