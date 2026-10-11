@@ -13,10 +13,10 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Remote: https://github.com/dropandresetmain-prog/token2049-origins.git.
 - Main verified unchanged: 7c09b37eaaeda2bf3eec94fc1e3456118962f636.
 - Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
-- Gateway deployed b122186ceaadc36cb75abb4fb986cde7423a3046; retained payer3945f9c52cf76e1960569d53416361bcd42de175; signing/grants/customer writes disabled; second integrated cold failed; final direct90s diagnostic PASS, integrated repeatability still pending.
-- Canonical gateway Git fingerprint: ef0291f957939be981e7247b081263820b78c0bf7cac03ae33fb9b6be17fb942; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
+- Gateway deployed 86f519450b1d61d5c42f8bbadb685b49f01ea798; retained payer3945f9c52cf76e1960569d53416361bcd42de175; signing/grants/customer writes disabled; second integrated cold failed; final direct90s diagnostic PASS, integrated repeatability still pending.
+- Canonical gateway Git fingerprint: 50029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
 - Initial Worker checkpoint9ee0e7d preserved; gateway integration runtime pinnedb122186. Final Worker sourceeeef8952a218b811f193c580d0a2b12bcdb155cd; deployed version00ee6d4a-afdd-4807-ad05-f46d33fa1986; moduleSHAdc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15.
-- Normal gateway dep-db5ibrd9fdbs73d067p0 live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation remains stopped; final direct diagnostic PASS is not repeated integrated acceptance.
+- Normal gateway dep-db5kvf142hec739b8940 live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation remains stopped; final direct diagnostic PASS is not repeated integrated acceptance.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
@@ -41,7 +41,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
 - [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
 - [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: preflight08:51UTC exactb122186/3945/Worker00ee6d4a;40non-OAuth hashes unchanged, all authority off. New gateway110s/130s correction and fixed terminal diagnostics;65unit PASS. Fresh44/825 full restore c635b74c45cf36d28203725edc9f19c83f9b1885c151a932584bf3464c065ae1. Native pending fixture PASS;68other native checks PASS, typecheck/build PASS. Next: gateway-only deployment then two new cold cycles.
+- Current checkpoint: integrated cycle1 PASS09:01:41.427UTC after3418.142s idle; outer200/36.054s, initial429/122ms, Workerupstream200/33.271s, directready35.365s, invalid-ID400. Independent startup and40non-OAuth histories unchanged. Cycle2 idle starts09:02:30UTC; no payer requests until>=09:18:30UTC. Authority stays off.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
@@ -120,7 +120,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: report direct PASS and STOP at integrated-repeatability pending. Private release phase remains wake-blocked-disabled. A separately budgeted gate must review gateway75s wake/90s total versus Worker90s, then verify two genuine cold integrated cycles with direct authenticated status and unchanged history. No activation or purchase.
+- Next action PRIMARY: run only integrated cycle2 after>=09:18:30UTC with management-only idle/artifact/fence verification. Refresh read-only gateway OAuth without payer calls. If PASS, recheck conditional activation/backup/custody gates; if FAIL STOP. No incident retry or purchase.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 

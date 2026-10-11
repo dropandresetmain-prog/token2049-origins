@@ -458,7 +458,30 @@
       "currentWorkerUpstreamMs": 90000,
       "mcpBackgroundResponseMs": 45000,
       "independentAcceptanceCallerMs": 160000,
-      "integratedNesting": "locally verified; two deployed cold cycles pending"
+      "integratedNesting": "deployed86f5194; new cold cycle1 PASS, cycle2 pending"
+    },
+    "finalIntegratedAcceptance": {
+      "gatewaySha": "86f519450b1d61d5c42f8bbadb685b49f01ea798",
+      "gatewayFingerprint": "50029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3",
+      "gatewayDeployId": "dep-db5kvf142hec739b8940",
+      "payerSha": "3945f9c52cf76e1960569d53416361bcd42de175",
+      "cycle1": {
+        "startedAt": "2026-10-11T09:01:41.427Z",
+        "completedAt": "2026-10-11T09:02:17.481Z",
+        "idleSeconds": 3418.142,
+        "durationMs": 36054,
+        "initialHttpStatus": 429,
+        "upstreamStatus": 200,
+        "renderRouting": "none",
+        "directAuthenticatedReady": true,
+        "invalidIdHttpStatus": 400,
+        "startupObserved": true,
+        "historyUnchanged": true,
+        "passed": true
+      },
+      "cycle2": "NOT RUN",
+      "signingDisabled": true,
+      "customerWritesDisabled": true
     }
   }
 }
