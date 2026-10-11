@@ -133,6 +133,8 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
     // The caller's own scoped OAuth token is passed through to the gateway contract; no shared gateway key exists here.
     const toolConfig: McpConfig = {
       gatewayUrl: config.gatewayUrl,
+      // PUBLIC_BASE_URL === MCP_PUBLIC_URL (enforced by config): the customer-facing origin where /console is mounted.
+      publicBaseUrl: config.publicUrl.origin,
       gatewayToken: token,
       // A free payer may be asleep: allow a cold start for /status and the payment call; durable payer history guards against repeats.
       bridgeTimeoutMs: config.bridgeTimeoutMs ?? 100_000,

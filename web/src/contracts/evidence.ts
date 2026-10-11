@@ -61,6 +61,8 @@ export const EvidenceListItem = z.object({
   createdAt: z.string(),
   provenance: Provenance,
   executionEvidenceStatus: ExecutionEvidenceStatus,
+  /** Receipt funding carries an independently verified payment. Optional: older backends omit it (treated as unknown). */
+  fundingVerified: z.boolean().optional(),
 });
 export type EvidenceListItem = z.infer<typeof EvidenceListItem>;
 

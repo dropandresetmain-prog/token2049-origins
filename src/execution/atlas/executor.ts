@@ -543,6 +543,9 @@ class AtlasExecutor implements CommerceExecutor {
       observed = null;
     }
     // Ticket numbers persist on cancelled orders: only counts are recorded, and they never imply ticketing.
+    // The provider's itineraryDownload URL is deliberately NOT modeled (wire.ts) and never fetched or surfaced:
+    // it is plain HTTP on an IP-address host, which fails the https-only transport guardrails this executor is
+    // configured with. Ticketing truth is orderStatus '2' + ticketStatus '1' on readback, never a document link.
     const details = {
       orderStatus: st,
       ticketStatus: ts,

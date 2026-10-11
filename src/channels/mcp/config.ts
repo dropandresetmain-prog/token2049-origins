@@ -26,6 +26,8 @@ export function loadPayerWake(env: NodeJS.ProcessEnv, bridge: ConsolidatedBridge
 export interface McpConfig {
   /** Base URL of the canonical HTTP gateway, e.g. `http://127.0.0.1:8080`. */
   gatewayUrl: string;
+  /** Public origin of the gateway for customer-facing proof links (hosted: MCP_PUBLIC_URL === PUBLIC_BASE_URL). Absent => no link is emitted. */
+  publicBaseUrl?: string;
   /** Bearer token for ONE gateway API client (one customer, scope-limited). */
   gatewayToken: string;
   /** Optional separate bounded payer processes, at most one per rail. Absent => `buy` returns action_required. */

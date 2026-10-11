@@ -1,10 +1,14 @@
 import { describe, expect, it } from 'vitest';
 import { projectProgress, completionReference } from '../../src/contracts/presentation.js';
-import type { PurchaseView } from '../../src/contracts/commerce.js';
+import type { PurchaseView, FundingSummary } from '../../src/contracts/commerce.js';
+
+// Canonical completion carries independently verified funding on the receipt, exactly as worker.buildReceipt
+// copies the verified funding_evidence rows onto every real succeeded purchase's receipt.
+const verifiedFunding: FundingSummary[] = [{ rail: 'cardano', network: 'cardano:preprod', asset: 'asset', amountBaseUnits: '49990000', decimals: 6, transferReference: 'tx1', paymentState: 'confirmed', purpose: 'principal_and_fee', verifiedAt: '2026-10-11T15:20:16.656Z', evidenceMode: 'local_fixture' }];
 
 const purchase = (category: PurchaseView['category'], commerceStatus: PurchaseView['commerceStatus']): PurchaseView => ({
   category, commerceStatus, state: 'succeeded', paymentState: 'confirmed', merchantPaymentStatus: 'test_balance_paid',
-  providerReference: 'REFERENCE-123', receipt: { receiptId: 'receipt-123', providerReference: 'RECEIPT-REF' },
+  providerReference: 'REFERENCE-123', receipt: { receiptId: 'receipt-123', providerReference: 'RECEIPT-REF', funding: verifiedFunding },
 } as PurchaseView);
 
 describe('durable successful presentation', () => {
@@ -36,6 +40,26 @@ describe('durable successful presentation', () => {
     }
     expect(projectProgress(purchase('flight', 'confirmed')).label).toBe('Purchase confirmed');
     expect(projectProgress(purchase('hotel', 'paid')).label).toBe('Purchase confirmed');
+  });
+
+  // A completion headline is earned only by independently verified funding on the receipt — the same signal
+  // the MCP orderConfirmation gate uses, so the sentence-case and uppercase forms can never disagree.
+  it('never claims completion when receipt funding is unverified or absent', () => {
+    const p = purchase('flight', 'ticketed');
+    const unverified = { ...p, receipt: { ...p.receipt!, funding: verifiedFunding.map((f) => ({ ...f, paymentState: 'submitted' as const })) } };
+    const absent = { ...p, receipt: { ...p.receipt!, funding: [] } };
+    const missing = { ...p, receipt: { receiptId: 'receipt-123', providerReference: 'RECEIPT-REF' } } as unknown as PurchaseView;
+    for (const q of [unverified, absent, missing]) {
+      const progress = projectProgress(q);
+      expect(progress).toMatchObject({ stage: 'verifying_result', outcomeFinal: false });
+      expect(progress.message).not.toMatch(/Ticket issued|Booking confirmed|Order confirmed|Purchase confirmed/);
+    }
+    expect(projectProgress(p)).toMatchObject({ stage: 'complete', label: 'Ticket issued' });
+    // Any of the verified funding states earns the headline.
+    for (const paymentState of ['confirmed', 'escrow_locked', 'released'] as const) {
+      const verified = { ...p, receipt: { ...p.receipt!, funding: [{ ...verifiedFunding[0]!, paymentState }] } };
+      expect(projectProgress(verified).stage).toBe('complete');
+    }
   });
 
   // A mislabeled rejection leaves a historical failed handoff on the view, but independent recovery confirmed

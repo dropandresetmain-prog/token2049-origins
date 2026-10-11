@@ -257,6 +257,7 @@ function build(spec: Spec, now: number) {
     fundingRequirement: requirement, createdAt: created.toISOString(),
     provenance: { environment: env, evidenceMode: 'local_fixture' },
     executionEvidenceStatus: done ? 'receipt_issued' : spec.events.includes('execution.started') ? 'pending' : 'not_started',
+    fundingVerified: paid,
   });
 
   const context = PurchaseContext.parse({ title: spec.title, requestedBy: { name: spec.requestedBy }, requestText: spec.requestText, approvedMaxTotal: usd(spec.limitCents) });

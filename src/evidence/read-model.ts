@@ -103,7 +103,7 @@ function purchaseEvidenceProjection(
   receiptJson: string | null,
   resultJson: string | null,
   attemptStatus: string | null,
-): { provenance: Provenance; executionEvidenceStatus: ExecutionEvidenceStatus } {
+): { provenance: Provenance; executionEvidenceStatus: ExecutionEvidenceStatus; fundingVerified: boolean } {
   const receipt = parse<ReceiptView>(receiptJson);
   const result = parse<{ kind?: unknown }>(resultJson);
   const evidenceMode =
@@ -119,7 +119,11 @@ function purchaseEvidenceProjection(
   else if (resultJson !== null || attemptStatus !== null) executionEvidenceStatus = 'unavailable';
   else executionEvidenceStatus = 'not_started';
 
-  return { provenance: { environment, evidenceMode }, executionEvidenceStatus };
+  // Same verified-funding signal as the completion gates (presentation.ts / MCP orderConfirmation), so a
+  // receipt issued without independently verified funding never presents as a completed purchase anywhere.
+  const fundingVerified = Array.isArray(receipt?.funding) && receipt.funding.some((f) => ['confirmed', 'escrow_locked', 'released'].includes(f.paymentState));
+
+  return { provenance: { environment, evidenceMode }, executionEvidenceStatus, fundingVerified };
 }
 
 /* ---------------- purchases ---------------- */
@@ -161,6 +165,7 @@ export async function listPurchases(db: Db, customerId: string, limit = 50) {
       createdAt: p.created_at,
       provenance: evidence.provenance,
       executionEvidenceStatus: evidence.executionEvidenceStatus,
+      fundingVerified: evidence.fundingVerified,
     };
   });
 }

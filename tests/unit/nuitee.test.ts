@@ -10,6 +10,8 @@ import { ProviderError } from '../../src/core/errors.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
 import { redact } from '../../src/infrastructure/redact.js';
 import { createNuiteeExecutor } from '../../src/execution/nuitee/index.js';
+import { projectProgress, completionReference } from '../../src/contracts/presentation.js';
+import type { PurchaseView } from '../../src/contracts/commerce.js';
 import { clientReferenceFor } from '../../src/execution/nuitee/booking.js';
 import { validateBaseUrl } from '../../src/execution/nuitee/config.js';
 import { pickTotal, sumRateTotals, toMinor } from '../../src/execution/nuitee/money.js';
@@ -440,6 +442,27 @@ describe('nuitee execute', () => {
     expect(persisted[1]![1]).toMatchObject({ providerReference: 'BK1' });
     expect(f.calls.filter((c) => c.method === 'POST')).toHaveLength(1);
     noPii([r, persisted]);
+  });
+
+  // Nuitée supports booking confirmation only. A completed hotel purchase is a booking with a booking
+  // reference; it is never a voucher/discount/experience document and no PDF/itinerary is produced or promised.
+  it('labels a completed hotel purchase as a booking confirmation, never a voucher or document', async () => {
+    const { r } = await run();
+    expect(r).toMatchObject({ kind: 'succeeded', commerceStatus: 'confirmed', providerReference: 'BK1' });
+    const view = {
+      category: 'hotel', commerceStatus: r.kind === 'succeeded' ? r.commerceStatus : 'unknown', state: 'succeeded',
+      paymentState: 'confirmed', merchantPaymentStatus: 'simulated_paid', providerReference: 'BK1',
+      receipt: { receiptId: 'rcp_1', providerReference: 'BK1', commerceStatus: 'confirmed',
+        funding: [{ rail: 'cardano', paymentState: 'confirmed' }] },
+    } as unknown as PurchaseView;
+    const progress = projectProgress(view);
+    expect(progress).toMatchObject({ stage: 'complete', label: 'Booking confirmed' });
+    expect(progress.message).toContain('Booking reference: BK1');
+    expect(completionReference(view)).toEqual({ label: 'Booking reference', value: 'BK1' });
+    // Neither the execution result/evidence nor the customer-facing presentation claims any document artifact.
+    const surfaced = JSON.stringify([r, progress, completionReference(view)]).toLowerCase();
+    expect(surfaced).not.toMatch(/voucher|discount|experience|pdf|itinerary|download/);
+    expect(surfaced).not.toContain('ticket');
   });
 
   it('derives the same clientReference on every call for one idempotency key', async () => {

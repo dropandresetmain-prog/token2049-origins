@@ -11,6 +11,17 @@ export type HumanProgress = z.infer<typeof HumanProgress>;
 const completeCommerce = new Set(['paid', 'confirmed', 'ticketed']);
 const paidMerchant = new Set(['paid', 'simulated_paid', 'test_balance_paid']);
 
+/**
+ * Independently verified funding, on the SAME receipt signal the MCP orderConfirmation gate uses, so the
+ * sentence-case headline and the uppercase confirmation can never disagree. A real succeeded receipt always
+ * carries funding evidence (worker.buildReceipt copies the verified funding_evidence rows); a receipt whose
+ * funding is absent or unverified has not proved payment and earns no completion headline.
+ */
+function fundingVerified(p: PurchaseView): boolean {
+  const funding = p.receipt?.funding;
+  return Array.isArray(funding) && funding.some((f) => ['confirmed', 'escrow_locked', 'released'].includes(f.paymentState));
+}
+
 /** Category alone cannot prove ticket issuance or a confirmed booking. */
 function successLabel(p: PurchaseView): string {
   if (p.category === 'retail' && ['paid', 'confirmed'].includes(p.commerceStatus)) return 'Order confirmed';
@@ -45,7 +56,7 @@ export function projectProgress(p: PurchaseView): HumanProgress {
       message: overdue ? 'The payment handoff has not reported an outcome. Ask the operator to reconcile it; do not pay again.' : 'The payer handoff is pending. Follow this purchase; do not pay again.',
       outcomeFinal: false, nextAction: overdue ? 'Ask the operator to reconcile the payment handoff.' : 'Call get_purchase again in about 20 seconds.' };
   }
-  if (p.state === 'unresolved' || (p.state === 'succeeded' && (!completeCommerce.has(p.commerceStatus) || !paidMerchant.has(p.merchantPaymentStatus) || !p.receipt))) {
+  if (p.state === 'unresolved' || (p.state === 'succeeded' && (!completeCommerce.has(p.commerceStatus) || !paidMerchant.has(p.merchantPaymentStatus) || !p.receipt || !fundingVerified(p)))) {
     return { ...base, stage: 'verifying_result', label: 'Verifying result',
       message: "We're verifying whether the merchant completed the purchase. No further action is needed right now.", outcomeFinal: false, nextAction: null };
   }

@@ -65,7 +65,8 @@ export function groupOf(key: StatusKey): Exclude<ListFilter, 'all'> | null {
 
 /**
  * List rows carry no PurchaseView, only the fields projectProgress reads. This builds exactly those fields
- * (receipt presence comes from executionEvidenceStatus) so list and detail share one status rule.
+ * (receipt presence comes from executionEvidenceStatus, verified funding from fundingVerified) so list and
+ * detail share one status rule: a completion headline needs the receipt's independently verified funding.
  */
 function progressForListItem(item: EvidenceListItem): HumanProgress {
   const fields = {
@@ -73,7 +74,7 @@ function progressForListItem(item: EvidenceListItem): HumanProgress {
     paymentState: item.paymentState,
     commerceStatus: item.commerceStatus,
     merchantPaymentStatus: item.merchantPaymentStatus,
-    receipt: item.executionEvidenceStatus === 'receipt_issued' ? {} : null,
+    receipt: item.executionEvidenceStatus === 'receipt_issued' ? { funding: item.fundingVerified === false ? [] : [{ paymentState: 'confirmed' }] } : null,
     providerReference: null,
     category: item.category,
     route: item.route,

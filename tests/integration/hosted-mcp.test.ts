@@ -568,6 +568,9 @@ describe('hosted MCP acceptance: the exact ChatGPT conversation', () => {
       const c = done.structuredContent.orderConfirmation;
       expect(c).toMatchObject({ headline: 'ORDER CONFIRMED', commerceType: 'retail', paymentVerified: true, purchaseId: pid });
       expect(c.receiptId).toMatch(/^rcp_/);
+      // The clickable proof link is the customer console deep link on the gateway's own public origin: a public
+      // page carrying only the opaque purchaseId; the console then reads the owner-scoped, redacted customer API.
+      expect(c.proofUrl).toBe(`${new URL(f.base).origin}/console/#/purchases/${pid}`);
       expect(c.reference.value).toBe(done.structuredContent.purchase.providerReference);
       expect(c.payments[0]).toMatchObject({ rail: 'cardano', transferReference: `hosted-${pid}` });
       const text = done.content[0].text as string;
@@ -617,6 +620,7 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
   async function viaStub(purchase: unknown) {
     const server = createMcpServer({
       gatewayUrl: 'http://stub.invalid', gatewayToken: 't2o_oat_stubtoken0123456789abcdef',
+      publicBaseUrl: 'https://gateway.example',
       fetch: (async () => new Response(JSON.stringify({ purchase }), { status: 200, headers: { 'content-type': 'application/json' } })) as typeof fetch,
     });
     const [a, b] = InMemoryTransport.createLinkedPair();
@@ -645,6 +649,12 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
     expect(text).toContain(line);
     expect(text).toMatch(/Receipt: rcp_/);
     expect(text).toMatch(/Payment verified \(cardano\): /);
+    // Clickable proof link: the console deep link, carrying only the opaque purchaseId; the target page
+    // authenticates with the customer's own access key and reads the owner-scoped, redacted customer API.
+    const proofUrl = res.structuredContent.orderConfirmation.proofUrl as string;
+    expect(proofUrl).toBe(`https://gateway.example/console/#/purchases/${encodeURIComponent(done.purchaseId)}`);
+    expect(proofUrl.slice(proofUrl.lastIndexOf('/purchases/') + '/purchases/'.length)).toBe(encodeURIComponent(done.purchaseId));
+    expect(text).toContain(proofUrl);
     // The customer-facing confirmation carries no environment suffix or demo caveat; the environment stays in the structured result.
     expect(text).not.toMatch(/environment|sandbox|testnet|Demo transaction|proof limitations/i);
     expect(res.structuredContent.orderConfirmation.environment).toBeTruthy();
@@ -678,6 +688,19 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
     const res = await viaStub(mutate(shape(done, { category: 'retail', route: 'shopify', status: 'paid', ref: '#1003' })));
     expect(res.content[0].text).not.toMatch(/ORDER CONFIRMED|BOOKING CONFIRMED|TICKET ISSUED/);
     expect(res.structuredContent.orderConfirmation).toBeUndefined();
+  });
+
+  // The presentation gate now requires the same verified receipt funding as orderConfirmation, so the
+  // sentence-case describePurchase headline can no longer leak when funding is unverified.
+  it('suppresses the sentence-case headline too when receipt funding is unverified', async () => {
+    const done = await base();
+    const shaped = shape(done, { category: 'retail', route: 'shopify', status: 'paid', ref: '#1003' });
+    const res = await viaStub({ ...shaped, receipt: { ...shaped.receipt, funding: shaped.receipt.funding.map((x: any) => ({ ...x, paymentState: 'submitted' })) } });
+    const text = res.content[0].text as string;
+    expect(text).not.toMatch(/ORDER CONFIRMED|BOOKING CONFIRMED|TICKET ISSUED/);
+    expect(text).not.toMatch(/Order confirmed|Booking confirmed|Ticket issued|Purchase confirmed/);
+    expect(res.structuredContent.orderConfirmation).toBeUndefined();
+    expect(res.structuredContent.progress).toMatchObject({ stage: 'verifying_result', outcomeFinal: false, paymentConfirmed: true });
   });
 });
 

@@ -33,6 +33,7 @@ export function createMcpServer(config: McpConfig, opts: { hosted?: { resourceMe
     bridges: BridgeClient.fromConfig(config),
     consolidatedBridge: BridgeClient.consolidated(config),
     secrets: secretsOf(config),
+    ...(config.publicBaseUrl ? { publicBaseUrl: config.publicBaseUrl } : {}),
     ...(profile ? { profile } : {}),
     ...(opts.hosted ? { auth: opts.hosted } : {}),
     ...(opts.background ? { background: opts.background } : {}),

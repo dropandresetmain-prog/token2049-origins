@@ -26,6 +26,8 @@ export interface ToolDeps {
   background?: BackgroundJobs;
   /** DEMO configuration: saved customer merged into create_quote fulfillment before validation. Absent => the user must supply every field. */
   profile?: DemoCustomerProfile;
+  /** Public origin of the gateway (hosted: MCP_PUBLIC_URL === PUBLIC_BASE_URL). Enables the customer-facing proof link; absent => no link is emitted. */
+  publicBaseUrl?: string;
   /** Present on the hosted endpoint: tools declare OAuth security schemes and enforce the token's scopes. */
   auth?: { resourceMetadataUrl: string };
 }
@@ -295,10 +297,12 @@ function displayReference(ref: string): string {
 
 /**
  * Present ONLY when the existing durable completion conditions hold (projectProgress stage "complete": state succeeded, paid commerce
- * and merchant status, receipt issued) AND the provider status is the one that proves this commerce type (retail paid, hotel
- * confirmed, flight ticketed) AND a funding payment was verified. Anything else yields no label, so the agent cannot over-claim.
+ * and merchant status, receipt issued, independently verified funding on the receipt) AND the provider status is the one that proves
+ * this commerce type (retail paid, hotel confirmed, flight ticketed). Anything else yields no label, so the agent cannot over-claim.
+ * `publicBaseUrl` (the gateway's own public origin) adds a proof link to the customer console: a public page that carries only the
+ * opaque purchaseId and then reads the authenticated, owner-scoped, redacted customer API with the viewer's own token.
  */
-export function orderConfirmation(p: PurchaseView): Record<string, unknown> | null {
+export function orderConfirmation(p: PurchaseView, publicBaseUrl?: string): Record<string, unknown> | null {
   if (projectProgress(p).stage !== 'complete' || !p.receipt || !p.providerReference) return null;
   const final = FINAL[p.category];
   const r = p.receipt;
@@ -323,6 +327,7 @@ export function orderConfirmation(p: PurchaseView): Record<string, unknown> | nu
     principal: formatMinor(r.principal),
     serviceFee: formatMinor(r.serviceFee),
     ...(r.displayConversion ? { displayConversion: r.displayConversion } : {}),
+    ...(publicBaseUrl ? { proofUrl: `${publicBaseUrl.replace(/\/+$/, '')}/console/#/purchases/${encodeURIComponent(p.purchaseId)}` } : {}),
     payments: verified.map((f) => ({ rail: f.rail, network: f.network, transferReference: f.transferReference, verifiedAt: f.verifiedAt })),
     evidenceRefs: r.evidenceRefs,
     limitations: r.limitations,
@@ -340,6 +345,7 @@ function confirmationText(c: Record<string, unknown>): string {
     ...(c.product ? [`Product: ${c.product as string}`] : []),
     `${ref.label}: ${ref.value}`,
     `Receipt: ${String(c.receiptId)}`,
+    ...(c.proofUrl ? [`Receipt and proof (opens with your Capsule access): ${String(c.proofUrl)}`] : []),
     `Payment verified (${pay.rail}): ${pay.transferReference}`,
     `Amount ${String(c.principal)} + service fee ${String(c.serviceFee)}`,
     ...(c.displayConversion ? [
@@ -539,7 +545,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           purchase.state === 'awaiting_funding' ? (purchase.paymentState !== 'not_received' ? 'confirmation_pending' : purchase.paymentAttempt?.status === 'running' ? 'payment_in_progress' : paymentFailed ? 'payment_failed' : 'action_required') : purchase.state === 'funded_queued' || purchase.state === 'executing' ? 'execution_pending' : purchase.state;
         const structured: Record<string, unknown> = { status, purchase, progress: projectProgress(purchase), ...(payment ? { payment } : {}) };
         let text = describePurchase(purchase);
-        const confirmation = orderConfirmation(purchase);
+        const confirmation = orderConfirmation(purchase, deps.publicBaseUrl);
         if (confirmation) {
           structured.orderConfirmation = confirmation;
           text = confirmationText(confirmation) + '\n' + text;
@@ -576,7 +582,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const { purchase } = await deps.gateway.getPurchase(purchaseId);
         const structured: Record<string, unknown> = { purchase, progress: projectProgress(purchase) };
         let text = describePurchase(purchase);
-        const confirmation = orderConfirmation(purchase);
+        const confirmation = orderConfirmation(purchase, deps.publicBaseUrl);
         if (confirmation) {
           structured.orderConfirmation = confirmation;
           text = confirmationText(confirmation) + '\n' + text;

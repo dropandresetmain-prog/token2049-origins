@@ -511,6 +511,26 @@ describe('atlas execute: payment gate', () => {
     expect(await b.ex.execute(new CtxHarness(b.fake).ctx())).toMatchObject({ kind: 'succeeded', commerceStatus: 'ticketing' });
   });
 
+  // itineraryDownload is plain HTTP on an IP-address host: unsafe transport, deliberately unmodeled (wire.ts)
+  // and never fetched. A ticket claim comes only from readback orderStatus '2' + ticketStatus '1'.
+  it('never surfaces the provider itineraryDownload link, and it never contributes to a ticket claim', async () => {
+    const unsafe = { itineraryDownload: 'http://203.0.113.7:8080/download/itinerary?orderNo=' + ORDER_NO };
+    const a = gateOnScript({ after: () => details({ orderStatus: '2', ticketStatus: '1', payTime: 'x', ...unsafe }) });
+    const ticketed = await a.ex.execute(new CtxHarness(a.fake).ctx());
+    expect(ticketed).toMatchObject({ kind: 'succeeded', commerceStatus: 'ticketed' });
+    const serialized = JSON.stringify(ticketed);
+    expect(serialized).not.toMatch(/itinerary/i);
+    expect(serialized).not.toContain('http://');
+    expect(serialized).not.toContain('203.0.113.7');
+    // Same unsafe link present, but ticketing not proven by readback: no ticket is claimed either.
+    const b = gateOnScript({ after: () => details({ orderStatus: '2', ticketStatus: '0', payTime: 'x', ...unsafe }) });
+    const pending = await b.ex.execute(new CtxHarness(b.fake).ctx());
+    expect(pending).toMatchObject({ kind: 'succeeded', commerceStatus: 'ticketing' });
+    expect(JSON.stringify(pending)).not.toMatch(/itinerary/i);
+    // The link is never fetched: the only HTTP calls are the documented order/pay/details endpoints.
+    expect(a.fake.calls.every((c) => !c.endpoint.toLowerCase().includes('itinerary') && !c.endpoint.toLowerCase().includes('download'))).toBe(true);
+  });
+
   it('reports the observed total honestly when a paid order differs from the quote', async () => {
     const { fake, ex } = gateOnScript({ after: () => details({ orderStatus: '1', payTime: 'x', totalPrice: 320 }) });
     const r = await ex.execute(new CtxHarness(fake).ctx());
