@@ -102,9 +102,12 @@ describe('SGD budget with USD merchant and unchanged funding', () => {
     const { search, quote } = await setup();
     const s = await search(); h.retail.price = money('USD', '4615');
     expect((await quote(s.body.offers[0].offerId)).status).toBe(201);
-    h.retail.price = money('USD', '4616');
-    const q = await quote(s.body.offers[0].offerId);
+    // Changed provider terms require a new discovery/selection: the frozen quote never re-executes the provider.
+    const next = await search(); h.retail.price = money('USD', '4616');
+    const q = await quote(next.body.offers[0].offerId);
     expect(q.body.error.code).toBe('spend_limit_exceeded');
+    // The first offer's quote stays frozen at the accepted boundary price.
+    expect((await quote(s.body.offers[0].offerId)).status).toBe(201);
   });
 
   it('filters an indicative item above the converted bound even when controlled-store fallback ignores it', async () => {

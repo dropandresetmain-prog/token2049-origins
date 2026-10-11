@@ -101,14 +101,21 @@ export function sourceMatches(source: FundingSource, option: FundingOptionView):
   return source.readiness === 'configured' && source.rail === option.rail && source.network === option.amount.network && source.assetId === option.amount.assetId;
 }
 
-/** Every reachable connected payer with its bridge (and the spend headroom it reports, if any). Read-only: /status never moves money. */
-async function connectedPayers(deps: ToolDeps): Promise<Array<{ bridge: BridgeClient; source: FundingSource; headroom?: bigint }>> {
+/**
+ * Every reachable connected payer with its bridge (and the spend headroom it reports, if any), plus the rails whose
+ * configured bridge failed its readiness probe transiently. Read-only: /status never moves money. A transient probe
+ * failure means "unknown right now, retryable" — never "this rail has no payer".
+ */
+async function connectedPayers(deps: ToolDeps): Promise<{ payers: Array<{ bridge: BridgeClient; source: FundingSource; headroom?: bigint }>; unreachableRails: string[] }> {
   if (deps.consolidatedBridge) {
     const { sources } = await deps.gateway.fundingSources();
-    return sources.map(source => ({ bridge: deps.consolidatedBridge!, source }));
+    return { payers: sources.map(source => ({ bridge: deps.consolidatedBridge!, source })), unreachableRails: [] };
   }
-  const all = await Promise.all((deps.bridges ?? []).map(async (bridge) => ({ bridge, status: await bridge.status() })));
-  return all.flatMap((p) => (p.status ? [{ bridge: p.bridge, source: p.status.source, ...(p.status.headroomBaseUnits !== undefined ? { headroom: p.status.headroomBaseUnits } : {}) }] : []));
+  const all = await Promise.all((deps.bridges ?? []).map(async (bridge) => ({ bridge, outcome: await bridge.statusOutcome() })));
+  return {
+    payers: all.flatMap((p) => (p.outcome.status ? [{ bridge: p.bridge, source: p.outcome.status.source, ...(p.outcome.status.headroomBaseUnits !== undefined ? { headroom: p.outcome.status.headroomBaseUnits } : {}) }] : [])),
+    unreachableRails: all.filter((p) => !p.outcome.status && p.outcome.transient).map((p) => p.bridge.rail),
+  };
 }
 
 /** Whether a payer that reports its headroom can afford this option right now. Unknown headroom is treated as "no known limit". */
@@ -238,7 +245,8 @@ export function demoDisclosure(): string {
 /** Terms that only restate the demo environment stay in structured output; the one disclosure covers them in text. */
 const ENVIRONMENT_TERM = /\b(sandbox|development store|bogus|simulated|testnet|test)\b/i;
 
-export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms: Map<string, bigint> = new Map(), delivery: string | null = null): string {
+/** `unreachableRails`: rails whose configured payer probe failed transiently. The quote stays executable; only the readiness re-check is deferred. */
+export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms: Map<string, bigint> = new Map(), delivery: string | null = null, unreachableRails: string[] = []): string {
   const fund = q.fundingOptions.map(f => {
     const digits = f.amount.amountBaseUnits.padStart(f.amount.decimals + 1, '0');
     const amount = f.amount.decimals ? digits.slice(0, -f.amount.decimals) + '.' + digits.slice(-f.amount.decimals) : digits;
@@ -248,7 +256,9 @@ export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms:
         ? (exceedsHeadroom(f, headrooms.get(connected.sourceId))
           ? 'Connected wallet ' + connected.displayAddress + ' BUT its remaining spend cap (' + String(headrooms.get(connected.sourceId)) + ' base units) is below this payment: it would be refused, nothing can be bought with it'
           : 'Connected wallet ' + connected.displayAddress + ' (configured; balance not verified)')
-        : 'External payment action required') +
+        : unreachableRails.includes(f.rail)
+          ? 'A payer for this rail could not be reached right now (transient readiness failure; retryable). The quote and this funding option remain executable: repeat create_quote later to re-check the payer. Do not describe this rail as unavailable.'
+          : 'External payment action required') +
       ' · selection ' + f.fundingOptionId;
   });
   return [
@@ -413,10 +423,11 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const assessment = assessFulfillment(deps.profile ? applyDemoProfile(fulfillment, deps.profile) : fulfillment);
         if (assessment.status === 'needs_input') return inputNeeded(deps, assessment);
         const { quote } = await deps.gateway.createQuote(OfferId.parse(offerId), assessment.value);
-        const payers = await connectedPayers(deps);
+        const { payers, unreachableRails } = await connectedPayers(deps);
         const fundingSources = payers.map(p => p.source);
         const headrooms = new Map(payers.flatMap(p => (p.headroom !== undefined ? [[p.source.sourceId, p.headroom] as [string, bigint]] : [])));
-        return success(deps, describeQuote(quote, fundingSources, headrooms, deliveryLabel(assessment.value)), { quote, fundingSources, demoDisclosure: demoDisclosure() });
+        return success(deps, describeQuote(quote, fundingSources, headrooms, deliveryLabel(assessment.value), unreachableRails),
+          { quote, fundingSources, ...(unreachableRails.length ? { unreachablePayerRails: unreachableRails } : {}), demoDisclosure: demoDisclosure() });
       } catch (e) {
         return gatewayFailure(deps, e);
       }
@@ -472,7 +483,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const canAttempt = !purchase || (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && (!purchase.paymentAttempt || (purchase.paymentAttempt.status === 'failed' && purchase.paymentAttempt.retrySafe)));
         if (canAttempt) {
           if (deps.consolidatedBridge || deps.bridges?.length) {
-            const matching = (await connectedPayers(deps)).filter(p => sourceMatches(p.source, option) && (!selectedSourceId || p.source.sourceId === selectedSourceId));
+            const matching = (await connectedPayers(deps)).payers.filter(p => sourceMatches(p.source, option) && (!selectedSourceId || p.source.sourceId === selectedSourceId));
             if (matching.length > 1) {
               return failure(deps, 'More than one connected payer claims the selected funding option. Fix the payer configuration. Nothing has been purchased.', { error: { code: 'payer_ambiguous' }, selectedFundingOptionId });
             }

@@ -29,6 +29,8 @@ async function wakeJson(response: Response): Promise<unknown> {
   finally { void reader.cancel().catch(() => undefined); }
 }
 type Status = { source: FundingSource; headroomBaseUnits?: bigint };
+/** Readiness plus whether a null status is a transient probe failure (retryable) rather than a definite no-payer answer. */
+export type StatusOutcome = { status: Status | null; transient: boolean };
 export type BridgeDiag = (event: Record<string, unknown>) => void;
 const stderrDiag: BridgeDiag = (event) => { process.stderr.write(`${JSON.stringify(event)}\n`); };
 const TRANSIENT_HTTP = new Set([502, 503, 504]);
@@ -49,7 +51,7 @@ function fetchOutcome(error: unknown): { outcome: string; transient: boolean; co
  */
 export class BridgeClient {
   private readonly f: typeof fetch;
-  private pendingStatus?: Promise<Status | null>;
+  private pendingStatus?: Promise<StatusOutcome>;
   private pendingPreparation?: Promise<boolean>;
   private lastPreparationFailure?: PreparationFailure;
   get preparationFailure(): PreparationFailure | undefined { return this.lastPreparationFailure ? { ...this.lastPreparationFailure } : undefined; }
@@ -78,21 +80,25 @@ export class BridgeClient {
   }
 
   /** Coalesce concurrent probes; recovery is read-only and stays inside the existing status budget. */
-  async status(): Promise<Status | null> {
+  async statusOutcome(): Promise<StatusOutcome> {
     if (this.pendingStatus) return this.pendingStatus;
     const pending = this.readiness();
     this.pendingStatus = pending;
     try { return await pending; } finally { if (this.pendingStatus === pending) this.pendingStatus = undefined; }
   }
 
-  private async readiness(): Promise<Status | null> {
+  async status(): Promise<Status | null> {
+    return (await this.statusOutcome()).status;
+  }
+
+  private async readiness(): Promise<StatusOutcome> {
     const timeoutMs = this.cfg.statusTimeoutMs ?? Math.min(this.cfg.timeoutMs ?? DEFAULT_TIMEOUT_MS, 5000);
     const deadline = Date.now() + timeoutMs;
     const report = (route: string, started: number, event: Record<string, unknown>) => {
       // Fixed fields only: no response bodies, error messages, URLs, headers or identities.
       try { (this.cfg.diag ?? stderrDiag)({ type: 'payer_readiness', rail: this.rail, route, ...event, ms: Date.now() - started, timeoutMs }); } catch { /* diagnostics never change readiness */ }
     };
-    const probe = async (): Promise<{ status: Status | null; transient: boolean }> => {
+    const probe = async (): Promise<StatusOutcome> => {
       const started = Date.now();
       let response: Response;
       try {
@@ -125,22 +131,22 @@ export class BridgeClient {
       return { status: { source: body.data.source, ...(typeof raw === 'string' ? { headroomBaseUnits: BigInt(raw) } : {}) }, transient: false };
     };
     let result = await probe();
-    if (!result.transient || deadline - Date.now() <= 500) return result.status;
+    if (!result.transient || deadline - Date.now() <= 500) return result;
     // One awaited health request replaces unobserved fire-and-forget wakes. No authentication/payment retries.
     const started = Date.now();
     try {
       const response = await this.f(`${this.cfg.url}/health`, { redirect: 'error', signal: AbortSignal.timeout(Math.max(1, deadline - Date.now())) });
       void response.body?.cancel().catch(() => undefined);
       report('health', started, { outcome: response.ok ? 'success' : 'http_error', status: response.status });
-      if (!response.ok && !TRANSIENT_HTTP.has(response.status)) return null;
-    } catch (e) { const outcome = fetchOutcome(e); report('health', started, outcome); if (!outcome.transient) return null; }
+      if (!response.ok && !TRANSIENT_HTTP.has(response.status)) return { status: null, transient: false };
+    } catch (e) { const outcome = fetchOutcome(e); report('health', started, outcome); if (!outcome.transient) return { status: null, transient: false }; }
     for (const backoff of [500, 1500]) {
-      if (deadline - Date.now() <= backoff) return null;
+      if (deadline - Date.now() <= backoff) return { status: null, transient: true };
       await (this.cfg.wait ?? ((ms) => new Promise<void>((resolve) => setTimeout(resolve, ms))))(backoff);
       result = await probe();
-      if (!result.transient) return result.status;
+      if (!result.transient) return result;
     }
-    return null;
+    return { status: null, transient: true };
   }
 
   async source(): Promise<FundingSource | null> {

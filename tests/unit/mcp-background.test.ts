@@ -1,5 +1,9 @@
 import { describe, expect, it } from 'vitest';
+import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { BackgroundJobs } from '../../src/channels/mcp/tools.js';
+import { createMcpServer } from '../../src/channels/mcp/server.js';
+import { startHarness, retailIntent, retailFulfillment } from '../support/harness.js';
 
 const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
@@ -53,5 +57,42 @@ describe('BackgroundJobs', () => {
     await sleep(120);
     expect(finished).toBe(true); // it was never cancelled and nothing crashed
     expect(await jobs.within(Promise.resolve(5))).toEqual({ pending: false, value: 5 });
+  });
+});
+
+describe('quote collection across a simulated process restart', () => {
+  it('a fresh BackgroundJobs collects the same durable quote without re-running the provider quote', async () => {
+    const h = await startHarness();
+    let quoteCalls = 0;
+    const inner = h.retail.quote.bind(h.retail);
+    h.retail.quote = async (...args: Parameters<typeof inner>) => { quoteCalls++; await sleep(150); return inner(...args); };
+    const session = async (background: BackgroundJobs) => {
+      const server = createMcpServer({ gatewayUrl: h.url, gatewayToken: h.alice.token }, { background });
+      const [a, b] = InMemoryTransport.createLinkedPair();
+      const client = new Client({ name: 'restart-collection', version: '1' });
+      await Promise.all([server.connect(a), client.connect(b)]);
+      return {
+        call: async (name: string, args: Record<string, unknown>) => await client.callTool({ name, arguments: args }) as any,
+        close: async () => { await client.close(); await server.close(); },
+      };
+    };
+    const first = await session(new BackgroundJobs(20));
+    const restarted = await session(new BackgroundJobs(5_000)); // restart: a fresh in-memory registry with nothing retained
+    try {
+      const search = await h.call('POST', '/v1/offers/search', { token: h.alice.token, body: { intent: retailIntent() } });
+      const request = { offerId: search.body.offers[0].offerId as string, fulfillment: retailFulfillment };
+      expect((await first.call('create_quote', request)).structuredContent.status).toBe('quote_pending');
+      await expect.poll(async () => (await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM quotes'))!.n, { timeout: 5000 }).toBe(1);
+      const persisted = (await h.gw.db.get<{ id: string; digest: string }>('SELECT id,digest FROM quotes'))!;
+      const collected = await restarted.call('create_quote', request);
+      expect(collected.isError).toBeFalsy();
+      expect(collected.structuredContent.quote).toMatchObject({ quoteId: persisted.id, digest: persisted.digest });
+      expect(collected.structuredContent.quote.fundingOptions.length).toBeGreaterThan(0);
+      expect(quoteCalls).toBe(1); // the durable join returned the persisted row; the provider was never re-executed
+      const again = await first.call('create_quote', request); // the original session converges on the same quote too
+      expect(again.structuredContent.quote.quoteId).toBe(persisted.id);
+      expect(quoteCalls).toBe(1);
+      expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM quotes'))!.n).toBe(1);
+    } finally { await first.close(); await restarted.close(); await h.close(); }
   });
 });

@@ -146,6 +146,26 @@ describe('Global discovery -> one shadow -> existing commerce core (all provider
       expect(changed.status).toBe(409);
     } finally { await restarted.close(); }
   });
+  it('a new gateway process collects the same controlled-catalog quote without a second cart or shadow', async () => {
+    const search = await h.call('POST', '/v1/offers/search', { token: h.alice.token, body: { intent: { ...intent, discovery: 'controlled_catalog' } } });
+    expect(search.status).toBe(200);
+    const controlledId = OfferView.parse(search.body.offers[0]).offerId;
+    const controlledQuote = () => h.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId: controlledId, fulfillment: retailFulfillment } });
+    const first = QuoteView.parse((await controlledQuote()).body.quote);
+    expect((await controlledQuote()).body.quote).toEqual(first); // repeat in the same process joins the persisted quote
+    const restarted = await startHarness({ schema, clock: h.clock, settlementPolicy: { mode: 'scaled_testnet', numerator: 1, denominator: 1000 } });
+    try {
+      const providerQuote = vi.spyOn(restarted.retail, 'quote').mockRejectedValue(new Error('provider must not be called after restart'));
+      const response = await restarted.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId: controlledId, fulfillment: retailFulfillment } });
+      expect(response.status).toBe(201); expect(response.body.quote).toEqual(first);
+      expect(providerQuote).not.toHaveBeenCalled();
+      const changed = await restarted.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId: controlledId, fulfillment: { ...retailFulfillment, email: 'changed@example.com' } } });
+      expect(changed.status).toBe(409);
+    } finally { await restarted.close(); }
+    expect(admin.create).not.toHaveBeenCalled(); // controlled catalog never provisions a shadow product
+    expect(h.retail.quote).toHaveBeenCalledTimes(1); // one provider quote => one cart across both processes
+    expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM quotes WHERE offer_id=$1', controlledId))!.n).toBe(1);
+  });
   it('concurrent quote calls return one quote or actionable busy conflict, then retry returns same quote', async () => {
     const results = await Promise.all([quote(), quote()]);
     expect(results.every(r => [201, 409].includes(r.status))).toBe(true); expect(results.some(r => r.status === 201)).toBe(true);

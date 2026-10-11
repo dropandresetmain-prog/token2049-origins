@@ -25,11 +25,13 @@ describe('MCP stalled-operation recovery', () => {
     return { offer: offers[0]!, quote };
   }
   const args = (q: any) => ({ quoteId: q.quoteId, selectedFundingOptionId: q.fundingOptions[0].fundingOptionId, quoteDigest: q.digest, maxTotal: q.payablePrincipal });
-  async function session(opts: { statusDelay?: number; payDelay?: number; retrySafe?: boolean; onPay?: () => void; background?: BackgroundJobs } = {}) {
+  async function session(opts: { statusDelay?: number; statusDown?: boolean; statusTimeoutMs?: number; payDelay?: number; retrySafe?: boolean; onPay?: () => void; background?: BackgroundJobs } = {}) {
     const fetchImpl: typeof fetch = async (input, init) => {
       const url = String(input);
       if (!url.startsWith(bridgeUrl)) return fetch(input, init);
+      if (url.endsWith('/health')) return new Response(null, { status: opts.statusDown ? 503 : 200 });
       if (url.endsWith('/status')) {
+        if (opts.statusDown) return Response.json({ ok: false, error: { code: 'unavailable', message: 'fixture payer down' } }, { status: 503 });
         await sleep(opts.statusDelay ?? 0);
         return Response.json({ ok: true, source: { sourceId: 'src_' + 'a'.repeat(32), rail: 'cardano', network: 'cardano:preprod', publicAddress: 'addr_test1fixturepayer00000000', displayAddress: 'fixture payer', assetId: h.funding.acceptedAsset().assetId, readiness: 'configured' } });
       }
@@ -37,7 +39,7 @@ describe('MCP stalled-operation recovery', () => {
       await sleep(opts.payDelay ?? 0);
       return Response.json({ ok: false, retrySafe: opts.retrySafe === true, error: { code: 'policy_violation', message: 'fixture refusal' } }, { status: 403 });
     };
-    const server = createMcpServer({ gatewayUrl: h.url, gatewayToken: h.alice.token, fetch: fetchImpl, bridges: { cardano: { url: bridgeUrl, token: 'fixture-bridge-token-0123456789' } } }, { ...(opts.background ? { background: opts.background } : {}) });
+    const server = createMcpServer({ gatewayUrl: h.url, gatewayToken: h.alice.token, fetch: fetchImpl, bridges: { cardano: { url: bridgeUrl, token: 'fixture-bridge-token-0123456789' } }, ...(opts.statusTimeoutMs ? { bridgeStatusTimeoutMs: opts.statusTimeoutMs } : {}) }, { ...(opts.background ? { background: opts.background } : {}) });
     const [a,b] = InMemoryTransport.createLinkedPair();
     const client = new Client({ name: 'stall-regression', version: '1' });
     await Promise.all([server.connect(a), client.connect(b)]);
@@ -58,6 +60,36 @@ describe('MCP stalled-operation recovery', () => {
     const collected = await s.call('create_quote', request);
     expect(collected.isError).toBe(true);
     expect(collected.structuredContent.error.code).toBe('quote_expired');
+  });
+
+  it('collects the same durable quote from a restarted session while the payer bridge is down, without an "unavailable" claim', async () => {
+    const { offers } = await gateway.searchOffers(retailIntent());
+    const request = { offerId: offers[0]!.offerId, fulfillment: retailFulfillment };
+    let quoteCalls = 0;
+    const inner = h.retail.quote.bind(h.retail);
+    h.retail.quote = async (...args: Parameters<typeof inner>) => { quoteCalls++; await sleep(120); return inner(...args); };
+    const slow = await session({ statusDelay: 400, background: new BackgroundJobs(20) });
+    expect((await slow.call('create_quote', request)).structuredContent.status).toBe('quote_pending');
+    await expect.poll(async () => (await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM quotes'))!.n, { timeout: 5000 }).toBe(1);
+    const persisted = (await h.gw.db.get<{ id: string; digest: string }>('SELECT id,digest FROM quotes'))!;
+    // Simulated process restart: a new server/session whose payer bridge is DOWN (transient 503) at collection time.
+    const restarted = await session({ statusDown: true, statusTimeoutMs: 400, background: new BackgroundJobs(5_000) });
+    const collected = await restarted.call('create_quote', request);
+    expect(collected.isError).toBeFalsy();
+    const quote = collected.structuredContent.quote;
+    expect(quote.quoteId).toBe(persisted.id);
+    expect(quote.digest).toBe(persisted.digest);
+    expect(quote.fundingOptions.length).toBeGreaterThan(0); // the completed quote stays executable
+    expect(collected.structuredContent.fundingSources).toEqual([]);
+    expect(collected.structuredContent.unreachablePayerRails).toEqual(['cardano']);
+    expect(collected.content[0].text).not.toContain('No payment source is currently available');
+    expect(collected.content[0].text).not.toMatch(/External payment action required/);
+    expect(collected.content[0].text).toMatch(/could not be reached right now/);
+    expect(quoteCalls).toBe(1); // the provider quote was never re-executed
+    // The original in-flight operation converges on the same persisted quote.
+    await expect.poll(async () => (await slow.call('create_quote', request)).structuredContent.quote?.quoteId, { timeout: 5000 }).toBe(persisted.id);
+    expect(quoteCalls).toBe(1);
+    expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM quotes'))!.n).toBe(1);
   });
 
   it('persists a late refusal and exposes it from a fresh MCP session without resending', async () => {

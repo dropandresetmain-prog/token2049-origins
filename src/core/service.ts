@@ -207,12 +207,14 @@ export class CommerceCore {
     const offer = await this.d.db.get<{ customer_id: string; intent_json: string }>('SELECT customer_id,intent_json FROM offers WHERE id=$1', offerId);
     if (!offer || offer.customer_id !== actor.customerId) throw new CoreError('not_found', 'offer not found');
     const intent = JSON.parse(offer.intent_json) as PurchaseIntent;
-    if (intent.category !== 'retail' || intent.discovery !== 'live') return this.createQuoteOnce(actor, offerId, rawFulfillment, supersedes);
+    if (intent.category !== 'retail') return this.createQuoteOnce(actor, offerId, rawFulfillment, supersedes);
     const assessment = assessFulfillment(rawFulfillment);
     if (assessment.status === 'needs_input') throw new CoreError('needs_input', 'fulfillment information required', assessment);
     const fulfillment = FulfillmentSchema.parse(assessment.value);
-    // One selected live offer has one immutable quote. New terms require a new discovery/selection.
-    // The session lock spans provider I/O without holding a database transaction.
+    // One selected retail offer has one immutable quote, in every discovery mode: Shopify quotes can create
+    // provider-side state (carts, sandbox shadow products), so repeats/restarts must join the persisted quote.
+    // New terms require a new discovery/selection. The session lock spans provider I/O without holding a database
+    // transaction. The lock key keeps its historical name so a rolling upgrade never holds two keys for one offer.
     const result = await this.d.db.withExclusiveLock('live-retail-quote:' + offerId, async () => {
       const existing = await this.d.db.get<QuoteRow>('SELECT * FROM quotes WHERE offer_id=$1 ORDER BY created_at LIMIT 1', offerId);
       if (existing) {
