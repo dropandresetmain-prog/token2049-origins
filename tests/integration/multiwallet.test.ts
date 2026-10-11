@@ -1,6 +1,7 @@
 import { afterEach, describe, it, expect, vi } from 'vitest';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { Client } from '@modelcontextprotocol/sdk/client/index.js';
+import { BackgroundJobs } from '../../src/channels/mcp/tools.js';
 import { createMcpServer } from '../../src/channels/mcp/server.js';
 import { PAYER_WAKE_URL, PAYER_WAKE_DESTINATION } from '../../src/channels/mcp/config.js';
 import { startHarness, retailIntent, retailFulfillment, type Harness } from '../support/harness.js';
@@ -109,6 +110,25 @@ describe('consolidated payer / canonical PostgreSQL / labeled fixture commerce',
   await client.callTool({name:'buy',arguments:args});await client.callTool({name:'get_purchase',arguments:{purchaseId:purchase.purchaseId}});
   expect(pays).toBe(1);expect(wakes).toBe(2);expect((await h.gw.db.all('SELECT id FROM purchases WHERE quote_id=$1',q.quoteId))).toHaveLength(1);
   expect((await h.gw.db.get('SELECT * FROM payment_handoffs WHERE purchase_id=$1',purchase.purchaseId))?.retry_safe).toBe(false);
+ });
+ it('FIXTURE: pending cold preparation joins identical buy calls before one durable payment claim',async()=>{
+  const h=await setup(),source=await register(h,'sui'),q=await quote(h);let release!:(r:Response)=>void,wakes=0,pays=0,statuses=0;
+  const f:typeof fetch=async(url,init)=>{
+   if(String(url)===PAYER_WAKE_URL){wakes++;return new Promise(r=>{release=r;});}
+   if(String(url).endsWith('/status'))return ++statuses===1?new Response('',{status:429,headers:{'x-render-routing':'hibernate-rate-limited'}}):Response.json({ok:true,source:null});
+   if(String(url).endsWith('/pay')){pays++;throw new TypeError('fixture response lost');}
+   return fetch(url,init);
+  };
+  const mcp=createMcpServer({gatewayUrl:h.url,gatewayToken:h.alice.token,consolidatedBridge:{url:PAYER_WAKE_DESTINATION,token:'fixture-payment-token-123456789',wake:{url:PAYER_WAKE_URL,token:'b'.repeat(64)}},fetch:f},{profile:null,background:new BackgroundJobs(20)});
+  const client=new Client({name:'pending-cold-fixture',version:'1'}),[a,b]=InMemoryTransport.createLinkedPair();await mcp.connect(a);await client.connect(b);active.push(async()=>{await client.close();await mcp.close();});
+  const option=q.fundingOptions.find((o:any)=>o.rail==='sui'),args={quoteId:q.quoteId,maxTotal:q.payablePrincipal,quoteDigest:q.digest,selectedFundingOptionId:option.fundingOptionId,selectedSourceId:source.sourceId};
+  for(let n=0;n<2;n++)expect((await client.callTool({name:'buy',arguments:args})).structuredContent).toMatchObject({status:'purchase_pending'});
+  for(let n=0;n<100&&!release;n++)await new Promise(r=>setTimeout(r,10));
+  expect(release).toBeTypeOf('function');expect(wakes).toBe(1);expect(pays).toBe(0);expect(await h.gw.db.all('SELECT * FROM payment_handoffs')).toHaveLength(0);
+  release(Response.json({ok:true,category:'upstream_2xx',upstreamStatus:200,contentType:'json',renderRouting:'none',durationMs:95_000,paymentAttempted:false}));
+  for(let n=0;n<100;n++){const result=await client.callTool({name:'buy',arguments:args});if((result.structuredContent as any).status!=='purchase_pending')break;}
+  await client.callTool({name:'buy',arguments:args});expect(wakes).toBe(1);expect(pays).toBe(1);
+  expect(await h.gw.db.all('SELECT * FROM purchases WHERE quote_id=$1',q.quoteId)).toHaveLength(1);expect(await h.gw.db.all('SELECT * FROM payment_handoffs')).toHaveLength(1);
  });
  it('appends fenced cap amendments while preserving immutable identities and original policy',async()=>{
   const h=await setup(),source=await register(h,'solana'),db=h.gw.db;

@@ -424,7 +424,7 @@
       "p99MemoryMB": 1.58,
       "exactAccountRequestsRemaining": "not measured"
     },
-    "nextAction": "Report single direct PASS. Separately budget nested gateway preparation and two genuine cold integrated cycles; keep all authority disabled. No payment or automatic activation.",
+    "nextAction": "Deploy only gateway correction with authority off; exactly two new integrated >=960s cold cycles. Either failure stops activation.",
     "previousVersionId": "f416f62f-6fb2-4026-851a-caafca88c33b",
     "previousDeployedModuleSha256": "e40e3110bdf403c1e0acb60b5493894aa27a3c28d10167e33a17b53775ac1450",
     "finalDiagnostic": {
@@ -453,10 +453,12 @@
       "providerWrites": 0
     },
     "gatewayTimeoutBoundary": {
-      "deployedWakeCallerMs": 75000,
-      "deployedPreparationMs": 90000,
+      "deployedWakeCallerMs": 110000,
+      "deployedPreparationMs": 130000,
       "currentWorkerUpstreamMs": 90000,
-      "integratedNesting": "not yet corrected/deployed/verified"
+      "mcpBackgroundResponseMs": 45000,
+      "independentAcceptanceCallerMs": 160000,
+      "integratedNesting": "locally verified; two deployed cold cycles pending"
     }
   }
 }

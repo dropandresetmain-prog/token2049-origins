@@ -12,6 +12,22 @@ const BridgeSuccess = z.object({
 });
 
 const DEFAULT_TIMEOUT_MS = 60_000;
+// The fixed Worker waits up to 90 seconds. Leave response transport margin, then time for direct readiness.
+export const PAYER_WAKE_CALL_TIMEOUT_MS = 110_000;
+export const PAYER_PREPARATION_TIMEOUT_MS = 130_000;
+const WakeTerminal = z.object({
+  ok: z.boolean(), category: z.enum(['upstream_2xx','redirect_refused','upstream_refused','timeout','transport_error','rate_limited','rate_limit_unavailable','invalid_request','unauthenticated','not_configured']),
+  upstreamStatus: z.number().int().min(100).max(599).optional(), contentType: z.enum(['json','html','other']).optional(),
+  renderRouting: z.enum(['none','other','hibernate-rate-limited']).optional(), durationMs: z.number().nonnegative().optional(), paymentAttempted: z.literal(false),
+}).strict();
+export type PreparationFailure = { httpStatus?: number; upstreamStatus?: number; responseCategory: string; renderRouting?: 'none'|'other'|'hibernate-rate-limited' };
+// Even a malformed intermediary response is bounded and never copied into logs or tool results.
+async function wakeJson(response: Response): Promise<unknown> {
+  const reader = response.body?.getReader(); if (!reader) return null;
+  let text = '', bytes = 0;
+  try { for (;;) { const chunk = await reader.read(); if (chunk.done) return JSON.parse(text); bytes += chunk.value.byteLength; if (bytes > 4096) return null; text += new TextDecoder().decode(chunk.value); } }
+  finally { void reader.cancel().catch(() => undefined); }
+}
 type Status = { source: FundingSource; headroomBaseUnits?: bigint };
 export type BridgeDiag = (event: Record<string, unknown>) => void;
 const stderrDiag: BridgeDiag = (event) => { process.stderr.write(`${JSON.stringify(event)}\n`); };
@@ -35,6 +51,8 @@ export class BridgeClient {
   private readonly f: typeof fetch;
   private pendingStatus?: Promise<Status | null>;
   private pendingPreparation?: Promise<boolean>;
+  private lastPreparationFailure?: PreparationFailure;
+  get preparationFailure(): PreparationFailure | undefined { return this.lastPreparationFailure ? { ...this.lastPreparationFailure } : undefined; }
 
   constructor(readonly rail: PayerRail, private readonly cfg: { url: string; token: string; wake?: BridgeEndpoint; fetch?: typeof fetch; timeoutMs?: number; statusTimeoutMs?: number; diag?: BridgeDiag; wait?: (ms: number) => Promise<void> }) {
     this.f = cfg.fetch ?? fetch;
@@ -150,25 +168,29 @@ export class BridgeClient {
     try {
       const response = await this.f(PAYER_WAKE_URL, {
         method: 'POST', headers: { authorization: 'Bearer ' + wake.token },
-        redirect: 'error', signal: AbortSignal.timeout(Math.max(1, Math.min(75_000, deadline - Date.now()))),
+        redirect: 'error', signal: AbortSignal.timeout(Math.max(1, Math.min(PAYER_WAKE_CALL_TIMEOUT_MS, deadline - Date.now()))),
       });
-      if (!response.ok) {
-        void response.body?.cancel().catch(() => undefined);
-        this.report('payer_wake', started, { outcome: 'http_error', status: response.status });
-        return false;
-      }
-      const result = z.object({
-        ok: z.literal(true), category: z.literal('upstream_2xx'), upstreamStatus: z.number().int().min(200).max(299),
-        contentType: z.enum(['json', 'html', 'other']), renderRouting: z.enum(['none', 'other', 'hibernate-rate-limited']),
-        durationMs: z.number().nonnegative(), paymentAttempted: z.literal(false),
-      }).strict().safeParse(await response.json());
-      this.report('payer_wake', started, { outcome: result.success ? 'health_response' : 'schema_mismatch', status: response.status });
-      return result.success;
-    } catch (error) { this.report('payer_wake', started, fetchOutcome(error)); return false; }
+      const parsed = WakeTerminal.safeParse(await wakeJson(response));
+      const terminal = parsed.success ? parsed.data : undefined;
+      const success = response.ok && terminal?.ok === true && terminal.category === 'upstream_2xx' &&
+        terminal.upstreamStatus !== undefined && terminal.upstreamStatus >= 200 && terminal.upstreamStatus < 300;
+      const fields: PreparationFailure = { httpStatus: response.status, responseCategory: terminal?.category ?? 'schema_mismatch',
+        ...(terminal?.upstreamStatus !== undefined ? { upstreamStatus: terminal.upstreamStatus } : {}),
+        ...(terminal?.renderRouting ? { renderRouting: terminal.renderRouting } : {}) };
+      this.report('payer_wake', started, { outcome: success ? 'health_response' : response.ok ? 'schema_mismatch' : 'http_error', status: response.status, ...fields,
+        ...(terminal?.durationMs !== undefined ? { upstreamDurationMs: terminal.durationMs } : {}) });
+      if (!success) this.lastPreparationFailure = fields;
+      return success;
+    } catch (error) {
+      const outcome = fetchOutcome(error);
+      this.lastPreparationFailure = { responseCategory: outcome.outcome === 'timeout' ? 'wake_caller_timeout' : 'wake_caller_transport_error' };
+      this.report('payer_wake', started, outcome); return false;
+    }
   }
 
   private async prepareTransport(): Promise<boolean> {
-    const started = Date.now(), budget = this.cfg.statusTimeoutMs ?? 90_000, deadline = started + budget;
+    const started = Date.now(), budget = this.cfg.statusTimeoutMs ?? PAYER_PREPARATION_TIMEOUT_MS, deadline = started + budget;
+    this.lastPreparationFailure = undefined;
     let wakeAttempted = false;
     // Only safe GETs are repeated. A platform refusal never authorizes a repeated POST /pay.
     for (let attempt = 0; attempt < 12 && Date.now() < deadline; attempt++) {
@@ -183,7 +205,10 @@ export class BridgeClient {
           const rawRetryAfter = res.headers.get('retry-after');
           if (rawRetryAfter && /^\d{1,6}$/.test(rawRetryAfter)) retryAfterMs = Number(rawRetryAfter) * 1000;
           else if (rawRetryAfter) { const at = Date.parse(rawRetryAfter); if (Number.isFinite(at)) retryAfterMs = Math.max(0, at - Date.now()); }
-          this.report('payer_transport', started, { outcome: 'http_error', status: res.status, attempt, contentType: (res.headers.get('content-type') ?? '').includes('application/json') ? 'json' : 'other' });
+          const rawRouting = res.headers.get('x-render-routing');
+          const renderRouting = rawRouting === 'hibernate-rate-limited' ? rawRouting : rawRouting ? 'other' : 'none';
+          this.lastPreparationFailure = { httpStatus: res.status, responseCategory: 'http_error', renderRouting };
+          this.report('payer_transport', started, { outcome: 'http_error', status: res.status, renderRouting, attempt, contentType: (res.headers.get('content-type') ?? '').includes('application/json') ? 'json' : 'other' });
           transient = PREPARATION_TRANSIENT_HTTP.has(res.status);
           if (res.status === 429 && res.headers.get('x-render-routing') === 'hibernate-rate-limited' && this.cfg.wake && !wakeAttempted) {
             // A wake changes availability only. Direct authenticated status must still pass before a durable claim.
@@ -195,6 +220,7 @@ export class BridgeClient {
           try { json = await res.json(); } catch { this.report('payer_transport', started, { outcome: 'invalid_json', attempt }); return false; }
           const parsed = z.object({ ok: z.literal(true), source: FundingSource.nullable(), ledger: z.record(z.string(), z.unknown()).optional() }).strict().safeParse(json);
           this.report('payer_transport', started, { outcome: parsed.success ? 'ready' : 'schema_mismatch', attempt });
+          if (parsed.success) this.lastPreparationFailure = undefined;
           return parsed.success;
         }
       } catch (error) {

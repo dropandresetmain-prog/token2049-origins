@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- COLD_WORKER_DIAGNOSTIC_PASS — INTEGRATED REPEATABILITY PENDING: one direct90s/110s diagnostic returned200/33.135s with independent startup. No activation; payment/customer authority stays disabled.
+- INTEGRATED_COLD_ACCEPTANCE_IN_PROGRESS: gateway readiness-only correction; exactly two new cold cycles authorized. Signing/grants/customer writes stay disabled until both PASS and existing gates pass.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -22,7 +22,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
 
 ## Constraints and authorization
-- Latest owner message authorizes one additional direct cold diagnostic: Worker90s/caller110s, optional bounded warm readback; authority stays disabled. Negative/inconclusive STOP; positive integrated repeatability remains pending.
+- Latest owner message authorizes gateway110s wake caller/130s preparation, two genuine integrated>=960s idle cycles, and covered conditional activation only after both PASS. Either failure STOP; no payment or incident retry.
 - Only one narrow on-demand Cloudflare wake Worker is authorized (11 October attachment8577f52b). No replacement MCP/commerce/payer/OAuth/database/browser, queue, cron, keep-alive, paid plan or service per customer/wallet/rail.
 - Keys only in payer. Original identities, caps, histories and sponsor roles preserved. Exact quote/digest/funding option/source bind approval.
 - Reservations and signed candidates persist before irreversible calls. Unknown outcomes reconcile the same candidate; merchant attempts are not duplicated.
@@ -41,7 +41,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
 - [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
 - [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: final direct diagnostic08:04UTC PASS after5506.843s idle, upstream200/routing none32.408s, caller33.135s, independent startup. Prior second integrated429/75s cancellation remains unresolved; gatewayb122186/payer3945 unchanged, authority off,40non-OAuth tables unchanged.
+- Current checkpoint: preflight08:51UTC exactb122186/3945/Worker00ee6d4a;40non-OAuth hashes unchanged, all authority off. New gateway110s/130s correction and fixed terminal diagnostics;65unit PASS. Fresh44/825 full restore c635b74c45cf36d28203725edc9f19c83f9b1885c151a932584bf3464c065ae1. Native pending fixture PASS;68other native checks PASS, typecheck/build PASS. Next: gateway-only deployment then two new cold cycles.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.

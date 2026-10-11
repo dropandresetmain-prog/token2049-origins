@@ -6,7 +6,7 @@ import type { McpConfig } from '../mcp/config.js';
 import { sendJson, serveMcpPost } from '../mcp/http.js';
 import type { HostedMcpConfig } from './config.js';
 import { HOSTED_MCP_SCOPES, HostedOAuth } from './oauth.js';
-import { BridgeClient } from '../mcp/bridge.js';
+import { BridgeClient, PAYER_PREPARATION_TIMEOUT_MS } from '../mcp/bridge.js';
 import { BackgroundJobs } from '../mcp/tools.js';
 
 export interface HostedMcpMount {
@@ -111,9 +111,9 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
     if (auth?.extra?.customerId !== config.customerId || !auth.scopes.includes('purchases:read')) return rpcError(res,403,-32000,'forbidden');
     if (Object.keys(req.query).length || req.headers['content-length'] && req.headers['content-length'] !== '0' || req.headers['transfer-encoding']) return rpcError(res,400,-32602,'no diagnostic parameters allowed');
     if (!config.consolidatedBridge) return res.status(409).json({ok:false,code:'payer_unconfigured',paymentAttempted:false});
-    const client = new BridgeClient('cardano',{...config.consolidatedBridge,fetch:opts.fetch,statusTimeoutMs:config.bridgeStatusTimeoutMs ?? 90_000,timeoutMs:10_000});
+    const client = new BridgeClient('cardano',{...config.consolidatedBridge,fetch:opts.fetch,statusTimeoutMs:config.bridgeStatusTimeoutMs ?? PAYER_PREPARATION_TIMEOUT_MS,timeoutMs:10_000});
     void (async () => {
-      if (!await client.prepare()) return res.status(503).json({ok:false,code:'payer_not_ready',paymentAttempted:false});
+      if (!await client.prepare()) return res.status(503).json({ok:false,code:'payer_not_ready',paymentAttempted:false,...client.preparationFailure});
       const result = await client.pay('transport_diagnostic');
       const contract = !result.ok && result.code === 'invalid_request' && result.httpStatus === 400 && result.responseCategory === 'canonical_failure';
       return res.status(contract ? 200 : 503).json({ok:contract,transportReady:true,postContractVerified:contract,paymentAttempted:false,
@@ -136,7 +136,7 @@ export function createHostedMcp(opts: { db: Db; config: HostedMcpConfig; fetch?:
       gatewayToken: token,
       // A free payer may be asleep: allow a cold start for /status and the payment call; durable payer history guards against repeats.
       bridgeTimeoutMs: config.bridgeTimeoutMs ?? 100_000,
-      bridgeStatusTimeoutMs: config.bridgeStatusTimeoutMs ?? 90_000,
+      bridgeStatusTimeoutMs: config.bridgeStatusTimeoutMs ?? PAYER_PREPARATION_TIMEOUT_MS,
       // Exact quotes drive a headless checkout on a small free instance and can take minutes; the quote itself continues server-side.
       gatewayTimeoutMs: config.gatewayTimeoutMs ?? 600_000,
       ...(config.consolidatedBridge ? { consolidatedBridge: config.consolidatedBridge } : {}),

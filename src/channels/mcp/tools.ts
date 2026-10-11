@@ -505,7 +505,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
           if (deps.consolidatedBridge && !(await payer.prepare())) {
             return failure(deps, 'The payment service is not ready. No payment was requested. Keep this purchase ID; the same approved purchase may be resumed while its quote is valid.', {
               status: 'action_required', purchase, progress: projectProgress(purchase),
-              payment: { attempted: false, ok: false, code: 'payer_not_ready', retrySafe: true },
+              payment: { attempted: false, ok: false, code: 'payer_not_ready', retrySafe: true, ...payer.preparationFailure },
             });
           }
           const claim = await deps.gateway.claimPaymentAttempt(purchase.purchaseId);

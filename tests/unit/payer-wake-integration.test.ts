@@ -1,10 +1,12 @@
-import { afterEach, describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { BridgeClient } from '../../src/channels/mcp/bridge.js';
 import { PAYER_WAKE_URL, PAYER_WAKE_DESTINATION, loadPayerWake, secretsOf } from '../../src/channels/mcp/config.js';
 import { loadHostedMcpConfig } from '../../src/channels/hosted-mcp/config.js';
+import { PAYER_PREPARATION_TIMEOUT_MS, PAYER_WAKE_CALL_TIMEOUT_MS } from '../../src/channels/mcp/bridge.js';
+import { WAKE_UPSTREAM_TIMEOUT_MS } from '../../deploy/payer-wake/worker.js';
 const TOKEN = 'payment-credential-fixture';
 const WAKE = 'b'.repeat(64);
 const asleep = () => new Response('private platform body', { status: 429, headers: { 'x-render-routing': 'hibernate-rate-limited' } });
@@ -14,7 +16,7 @@ function harness(responses: Array<() => Response | Promise<Response>>, wakeUrl =
   const calls: Array<{url:string; init?:RequestInit}> = [], events: unknown[] = [], waits: number[] = [];
   const client = new BridgeClient('sui', { url: PAYER_WAKE_DESTINATION, token: TOKEN, wake: { url: wakeUrl, token: WAKE },
     fetch: async (input, init) => { calls.push({url:String(input),init}); const next=responses.shift(); if (!next) throw Error('unexpected extra call'); return next(); },
-    statusTimeoutMs: 90_000, diag: e=>events.push(e), wait: async ms=>{waits.push(ms);} });
+    statusTimeoutMs: 130_000, diag: e=>events.push(e), wait: async ms=>{waits.push(ms);} });
   return {client,calls,events,waits};
 }
 describe('optional fixed health wake before payment authority', () => {
@@ -37,7 +39,7 @@ describe('optional fixed health wake before payment authority', () => {
   it('never retries a successful wake when direct readiness remains refused',async()=>{const h=harness([asleep,woke,...Array.from({length:11},()=>asleep)]);expect(await h.client.prepare()).toBe(false);expect(h.calls.filter(c=>c.url===PAYER_WAKE_URL)).toHaveLength(1);expect(h.calls.every(c=>!c.url.endsWith('/pay'))).toBe(true);});
   it('coalesces concurrent preparations into one wake',async()=>{let finish!:(v:Response)=>void;const h=harness([asleep,()=>new Promise(r=>{finish=r;}),ready]);const a=h.client.prepare(),b=h.client.prepare();while(!finish)await new Promise(r=>setTimeout(r,0));finish(woke());expect(await Promise.all([a,b])).toEqual([true,true]);expect(h.calls).toHaveLength(3);});
   it('refuses a changed wake destination before sending credentials',async()=>{const h=harness([asleep],'https://evil.invalid/wake');expect(await h.client.prepare()).toBe(false);expect(h.calls).toHaveLength(1);});
-  it('respects Retry-After that exceeds the entire readiness budget',async()=>{const h=harness([()=>new Response('',{status:429,headers:{'x-render-routing':'hibernate-rate-limited','retry-after':'120'}})]);expect(await h.client.prepare()).toBe(false);expect(h.calls).toHaveLength(1);});
+  it('respects Retry-After that exceeds the entire readiness budget',async()=>{const h=harness([()=>new Response('',{status:429,headers:{'x-render-routing':'hibernate-rate-limited','retry-after':'140'}})]);expect(await h.client.prepare()).toBe(false);expect(h.calls).toHaveLength(1);});
   it('refuses malformed wake success',async()=>{const h=harness([asleep,()=>Response.json({ok:true,paymentAttempted:true})]);expect(await h.client.prepare()).toBe(false);expect(h.calls).toHaveLength(2);});
 });
 const roots:string[]=[];
@@ -55,4 +57,35 @@ describe('dedicated wake configuration',()=>{
  it('rejects reuse of a payment or host token',()=>{const env=configuration();const bridge={url:PAYER_WAKE_DESTINATION,token:WAKE};expect(()=>loadPayerWake(env,bridge,[])).toThrow(/distinct dedicated/);expect(()=>loadPayerWake(env,{url:PAYER_WAKE_DESTINATION,token:TOKEN},[WAKE])).toThrow(/distinct dedicated/);});
  it('rejects a short/nonhex wake secret without echoing it',()=>{const env=configuration();writeFileSync(env.MCP_PAYER_WAKE_TOKEN_FILE!,'sensitive-nonhex-fixture-secret');expect(()=>loadHostedMcpConfig(env)).toThrow(/64-character hex/);try{loadHostedMcpConfig(env);}catch(e){expect(String(e)).not.toContain('sensitive-nonhex-fixture-secret');}});
  it('remains absent by default',()=>{const c=loadHostedMcpConfig(configuration({MCP_PAYER_WAKE_URL:undefined,MCP_PAYER_WAKE_TOKEN_FILE:undefined}))!;expect(c.consolidatedBridge?.wake).toBeUndefined();});
+});
+
+describe('nested cold readiness budgets',()=>{
+ afterEach(()=>{vi.restoreAllMocks();vi.useRealTimers();});
+ it('leaves Worker response and subsequent direct readiness time',()=>{
+  expect(PAYER_WAKE_CALL_TIMEOUT_MS).toBeGreaterThan(WAKE_UPSTREAM_TIMEOUT_MS);
+  expect(PAYER_PREPARATION_TIMEOUT_MS).toBeGreaterThan(PAYER_WAKE_CALL_TIMEOUT_MS+10_000);
+ });
+ it('keeps the wake caller connected past the upstream deadline and then checks authenticated status',async()=>{
+  vi.useFakeTimers();
+  vi.spyOn(AbortSignal,'timeout').mockImplementation(ms=>{const c=new AbortController();setTimeout(()=>c.abort(new DOMException('timeout','TimeoutError')),ms);return c.signal;});
+  let wakeSignal:AbortSignal|undefined;
+  const h=harness([asleep,()=>new Promise(resolve=>{wakeSignal=h.calls[1]!.init!.signal!;setTimeout(()=>resolve(woke()),95_000);}),ready]);
+  const pending=h.client.prepare();await vi.advanceTimersByTimeAsync(90_001);expect(wakeSignal?.aborted).toBe(false);
+  await vi.advanceTimersByTimeAsync(5_000);expect(await pending).toBe(true);expect(h.calls).toHaveLength(3);
+ });
+ it.each([
+  ['upstream_refused',429,'hibernate-rate-limited'],['timeout',undefined,undefined],['transport_error',undefined,undefined],
+ ])('retains safe terminal classification %s without a payment',async(category,upstreamStatus,renderRouting)=>{
+  const h=harness([asleep,()=>Response.json({ok:false,category,upstreamStatus,renderRouting,durationMs:90_000,paymentAttempted:false},{status:503})]);
+  expect(await h.client.prepare()).toBe(false);expect(h.client.preparationFailure).toMatchObject({httpStatus:503,responseCategory:category,...(upstreamStatus?{upstreamStatus}: {})});
+  expect(h.events).toContainEqual(expect.objectContaining({type:'payer_wake',status:503,responseCategory:category}));expect(h.calls).toHaveLength(2);
+ });
+ it('cancels a silent Worker at the caller deadline without retry',async()=>{
+  vi.useFakeTimers();vi.spyOn(AbortSignal,'timeout').mockImplementation(ms=>{const c=new AbortController();setTimeout(()=>c.abort(new DOMException('timeout','TimeoutError')),ms);return c.signal;});
+  const h=harness([asleep,()=>new Promise((_resolve,reject)=>{h.calls[1]!.init!.signal!.addEventListener('abort',()=>reject(h.calls[1]!.init!.signal!.reason));})]);
+  const pending=h.client.prepare();await vi.advanceTimersByTimeAsync(110_001);expect(await pending).toBe(false);expect(h.client.preparationFailure?.responseCategory).toBe('wake_caller_timeout');expect(h.calls).toHaveLength(2);
+ });
+ it('never retains an oversized or private Worker body',async()=>{
+  const h=harness([asleep,()=>new Response('sensitive'+ 'x'.repeat(5000),{status:503})]);expect(await h.client.prepare()).toBe(false);expect(h.client.preparationFailure).toEqual({httpStatus:503,responseCategory:'schema_mismatch'});expect(JSON.stringify(h.events)).not.toContain('sensitive');
+ });
 });
