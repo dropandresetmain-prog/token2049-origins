@@ -321,5 +321,27 @@
     "liveRows": "all nine NOT RUN",
     "gatewayDeployId": "dep-db592kflk1mc7395p2mg",
     "payerDeployId": "dep-db595f3rjlhs73crrsa0"
+  },
+  "wakeExperiment": {
+    "status": "PREPARED_LOCAL_COLD_NOT_RUN",
+    "authorization": "owner attachment8577f52b, 11 October2026",
+    "workerName": "capsule-payer-wake-experiment",
+    "accountId": "c9e98d4cf5ad6e4eee3a5851d19639a8",
+    "plan": "Free",
+    "planProof": "Authenticated Cloudflare Workers plans dashboard: Free, $0, disabled Current plan button; Paid has Upgrade button",
+    "wranglerVersion": "4.149.0",
+    "secretNames": [
+      "CAPSULE_WAKE_SECRET"
+    ],
+    "destination": "https://t2o-cardano-payer.onrender.com/health",
+    "gatewayIntegrationEnabled": false,
+    "signingEnabled": false,
+    "scheduledTriggers": [],
+    "additionalStorageResources": 0,
+    "requestBudget": {
+      "maxWorkerRequests": 20,
+      "maxRenderHealthRequests": 2,
+      "newPremiumResources": 0
+    }
   }
 }

@@ -1,0 +1,25 @@
+{
+  "name": "capsule-payer-wake-experiment",
+  "main": "worker.ts",
+  "account_id": "c9e98d4cf5ad6e4eee3a5851d19639a8",
+  "compatibility_date": "2026-10-11",
+  "workers_dev": true,
+  "preview_urls": false,
+  "observability": {
+    "enabled": true,
+    "logs": {
+      "enabled": true,
+      "invocation_logs": false
+    }
+  },
+  "ratelimits": [
+    {
+      "name": "WAKE_RATE_LIMITER",
+      "namespace_id": "2026101100",
+      "simple": {
+        "limit": 2,
+        "period": 60
+      }
+    }
+  ]
+}

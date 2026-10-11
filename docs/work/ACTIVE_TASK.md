@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- BLOCKED_TECHNICAL: owner-authorized readiness/cap repair implemented; Render cold admission returns429 hibernate-rate-limited. No activation; owner E2E NOT RUN.
+- WAKE_EXPERIMENT_IN_PROGRESS: owner explicitly authorized one Free authenticated Cloudflare Worker for fixed payer GET/health. Existing cold blocker persists until genuine proof; all payment/customer authority remains disabled.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -22,7 +22,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
 
 ## Constraints and authorization
-- No Cloudflare, replacement OAuth, queue, wake system, paid plan or service per customer/wallet/rail.
+- Only one narrow on-demand Cloudflare wake Worker is authorized (11 October attachment8577f52b). No replacement MCP/commerce/payer/OAuth/database/browser, queue, cron, keep-alive, paid plan or service per customer/wallet/rail.
 - Keys only in payer. Original identities, caps, histories and sponsor roles preserved. Exact quote/digest/funding option/source bind approval.
 - Reservations and signed candidates persist before irreversible calls. Unknown outcomes reconcile the same candidate; merchant attempts are not duplicated.
 - Rail caps remain separate. Applied migrations immutable and additive; historical purchase owners are not reassigned.
@@ -116,7 +116,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action OWNER: send the prepared Render support packet in PAYER_READINESS_REPAIR.md for a supported Free cold-admission correction. PRIMARY then verifies drift/history and cold transport before any activation. No further retry/deploy loop.
+- Next action PRIMARY: verify existing Cloudflare access and actual Free plan; deploy fixed-health diagnostic Worker only; genuine >=15min idle test with independent startup evidence. If FAIL stop disabled. If PASS integrate opt-in preclaim wake, repeat cold proof, narrow independent review and existing conditional activation gates.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 
