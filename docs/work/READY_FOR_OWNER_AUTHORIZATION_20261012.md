@@ -5,8 +5,9 @@
 - Repository: dropandresetmain-prog/token2049-origins.
 - Repair branch: `codex/capsule-e2e-reliability`. Worktree: `C:/Dev/token2049-origins-e2e-reliability`.
 - Base checkpoint: `51ff776dea12adededd832890e8924a0e1936182` (docs: investigate owner E2E outcomes and scoped repair plan).
-- Candidate HEAD: `c3fd5ebf4c48d554f95f0d483973055f9e566e7f` (fix(mcp,console): harden two review findings on the WS2/WS3 invariants).
-- Pushed: yes. `origin/codex/capsule-e2e-reliability` == HEAD == `c3fd5ebf4c48d554f95f0d483973055f9e566e7f`; working tree clean.
+- Deployable CODE candidate: `c3fd5ebf4c48d554f95f0d483973055f9e566e7f` (fix(mcp,console): harden two review findings on the WS2/WS3 invariants) — the last commit touching `src/` or `web/`.
+- Branch tip: the latest commit on `codex/capsule-e2e-reliability`, a documentation-only commit adding this handoff and the ledger update (`git rev-parse origin/codex/capsule-e2e-reliability` is authoritative). Docs-only commits on top of `c3fd5eb` build to an IDENTICAL gateway artifact — `tsconfig.build.json` includes only `src/` + specific `scripts/` (docs/ and tests/ excluded; web/ unchanged) — so deploying the tip or `c3fd5eb` yields the same running gateway.
+- Pushed: yes. `origin/codex/capsule-e2e-reliability` is up to date with the local branch; working tree clean.
 - Commit count base..HEAD: 12. Aggregate diff: 41 files, +1090 / −235 (docs 2, src 18, tests 16, web 5).
 - Main: UNCHANGED at `7c09b37eaaeda2bf3eec94fc1e3456118962f636`.
 - Deployed gateway / consolidated payer / Cloudflare wake Worker: UNCHANGED (read-only reference only; exact deployed SHAs and Render dep-ids are recorded in docs/HANDOFF.md and the ledger). This branch has not been built or deployed.
