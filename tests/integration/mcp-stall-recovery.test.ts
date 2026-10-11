@@ -92,6 +92,24 @@ describe('MCP stalled-operation recovery', () => {
     expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM quotes'))!.n).toBe(1);
   });
 
+  it('reports a transient payer-probe failure at buy as retryable, never as a missing source or a rail switch', async () => {
+    const { quote } = await offerAndQuote();
+    // The quote is executable; at buy time the SAME rail's payer probe fails transiently (503), so the payer is
+    // "unknown right now", not absent. buy must create no purchase, must not switch rails, and must not tell the host
+    // to connect another source or use an external channel — the identical buy is retried later.
+    const down = await session({ statusDown: true, statusTimeoutMs: 400 });
+    const res = await down.call('buy', args(quote));
+    expect(res.isError).toBeFalsy();
+    expect(res.structuredContent.status).toBe('action_required');
+    expect(res.structuredContent.purchase).toBeUndefined();
+    expect(res.structuredContent.unreachablePayerRails).toEqual(['cardano']);
+    expect(res.content[0].text).toMatch(/could not be reached right now/);
+    expect(res.content[0].text).not.toMatch(/Connect a matching source/);
+    expect(res.content[0].text).not.toMatch(/channel for external payment/);
+    expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM purchases'))!.n).toBe(0);
+    expect(h.retail.executeCalls).toBe(0);
+  });
+
   it('persists a late refusal and exposes it from a fresh MCP session without resending', async () => {
     const { quote } = await offerAndQuote();
     let calls = 0;

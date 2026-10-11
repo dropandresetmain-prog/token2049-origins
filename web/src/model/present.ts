@@ -74,7 +74,7 @@ function progressForListItem(item: EvidenceListItem): HumanProgress {
     paymentState: item.paymentState,
     commerceStatus: item.commerceStatus,
     merchantPaymentStatus: item.merchantPaymentStatus,
-    receipt: item.executionEvidenceStatus === 'receipt_issued' ? { funding: item.fundingVerified === false ? [] : [{ paymentState: 'confirmed' }] } : null,
+    receipt: item.executionEvidenceStatus === 'receipt_issued' ? { funding: item.fundingVerified === true ? [{ paymentState: 'confirmed' }] : [] } : null,
     providerReference: null,
     category: item.category,
     route: item.route,

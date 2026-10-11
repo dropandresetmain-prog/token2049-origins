@@ -496,12 +496,19 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const canAttempt = !purchase || (purchase.state === 'awaiting_funding' && purchase.paymentState === 'not_received' && (!purchase.paymentAttempt || (purchase.paymentAttempt.status === 'failed' && purchase.paymentAttempt.retrySafe)));
         if (canAttempt) {
           if (deps.consolidatedBridge || deps.bridges?.length) {
-            const matching = (await connectedPayers(deps)).payers.filter(p => sourceMatches(p.source, option) && (!selectedSourceId || p.source.sourceId === selectedSourceId));
+            const { payers, unreachableRails } = await connectedPayers(deps);
+            const matching = payers.filter(p => sourceMatches(p.source, option) && (!selectedSourceId || p.source.sourceId === selectedSourceId));
             if (matching.length > 1) {
               return failure(deps, 'More than one connected payer claims the selected funding option. Fix the payer configuration. Nothing has been purchased.', { error: { code: 'payer_ambiguous' }, selectedFundingOptionId });
             }
             if (!matching[0]) {
-              return success(deps, 'The connected payer cannot use the selected funding option. Connect a matching source or use a channel for external payment. Nothing has been purchased.', { status: 'action_required', quote, selectedFundingOptionId });
+              // A transient probe failure is "payer unknown right now, retryable" — never "this rail has no payer".
+              // Same rule as describeQuote: keep the selected rail and option, retry the identical buy, never switch or fall back.
+              const transient = unreachableRails.includes(option.rail);
+              return success(deps, transient
+                ? `A payer for the ${option.rail} rail could not be reached right now (transient readiness failure; retryable). Nothing has been purchased and no purchase was created. Repeat buy later with EXACTLY the same arguments to re-check the payer; do not switch to another rail or funding option, and do not describe this rail as unavailable.`
+                : 'The connected payer cannot use the selected funding option. Connect a matching source or use a channel for external payment. Nothing has been purchased.',
+                { status: 'action_required', quote, selectedFundingOptionId, ...(transient ? { unreachablePayerRails: [option.rail] } : {}) });
             }
             if (exceedsHeadroom(option, matching[0].headroom)) {
               return failure(deps, `The connected payer's remaining spend cap (${String(matching[0].headroom)} base units) is below this payment (${option.amount.amountBaseUnits}). It would be refused. Nothing has been purchased and no purchase was created. Choose a cheaper offer, or ask the operator to review the payer cap.`,

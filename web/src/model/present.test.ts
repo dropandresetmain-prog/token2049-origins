@@ -22,6 +22,22 @@ describe('presenters over sample purchases', () => {
     expect(filterRows(vm.rows, 'all', 'bangkok').map((r) => r.title)).toEqual(['One night in Bangkok']);
   });
 
+  it('never treats a receipt from a backend that omits fundingVerified as completed', async () => {
+    const list = await source.listPurchases();
+    // Baseline: this backend reports independently verified funding, so three rows are completed.
+    expect(presentList(list, ctx).counts.completed).toBe(3);
+    // An older backend omits fundingVerified ("treated as unknown"): a receipt alone must not earn a completion
+    // headline. The list gate defaults the unknown direction to unverified, matching the detail/MCP gates.
+    const stripped = presentList(
+      { ...list, entries: list.entries.map((e) => ({ ...e, item: { ...e.item, fundingVerified: undefined } })) },
+      ctx,
+    );
+    expect(stripped.counts.completed).toBe(0);
+    const labels = stripped.rows.map((r) => r.status.label);
+    expect(labels).not.toContain('Order confirmed');
+    expect(labels).not.toContain('Booking confirmed');
+  });
+
   it('never shows a receipt before the merchant confirms', async () => {
     for (const key of ['in-progress', 'checking', 'price-changed', 'awaiting-payment']) {
       expect((await detail(key)).receipt).toBeNull();
