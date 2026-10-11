@@ -294,6 +294,40 @@ describe('hosted MCP: OAuth 2.1 authorization code + PKCE', () => {
     expect(tokens.access_token).toMatch(/^t2o_oat_/);
   });
 
+  it('labels the consent page as a demo-account sign-in with human-readable permissions and one disclosure', async () => {
+    const f = await start();
+    const c = await connect(f);
+    const html = c.html;
+    // (a) The passcode signs in to the protected demo account; it is not a payment password and approves nothing.
+    expect(html).toMatch(/Owner passcode — signs you in to the protected Capsule demo account/);
+    expect(html).toMatch(/not a payment password or a wallet key/);
+    expect(html).toMatch(/does not approve any purchase/);
+    expect(html).toContain('<h1>Sign in to the Capsule demo account</h1>');
+    // (b) No host/chat permission-card assumption: Capsule states only what it itself guarantees.
+    expect(html).not.toContain('explicit approval in the chat');
+    expect(html).not.toMatch(/host (?:shows|renders)|permission card|approval card/i);
+    // (c) Permissions explained in plain language (derived from the requested scopes), alongside the raw codes.
+    expect(html).toContain('<code>offers:read</code>');
+    expect(html).toContain('<code>quotes:write</code>');
+    expect(html).toContain('<code>purchases:write</code>');
+    expect(html).toContain('<code>purchases:read</code>');
+    expect(html).toMatch(/together these let ChatGPT search partner offers, create price quotes, place purchases on behalf of the demo account and read those purchases and their confirmation details back/);
+    expect(html).not.toMatch(/purchases:fund|evidence:read/);
+    // (d) Exactly one sandbox/testnet disclosure; the old duplicate infrastructure sentences are gone.
+    expect(html).not.toContain('bounded Cardano Preprod test wallet');
+    expect(html).not.toContain('No real funds are involved');
+    expect(html.match(/sandbox\/testnet/gi)).toHaveLength(1);
+    expect(html).toMatch(/no real money moves/);
+    // (e) Sign-in and per-purchase approval are visibly separate steps.
+    expect(html).toMatch(/Signing in is not buying/);
+    expect(html).toMatch(/Capsule places one only after you explicitly approve that exact quote and your chosen payment option \(the <code>buy<\/code> approval\)/);
+    // The POST contract fields the consent handler depends on are untouched.
+    expect(html).toMatch(/name="request_id" value="[^"]+"/);
+    expect(html).toContain('<input type="password" name="passcode" required autocomplete="off">');
+    expect(html).toContain('<button type="submit" name="decision" value="approve">Approve</button>');
+    expect(html).toContain('<button type="submit" name="decision" value="deny" formnovalidate>Deny</button>');
+  });
+
   it('refuses a wrong PKCE verifier, a replayed code (revoking its tokens) and a foreign resource', async () => {
     const f = await start();
     const c = await connect(f);

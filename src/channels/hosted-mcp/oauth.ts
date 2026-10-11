@@ -58,6 +58,19 @@ function equalSecrets(a: string, b: string): boolean {
 
 const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]!);
 
+/**
+ * Plain-language meaning of each grantable hosted scope, used only for consent-page copy. The page derives its
+ * permissions sentence from the scopes actually requested, so it stays truthful if the requested set changes.
+ */
+const SCOPE_MEANINGS: ReadonlyArray<readonly [scope: string, meaning: string]> = [
+  ['offers:read', 'search partner offers'],
+  ['quotes:write', 'create price quotes'],
+  ['purchases:write', 'place purchases on behalf of the demo account'],
+  ['purchases:read', 'read those purchases and their confirmation details back'],
+];
+
+const joinPlain = (parts: string[]): string => (parts.length <= 1 ? (parts[0] ?? '') : `${parts.slice(0, -1).join(', ')} and ${parts[parts.length - 1]}`);
+
 export class HostedOAuth implements OAuthServerProvider {
   private readonly now: () => Date;
   private readonly accessTtl: number;
@@ -175,17 +188,20 @@ export class HostedOAuth implements OAuthServerProvider {
 
   private consentHtml(requestId: string, client: OAuthClientInformationFull, scopes: string[], redirectUri: string, error?: string): string {
     const name = escapeHtml(client.client_name ?? 'An MCP client');
-    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Authorize Capsule</title>
+    const meanings = SCOPE_MEANINGS.filter(([scope]) => scopes.includes(scope)).map(([, meaning]) => meaning);
+    const plainEnglish = meanings.length ? `together these let ${name} ${joinPlain(meanings)}` : 'on their own these grant no shopping ability';
+    return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in to Capsule</title>
 <style>body{font:16px/1.5 system-ui,sans-serif;max-width:30rem;margin:3rem auto;padding:0 1rem;color:#111}h1{font-size:1.3rem}code{background:#eee;padding:.1rem .3rem;border-radius:.25rem}
 input{width:100%;padding:.6rem;margin:.4rem 0 1rem;box-sizing:border-box;font-size:1rem}button{padding:.6rem 1.2rem;font-size:1rem;margin-right:.5rem}.err{color:#b00020}.note{color:#555;font-size:.9rem}</style></head>
-<body><h1>Connect ${name} to Capsule</h1>
-<p><strong>${name}</strong> is asking to search offers, create quotes and place <strong>sandbox/testnet</strong> purchases through Capsule on behalf of the hosted demo account.</p>
-<p>Permissions: ${scopes.map((s) => `<code>${escapeHtml(s)}</code>`).join(' ')}</p>
-<p class="note">The approval will be sent to <code>${escapeHtml(new URL(redirectUri).origin)}</code>. Only approve if you started this connection yourself.</p>
-<p class="note">Payments use a bounded Cardano Preprod test wallet. Every purchase still needs your explicit approval in the chat. No real funds are involved.</p>
+<body><h1>Sign in to the Capsule demo account</h1>
+<p><strong>${name}</strong> is asking to sign in as the one hosted Capsule demo account so it can search and shop with you. Approving here connects that session; it does not buy anything by itself.</p>
+<p>Permissions requested: ${scopes.map((s) => `<code>${escapeHtml(s)}</code>`).join(' ')} — ${plainEnglish}.</p>
+<p class="note">Capsule is a sandbox/testnet demo: purchases settle in testnet funds and no real money moves.</p>
+<p><strong>Signing in is not buying.</strong> Each purchase is a separate step: Capsule places one only after you explicitly approve that exact quote and your chosen payment option (the <code>buy</code> approval).</p>
+<p class="note">The result of this sign-in is sent to <code>${escapeHtml(new URL(redirectUri).origin)}</code>. Only approve if you started this connection yourself.</p>
 ${error ? `<p class="err">${escapeHtml(error)}</p>` : ''}
 <form method="post" action="/oauth/consent" autocomplete="off"><input type="hidden" name="request_id" value="${escapeHtml(requestId)}">
-<label>Owner passcode<input type="password" name="passcode" required autocomplete="off"></label>
+<label>Owner passcode — signs you in to the protected Capsule demo account. It is not a payment password or a wallet key, and it does not approve any purchase.<input type="password" name="passcode" required autocomplete="off"></label>
 <button type="submit" name="decision" value="approve">Approve</button><button type="submit" name="decision" value="deny" formnovalidate>Deny</button></form></body></html>`;
   }
 
