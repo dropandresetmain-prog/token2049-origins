@@ -1,6 +1,7 @@
 import { describe, expect, it, vi } from 'vitest';
 import { CATALOG_PROFILE, GLOBAL_CATALOG_ENDPOINT, GlobalCatalogClient, assertLiveIntent, normalizeCatalog, SANDBOX_BOUNDARY } from '../../src/execution/shopify/globalCatalog.js';
 import { shadowPayload } from '../../src/execution/shopify/shadowAdmin.js';
+import { sourceDigest } from '../../src/execution/shopify/shadow.js';
 import type { RetailIntent } from '../../src/contracts/intent.js';
 import type { SourceOffer } from '../../src/contracts/provenance.js';
 import { ManualClock } from '../../src/infrastructure/clock.js';
@@ -39,7 +40,8 @@ describe('Global Catalog UCP normalization', () => {
       merchantUrl: 'https://merchant.example/', productTitle: 'Canvas tote', variantTitle: 'Natural',
       productUrl: 'https://merchant.example/products/tote?variant=101',
       observedPrice: { currency: 'USD', amountMinor: '1999', scale: 2 }, availability: 'available', observedAt,
-      schemaVersion: '2026-08-25', evidenceMode: 'fresh_external' });
+      schemaVersion: '2026-08-25', evidenceMode: 'fresh_external',
+      media: [{ type: 'image', url: 'https://media.example/tote.jpg' }] });
     expect(offer!.executionRef).toEqual({ sourceOffer: offer!.sourceOffer, quantity: 1 });
     expect(offer!.indicativePrice).toEqual(offer!.sourceOffer!.observedPrice);
     expect(offer!.expiresAt).toBe('2026-10-06T12:05:00.000Z');
@@ -122,9 +124,43 @@ describe('Global Catalog UCP normalization', () => {
     expect(offers[0]!.sourceOffer!.variantId).toBe('gid://shopify/ProductVariant/101');
   });
 
-  it('does not retain raw payload, imagery, checkout handles or URL tracking', () => {
+  it('retains genuine variant imagery but not raw payload, checkout handles or URL tracking', () => {
+    const [offer] = normalizeCatalog(catalog(), intent, observedAt);
+    expect(offer!.sourceOffer!.media).toEqual([{ type: 'image', url: 'https://media.example/tote.jpg' }]);
     const serialized = JSON.stringify(normalizeCatalog(catalog(), intent, observedAt));
-    for (const secret of ['raw-secret', 'media.example', 'checkout', 'utm_source', '#details']) expect(serialized).not.toContain(secret);
+    for (const secret of ['raw-secret', 'checkout', 'utm_source', '#details']) expect(serialized).not.toContain(secret);
+  });
+
+  it('filters unsafe or non-image variant media and omits the key entirely', () => {
+    const media = [
+      { type: 'image', url: 'http://insecure.example/a.jpg' },
+      { type: 'video', url: 'https://media.example/v.mp4' },
+      { type: 'image', url: 'https://user:pass@media.example/b.jpg' },
+      { type: 'image', url: 'https://media.example:8443/c.jpg' },
+    ];
+    const [offer] = normalizeCatalog(catalog([variant({ media })]), intent, observedAt);
+    expect(offer!.sourceOffer!.media).toBeUndefined();
+    expect('media' in offer!.sourceOffer!).toBe(false);
+  });
+
+  it('bounds retained genuine variant imagery to 5 items', () => {
+    const media = Array.from({ length: 7 }, (_, i) => ({ type: 'image', url: `https://media.example/img-${i}.jpg` }));
+    const [offer] = normalizeCatalog(catalog([variant({ media })]), intent, observedAt);
+    expect(offer!.sourceOffer!.media).toHaveLength(5);
+  });
+
+  it('keeps sourceDigest stable for media-less offers and changes it when media is added', () => {
+    const base = { source: 'shopify_global_catalog', productId: 'gid://shopify/p/ABC123',
+      variantId: 'gid://shopify/ProductVariant/101', merchantId: 'gid://shopify/Shop/42', merchantName: 'Example merchant',
+      merchantUrl: 'https://merchant.example/', productTitle: 'Canvas tote', variantTitle: 'Natural',
+      productUrl: 'https://merchant.example/products/tote?variant=101',
+      observedPrice: { currency: 'USD', amountMinor: '1999', scale: 2 }, availability: 'available', observedAt,
+      schemaVersion: '2026-08-25', evidenceMode: 'fresh_external' } as const;
+    // A stored media-less offer and the same offer re-parsed with media omitted digest identically (byte-identical JSON).
+    expect(sourceDigest(base as SourceOffer)).toBe(sourceDigest({ ...base } as SourceOffer));
+    // Genuine imagery is a real change to the frozen snapshot, so it digests differently (new offers get new random ids; never collides with a stored mapping).
+    expect(sourceDigest({ ...base, media: [{ type: 'image', url: 'https://media.example/tote.jpg' }] } as SourceOffer))
+      .not.toBe(sourceDigest(base as SourceOffer));
   });
 
   it.each([

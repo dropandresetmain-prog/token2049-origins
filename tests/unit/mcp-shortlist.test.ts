@@ -22,6 +22,11 @@ const withSource = (n: number): OfferView => offer(n, {
   },
 } as Partial<OfferView>);
 
+const withSourceMedia = (n: number, media: Array<{ type: 'image'; url: string }>): OfferView => {
+  const base = withSource(n);
+  return { ...base, sourceOffer: { ...base.sourceOffer!, media } } as OfferView;
+};
+
 async function findOffers(offers: OfferView[], opts: { liveOffers?: OfferView[]; intent?: Record<string, unknown> } = {}) {
   const calls: string[] = [];
   const intents: any[] = [];
@@ -82,6 +87,15 @@ describe('find_offers shortlist and explicit selection', () => {
     expect(second).not.toHaveProperty('merchant');
     expect(Object.keys(second).sort()).toEqual(['category', 'description', 'expiresAt', 'indicativePrice', 'observedAt', 'offerId', 'providerEnvironment', 'route', 'terms', 'title']);
     expect(JSON.stringify(res.structuredContent.shortlist)).not.toMatch(/rating|review|shipping time|delivery|in stock|brand/i);
+  });
+
+  it('surfaces the primary genuine merchant image as imageUrl and omits it without media', () => {
+    const withImage = shortlistOf([withSourceMedia(1, [{ type: 'image', url: 'https://media.example/tote.jpg' }])])[0]!;
+    expect(withImage).toMatchObject({ offerId: 'off_TESTOFFER0001', merchant: 'Merchant 1', imageUrl: 'https://media.example/tote.jpg' });
+    // An offer whose source carries no genuine media simply has no imageUrl; nothing is invented.
+    const noMedia = shortlistOf([withSource(2)])[0]!;
+    expect(noMedia).toHaveProperty('merchant');
+    expect(noMedia).not.toHaveProperty('imageUrl');
   });
 
   it('instructs present -> recommend one -> ask, and makes create_quote explicitly NOT the next action', async () => {

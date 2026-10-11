@@ -10,7 +10,9 @@ export const SourceOffer = z.object({
   merchantId: z.string().regex(/^gid:\/\/shopify\/Shop\/\d+$/),
   merchantName: z.string().min(1).max(200), merchantUrl: safeSourceUrl(),
   productTitle: z.string().min(1).max(250), variantTitle: z.string().min(1).max(250),
-  productUrl: safeSourceUrl(), observedPrice: Money,
+  productUrl: safeSourceUrl(),
+  media: z.array(z.object({ type: z.literal('image'), url: safeSourceUrl() }).strict()).max(5).optional(),
+  observedPrice: Money,
   availability: z.literal('available'), observedAt: z.iso.datetime(),
   schemaVersion: z.literal('2026-08-25'), evidenceMode: EvidenceMode,
 }).strict();

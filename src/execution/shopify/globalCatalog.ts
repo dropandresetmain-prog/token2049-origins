@@ -36,6 +36,14 @@ function sourceUrl(value: string) {
   if (variant && /^\d+$/.test(variant)) url.searchParams.set('variant', variant);
   return url.toString();
 }
+/** Genuine variant imagery is display-only; keep only safe https images that mirror the SourceOffer media rule. Never fetched. */
+function isSafeMediaUrl(value: string) {
+  try {
+    if (value.length > 2000) return false;
+    const url = new URL(value);
+    return url.protocol === 'https:' && !url.username && !url.password && !url.port;
+  } catch { return false; }
+}
 export function normalizeCatalog(raw: unknown, value: PurchaseIntent, observedAt: string, fixture = false): ProviderOffer[] {
   const intent = assertLiveIntent(value);
   const payload = CatalogResponse.parse(raw);
@@ -49,12 +57,15 @@ export function normalizeCatalog(raw: unknown, value: PurchaseIntent, observedAt
         BigInt(v.price.amount) > MAX_SOURCE_ITEM_MINOR || BigInt(v.price.amount) > BigInt(intent.spendCeiling.amountMinor) ||
         v.requires?.selling_plan || v.requires?.components || seen.has(v.id)) continue;
     try {
+      const images = (v.media ?? []).filter(m => m.type === 'image' && isSafeMediaUrl(m.url)).slice(0, 5)
+        .map(m => ({ type: 'image' as const, url: m.url }));
       const source = SourceOffer.parse({ source: 'shopify_global_catalog', productId: product.id, variantId: v.id,
         merchantId: v.seller.id, merchantName: v.seller.name, merchantUrl: sourceUrl(v.seller.url),
         productTitle: product.title, variantTitle: v.title, productUrl: sourceUrl(v.url ?? product.url ?? ''),
         observedPrice: { currency: v.price.currency, amountMinor: String(v.price.amount), scale: 2 },
         availability: 'available', observedAt, schemaVersion: payload.ucp.version,
-        evidenceMode: fixture ? 'local_fixture' : 'fresh_external' });
+        evidenceMode: fixture ? 'local_fixture' : 'fresh_external',
+        ...(images.length ? { media: images } : {}) });
       result.push({ title: source.productTitle, description: 'Live source offer; execution uses Capsule Shopify Sandbox.',
         indicativePrice: source.observedPrice, terms: [SANDBOX_BOUNDARY, 'Source item price excludes Capsule sandbox shipping and tax.'],
         executionRef: { sourceOffer: source, quantity: 1 }, sourceOffer: source,

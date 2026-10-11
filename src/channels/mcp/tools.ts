@@ -199,7 +199,7 @@ export function shortlistOf(offers: OfferView[]) {
     providerEnvironment: o.providerEnvironment,
     indicativePrice: formatMinor(o.indicativePrice),
     ...(o.searchConversion ? { searchConversion: o.searchConversion } : {}),
-    ...(o.sourceOffer ? { merchant: o.sourceOffer.merchantName, productUrl: o.sourceOffer.productUrl, variant: o.sourceOffer.variantTitle, availability: o.sourceOffer.availability } : {}),
+    ...(o.sourceOffer ? { merchant: o.sourceOffer.merchantName, productUrl: o.sourceOffer.productUrl, variant: o.sourceOffer.variantTitle, availability: o.sourceOffer.availability, ...(o.sourceOffer.media?.length ? { imageUrl: o.sourceOffer.media[0]!.url } : {}) } : {}),
     terms: o.terms.slice(0, 5),
     expiresAt: o.expiresAt,
     observedAt: o.sourceObservedAt,
