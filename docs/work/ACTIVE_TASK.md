@@ -16,7 +16,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Gateway 86f519450b1d61d5c42f8bbadb685b49f01ea798; payer3945f9c52cf76e1960569d53416361bcd42de175; signing=true,3source/instance grants enabled, saved customer commerce scope restored after gates.
 - Canonical gateway Git fingerprint: 50029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
 - Initial Worker checkpoint9ee0e7d preserved; gateway integration runtime pinned86f519450b1d61d5c42f8bbadb685b49f01ea798. Final Worker sourceeeef8952a218b811f193c580d0a2b12bcdb155cd; deployed version00ee6d4a-afdd-4807-ad05-f46d33fa1986; moduleSHAdc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15.
-- Gateway dep-db5kvf142hec739b8940 and activated same payer dep-db5la02jnfac73ast890 LIVE/Free; final source/proof/OAuth PASS.
+- Gateway dep-db5q9jdckfvc73b35c50 (same86f5194; owner-authorized passphrase rotation) and activated same payer dep-db5la02jnfac73ast890 LIVE/Free; final source/proof/OAuth PASS.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
@@ -33,6 +33,12 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Conditional activation permission exercised only after history, ownership, fencing and hosted readiness passed.
 - Latest owner authorization permits the narrow repair through deployment/readiness and aligning Solana/Sui token/commercial per-payment/daily/cumulative caps to Cardano (5,100,000 units / USD5,100 at1:1000). Chain gas/fee caps remain separate. No agent broadcast, funding, provider writes or merchant payment.
 - Three owner incident rows failed before recorded signing; all expired with unsafe handoffs. Do not retry or mutate them. Remaining live rows NOT RUN.
+
+## Owner passcode follow-up
+- Owner requested a privately generated memorable passphrase; only the gateway owner-passcode secret changed, with the same86f5194 revision redeployed.
+- Old passcode HTTP401; new passphrase consent/PKCE/MCP initialize/tool discovery PASS using purchases:read only. Non-OAuth table hashes, all gateway environment variables and payer deployment unchanged. No payment or merchant call.
+- Passphrase copied privately to the owner clipboard; protected local file remains the retrieval source. No credential value or digest retained in Git.
+- Protected evidence: ~/.capsule/neon-migration-20261011/owner-passcode-rotation-20261011. Owner E2E remains NOT RUN.
 
 ## Current repair checklist
 - [x] Authenticated selected-payer transport readiness before durable claim; useful bounded progress and expiry recheck.

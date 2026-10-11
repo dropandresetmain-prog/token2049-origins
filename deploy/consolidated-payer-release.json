@@ -305,7 +305,7 @@
     },
     "payerSha": "3945f9c52cf76e1960569d53416361bcd42de175",
     "payerCanonicalGitSourceFingerprint": "addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46",
-    "gatewayDeployId": "dep-db5kvf142hec739b8940",
+    "gatewayDeployId": "dep-db5q9jdckfvc73b35c50",
     "coldFirstCheck": {
       "idleSeconds": 978.981,
       "outerHttpStatus": 503,
@@ -348,6 +348,16 @@
       "oldSignersFenced": true,
       "chainBroadcasts": 0,
       "providerWrites": 0
+    },
+    "ownerPasscodeRotation": {
+      "verifiedAt": "2026-10-11T15:03:54.402Z",
+      "sameGatewaySha": "86f519450b1d61d5c42f8bbadb685b49f01ea798",
+      "previousGatewayDeployId": "dep-db5kvf142hec739b8940",
+      "oldPasscodeRejected": true,
+      "newPasscodeAccepted": true,
+      "financialStateUnchanged": true,
+      "payerUnchanged": true,
+      "mcpDiscovery": true
     }
   },
   "previousHostedAcceptance": {
