@@ -105,6 +105,8 @@ export const QuoteView = z
     /** merchantTotal + serviceFee: the amount purchase funding must cover. */
     payablePrincipal: Money,
     displayConversion: DisplayConversion.optional(),
+    /** The user's originally stated budget (flight/hotel USD-input contract); a preserved reference, never a bound. */
+    originalBudget: Money.optional(),
     fundingOptions: z.array(FundingOption),
     fulfillmentSummary: z.string(),
     terms: z.array(z.string()),
@@ -218,6 +220,8 @@ export const ReceiptView = z
     evidenceMode: EvidenceMode,
     principal: Money,
     displayConversion: DisplayConversion.optional(),
+    /** The user's originally stated budget (flight/hotel USD-input contract); a preserved reference, never a bound. */
+    originalBudget: Money.optional(),
     serviceFee: Money,
     funding: z.array(FundingSummary),
     /** Frozen selected requirement, retained after funding and completion. */
@@ -272,6 +276,8 @@ export const PurchaseView = z
     merchantPaymentStatus: MerchantPaymentStatus,
     payablePrincipal: Money,
     displayConversion: DisplayConversion.optional(),
+    /** The user's originally stated budget (flight/hotel USD-input contract); a preserved reference, never a bound. */
+    originalBudget: Money.optional(),
     fundingInstructions: FundingInstructions.nullable(),
     funding: z.array(FundingSummary),
     /** Frozen selected requirement, retained after funding and completion. */

@@ -277,6 +277,13 @@ export class CommerceCore {
       displayConversion = { ...searchConversion, convertedPayable: budgetPayable };
     }
     if (intent.spendCeiling.currency !== budgetPayable.currency || intent.spendCeiling.scale !== budgetPayable.scale) {
+      // Flight/hotel have no FX path: the host must send the budget as exact USD. Make that legible without
+      // weakening the retail FX enforcement above or the generic currency/scale guard for other cases.
+      if ((intent.category === 'flight' || intent.category === 'hotel') && intent.spendCeiling.currency !== budgetPayable.currency) {
+        throw new CoreError('invalid_request', `flight and hotel budgets must be provided as exact ${budgetPayable.currency} (the host converts the user's stated budget and may pass originalBudget as a reference); Capsule does not convert FX for flight/hotel`, {
+          quoteCurrency: payable.currency,
+        });
+      }
       throw new CoreError('invalid_request', 'spend ceiling currency/scale does not match the provider quote', {
         quoteCurrency: payable.currency,
       });
@@ -300,6 +307,7 @@ export class CommerceCore {
       serviceFee: fee,
       payable,
       ...(displayConversion ? { displayConversion } : {}),
+      ...(intent.originalBudget ? { originalBudget: intent.originalBudget } : {}),
       fundingOptions,
       fulfillment,
       executionRef: pq.executionRef,
@@ -322,6 +330,7 @@ export class CommerceCore {
       serviceFee: fee,
       payablePrincipal: payable,
       ...(displayConversion ? { displayConversion } : {}),
+      ...(intent.originalBudget ? { originalBudget: intent.originalBudget } : {}),
       fundingOptions,
       fulfillmentSummary: pq.fulfillmentSummary,
       terms: pq.terms,

@@ -2,7 +2,7 @@ import { afterEach, describe, expect, it, vi } from 'vitest';
 import { startHarness, retailFulfillment, retailIntent, type Harness } from '../support/harness.js';
 import { GlobalSandboxExecutor } from '../../src/execution/shopify/globalSandbox.js';
 import { FrankfurterClient, FX_UNAVAILABLE } from '../../src/integrations/frankfurter/client.js';
-import { money } from '../../src/contracts/money.js';
+import { money, type Money } from '../../src/contracts/money.js';
 import { PurchaseView, QuoteView, ReceiptView } from '../../src/contracts/commerce.js';
 import { digestOf } from '../../src/infrastructure/ids.js';
 import { orderConfirmation, describeQuote } from '../../src/channels/mcp/tools.js';
@@ -48,6 +48,8 @@ describe('SGD budget with USD merchant and unchanged funding', () => {
     expect(q.payablePrincipal).toEqual(money('USD', '4319'));
     expect(q.displayConversion?.convertedPayable).toEqual(money('SGD', '5615'));
     expect(q.displayConversion?.snapshot).toEqual(o.searchConversion.snapshot);
+    // Retail preserves the original via displayConversion.userBudget, so it never sets originalBudget.
+    expect(q.originalBudget).toBeUndefined();
     expect(q.fundingOptions[0]?.settlement?.commercialTotal).toEqual(money('USD', '4319'));
     expect(q.fundingOptions[0]?.amount.amountBaseUnits).toBe('43190'); // 0.043190 tUSDM under 1:1000
     const stored = await h.gw.db.get<{ fulfillment_json: string; execution_ref_json: string }>('SELECT * FROM quotes WHERE id=$1', q.quoteId);
@@ -129,5 +131,88 @@ describe('SGD budget with USD merchant and unchanged funding', () => {
     const s = await search(); expect(s.status).toBe(503);
     expect(s.body.error.message).toBe(FX_UNAVAILABLE); expect(searchSpy).not.toHaveBeenCalled();
     expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM offers'))!.n).toBe(0);
+  });
+});
+
+describe('flight/hotel budgets are exact USD with a preserved originalBudget reference', () => {
+  const flightFulfillment = {
+    category: 'flight',
+    contact: { familyName: 'Tan', givenName: 'Wei', email: 'wei@example.com', mobile: '8000-12345678' },
+    passengers: [{ familyName: 'Tan', givenName: 'Wei', gender: 'M', birthday: '1990-01-01', nationality: 'SG', passengerType: 'adult' }],
+  };
+  const flightIntent = (ceiling: Money, originalBudget?: Money) => ({
+    category: 'flight', from: 'SIN', to: 'LHR', departDate: '2026-12-01', adults: 1,
+    spendCeiling: ceiling, ...(originalBudget ? { originalBudget } : {}),
+  });
+
+  async function setupFlight() {
+    h = await startHarness({ settlementPolicy: { mode: 'scaled_testnet', numerator: 1, denominator: 1000 } });
+    const search = (intent: unknown) => h.call('POST', '/v1/offers/search', { token: h.alice.token, body: { intent } });
+    const quote = (offerId: string) => h.call('POST', '/v1/quotes', { token: h.alice.token, body: { offerId, fulfillment: flightFulfillment } });
+    return { search, quote };
+  }
+
+  it('quotes exact USD with an SGD originalBudget reference, binds it to the digest, and copies it to purchase + receipt', async () => {
+    const { search, quote } = await setupFlight();
+    const s = await search(flightIntent(money('USD', '20000'), money('SGD', '27000')));
+    expect(s.status).toBe(200);
+    const response = await quote(s.body.offers[0].offerId);
+    expect(response.status).toBe(201);
+    const q = QuoteView.parse(response.body.quote);
+    expect(q.payablePrincipal).toEqual(money('USD', '15000'));
+    // Flight has no FX path: no displayConversion, and the SGD originalBudget is a preserved reference only.
+    expect(q.displayConversion).toBeUndefined();
+    expect(q.originalBudget).toEqual(money('SGD', '27000'));
+    const stored = await h.gw.db.get<{ fulfillment_json: string; execution_ref_json: string }>('SELECT * FROM quotes WHERE id=$1', q.quoteId);
+    const terms = { quoteId: q.quoteId, customerId: q.customerId, offerId: q.offerId, route: q.route, merchantTotal: q.merchantTotal,
+      serviceFee: q.serviceFee, payable: q.payablePrincipal, originalBudget: q.originalBudget, fundingOptions: q.fundingOptions,
+      fulfillment: JSON.parse(stored!.fulfillment_json), executionRef: JSON.parse(stored!.execution_ref_json), expiresAt: q.expiresAt };
+    expect(digestOf(terms)).toBe(q.digest);
+    // The reference is bound into the immutable digest: swapping it after approval changes the digest.
+    expect(digestOf({ ...terms, originalBudget: money('SGD', '99999') })).not.toBe(q.digest);
+    const qText = describeQuote(q, []);
+    expect(qText).toContain('Your original budget: 270.00 SGD');
+    expect(qText).toContain('the reference is preserved, not charged');
+
+    const p = await h.call('POST', '/v1/purchases', { token: h.alice.token, headers: { 'idempotency-key': 'flight-original-budget' },
+      body: { quoteId: q.quoteId, approval: { maxTotal: q.payablePrincipal, quoteDigest: q.digest, selectedFundingOptionId: q.fundingOptions[0]!.fundingOptionId } } });
+    expect(p.status).toBe(201);
+    expect(PurchaseView.parse(p.body.purchase).originalBudget).toEqual(money('SGD', '27000'));
+    const id = p.body.purchase.purchaseId;
+    expect((await h.call('POST', `/v1/purchases/${id}/fund`, { token: h.alice.token, headers: { 'payment-signature': `fixture:flight-proof:${q.fundingOptions[0]!.amount.amountBaseUnits}` } })).status).toBe(202);
+    // Flight completion presentation requires the ticketed proof status.
+    const execute = h.flight.execute.bind(h.flight), retrieve = h.flight.retrieve.bind(h.flight);
+    vi.spyOn(h.flight, 'execute').mockImplementation(async ctx => { const r = await execute(ctx); return r.kind === 'succeeded' ? { ...r, commerceStatus: 'ticketed' } : r; });
+    vi.spyOn(h.flight, 'retrieve').mockImplementation(async ctx => { const r = await retrieve(ctx); return r.kind === 'succeeded' ? { ...r, commerceStatus: 'ticketed' } : r; });
+    await h.gw.worker.tick();
+    const done = PurchaseView.parse((await h.call('GET', `/v1/purchases/${id}`, { token: h.alice.token })).body.purchase);
+    expect(done.state).toBe('succeeded');
+    expect(ReceiptView.parse(done.receipt).originalBudget).toEqual(money('SGD', '27000'));
+    expect(orderConfirmation(done)?.originalBudget).toBe('270.00 SGD');
+    const server = createMcpServer({ gatewayUrl: h.url, gatewayToken: h.alice.token });
+    const [a, b] = InMemoryTransport.createLinkedPair();
+    const client = new Client({ name: 'flight-fixture', version: '0' });
+    await Promise.all([server.connect(a), client.connect(b)]);
+    try {
+      const result = await client.callTool({ name: 'get_purchase', arguments: { purchaseId: id } }) as CallToolResult;
+      const text = result.content.find(c => c.type === 'text')?.text ?? '';
+      expect(text).toContain('TICKET ISSUED');
+      expect(text).toContain('Your original budget: 270.00 SGD');
+      // The reference line adds no second sandbox/testnet/demo disclosure to the confirmation.
+      expect(text).not.toMatch(/sandbox|testnet|Demo transaction/i);
+    } finally { await client.close(); await server.close(); }
+  });
+
+  it('rejects a non-USD flight spend ceiling with the legible USD-input error, not an opaque mismatch', async () => {
+    const { search, quote } = await setupFlight();
+    const s = await search(flightIntent(money('SGD', '27000')));
+    expect(s.status).toBe(200);
+    const q = await quote(s.body.offers[0].offerId);
+    expect(q.status).toBe(400);
+    expect(q.body.error.code).toBe('invalid_request');
+    expect(q.body.error.message).toContain('flight and hotel budgets must be provided as exact USD');
+    expect(q.body.error.message).toContain('Capsule does not convert FX for flight/hotel');
+    expect(q.body.error.details.quoteCurrency).toBe('USD');
+    expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM quotes'))!.n).toBe(0);
   });
 });

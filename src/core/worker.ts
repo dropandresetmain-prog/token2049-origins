@@ -632,6 +632,7 @@ export class Worker {
       evidenceMode,
       principal: qv.merchantTotal,
       ...(qv.displayConversion ? { displayConversion: qv.displayConversion } : {}),
+      ...(qv.originalBudget ? { originalBudget: qv.originalBudget } : {}),
       fundingRequirement: fundingRequirementView(JSON.parse(p.funding_requirement_json) as FundingRequirementRecord),
       serviceFee: qv.serviceFee,
       funding,

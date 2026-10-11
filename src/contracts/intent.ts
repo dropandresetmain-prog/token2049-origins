@@ -9,6 +9,14 @@ const Iata = z.string().regex(/^[A-Z]{3}$/, 'IATA code');
 const common = {
   /** Original user budget; supported FX paths check exact payable against it using frozen reference evidence. */
   spendCeiling: Money,
+  /**
+   * The user's originally stated budget in their own currency, when the host converted it to the spendCeiling
+   * currency (the flight/hotel USD-input contract: flight/hotel budgets are received/approved as exact USD and
+   * Capsule performs no FX for them). Preserved as a reference only; it never relaxes the spendCeiling bound and
+   * is bound into the quote digest so it cannot be swapped after approval. Retail leaves it unset because
+   * displayConversion.userBudget already preserves the original budget for the retail FX path.
+   */
+  originalBudget: Money.optional(),
   /** Optional route pin; otherwise the category default route is used. */
   route: ProviderRoute.optional(),
   objective: z.string().max(500).optional(),

@@ -272,6 +272,9 @@ export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms:
       'FX reference: Frankfurter, ' + q.displayConversion.snapshot.referenceDate + '; 1 ' + q.displayConversion.snapshot.from + ' = ' + q.displayConversion.snapshot.rate + ' ' + q.displayConversion.snapshot.to + '.',
       'Approve the exact USD merchant quote and an explicit funding option. SGD is a budget/display reference only. Pass payablePrincipal as maxTotal. This FX reference is frozen.',
     ] : []),
+    ...(q.originalBudget ? [
+      'Your original budget: ' + formatMinor(q.originalBudget) + ' (this quote is in exact USD; the reference is preserved, not charged).',
+    ] : []),
     delivery ?? 'Fulfillment: ' + q.fulfillmentSummary,
     ...q.terms.filter(t => !ENVIRONMENT_TERM.test(t)).map(t => 'Terms: ' + t),
     'Expires ' + q.expiresAt + '.',
@@ -327,6 +330,7 @@ export function orderConfirmation(p: PurchaseView, publicBaseUrl?: string): Reco
     principal: formatMinor(r.principal),
     serviceFee: formatMinor(r.serviceFee),
     ...(r.displayConversion ? { displayConversion: r.displayConversion } : {}),
+    ...(r.originalBudget ? { originalBudget: formatMinor(r.originalBudget) } : {}),
     ...(publicBaseUrl ? { proofUrl: `${publicBaseUrl.replace(/\/+$/, '')}/console/#/purchases/${encodeURIComponent(p.purchaseId)}` } : {}),
     payments: verified.map((f) => ({ rail: f.rail, network: f.network, transferReference: f.transferReference, verifiedAt: f.verifiedAt })),
     evidenceRefs: r.evidenceRefs,
@@ -351,6 +355,9 @@ function confirmationText(c: Record<string, unknown>): string {
     ...(c.displayConversion ? [
       'Your reference budget equivalent (including service fee): about ' + formatMinor((c.displayConversion as NonNullable<QuoteView['displayConversion']>).convertedPayable) +
       ' · Frankfurter, ' + (c.displayConversion as NonNullable<QuoteView['displayConversion']>).snapshot.referenceDate,
+    ] : []),
+    ...(c.originalBudget ? [
+      'Your original budget: ' + String(c.originalBudget) + ' (this quote is in exact USD; the reference is preserved, not charged).',
     ] : []),
     `End your reply with "${c.headline as string}" followed by these references.`,
   ].join('\n');
@@ -383,7 +390,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     {
       title: 'Find offers',
       description:
-        'Search supported retail, hotel and flight offers from a structured purchase intent (retail searches the live product catalog by default). Interpret S$, SGD, Singapore dollar and Singapore dollars as spendCeiling.currency="SGD", scale=2; preserve the user budget. Retail provider prices remain USD; FX reference is for search/budget/display only. Results are indicative and NOT executable. Nothing is bought or reserved. Afterwards present the best 3 options to the user, mark one "Recommended" with a short reason, and let the user choose before calling create_quote.',
+        'Search supported retail, hotel and flight offers from a structured purchase intent (retail searches the live product catalog by default). For RETAIL, interpret S$, SGD, Singapore dollar and Singapore dollars as spendCeiling.currency="SGD", scale=2; preserve the user budget. Retail provider prices remain USD; FX reference is for search/budget/display only. For FLIGHT and HOTEL, convert the user\'s budget to exact USD (spendCeiling.currency="USD", scale 2) — Capsule does NOT convert FX for flight/hotel — and pass the user\'s original stated budget as `originalBudget` so it is preserved and shown back. Results are indicative and NOT executable. Nothing is bought or reserved. Afterwards present the best 3 options to the user, mark one "Recommended" with a short reason, and let the user choose before calling create_quote.',
       inputSchema: { intent: PurchaseIntentDraft },
       annotations: { readOnlyHint: true, destructiveHint: false, openWorldHint: true },
       ...securityMeta(deps, 'find_offers'),
