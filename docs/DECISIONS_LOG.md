@@ -1,5 +1,9 @@
 # Capsule decisions log
 
+## 11 October2026 — final independent cold diagnostic
+
+Owner authorized one additional direct fixed-health diagnostic, retaining all payment authority disabled. Worker upstream90s and independent caller110s separate terminal classification from client cancellation. Actual cold request after91minutes passed200 with independent startup in33.135s; canonical histories unchanged. This successful duration is below the old75s deadline and does not establish a fix for intermittent ingress. Production gateway remains unchanged; separately budget its nested preparation deadlines and two fresh integrated cold cycles before reconsidering activation. [Exact evidence](architecture/PAYER_READINESS_REPAIR.md).
+
 ## 11 October 2026 — owner-authorized fixed health wake
 
 A demonstrated Render gateway-to-sleeping-payer refusal (429 with x-render-routing:hibernate-rate-limited) blocks authenticated preparation. The owner explicitly authorized one Free Cloudflare Worker that calls only the existing payer GET/health from an external origin. A genuine cold diagnostic PASS preceded gateway integration; the first deployed integrated cold check also passes. The second integrated check FAILED (974.361s idle, direct429,75s client timeout, outer503, no payer startup). Stop under the owner failure rule; do not activate based on warm-only or intermittent success. Preserve the disabled candidate and exact evidence. Final Worker upstream status is unknown because the gateway cancelled before receiving its response.

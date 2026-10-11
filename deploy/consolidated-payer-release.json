@@ -254,7 +254,7 @@
       "chainBroadcasts": 0
     },
     "quotaEvidence": "Authenticated Render billing dashboard 11 October13:55SG: Hobby/no card/USD0,672.77hours/434pipeline minutes/~4.885GB remaining; shared rounded counters.",
-    "status": "BLOCKED_TECHNICAL_WAKE_REPEATED_COLD_FAILED_SIGNING_DISABLED",
+    "status": "COLD_WORKER_DIAGNOSTIC_PASS_INTEGRATED_PENDING_SIGNING_DISABLED",
     "candidateSha": "b122186ceaadc36cb75abb4fb986cde7423a3046",
     "canonicalGitSourceFingerprint": "ef0291f957939be981e7247b081263820b78c0bf7cac03ae33fb9b6be17fb942",
     "fingerprintBasis": "sorted tracked path NUL canonical Git blob bytes NUL",
@@ -307,7 +307,7 @@
       "paymentAttempted": false
     },
     "finalBoundaryTests": 8,
-    "lastVerifiedAt": "2026-10-11T06:23:52.013Z"
+    "lastVerifiedAt": "2026-10-11T08:04:42.017Z"
   },
   "previousHostedAcceptance": {
     "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",
@@ -329,7 +329,7 @@
     "payerDeployId": "dep-db595f3rjlhs73crrsa0"
   },
   "wakeExperiment": {
-    "status": "BLOCKED_TECHNICAL_SECOND_INTEGRATED_COLD_FAILED",
+    "status": "COLD_WORKER_DIAGNOSTIC_PASS_INTEGRATED_REPEATABILITY_PENDING",
     "authorization": "owner attachment8577f52b, 11 October2026",
     "workerName": "capsule-payer-wake-experiment",
     "accountId": "c9e98d4cf5ad6e4eee3a5851d19639a8",
@@ -347,11 +347,18 @@
     "requestBudget": {
       "maxWorkerRequests": 20,
       "maxRenderHealthRequests": 3,
-      "newPremiumResources": 0
+      "newPremiumResources": 0,
+      "ownerAdditionalFinalDiagnostic": {
+        "authorizedWorkerRequests": 1,
+        "usedWorkerRequests": 1,
+        "authorizedHealthRequests": 1,
+        "usedHealthRequests": 1,
+        "warmReadbacksUsed": 0
+      }
     },
     "workerUrl": "https://capsule-payer-wake-experiment.dropandreset-main.workers.dev",
-    "versionId": "f416f62f-6fb2-4026-851a-caafca88c33b",
-    "deployedModuleSha256": "e40e3110bdf403c1e0acb60b5493894aa27a3c28d10167e33a17b53775ac1450",
+    "versionId": "00ee6d4a-afdd-4807-ad05-f46d33fa1986",
+    "deployedModuleSha256": "dc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15",
     "firstCold": {
       "started": "2026-10-11T05:43:50.508Z",
       "idleSeconds": 982.281,
@@ -417,6 +424,39 @@
       "p99MemoryMB": 1.58,
       "exactAccountRequestsRemaining": "not measured"
     },
-    "nextAction": "Stop activation and runtime experiments. Preserve disabled candidate; resolve upstream cold-start versus equal deadline cancellation using read-only evidence/support or separately authorized bounded diagnostic."
+    "nextAction": "Report single direct PASS. Separately budget nested gateway preparation and two genuine cold integrated cycles; keep all authority disabled. No payment or automatic activation.",
+    "previousVersionId": "f416f62f-6fb2-4026-851a-caafca88c33b",
+    "previousDeployedModuleSha256": "e40e3110bdf403c1e0acb60b5493894aa27a3c28d10167e33a17b53775ac1450",
+    "finalDiagnostic": {
+      "sourceSha": "eeef8952a218b811f193c580d0a2b12bcdb155cd",
+      "workerDeploymentId": "22ac89a7-f73b-4387-bcab-472e4394687a",
+      "startedAt": "2026-10-11T08:04:03.216Z",
+      "completedAt": "2026-10-11T08:04:36.351Z",
+      "verifiedAt": "2026-10-11T08:04:42.017Z",
+      "idleSeconds": 5506.843,
+      "upstreamDeadlineMs": 90000,
+      "callerDeadlineMs": 110000,
+      "callerElapsedMs": 33135,
+      "workerUpstreamElapsedMs": 32408,
+      "workerHttpStatus": 200,
+      "upstreamHttpStatus": 200,
+      "category": "upstream_2xx",
+      "renderRouting": "none",
+      "independentStartup": true,
+      "startupAt": "2026-10-11T08:04:27.933858715Z",
+      "historyUnchanged": true,
+      "comparedNonOAuthTables": 40,
+      "signingDisabled": true,
+      "grantsDisabled": true,
+      "customerWritesDisabled": true,
+      "chainBroadcasts": 0,
+      "providerWrites": 0
+    },
+    "gatewayTimeoutBoundary": {
+      "deployedWakeCallerMs": 75000,
+      "deployedPreparationMs": 90000,
+      "currentWorkerUpstreamMs": 90000,
+      "integratedNesting": "not yet corrected/deployed/verified"
+    }
   }
 }

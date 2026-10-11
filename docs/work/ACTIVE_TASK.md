@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- FINAL_COLD_DIAGNOSTIC_AUTHORIZED: owner permits one independent fixed-health request with nested90s/110s deadlines. No activation; payment/customer authority stays disabled.
+- COLD_WORKER_DIAGNOSTIC_PASS — INTEGRATED REPEATABILITY PENDING: one direct90s/110s diagnostic returned200/33.135s with independent startup. No activation; payment/customer authority stays disabled.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -13,10 +13,10 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Remote: https://github.com/dropandresetmain-prog/token2049-origins.git.
 - Main verified unchanged: 7c09b37eaaeda2bf3eec94fc1e3456118962f636.
 - Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
-- Gateway deployed b122186ceaadc36cb75abb4fb986cde7423a3046; retained payer3945f9c52cf76e1960569d53416361bcd42de175; signing/grants/customer writes disabled; second integrated cold failed, activation stopped.
+- Gateway deployed b122186ceaadc36cb75abb4fb986cde7423a3046; retained payer3945f9c52cf76e1960569d53416361bcd42de175; signing/grants/customer writes disabled; second integrated cold failed; final direct90s diagnostic PASS, integrated repeatability still pending.
 - Canonical gateway Git fingerprint: ef0291f957939be981e7247b081263820b78c0bf7cac03ae33fb9b6be17fb942; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
-- Worker checkpoint9ee0e7d pushed; gateway integration replacement resolve git rev-parse HEAD. Worker deployed versionf416f62f, canonical moduleSHAe40e3110bdf403c1e0acb60b5493894aa27a3c28d10167e33a17b53775ac1450.
-- Normal gateway dep-db5ibrd9fdbs73d067p0 live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation stopped under owner failure rule.
+- Initial Worker checkpoint9ee0e7d preserved; gateway integration runtime pinnedb122186. Final Worker sourceeeef8952a218b811f193c580d0a2b12bcdb155cd; deployed version00ee6d4a-afdd-4807-ad05-f46d33fa1986; moduleSHAdc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15.
+- Normal gateway dep-db5ibrd9fdbs73d067p0 live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation remains stopped; final direct diagnostic PASS is not repeated integrated acceptance.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
@@ -41,13 +41,13 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
 - [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
 - [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: gatewayb122186/payer3945live normal/disabled; first integrated cold993.28s idle/34.250s PASS; second974.361s idle FAILED06:20:40UTC,429 then75s wake-client timeout/outer503, no startup through06:23:52UTC. Cold429 retries and identified UA fail; unauthenticatedhealth confirms x-render-routing hibernate-rate-limited.175integrated/85affected/8finaltests,6gateassertions,builds and OAuth16PASS;44table history unchanged.
+- Current checkpoint: final direct diagnostic08:04UTC PASS after5506.843s idle, upstream200/routing none32.408s, caller33.135s, independent startup. Prior second integrated429/75s cancellation remains unresolved; gatewayb122186/payer3945 unchanged, authority off,40non-OAuth tables unchanged.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
 - UNKNOWN: exact historical ingress HTTP status; inactive payer is leading hypothesis, not definitive cause.
 
-- [x] Final diagnostic nesting21Worker tests/typecheck/Wrangler dry bundle/default-deny runner PASS; preflight08:01UTC verifies exact old Worker/content, disabled authority and40non-OAuth tables unchanged; no wake made yet.
+- [x] Final diagnostic21Worker tests/typecheck/default-deny PASS; actual deployed module equals dry bundle.08:04UTC one direct request after5506.843s idle: Worker200/upstream200JSON/routing none,32.408s upstream/33.135s caller; Render startup08:04:27.933UTC.40non-OAuth hashes/authority unchanged.
 - [x] Wake boundary19tests/local workerd/independent review; gateway135affected unit tests and68native PostgreSQL/MCP integration tests/typecheck/build PASS; independent extension no code blocker, including9fixture combinations and unclaimed wake failure/ambiguousPOST protection.
 
 ## Implementation and local verification
@@ -114,13 +114,13 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - No card on file verified: excess use stops builds/suspends Free apps. Worker Free/$0 verified; budget20Worker requests/3health wakes,30build minutes/2instance hours. No exact account-wide Worker request meter.
 - Neon Free confirmed free_v3:1GiB/project,100CUh/month,6hrestore; API06:09:55UTC reportscompute_time_seconds2713,39,889,248transfer bytes; exact remaining Free compute allowance unverified. Zero storage/writes counters are not zero-usage proof.
 - Conservative empty-queue estimate43.4CUh/month using7min active windows; reserve20CUh for owner. Actual idle/reconnect PASS.
-- Act Now: retain signing=false/three disabled sources and grants/read-only customer; second cold gate failed. Investigate Now: upstream cold admission vs equal75s deadline cancellation; no definitive Worker upstream HTTP response. First cold PASS at05:43UTC after982.281s idle: Worker200/upstream200 in32.441s, independent payer startup; authenticated gateway readiness subsequently PASS. Histories unchanged.
+- Act Now: retain signing=false/three disabled sources/grants/read-only customer after direct diagnostic PASS. Investigate Now: prior75s call lacks upstream status; gateway75s/90s versus Worker90s needs a separately budgeted integrated gate. First cold PASS at05:43UTC after982.281s idle: Worker200/upstream200 in32.441s, independent payer startup; authenticated gateway readiness subsequently PASS. Histories unchanged.
 - Investigate Now: owner9live rows/browser timing/disconnects and undocumented limiter scope/reset.
 - Investigate Now: periodic protected backups and shared quotas; no paid/provider retention change without approval.
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: verify exact disabled state/history/Worker; deploy only90s diagnostic Worker and make one independent110s caller request after proven idle. Negative/inconclusive STOP; positive integrated repeatability pending. No activation. Late payer startup06:32:15UTC newly observed; trigger unknown. All prior histories unchanged.
+- Next action PRIMARY: report direct PASS and STOP at integrated-repeatability pending. Private release phase remains wake-blocked-disabled. A separately budgeted gate must review gateway75s wake/90s total versus Worker90s, then verify two genuine cold integrated cycles with direct authenticated status and unchanged history. No activation or purchase.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 

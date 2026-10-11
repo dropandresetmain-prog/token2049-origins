@@ -1,6 +1,6 @@
 # Payment readiness and cap repair — 11 October 2026
 
-**BLOCKED_TECHNICAL — repeated cold wake acceptance failed. Experiment stopped; payments/customer writes remain disabled.**
+**COLD_WORKER_DIAGNOSTIC_PASS — INTEGRATED REPEATABILITY PENDING. Signing, grants and customer purchase writes remain disabled.**
 
 Owner scope: repair through hosted non-spending readiness; the owner runs fresh live purchases. Existing MCP/OAuth, Render Free services, PostgreSQL histories and merchant integrations remain canonical.
 
@@ -119,3 +119,32 @@ At06:23:52UTC the exact gatewayb122186ceaadc36cb75abb4fb986cde7423a3046 and paye
 | Park for Later | Infrastructure replacement, paid plans, consumer onboarding and general orchestration. | Outside the narrowly authorized transport experiment. |
 
 The minimum next action is to resolve this specific availability behavior, then verify the existing candidate; no database/chain/provider rewrite is justified. Published [Render Free documentation](https://render.com/docs/free), re-read11October, says HTTP traffic spins up an idle service in about one minute, but does not describe the observed hibernate-rate-limited reason. Its management-API limits are a separate contract and do not explain application ingress. Do not invent a supported bypass. A support message needs owner sending/explicit messaging authorization; a further deployed experiment after the instructed stop needs explicit scope/budget. Keep this chat for that narrow continuation. Do not restore stale history or reactivate old signers.
+
+
+## One final independent cold-ingress diagnostic — 11 October16:04 Singapore
+
+Owner explicitly authorized one additional non-spending diagnostic with nested deadlines. Before edits, Render gatewayb122186ceaadc36cb75abb4fb986cde7423a3046/payer3945f9c52cf76e1960569d53416361bcd42de175, old Workerf416f62f and its exact deployed module fingerprint matched. All40non-OAuth tables matched the protected canonical44-table baseline; signing/three grants/customer purchase writes remained disabled. Wrangler's existing OAuth access was refreshed without new consent or permissions. No infrastructure, database, payment module/policy or merchant changes occurred.
+
+Later evidence: payer startup2026-10-11T06:32:15.190131467Z appeared after the previous report's06:23:52UTC cutoff. Its trigger is UNKNOWN. This does not alter the earlier observed75s cancellation; it makes any claim that the payer never eventually started invalid. No later payer app activity appeared after06:32:16UTC in complete management log pages. Agent made no intervening payer request.
+
+Only the Worker's upstream deadline changed75s→90s. The independent diagnostic caller waits110s; production gateway bridge.ts was inspected and left unchanged at its verified deployed SHA. Existing fixed destination, dedicated authentication, rate limiter, redirect refusal and sanitized terminal logs remain. The default-deny single-use operator script scripts/multiwallet/cold-ingress-diagnostic.mjs verifies pinned versions/content/history/authority, records an exclusive durable attempt marker before its only request, and persists terminal result before log/database follow-up. Unexpected bodies and sensitive headers are never retained. No automatic retry is possible under this authorization.
+
+| Actual evidence | Verified value |
+|---|---|
+| Source commit | eeef8952a218b811f193c580d0a2b12bcdb155cd |
+| Worker version / deployment |00ee6d4a-afdd-4807-ad05-f46d33fa1986 /22ac89a7-f73b-4387-bcab-472e4394687a |
+| Canonical deployed module SHA256 |dc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15; exactly matches verified dry-run bundle |
+| Request / response timestamps |08:04:03.216UTC /08:04:36.351UTC |
+| Pre-request inactivity |5506.843seconds (>91minutes); no app activity since06:32:16UTC |
+| Worker / upstream result |HTTP200 /HTTP200, JSON, category upstream_2xx, recognized Render routing none |
+| Elapsed |32,408ms Worker upstream;33,135ms independent caller |
+| Independent Render startup |08:04:27.933858715UTC, Consolidated payer listening |
+| After-result verification |08:04:42.017UTC: same gateway/payer SHAs,40non-OAuth table hashes unchanged, authority still disabled, old signers fenced |
+| Budget / writes |Exactly1Worker request/1fixed health GET; no warm readback, payment claim, signing, chain broadcast or provider operation |
+| Narrow checks |21Worker tests PASS; root typecheck PASS; runner syntax/default-deny PASS; Wrangler4.149.0 dry bundle and actual upload PASS,5.00KiB/startup2ms |
+
+Verdict: **COLD_WORKER_DIAGNOSTIC_PASS — INTEGRATED REPEATABILITY PENDING**. This proves a genuine cold Cloudflare-to-Render success and a terminal response received by the independent caller. Its33s duration was already below the former75s deadline; it does not prove that extending the deadline fixes the earlier intermittent failure or identify a Render limiter rule. No additional retry or runtime experiment follows this single-request scope.
+
+Minimum next gate: separately budget two genuine≥960s integrated idle-to-active cycles on exact pinned artifacts, with all authority still off. First review the deployed gateway's75s wake caller and90s overall preparation against the now90s Worker: the caller/whole-preparation deadlines must leave room for the Worker terminal response and subsequent direct authenticated status. Any change stays in bounded preparation, never payment POST retries. Verify direct authenticated status, independent startup, unchanged histories, preserved ownership/fences and safe failed-preclaim behavior. Only after both cycles and existing backup/history/signing gates pass may prior conditional activation be reconsidered. All9owner live rows remain NOT RUN.
+
+Triage: **Act Now** retain disabled authority and the exact single-attempt evidence (done); **Investigate Now** integrated budget/repeatability and original ambiguous ingress cause (blocks activation); **Ignore / Accept Risk** preserve prior unsafe incident liabilities and conservative gas/sponsor exposure; **Park for Later** infrastructure replacement/general orchestration. Same chat for this narrow next gate. Do not retry incident purchases or restore stale canonical history.

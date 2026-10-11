@@ -1,12 +1,12 @@
 # Capsule — current handoff
 
-## Current repair — BLOCKED_TECHNICAL
+## Current repair — COLD_WORKER_DIAGNOSTIC_PASS; integrated repeatability pending
 
 Gatewayb122186ceaadc36cb75abb4fb986cde7423a3046 (Git source fingerprintef0291f957939be981e7247b081263820b78c0bf7cac03ae33fb9b6be17fb942); retained payer3945f9c52cf76e1960569d53416361bcd42de175. One owner-authorized Free Cloudflare Worker calls only fixed GET/health. The first integrated gateway cold check passes after993.28s idle, with direct429, Worker200/32.761s, authenticated readiness and canonical invalid-ID400; total34.250s. No payment attempt and all financial histories unchanged.
 
 Focused135unit/68native PostgreSQL-MCP tests, typecheck/build and narrow independent review PASS. Consistent44table/805row backup restores completely, SHAcaf31fb7f1acbc05a4bff030a9020d81fa9a02eb142fdfdb40ae8627ea3020d8. Original3wallets,1:1000scale, matched5.1m caps and sponsor/gas limits are preserved.
 
-Second integrated cold acceptance FAILED at06:20:40UTC after974.361s idle: direct Render429, Worker client timeout75.002s, outer503 payer_not_ready, no payer startup observed through06:23:52UTC. The experiment is stopped under the owner failure rule. Signing/grants/customer writes remain disabled; no activation or payment occurred. Cloudflare recorded one cancelled invocation, zero CPU/memory errors; its final upstream HTTP response is UNKNOWN. Same chat next action is to resolve the bounded cold transport diagnosis, not purchase. See [task ledger](work/ACTIVE_TASK.md). Historical3unsafe purchases remain untouched. [Runtime/release evidence](architecture/PAYER_READINESS_REPAIR.md).
+Final owner-authorized direct diagnostic PASS at08:04UTC after5506.843s inactivity: Worker200/upstream200JSON/routing none,32.408s upstream/33.135s caller. Independently logged payer startup08:04:27.933UTC. Worker version00ee6d4a-afdd-4807-ad05-f46d33fa1986, moduleSHAdc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15, sourceeeef8952a218b811f193c580d0a2b12bcdb155cd. Deadlines90s upstream/110s independent caller. Exactly one request;40non-OAuth histories unchanged. Signing/grants/customer writes still disabled. Previous integrated failure remains evidence; this33s success does not prove a longer deadline cured it. Gateway remainsb122186 with75s wake caller/90s preparation, so nested gateway budgets and two fresh integrated cold checks require a separately budgeted gate before any activation. All9live rows remain NOT RUN. [Exact evidence](architecture/PAYER_READINESS_REPAIR.md).
 
 ## Previous hosted checkpoint — historical, superseded by repair
 
