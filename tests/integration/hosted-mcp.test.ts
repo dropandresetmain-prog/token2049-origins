@@ -964,7 +964,15 @@ describe('hosted MCP: tool calls that outlast ChatGPT\'s ~60 s patience', () => 
         expect(first.structuredContent.status).toBe('purchase_pending');
         expect(first.content[0].text).toMatch(/repeat buy with EXACTLY the same arguments/);
         expect(first.content[0].text).not.toMatch(/ORDER CONFIRMED/);
-        const pid = (await f.h.gw.db.get<{ id: string }>('SELECT id FROM purchases WHERE quote_id=$1', q.quoteId))!.id;
+        // buy returns purchase_pending while the background job creates the purchase asynchronously, so
+        // wait for that canonical row instead of assuming it is visible the instant pending is returned
+        // (under full-suite parallel load the 150 ms background budget can elapse before the insert commits).
+        let pid: string | undefined;
+        for (let i = 0; i < 100 && !pid; i++) {
+          pid = (await f.h.gw.db.get<{ id: string }>('SELECT id FROM purchases WHERE quote_id=$1', q.quoteId))?.id;
+          if (!pid) await sleep(50);
+        }
+        expect(pid).toBeTruthy();
         const again = await client.callTool({ name: 'buy', arguments: args }) as any;
         expect(again.structuredContent.status).toBe('purchase_pending');
         await sleep(1300);
