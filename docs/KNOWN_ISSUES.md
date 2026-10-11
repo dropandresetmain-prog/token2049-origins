@@ -4,7 +4,8 @@
 
 | Classification | Finding / action | Risk / blocker |
 |---|---|---|
-| Act Now | Render cold ingress returns429 with x-render-routing hibernate-rate-limited even on unauthenticatedhealth. Send the prepared owner support packet for a supported Free correction. | Blocks hosted payments; keep signing/grants/customer writes disabled. No paid/keepalive/manualwarming fallback. |
+| Act Now | Preserve disabled authority: second integrated cold check FAILED after974.361s idle, direct429 then75s Worker-client timeout/outer503; no payer startup. First two successful wakes do not establish reliability. | Blocks payment testing. Experiment stopped; signing/grants/customer writes remain disabled, financial hashes unchanged. |
+| Investigate Now | Distinguish Render cold admission/startup from the equal75s gateway/Worker timeout race. Cloudflare reports one client cancellation, zero CPU/memory errors; final upstream HTTP response is unknown. | No speculative timeout increase or new deployment. Existing management logs/support explanation, then a separately scoped diagnostic if authorized. |
 | Act Now | Pre-claim readiness, sanitized errors and audited Cardano-equivalent cap alignment implemented/deployed.175integrated/85affected/8finaltests and6gate assertions PASS. | Code fixes complete; not cold-ready. Histories/caps remain authoritative. |
 | Investigate Now | Limiter scope/window/reset and exact historical incident status are not documented/retained. | Do not infer source-IP ban, quota exhaustion or automatic reset. Support/runtime evidence required. |
 | Investigate Now | Owner’s nine live E2E tests, actual browser checkout timing/memory and host disconnect behavior. | All NOT RUN on the repaired candidate; non-spending readiness cannot substitute. |

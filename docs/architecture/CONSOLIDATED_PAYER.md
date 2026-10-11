@@ -1,6 +1,6 @@
 # Consolidated payer candidate
 
-Current status: **BLOCKED_TECHNICAL — Render cold hibernation admission.** Gateway `fe8abb7a82eb6e610445b40459137b5735647f39`; retained payer `3945f9c52cf76e1960569d53416361bcd42de175`; branch `codex/capsule-neon-migration`. Payment grants/signing and customer writes remain disabled. Token caps now match Cardano; all owner live acceptance rows remain NOT RUN. Exact runtime evidence, fingerprints and the owner support packet: [current repair record](PAYER_READINESS_REPAIR.md).
+Current status: **BLOCKED_TECHNICAL — repeated cold wake acceptance failed.** Gateway `b122186ceaadc36cb75abb4fb986cde7423a3046`; retained payer `3945f9c52cf76e1960569d53416361bcd42de175`; branch `codex/capsule-neon-migration`. Payment grants/signing and customer writes remain disabled. Token caps now match Cardano; all owner live acceptance rows remain NOT RUN. Exact runtime evidence, fingerprints and the owner support packet: [current repair record](PAYER_READINESS_REPAIR.md).
 
 The retained implementation/cutover evidence below describes the earlier `cb7b96e9e43a09842c1e9ee031bd1d8e3ec73e78` checkpoint (fingerprint `f2d961ba32f725057312b47ba7557e7971f194a648417314a5a18b9d9abcd84a`), before the owner incident and repair. It is historical acceptance evidence rather than today’s activation state.
 
@@ -125,3 +125,7 @@ Fresh integrated independent review found one namespace bypass, fixed and covere
 ## Narrow owner payment repair
 
 The11October owner-authorized readiness/diagnostic and cap correction is recorded in [PAYER_READINESS_REPAIR.md](PAYER_READINESS_REPAIR.md). Its later deployment record supersedes prior cap/revision observations below; original evidence remains historical.
+
+## Authorized fixed-health wake correction
+
+The11October explicit owner exception adds one Free authenticated on-demand Cloudflare Worker solely for the existing payer GET/health. It does not host application, signing or database work. Gateway opt-in triggers only after the specific Render hibernation429, before claim; direct authenticated status remains mandatory. No wallet fan-out or POST/pay retry. Dedicated secret names, exact artifacts, cold evidence, conditional activation and rollback boundary are in [PAYER_READINESS_REPAIR.md](PAYER_READINESS_REPAIR.md) and the release manifest. The earlier general Cloudflare exclusion is superseded only for this fixed-health boundary.

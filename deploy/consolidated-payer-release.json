@@ -254,7 +254,7 @@
       "chainBroadcasts": 0
     },
     "quotaEvidence": "Authenticated Render billing dashboard 11 October13:55SG: Hobby/no card/USD0,672.77hours/434pipeline minutes/~4.885GB remaining; shared rounded counters.",
-    "status": "WAKE_INTEGRATION_IN_PROGRESS_SIGNING_DISABLED",
+    "status": "BLOCKED_TECHNICAL_WAKE_REPEATED_COLD_FAILED_SIGNING_DISABLED",
     "candidateSha": "b122186ceaadc36cb75abb4fb986cde7423a3046",
     "canonicalGitSourceFingerprint": "ef0291f957939be981e7247b081263820b78c0bf7cac03ae33fb9b6be17fb942",
     "fingerprintBasis": "sorted tracked path NUL canonical Git blob bytes NUL",
@@ -307,7 +307,7 @@
       "paymentAttempted": false
     },
     "finalBoundaryTests": 8,
-    "lastVerifiedAt": "2026-10-10T22:27:58.399Z"
+    "lastVerifiedAt": "2026-10-11T06:23:52.013Z"
   },
   "previousHostedAcceptance": {
     "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",
@@ -329,7 +329,7 @@
     "payerDeployId": "dep-db595f3rjlhs73crrsa0"
   },
   "wakeExperiment": {
-    "status": "FIRST_INTEGRATED_COLD_PASS_SECOND_PENDING",
+    "status": "BLOCKED_TECHNICAL_SECOND_INTEGRATED_COLD_FAILED",
     "authorization": "owner attachment8577f52b, 11 October2026",
     "workerName": "capsule-payer-wake-experiment",
     "accountId": "c9e98d4cf5ad6e4eee3a5851d19639a8",
@@ -367,7 +367,7 @@
       "capsule-payer-wake-token"
     ],
     "gatewayIntegration": "optional; only Render hibernation429 before claim; direct authenticated status required",
-    "review": "Independent narrow extension: no Act Now code blocker; deployed cold gate pending",
+    "review": "Independent narrow extension: no Act Now code blocker; repeated deployed cold acceptance failed",
     "releaseSteps": [
       "consistent protected backup with isolated PostgreSQL18 restore",
       "verify exact disabled gateway/payer, zero in-flight work, old signer fencing, all financial hashes",
@@ -391,7 +391,32 @@
         "independentStartup": true,
         "historyUnchanged": true,
         "paymentAttempted": false
+      },
+      {
+        "started": "2026-10-11T06:20:40.893Z",
+        "idleSeconds": 974.361,
+        "durationMs": 75351,
+        "gatewayInitialStatus": 429,
+        "workerClientOutcome": "timeout",
+        "workerClientMs": 75002,
+        "workerUpstreamHttpStatus": null,
+        "outerStatus": 503,
+        "code": "payer_not_ready",
+        "independentStartup": false,
+        "historyUnchanged": true,
+        "paymentAttempted": false
       }
-    ]
+    ],
+    "metrics": {
+      "source": "authenticated Cloudflare dashboard 11 October2026 ~14:23SG",
+      "invocations": 4,
+      "subrequests": 3,
+      "clientCancelled": 1,
+      "runtimeErrors": 0,
+      "p99CpuMs": 4.05,
+      "p99MemoryMB": 1.58,
+      "exactAccountRequestsRemaining": "not measured"
+    },
+    "nextAction": "Stop activation and runtime experiments. Preserve disabled candidate; resolve upstream cold-start versus equal deadline cancellation using read-only evidence/support or separately authorized bounded diagnostic."
   }
 }

@@ -1,6 +1,6 @@
 # Multiwallet owner acceptance
 
-**BLOCKED_TECHNICAL — do not start purchase testing yet.** Render cold admission returns429 hibernate-rate-limited. The candidate is deployed with signing/wallet grants/customer writes disabled; activation awaits supported Free resolution and cold proof. All nine live rows are NOT RUN on the repaired candidate.
+**BLOCKED_TECHNICAL — do not start purchases.** Two cold wakes succeeded, but the second integrated check failed at the75s timeout without observed payer startup. The owner-required repeated acceptance gate has failed; activation is stopped. Signing/wallet grants/customer writes remain disabled. All nine live rows are NOT RUN. The sheet below is prepared for a future verified release, not current permission to test.
 
 Use the existing `https://token2049-origins.onrender.com/mcp` with its existing OAuth implementation. Consult [current official connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt); account/workspace controls and UI wording may differ. Copy the exact redirect URI from the host's MCP/OAuth setup interface into the allowed configuration when needed. Retrieve the existing access code through its protected owner method; do not paste it into chat, logs or proof artifacts. No new OAuth provider is required. Console: [Capsule](https://token2049-origins.onrender.com/console/).
 
@@ -37,6 +37,8 @@ The existing testnet scale is **1:1000**, not exchange-rate or production-money 
 | Cardano Preprod demo wallet | Per-payment/daily/cumulative 5,100,000 token base units; fee cap 2,500,000,000 lovelace; ADA output cap 10,000,000,000 lovelace. Retained 5 entries/94,820 committed; cumulative headroom 5,005,180. Balance/fee availability is not established by those counters. |
 | Solana Devnet demo wallet | 5,100,000 base units per-payment/daily/cumulative; USD5,100 commercial cap; shared sponsor fee cap 100,000 lamports. Retained 7 entries/2 blocked,94,220 committed; cumulative headroom 5,005,780 and sponsor headroom 74,998 lamports. Read-only finalized balance check passed at 19:27 UTC 10 Oct; balances can change. Payer token funds and sponsor fees are separate. |
 | Sui Testnet demo wallet | 5,100,000 base units per-payment/daily/cumulative; USD5,100 commercial cap; 10,000,000 MIST gas/payment and 500,000,000 MIST cumulative gas. Retained history counts 35,900 token units and 20,000,000 MIST, including two signed records. |
+
+Daily windows retain their existing semantics: Cardano and Solana use UTC days; Sui uses a rolling24hours. Numeric token caps match, and prior exposure is retained. No test may silently raise token, gas or sponsor limits.
 
 Use these exact registered source IDs (the same ID applies to that rail in every row):
 

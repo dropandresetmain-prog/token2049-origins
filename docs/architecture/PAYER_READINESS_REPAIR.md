@@ -1,6 +1,6 @@
 # Payment readiness and cap repair — 11 October 2026
 
-**WAKE_INTEGRATION_IN_PROGRESS — genuine Cloudflare-origin cold PASS; repeated integrated acceptance pending. Payments/customer writes remain disabled.**
+**BLOCKED_TECHNICAL — repeated cold wake acceptance failed. Experiment stopped; payments/customer writes remain disabled.**
 
 Owner scope: repair through hosted non-spending readiness; the owner runs fresh live purchases. Existing MCP/OAuth, Render Free services, PostgreSQL histories and merchant integrations remain canonical.
 
@@ -93,3 +93,29 @@ Fresh backup initially stopped before deployment: Neon inventory now has cloud_a
 First integrated gateway cold PASS at06:03:50.314UTC:993.28s idle; initial direct status429 at58ms; Worker health200 in32,761ms; direct authenticated ready at33,870ms; fixed invalid-IDPOST canonical400; outer200 in34,250ms. Independent Render payer startup and all non-OAuth hashes unchanged. Render log ingestion lagged the HTTP reply; a management-only follow-up recovered ready/400 events, without repeating the diagnostic or touching the payer. Protected original and supplemental proofs retained. Second integrated window starts06:04:24.564UTC.
 
 Current Neon read-only management proof06:09:55UTC: owner subscription free_v3, project compute_time_seconds2713/data_transfer_bytes39,889,248,6hrestore, canonical unpooled endpoint fixed0.25CU. Free consumption-history exact remaining allowance is unavailable; zero legacy storage/written counters do not establish zero usage. No database configuration changed. [Workers limits](https://developers.cloudflare.com/workers/platform/limits/) updated8October2026:100,000requests/day,10msCPU; actual Free runtime cold responses pass. [Rate-limit binding](https://developers.cloudflare.com/workers/runtime-apis/bindings/rate-limit/) is eventually consistent per location, accepted only for health traffic.
+
+
+## Final wake experiment result — 11 October14:23 Singapore
+
+The Worker can wake this payer, but reliability acceptance failed. Preserve the deployed opt-in code and disabled authority; do not turn two successes into a claim of E2E readiness. The owner explicitly requires stopping when the Worker cannot start the cold payer. No further runtime experiment or activation follows this checkpoint.
+
+| Controlled genuine cold check | Idle | Observed result | Independent payer startup | Financial effect |
+|---|---|---|---|---|
+| Standalone Worker05:43:50.508UTC |982.281s| Worker200/upstream200,32.441s | VERIFIED | None |
+| Integrated gateway06:03:50.314UTC |993.280s| direct429, Worker200/32.761s, direct authenticated ready, invalid-ID400; outer200/34.250s | VERIFIED | None |
+| Integrated gateway06:20:40.893UTC |974.361s| direct429/59ms, Worker-client timeout75.002s; outer503 payer_not_ready/75.351s | NOT OBSERVED through06:23:52UTC | None |
+
+The third request reached Cloudflare: dashboard4invocations/3subrequests, one cancelled invocation. Zero exceeded CPU/memory/internal/uncaught-exception errors; P99CPU4.05ms and memory1.58MB remain within Free limits. Only the two successful health-result logs are retained. The final failed Worker upstream HTTP response is UNKNOWN, not a proved Cloudflare-origin429. Gateway and Worker both use75s deadlines, allowing gateway cancellation before the Worker emits its own timeout; this is a diagnosis/observability limitation, not evidence that a longer deadline fixes startup. Render app logs contain no new payer startup through final management verification.
+
+At06:23:52UTC the exact gatewayb122186ceaadc36cb75abb4fb986cde7423a3046 and payer3945f9c52cf76e1960569d53416361bcd42de175 remain LIVE/Free; deployment IDsdep-db5ibrd9fdbs73d067p0/dep-db5b0o5ckfvc739j3l60. Signingfalse, three disabled registrations/instance grants, customer quotes/purchase writesfalse, old Solana suspended and both legacy payer clients revoked. All non-OAuth44-table hashes match the fresh44/805 protected baseline. Source listing authenticated200/unavailable, unauthenticated401; console and historical receipt/proof200. Private release phasewake-blocked-disabled prevents accidentally using the old activation gate. Backupcaf31fb7f1acbc05a4bff030a9020d81fa9a02eb142fdfdb40ae8627ea3020d8 fully restored all rows/catalogs/ACLs. No quote, purchase, payment claim, signing, broadcast, funding or provider operation was created by this experiment.
+
+| Classification | Finding and action | Deferral risk / blocker |
+|---|---|---|
+| Act Now | Keep authority fenced and owner tests paused; preserve exact runtime/history evidence. Done. | Enabling after intermittent success would expose users to unresolved cold ingress. Blocks release. |
+| Investigate Now | Establish failed upstream outcome/startup rule and distinguish deadline cancellation from Render admission. Owner may send the existing support request, adding this timestamp/service ID and successful-vs-failed wake evidence. No message sent. | Final upstream response and limiter reset remain unknown. Blocks release. |
+| Investigate Now | If additional runtime work is authorized, use one bounded diagnostic with nested deadlines that permit observing the Worker's final result; payment authority stays off. Require two complete integrated cold successes before activation. | A larger timeout alone is not a demonstrated fix. No automatic retest/redeploy authorized after this stop. |
+| Investigate Now | Owner's nine fresh live rows and real checkout/disconnect behavior. | All NOT RUN; fixtures do not prove merchant completion. |
+| Ignore / Accept Risk | Preserve approximate health coalescing/rate limiting and expired unsafe incident liabilities. | Not a financial lock; never repeat payment or switch source after ambiguity. |
+| Park for Later | Infrastructure replacement, paid plans, consumer onboarding and general orchestration. | Outside the narrowly authorized transport experiment. |
+
+The minimum next action is to resolve this specific availability behavior, then verify the existing candidate; no database/chain/provider rewrite is justified. Published [Render Free documentation](https://render.com/docs/free), re-read11October, says HTTP traffic spins up an idle service in about one minute, but does not describe the observed hibernate-rate-limited reason. Its management-API limits are a separate contract and do not explain application ingress. Do not invent a supported bypass. A support message needs owner sending/explicit messaging authorization; a further deployed experiment after the instructed stop needs explicit scope/budget. Keep this chat for that narrow continuation. Do not restore stale history or reactivate old signers.

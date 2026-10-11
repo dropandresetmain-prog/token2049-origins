@@ -1,5 +1,11 @@
 # Capsule decisions log
 
+## 11 October 2026 — owner-authorized fixed health wake
+
+A demonstrated Render gateway-to-sleeping-payer refusal (429 with x-render-routing:hibernate-rate-limited) blocks authenticated preparation. The owner explicitly authorized one Free Cloudflare Worker that calls only the existing payer GET/health from an external origin. A genuine cold diagnostic PASS preceded gateway integration; the first deployed integrated cold check also passes. The second integrated check FAILED (974.361s idle, direct429,75s client timeout, outer503, no payer startup). Stop under the owner failure rule; do not activate based on warm-only or intermittent success. Preserve the disabled candidate and exact evidence. Final Worker upstream status is unknown because the gateway cancelled before receiving its response.
+
+The opt-in gateway trigger uses a new dedicated wake credential, never payment/OAuth credentials or financial payloads. Direct authenticated payer status must pass before the durable payment claim. Existing Render gateway/payer/MCP/OAuth/browser and Neon PostgreSQL stay canonical. No cron, keep-alive, storage, proxy, new signing service or payment retry is introduced. Approximate location/isolate rate limits are acceptable for health traffic; authoritative financial locks remain unchanged. [Exact evidence and release gates](architecture/PAYER_READINESS_REPAIR.md).
+
 ## 11 October 2026 — payment transport and owner-authorized cap alignment
 
 Use authenticated, bounded read-only transport preparation before a durable payment claim. Repeat only safe GET readiness calls; never automatically retry POST /pay. Retain HTTP status and fixed response categories without secrets or transaction bodies. Unknown attempts remain blocked and require readback.
