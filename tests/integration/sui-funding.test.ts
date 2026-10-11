@@ -222,7 +222,16 @@ describe('Sui adapter with mocked chain and real HTTP/core/PostgreSQL', () => {
       h.gw.core.deps.fundingAdapters.clear(); h.gw.core.deps.fundingAdapters.set('sui', initial.adapter);
       const p = await createFundablePurchase(h), id = p.purchase.purchaseId, input = await storedInput(h, id);
       const s = await suiScenario(input, { throwExecute: true }); h.gw.core.deps.fundingAdapters.set('sui', s.adapter);
-      expect((await h.call('POST', `/v1/purchases/${id}/fund`, { token: h.alice.token, headers: { 'sui-payment': s.candidate.header } })).status).toBe(402);
+      // An ambiguous submission (settlement attempted, finality unavailable) is confirmation-pending, never a
+      // rejected payment: 202, payment_state stays unknown, the candidate is retained and a non-terminal
+      // funding.confirmation_pending event is journaled instead of funding.rejected.
+      const ambiguous = await h.call('POST', `/v1/purchases/${id}/fund`, { token: h.alice.token, headers: { 'sui-payment': s.candidate.header } });
+      expect(ambiguous.status).toBe(202);
+      expect(ambiguous.body.confirmationPending).toBe(true);
+      expect(await h.gw.db.get('SELECT state,payment_state FROM purchases WHERE id=$1', id)).toEqual({ state: 'awaiting_funding', payment_state: 'unknown' });
+      expect(await h.gw.db.get("SELECT id FROM purchase_events WHERE purchase_id=$1 AND type='funding.confirmation_pending'", id)).toBeDefined();
+      expect(await h.gw.db.get("SELECT id FROM purchase_events WHERE purchase_id=$1 AND type='funding.rejected'", id)).toBeUndefined();
+      expect((await h.gw.db.get<{ status: string }>('SELECT status FROM funding_attempts WHERE purchase_id=$1', id))!.status).toBe('pending');
       expect((await h.call('POST', `/v1/purchases/${id}/fund`, { token: h.alice.token, headers: { 'sui-payment': s.candidate.header } })).status).toBe(409);
       expect(s.counts().executed).toBe(1); expect(h.retail.executeCalls).toBe(0);
       s.setOptions({ throwExecute: false, missingTransaction: false }); expect(await h.gw.core.recoverPendingFunding(id)).toBe(true);

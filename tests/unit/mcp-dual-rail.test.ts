@@ -8,7 +8,7 @@ import { Client } from '@modelcontextprotocol/sdk/client/index.js';
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import { InMemoryTransport } from '@modelcontextprotocol/sdk/inMemory.js';
 import { startHarness, retailIntent, retailFulfillment, type Harness } from '../support/harness.js';
-import { FixtureFundingAdapter } from '../support/fixtures.js';
+import { FixtureFundingAdapter, FIXTURE_NETWORK } from '../support/fixtures.js';
 import { createClient } from '../../src/infrastructure/auth.js';
 import { createMcpServer } from '../../src/channels/mcp/server.js';
 import { registerTools } from '../../src/channels/mcp/tools.js';
@@ -74,6 +74,24 @@ function solanaFixtureAdapter(h: Harness): FundingAdapter {
       const v = await fixture.verify(header, r);
       return v.ok ? { ok: true, funding: { ...v.funding, rail: 'solana', network: SOLANA_DEVNET_NETWORK, assetId: SOLANA_DEVNET_USDC_MINT, payer: SOLANA_PAYER, payee: SOLANA_PAYEE } } : v;
     },
+  };
+}
+
+/**
+ * Cardano rail whose request-path verification is inconclusive: settlement was attempted but finality is
+ * unavailable, so the gateway must hold it confirmation-pending (never a rejected payment) and keep one durable
+ * signed candidate. Independent recovery of that SAME candidate then confirms it — no second signing, no retry.
+ */
+function ambiguousThenConfirmedCardanoAdapter(h: Harness): FundingAdapter {
+  const fixture = new FixtureFundingAdapter(h.clock);
+  return {
+    rail: 'cardano', network: FIXTURE_NETWORK, paymentHeaderName: 'payment-signature',
+    acceptedAsset: () => fixture.acceptedAsset(),
+    readiness: () => fixture.readiness(),
+    paymentRequirements: (r) => fixture.paymentRequirements(r),
+    prepare: async (header) => ({ ok: true, transferReference: header.split(':')[1]! }),
+    verify: async () => ({ ok: false, code: 'payment_required', reason: 'outcome retained for independent recovery', settlementAttempted: true }),
+    recover: async (transferReference, r) => fixture.verify(`fixture:${transferReference}:${r.amount.amountBaseUnits}`, r),
   };
 }
 
@@ -340,6 +358,41 @@ describe('MCP dual-rail payer parity', () => {
         expect(solana.calls).toHaveLength(0);
         expect(await purchaseCount()).toBe(0);
       } finally { await m.close(); await twin.close(); }
+    });
+  });
+
+  describe('nondefinitive settlement', () => {
+    it('presents confirmation pending with a succeeded handoff, then the final truthful headline after same-candidate recovery', async () => {
+      h.gw.core.deps.fundingAdapters.set('cardano', ambiguousThenConfirmedCardanoAdapter(h));
+      const m = await connectBoth();
+      try {
+        const { quote } = await quoteViaMcp(m);
+        const bought = await m.call('buy', buyArgs(quote, 'cardano'));
+        // The gateway held the inconclusive settlement (202), so the bridge reported ok and the MCP layer
+        // presents confirmation pending — never a rejected payment — with a succeeded (not failed) handoff.
+        expect(bought.isError).toBeFalsy();
+        expect(bought.structuredContent.status).toBe('confirmation_pending');
+        expect(bought.structuredContent.payment).toMatchObject({ attempted: true, ok: true });
+        expect(bought.structuredContent.purchase.paymentState).toBe('unknown');
+        expect(bought.structuredContent.purchase.paymentAttempt.status).toBe('succeeded');
+        expect(bought.structuredContent.progress).toMatchObject({ stage: 'confirming_payment', outcomeFinal: false, paymentConfirmed: false });
+        expect(cardano.calls).toHaveLength(1);
+        expect(solana.calls).toHaveLength(0);
+        const id = bought.structuredContent.purchase.purchaseId as string;
+        // Exactly one durable signing candidate; independent recovery of that SAME candidate confirms it.
+        expect((await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM funding_attempts WHERE purchase_id = $1', id))!.n).toBe(1);
+        expect(await h.gw.core.recoverPendingFunding(id)).toBe(true);
+        await h.gw.worker.tick();
+        const done = await m.call('get_purchase', { purchaseId: id });
+        expect(done.structuredContent.purchase.state).toBe('succeeded');
+        expect(done.structuredContent.progress).toMatchObject({ stage: 'complete', label: 'Order confirmed', outcomeFinal: true });
+        expect(h.retail.executeCalls).toBe(1);
+        // Repeating buy follows the same purchase and never re-POSTs to the payer.
+        const again = await m.call('buy', buyArgs(quote, 'cardano'));
+        expect(again.structuredContent.purchase.purchaseId).toBe(id);
+        expect(cardano.calls).toHaveLength(1);
+        expect(await purchaseCount()).toBe(1);
+      } finally { await m.close(); }
     });
   });
 });

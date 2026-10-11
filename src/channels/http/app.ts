@@ -157,6 +157,12 @@ export function createHttpApp(opts: HttpAppOptions): express.Express {
         res.status(402).json({ ...r.requirements, purchase: r.purchase });
         return;
       }
+      if (r.kind === 'confirmation_pending') {
+        // Inconclusive settlement: the durable candidate and independent recovery own the truth. 202 (not an
+        // error) keeps the payer/MCP layers from presenting a definitive rejection or inviting another payment.
+        res.status(202).json({ purchase: r.purchase, confirmationPending: true });
+        return;
+      }
       if (r.settlementHeader) res.setHeader(r.settlementHeader.name, r.settlementHeader.value);
       res.status(202).json({ purchase: r.purchase });
     }),

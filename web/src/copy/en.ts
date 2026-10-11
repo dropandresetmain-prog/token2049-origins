@@ -355,6 +355,7 @@ export const activity: Record<string, string> & { fallback: string } = {
   'capacity.released': 'Set-aside amount released',
   'funding.attempt_prepared': 'Payment requested',
   'funding.submitted': 'Payment sent',
+  'funding.confirmation_pending': 'Awaiting payment confirmation',
   'funding.confirmed': 'Payment received',
   'funding.invalid': "Payment couldn't be accepted",
   'funding.rejected': 'Payment declined',

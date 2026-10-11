@@ -63,6 +63,8 @@ export interface CoreDeps {
 
 export type FundResult =
   | { kind: 'payment_required'; requirements: Record<string, unknown>; purchase: PurchaseView }
+  /** Settlement was attempted (or its outcome is unknown) without independent finalized proof either way. */
+  | { kind: 'confirmation_pending'; purchase: PurchaseView }
   | { kind: 'funded'; purchase: PurchaseView; settlementHeader?: { name: string; value: string } };
 
 const READY_FOR_USE = new Set(['CONFIGURED_UNVERIFIED', 'EXTERNAL_CHECK_PASSED', 'LOCAL_TESTS_ONLY']);
@@ -675,6 +677,15 @@ export class CommerceCore {
     let p = (await getPurchaseRow(this.d.db, purchaseId))!;
     const verification = await adapter.verify(paymentHeader, input);
     if (!verification.ok) {
+      // A nondefinitive outcome — settlement was attempted, or its result is unknown, without independent
+      // finalized proof of failure — is confirmation-pending, never a rejected payment. persistFundingCandidate
+      // already set payment_state='unknown', kept the signed candidate and enqueued recover_funding; journal a
+      // non-terminal event and return the 202-equivalent result so no layer presents a definitive rejection or
+      // invites another payment POST, candidate or wallet. Definitive rejection below is unchanged.
+      if (verification.code === 'payment_required' && verification.settlementAttempted !== false && !verification.definitiveFailure) {
+        await appendEvent(this.d.db, p.id, 'funding.confirmation_pending', { reason: verification.reason }, this.now());
+        return { kind: 'confirmation_pending', purchase: await this.viewOf(p) };
+      }
       if (verification.definitiveFailure) await this.closeFailedFunding(purchaseId, verification.reason);
       const nowIso = this.now();
       await this.d.db.tx(async () => {
