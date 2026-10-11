@@ -30,8 +30,15 @@ try {
  admin=new pg.Client(localConfig);await admin.connect();assert.match((await admin.query('SELECT version() AS v')).rows[0].v,/PostgreSQL 18\./);
  const appRole=source.catalogs.roles.find(r=>r.rolname===source.info.role);assert.ok(appRole&&!appRole.rolsuper&&!appRole.rolbypassrls&&!appRole.rolreplication);
  const requiredRoles=new Set([appRole.rolname,...source.catalogs.default_acls.map(x=>x.role)]);
+ // Neon can add platform-owned defaults after endpoint startup. Retain their ACLs in the disposable restore,
+ // using inert NOLOGIN placeholders, never copying platform superuser, replication or bypass privileges.
+ for(const acl of source.catalogs.default_acls.filter(x=>x.role==='cloud_admin')){
+  assert.equal(acl.schema,'public');assert.ok(['r','S'].includes(acl.kind));
+  assert.equal(acl.acl,acl.kind==='S'?'{neon_superuser=r*w*U*/cloud_admin}':'{neon_superuser=a*r*w*d*D*m*/cloud_admin}');
+  requiredRoles.add('neon_superuser');
+ }
  for(const role of requiredRoles){
-  assert.match(role,/^(token2049_origins_db_user|capsule_owner)$/);
+  assert.match(role,/^(token2049_origins_db_user|capsule_owner|cloud_admin|neon_superuser)$/);
   if(!(await admin.query('SELECT 1 FROM pg_roles WHERE rolname=$1',[role])).rowCount){
    const r=role===appRole.rolname?appRole:{rolcreatedb:false,rolcreaterole:false,rolcanlogin:false};
    await admin.query(`CREATE ROLE ${qi(role)} ${r.rolcanlogin?'LOGIN':'NOLOGIN'} ${r.rolcreatedb?'CREATEDB':'NOCREATEDB'} ${r.rolcreaterole?'CREATEROLE':'NOCREATEROLE'} NOSUPERUSER NOBYPASSRLS NOREPLICATION`);
@@ -49,6 +56,10 @@ try {
  // PostgreSQL may reorder ACL array entries on restore; compare the complete grant sets, including grantors.
  const canonicalAcls=rows=>rows.map(x=>({...x,acl:x.acl.slice(1,-1).split(',').sort()}));
  comparison.default_acls=JSON.stringify(canonicalAcls(source.catalogs.default_acls))===JSON.stringify(canonicalAcls(target.catalogs.default_acls));
+ for(const role of ['cloud_admin','neon_superuser'].filter(r=>requiredRoles.has(r))){
+  const r=target.catalogs.roles.find(x=>x.rolname===role);
+  assert.ok(r&&!r.rolsuper&&!r.rolcanlogin&&!r.rolcreaterole&&!r.rolcreatedb&&!r.rolreplication&&!r.rolbypassrls,'platform restore role must remain inert');
+ }
  comparison.appRole=JSON.stringify(appRole)===JSON.stringify(target.catalogs.roles.find(r=>r.rolname===appRole.rolname));
  const proof={comparison,backupSha256:checksum,version:target.info.version,created:new Date().toISOString(),tables:Object.keys(source.tables).length,rows:Object.values(source.tables).reduce((n,x)=>n+x.count,0)};
  privateWrite(join(root,'restore-verification.json'),JSON.stringify(proof));assert.ok(Object.values(comparison).every(Boolean),'Full restore comparison failed');

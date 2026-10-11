@@ -118,7 +118,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: finish narrow integration review/build; fresh protected backup/restore; deploy gateway-only replacement with dedicated wake secret; two >=16min idle-to-active integrated checks; resume inspected conditional activation gates. No purchase.
+- Next action PRIMARY: deploy pushed gateway-only wake replacement with fresh dedicated secret, all authority disabled; two >=16min integrated cold checks; then inspected conditional activation. Narrow review/build PASS. Fresh44table/805row snapshot/PG18restore PASS, SHAcaf31fb7; exact inert Neon platform ACL placeholders preserve all ACLs without source changes.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 
