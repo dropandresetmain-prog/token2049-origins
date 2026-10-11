@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- BLOCKED_TECHNICAL: standalone and first integrated cold PASS; second integrated cold FAILED. Experiment stopped per owner failure rule; payment/customer authority remains disabled.
+- FINAL_COLD_DIAGNOSTIC_AUTHORIZED: owner permits one independent fixed-health request with nested90s/110s deadlines. No activation; payment/customer authority stays disabled.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -22,6 +22,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
 
 ## Constraints and authorization
+- Latest owner message authorizes one additional direct cold diagnostic: Worker90s/caller110s, optional bounded warm readback; authority stays disabled. Negative/inconclusive STOP; positive integrated repeatability remains pending.
 - Only one narrow on-demand Cloudflare wake Worker is authorized (11 October attachment8577f52b). No replacement MCP/commerce/payer/OAuth/database/browser, queue, cron, keep-alive, paid plan or service per customer/wallet/rail.
 - Keys only in payer. Original identities, caps, histories and sponsor roles preserved. Exact quote/digest/funding option/source bind approval.
 - Reservations and signed candidates persist before irreversible calls. Unknown outcomes reconcile the same candidate; merchant attempts are not duplicated.
@@ -46,6 +47,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
 - UNKNOWN: exact historical ingress HTTP status; inactive payer is leading hypothesis, not definitive cause.
 
+- [x] Final diagnostic nesting21Worker tests/typecheck/Wrangler dry bundle/default-deny runner PASS; preflight08:01UTC verifies exact old Worker/content, disabled authority and40non-OAuth tables unchanged; no wake made yet.
 - [x] Wake boundary19tests/local workerd/independent review; gateway135affected unit tests and68native PostgreSQL/MCP integration tests/typecheck/build PASS; independent extension no code blocker, including9fixture combinations and unclaimed wake failure/ambiguousPOST protection.
 
 ## Implementation and local verification
@@ -118,7 +120,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: STOP runtime experiments/activation; private state wake-blocked-disabled. Read preserved proof before any separately authorized bounded diagnosis; no repeat deployment or warming. Same chat for narrow resolution, owner sends support packet if needed. Fresh44table/805row PG18restore PASS SHAcaf31fb7; original histories unchanged.
+- Next action PRIMARY: verify exact disabled state/history/Worker; deploy only90s diagnostic Worker and make one independent110s caller request after proven idle. Negative/inconclusive STOP; positive integrated repeatability pending. No activation. Late payer startup06:32:15UTC newly observed; trigger unknown. All prior histories unchanged.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 

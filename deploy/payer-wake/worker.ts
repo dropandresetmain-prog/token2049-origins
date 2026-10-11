@@ -1,6 +1,8 @@
 const DESTINATION = 'https://t2o-cardano-payer.onrender.com/health';
 const PUBLIC_HOST = 'capsule-payer-wake-experiment.dropandreset-main.workers.dev';
-const TIMEOUT_MS = 75_000;
+// This diagnostic must finish before its independent caller's 110-second deadline.
+// It does not change the deployed gateway's payment-preparation budget.
+export const WAKE_UPSTREAM_TIMEOUT_MS = 90_000;
 export interface WakeEnv {
   CAPSULE_WAKE_SECRET?: string;
   WAKE_RATE_LIMITER?: { limit(input: { key: string }): Promise<{ success: boolean }> };
@@ -45,7 +47,7 @@ export function createWakeHandler(deps: Dependencies = {}) {
       const response = await f(DESTINATION, {
         method: 'GET', redirect: 'manual', credentials: 'omit',
         headers: { accept: 'application/json', 'user-agent': 'Capsule-Wake/0.1', 'cache-control': 'no-store' },
-        signal: AbortSignal.timeout(TIMEOUT_MS),
+        signal: AbortSignal.timeout(WAKE_UPSTREAM_TIMEOUT_MS),
       });
       void response.body?.cancel().catch(() => undefined);
       const mime = response.headers.get('content-type') ?? '';

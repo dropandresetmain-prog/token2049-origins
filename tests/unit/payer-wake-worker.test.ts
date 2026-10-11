@@ -1,5 +1,5 @@
 import {describe,it,expect,vi} from 'vitest';
-import {createWakeHandler, type WakeEnv} from '../../deploy/payer-wake/worker.js';
+import {createWakeHandler, WAKE_UPSTREAM_TIMEOUT_MS, type WakeEnv} from '../../deploy/payer-wake/worker.js';
 const SECRET='a'.repeat(64), URL='https://capsule-payer-wake-experiment.dropandreset-main.workers.dev/wake';
 const env=():WakeEnv=>({CAPSULE_WAKE_SECRET:SECRET,WAKE_RATE_LIMITER:{limit:vi.fn(async()=>({success:true}))}});
 const request=(overrides:RequestInit={})=>new Request(URL,{method:'POST',headers:{authorization:'Bearer '+SECRET},...overrides});
@@ -26,4 +26,28 @@ describe('fixed Render health wake Worker',()=>{
  it('limits replayed authorization before outbound traffic',async()=>{const h=harness();const e=env();e.WAKE_RATE_LIMITER!.limit=vi.fn(async()=>({success:false}));expect((await h.worker.fetch(request(),e)).status).toBe(429);expect(h.outbound).not.toHaveBeenCalled();});
  it('fails closed when rate limiting is unavailable',async()=>{const h=harness();const e=env();e.WAKE_RATE_LIMITER!.limit=vi.fn(async()=>{throw Error('PRIVATE');});expect((await h.worker.fetch(request(),e)).status).toBe(503);expect(h.outbound).not.toHaveBeenCalled();});
  it('sanitizes network/timeout errors and never retries',async()=>{const h=harness(async()=>{throw new DOMException('PRIVATE','TimeoutError');});const r=await h.worker.fetch(request(),env());expect(await r.json()).toMatchObject({category:'timeout',paymentAttempted:false});expect(h.outbound).toHaveBeenCalledTimes(1);expect(JSON.stringify(h.logs)).not.toContain('PRIVATE');});
+ it('returns a terminal upstream timeout before the independent caller cancels',async()=>{
+  vi.useFakeTimers();
+  const timers:Array<ReturnType<typeof setTimeout>>=[];
+  const timeout=vi.spyOn(AbortSignal,'timeout').mockImplementation(ms=>{
+   const controller=new AbortController();timers.push(setTimeout(()=>controller.abort(new DOMException('deadline','TimeoutError')),ms));return controller.signal;
+  });
+  try{
+   const caller=AbortSignal.timeout(110_000),logs:Array<Record<string,unknown>>=[];
+   const outbound=vi.fn(async(_url:Parameters<typeof fetch>[0],init?:RequestInit)=>new Promise<Response>((_resolve,reject)=>init!.signal!.addEventListener('abort',()=>reject(init!.signal!.reason),{once:true})));
+   const worker=createWakeHandler({fetch:outbound as typeof fetch,log:e=>logs.push(e)});
+   const pending=worker.fetch(request({signal:caller}),env());
+   await vi.advanceTimersByTimeAsync(89_999);expect(caller.aborted).toBe(false);expect(logs).toHaveLength(0);
+   await vi.advanceTimersByTimeAsync(1);const response=await pending;
+   expect(response.status).toBe(503);expect(await response.json()).toMatchObject({category:'timeout',durationMs:90_000,paymentAttempted:false});
+   expect(caller.aborted).toBe(false);expect(outbound).toHaveBeenCalledTimes(1);expect(logs).toHaveLength(1);expect(logs[0]).toMatchObject({type:'capsule_payer_wake',category:'timeout'});
+   expect(timeout).toHaveBeenCalledWith(WAKE_UPSTREAM_TIMEOUT_MS);
+  }finally{for(const timer of timers)clearTimeout(timer);timeout.mockRestore();vi.useRealTimers();}
+ });
+ it('reports a terminal transport failure without leaking its exception or retrying',async()=>{
+  const h=harness(async()=>{throw new TypeError('PRIVATE CONNECTION DETAILS');});const response=await h.worker.fetch(request(),env());
+  expect(response.status).toBe(503);expect(await response.json()).toMatchObject({category:'transport_error',paymentAttempted:false});
+  expect(h.outbound).toHaveBeenCalledTimes(1);expect(h.logs).toHaveLength(1);expect(JSON.stringify(h.logs)).not.toContain('PRIVATE');
+ });
+
 });
