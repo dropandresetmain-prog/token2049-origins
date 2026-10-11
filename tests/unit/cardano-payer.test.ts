@@ -92,10 +92,12 @@ describe('bounded payer', () => {
     const s = setup(); writeFileSync(s.config.ledgerFile, 'broken');
     await expect(new Payer(s.deps).pay(ID)).rejects.toThrow('unreadable'); expect(s.signer).not.toHaveBeenCalled();
   });
-  it('retries transport loss with exactly the persisted transaction', async () => {
+  it('does not re-POST after transport loss; an explicit re-run resends exactly the persisted transaction', async () => {
     const s = setup(); const base = s.deps.fetchImpl; let lost = false;
     s.deps.fetchImpl = async (url, init) => { const signature = new Headers(init?.headers).get('payment-signature');
       if (signature && !lost) { lost = true; s.sent.push(signature); throw new Error('timeout'); } return base(url, init); };
+    await expect(new Payer({ ...s.deps, maxAttempts: 2 }).pay(ID)).rejects.toMatchObject({ code: 'gateway_unreachable', retrySafe: false });
+    expect(s.sent).toHaveLength(1); // the automatic path made exactly one signed funding POST
     await new Payer(s.deps).pay(ID); expect(s.signer).toHaveBeenCalledTimes(1); expect(s.sent[0]).toBe(s.sent[1]);
   });
 });

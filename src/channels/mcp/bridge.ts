@@ -8,7 +8,8 @@ export type BridgeResult = { ok: true; transferReference: string | null } | { ok
 const BridgeFailure = z.object({ ok: z.literal(false), error: z.object({ code: z.string(), message: z.string() }), retrySafe: z.boolean().optional() });
 const BridgeSuccess = z.object({
   ok: z.literal(true),
-  payment: z.object({ transferReference: z.string() }).partial().optional(),
+  // A pending outcome has no funding evidence yet; tolerate an explicit null from any payer build.
+  payment: z.object({ transferReference: z.string().nullable() }).partial().optional(),
 });
 
 const DEFAULT_TIMEOUT_MS = 60_000;

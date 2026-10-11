@@ -35,7 +35,7 @@ const STATUS: Record<PayerErrorCode, number> = {
 
 /** What a bridge needs from a payer: pay one existing gateway purchase. `purchase` is optional (callers re-read the gateway). */
 export interface BridgePayer {
-  pay(purchaseId: string): Promise<{ purchase?: unknown; transferReference: string | null; resumed: boolean }>;
+  pay(purchaseId: string): Promise<{ purchase?: unknown; transferReference: string | null; resumed: boolean; pending?: boolean }>;
 }
 
 /** Where a bridge may be reached from. Loopback is the default; `hosted` is for the public HTTPS free web service. */
@@ -177,8 +177,8 @@ export function createBridge(deps: BridgeDeps): Server {
 
         if (/^pur_[A-Za-z0-9]{10,40}$/.test(purchaseId)) log({ type: 'bridge.received', purchaseId });
         const r = await (deps.serializePayments === false ? deps.payer.pay(purchaseId as string) : exclusive(() => deps.payer.pay(purchaseId as string)));
-        log({ type: 'bridge.paid', purchaseId, resumed: r.resumed });
-        return send(res, 200, { ok: true, ...(r.purchase !== undefined ? { purchase: redact(r.purchase) } : {}), payment: { transferReference: r.transferReference } });
+        log({ type: 'bridge.paid', purchaseId, resumed: r.resumed, ...(r.pending ? { pending: true } : {}) });
+        return send(res, 200, { ok: true, ...(r.purchase !== undefined ? { purchase: redact(r.purchase) } : {}), payment: r.transferReference ? { transferReference: r.transferReference } : {} });
       } catch (e) {
         if (e instanceof PayerError) {
           log({ type: 'bridge.refused', code: e.code });

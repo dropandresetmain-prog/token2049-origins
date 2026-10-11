@@ -519,7 +519,7 @@ describe('cardano adapter: verify and settle', () => {
     expect(down.logs.some((l) => l.type === 'blockfrost.error')).toBe(true);
   });
 
-  it('on an indeterminate settle, adopts the payment if the chain shows it, else asks for an identical retry', async () => {
+  it('on an indeterminate settle, adopts the payment if the chain shows it, else stays pending (never a rejection or a retry request)', async () => {
     const lands = okRig();
     lands.fac.settleImpl = async () => {
       throw new Error('timeout');
@@ -534,8 +534,30 @@ describe('cardano adapter: verify and settle', () => {
       throw new Error('timeout');
     };
     const v = await unseen.adapter.verify(header(unseen), input());
+    // Settlement was invoked and nothing is observable yet: pending (core retains the candidate), not payment_invalid.
+    expect(v).toEqual({ ok: false, code: 'payment_required', reason: 'Cardano settlement outcome retained for independent recovery', settlementAttempted: true });
+    expect(v).not.toHaveProperty('definitiveFailure');
+    if (!v.ok) expect(v.reason).not.toMatch(/retry|identical|invalid/i);
+    // The facilitator is asked to settle exactly once; recovery from here is read-only.
+    expect(unseen.fac.calls.filter((c) => c === 'settle')).toHaveLength(1);
+    expect(unseen.logs.some((l) => l.type === 'settlement.pending_recovery')).toBe(true);
+    // A blockfrost outage during the same uncertainty is equally pending, not a rejection.
+    const outage = okRig();
+    outage.bf.status = 503;
+    outage.fac.settleImpl = async () => { throw new Error('timeout'); };
+    expect(await outage.adapter.verify(header(outage), input())).toMatchObject({ ok: false, code: 'payment_required', settlementAttempted: true });
+  });
+
+  it('keeps definitive pre-settlement and settlement failures as rejections', async () => {
+    const refused = okRig();
+    refused.fac.verifyImpl = async () => ({ isValid: false, invalidReason: 'invalid_exact_cardano_payload_input_not_available' });
+    expect(await refused.adapter.verify(header(refused), input())).toMatchObject({ ok: false, code: 'payment_invalid', settlementAttempted: false });
+    const failed = okRig();
+    failed.bf.txs.clear();
+    failed.fac.settleImpl = async () => { throw new SettleError(400, { success: false, errorReason: 'transaction_rejected', transaction: '', network: 'cardano:preprod' }); };
+    const v = await failed.adapter.verify(header(failed), input());
     expect(v).toMatchObject({ ok: false, code: 'payment_invalid' });
-    if (!v.ok) expect(v.reason).toContain('settlement_indeterminate');
+    expect(v).not.toHaveProperty('settlementAttempted', true);
   });
 
   it('refuses an invalid SDK verification even when an old payment appears on chain', async () => {

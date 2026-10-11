@@ -6,7 +6,10 @@
  *
  * Flow:  GET purchase -> POST /fund (expect 402) -> policy checks (BEFORE any signing) -> reserve in the
  *        durable ledger -> sign with the SDK (x402Client + ExactCardanoScheme) -> POST /fund with
- *        PAYMENT-SIGNATURE. Retries always resend the IDENTICAL header; a second transaction is never built.
+ *        PAYMENT-SIGNATURE. A run sends ONE signed funding POST. Any ambiguous outcome (timeout, transport error, 5xx,
+ *        429, 202 without funding evidence) is reconciled by read-only GETs of the canonical purchase, never by another
+ *        POST. A later explicit run may resend the IDENTICAL stored header only while the gateway still shows nothing
+ *        received; a second transaction is never built.
  *
  * The signed header is a spend instruction. It is kept in memory and in the 0600 ledger, never logged,
  * and never returned to callers (bridge responses carry only the purchase and the transaction id).
@@ -36,6 +39,11 @@ export interface PayResult {
   transferReference: string | null;
   /** True when a previous run of this payer had already paid; nothing new was signed or sent. */
   resumed: boolean;
+  /**
+   * True when the gateway holds the durable candidate and confirmation is still pending (no funding evidence yet).
+   * The ledger entry stays `signed`, so cap/exposure accounting remains conservative until independently resolved.
+   */
+  pending?: boolean;
 }
 
 export interface PayerDeps {
@@ -50,6 +58,7 @@ export interface PayerDeps {
   now?: () => Date;
   /** Sanitized events only (no headers, no tokens, no mnemonic). */
   log?: (entry: Record<string, unknown>) => void;
+  /** Bound on read-only reconciliation reads after an ambiguous funding POST. The POST itself is never repeated. */
   maxAttempts?: number;
   /** Per-request timeout for POST /fund; the gateway may hold the call while the facilitator settles (~75s). */
   fundTimeoutMs?: number;
@@ -243,6 +252,13 @@ export class Payer {
     // 1. Current purchase. If we already paid it in an earlier run, report instead of paying again.
     const { raw: purchaseRaw, lite: purchase } = await this.getPurchase(purchaseId);
     const prior = await this.ledger.find(purchaseId);
+    // Our signed candidate is already with the gateway (settlement attempted or in recovery) but no funding evidence is
+    // published yet. Do not request a new challenge or POST again: report pending and leave the entry `signed`.
+    if (prior?.header && (prior.status === 'signed' || prior.status === 'accepted') && purchase.state === 'awaiting_funding' &&
+        purchase.funding.length === 0 && (purchase.paymentState === 'unknown' || purchase.paymentState === 'submitted')) {
+      this.log({ type: 'payer.pending', purchaseId, why: 'gateway_holds_candidate' });
+      return { purchase: purchaseRaw, transferReference: prior.transferReference, resumed: true, pending: true };
+    }
     if (purchase.state !== 'awaiting_funding' || purchase.paymentState === 'submitted') {
       if (prior && (prior.status === 'signed' || prior.status === 'accepted') && purchase.funding.length > 0) {
         await this.ledger.upsert({ ...prior, status: 'accepted', transferReference: prior.transferReference ?? purchase.funding[0]!.transferReference, updatedAt: this.now().toISOString() });
@@ -377,73 +393,117 @@ export class Payer {
     return signer;
   }
 
+  /**
+   * Exactly ONE signed funding POST per run. Once the header has left this process the outcome may already be committed
+   * (gateway settled, response lost), so a timeout, transport error, 5xx, 429 or unconfirmed 202 is never answered with
+   * another POST: it is resolved by read-only reconciliation of the canonical purchase (`reconcile`). The signed header,
+   * transaction and ledger reservation are untouched; only an explicit later run may resend the stored header, and only
+   * while the gateway still shows nothing received.
+   */
   private async sendFunding(purchaseId: string, header: string): Promise<PayResult> {
+    let res: Response;
+    try {
+      res = await this.call('POST', `/v1/purchases/${purchaseId}/fund`, { [SIGNATURE_HEADER]: header }, this.d.fundTimeoutMs ?? 120_000);
+    } catch (e) {
+      if (e instanceof PayerError) throw e;
+      this.log({ type: 'payer.reconcile', purchaseId, why: 'transport' });
+      return this.reconcile(purchaseId, 'network error or timeout');
+    }
+
+    if (res.status === 202 || res.status === 200) {
+      const body = (await res.json().catch(() => null)) as { purchase?: unknown; confirmationPending?: unknown } | null;
+      const receipt = res.headers.get('payment-response');
+      let tx: string | null = null;
+      try {
+        if (receipt) tx = decodePaymentResponseHeader(receipt).transaction || null;
+      } catch {
+        tx = null;
+      }
+      const lite = PurchaseLite.safeParse(body?.purchase);
+      if (lite.success && lite.data.purchaseId === purchaseId) {
+        if (lite.data.funding.length > 0) {
+          tx ??= lite.data.funding[0]!.transferReference;
+          await this.markAccepted(purchaseId, tx);
+          return { purchase: body?.purchase ?? null, transferReference: tx, resumed: false };
+        }
+        // 202 confirmation_pending: the gateway journaled an inconclusive settlement and holds the durable candidate.
+        // No funding-evidence row exists yet and none is invented; the entry stays `signed` (exposure stays counted).
+        if (body?.confirmationPending === true && lite.data.state === 'awaiting_funding' &&
+            (lite.data.paymentState === 'unknown' || lite.data.paymentState === 'submitted')) {
+          this.log({ type: 'payer.pending', purchaseId, why: 'confirmation_pending' });
+          return { purchase: body.purchase ?? null, transferReference: null, resumed: false, pending: true };
+        }
+      }
+      this.log({ type: 'payer.reconcile', purchaseId, why: 'unconfirmed_ack' });
+      return this.reconcile(purchaseId, 'acknowledgement did not confirm this purchase');
+    }
+
+    const errBody = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
+    const code = errBody?.error?.code;
+    const message = errBody?.error?.message ?? '';
+
+    if (res.status === 401 || res.status === 403) throw new PayerError('unauthenticated', 'gateway rejected the payer token');
+
+    // Outcome unknown (gateway may have attempted settlement before failing, or an old gateway reports an uncertain
+    // settlement as payment_invalid): read, do not write.
+    if (res.status >= 500 || res.status === 429 || (code === 'payment_invalid' && /settlement_indeterminate/.test(message))) {
+      this.log({ type: 'payer.reconcile', purchaseId, why: `http_${res.status}` });
+      return this.reconcile(purchaseId, `gateway HTTP ${res.status}`);
+    }
+
+    // The gateway proved settlement was never invoked (it removes the pending candidate before answering). Nothing
+    // reached the chain, but a repeat is still an explicit operator/agent decision, not an automatic loop.
+    if (code === 'payment_invalid' && /facilitator_unavailable/.test(message)) {
+      throw new PayerError('gateway_unreachable', 'facilitator temporarily unavailable; payment was not settled; re-run to resend the identical stored payment');
+    }
+
+    if (res.status === 409) {
+      // Our earlier attempt may have landed with the response lost. Look before reporting a conflict.
+      const got = await this.getPurchase(purchaseId).catch(() => null);
+      if (got && got.lite.state !== 'awaiting_funding' && got.lite.funding.length > 0 && code !== 'payment_replayed') {
+        const tx = got.lite.funding[0]!.transferReference;
+        await this.markAccepted(purchaseId, tx);
+        return { purchase: got.raw, transferReference: tx, resumed: true };
+      }
+      if (got && code !== 'payment_replayed' && got.lite.state === 'awaiting_funding' && got.lite.funding.length === 0 &&
+          (got.lite.paymentState === 'unknown' || got.lite.paymentState === 'submitted')) {
+        this.log({ type: 'payer.pending', purchaseId, why: 'conflict_candidate_held' });
+        return { purchase: got.raw, transferReference: null, resumed: true, pending: true };
+      }
+      throw new PayerError('conflict', code === 'payment_replayed' ? 'gateway reports this payment was already used' : 'purchase does not accept this payment', got?.raw);
+    }
+
+    if (res.status === 404) throw new PayerError('not_found', 'purchase not found');
+    // Definitive rejection (payment_invalid, quote_expired, ...). The reason is the gateway's sanitized code.
+    throw new PayerError('payment_rejected', `gateway rejected the payment${code ? ` (${/^[a-z_]{3,40}$/.test(code) ? code : 'error'})` : ''}`);
+  }
+
+  /**
+   * Read-only resolution of an ambiguous funding POST. Bounded GETs of the canonical purchase only; never a POST, never a
+   * new candidate or wallet. A pending result keeps the ledger entry `signed`; confirmed funding evidence promotes it.
+   */
+  private async reconcile(purchaseId: string, note: string): Promise<PayResult> {
     const max = this.d.maxAttempts ?? RETRY_DELAYS_MS.length + 1;
-    let lastNote = 'no response';
     for (let attempt = 0; attempt < max; attempt++) {
       if (attempt > 0) await this.sleep(RETRY_DELAYS_MS[Math.min(attempt - 1, RETRY_DELAYS_MS.length - 1)]!);
-      let res: Response;
-      try {
-        res = await this.call('POST', `/v1/purchases/${purchaseId}/fund`, { [SIGNATURE_HEADER]: header }, this.d.fundTimeoutMs ?? 120_000);
-      } catch (e) {
-        if (e instanceof PayerError) throw e;
-        lastNote = 'network error or timeout';
-        this.log({ type: 'payer.retry', purchaseId, attempt, why: 'transport' });
-        continue;
-      }
-
-      if (res.status === 202 || res.status === 200) {
-        const body = (await res.json().catch(() => null)) as { purchase?: unknown } | null;
-        const receipt = res.headers.get('payment-response');
-        let tx: string | null = null;
-        try {
-          if (receipt) tx = decodePaymentResponseHeader(receipt).transaction || null;
-        } catch {
-          tx = null;
-        }
-        const lite = PurchaseLite.safeParse(body?.purchase);
-        if (!lite.success || lite.data.purchaseId !== purchaseId || lite.data.funding.length === 0) {
-          throw new PayerError('gateway_unreachable', 'payment response did not confirm this purchase; retry the identical payment');
-        }
-        tx ??= lite.data.funding[0]!.transferReference;
+      const got = await this.getPurchase(purchaseId).catch((e) => { if (e instanceof PayerError && e.code === 'unauthenticated') throw e; return null; });
+      if (!got) continue;
+      const v = got.lite;
+      if (v.funding.length > 0) {
+        const tx = v.funding[0]!.transferReference;
         await this.markAccepted(purchaseId, tx);
-        return { purchase: body?.purchase ?? null, transferReference: tx, resumed: false };
+        return { purchase: got.raw, transferReference: tx, resumed: true };
       }
-
-      const errBody = (await res.json().catch(() => null)) as { error?: { code?: string; message?: string } } | null;
-      const code = errBody?.error?.code;
-      const message = errBody?.error?.message ?? '';
-
-      if (res.status === 401 || res.status === 403) throw new PayerError('unauthenticated', 'gateway rejected the payer token');
-
-      // Transient on the gateway side: the same payload may still succeed.
-      const retryable =
-        res.status >= 500 ||
-        res.status === 429 ||
-        (code === 'payment_invalid' && /facilitator_unavailable|settlement_indeterminate/.test(message));
-      if (retryable) {
-        lastNote = `gateway HTTP ${res.status}`;
-        this.log({ type: 'payer.retry', purchaseId, attempt, why: `http_${res.status}` });
-        continue;
+      if (v.state === 'awaiting_funding' && (v.paymentState === 'unknown' || v.paymentState === 'submitted')) {
+        this.log({ type: 'payer.pending', purchaseId, why: 'reconciled' });
+        return { purchase: got.raw, transferReference: null, resumed: true, pending: true };
       }
-
-      if (res.status === 409) {
-        // Our earlier attempt may have landed with the response lost. Look before reporting a conflict.
-        const got = await this.getPurchase(purchaseId).catch(() => null);
-        if (got && got.lite.state !== 'awaiting_funding' && got.lite.funding.length > 0 && code !== 'payment_replayed') {
-          const tx = got.lite.funding[0]!.transferReference;
-          await this.markAccepted(purchaseId, tx);
-          return { purchase: got.raw, transferReference: tx, resumed: true };
-        }
-        throw new PayerError('conflict', code === 'payment_replayed' ? 'gateway reports this payment was already used' : 'purchase does not accept this payment', got?.raw);
-      }
-
-      if (res.status === 404) throw new PayerError('not_found', 'purchase not found');
-      // Definitive rejection (payment_invalid, quote_expired, ...). The reason is the gateway's sanitized code.
-      throw new PayerError('payment_rejected', `gateway rejected the payment${code ? ` (${/^[a-z_]{3,40}$/.test(code) ? code : 'error'})` : ''}`);
+      if (v.state !== 'awaiting_funding') throw new PayerError('conflict', 'purchase no longer accepts funding', got.raw);
     }
-    throw new PayerError('gateway_unreachable', `payment sent but no confirmed answer (${lastNote}); re-run to resend the identical payment`);
+    // Nothing observable yet. The signed header stays in the ledger and counted against the caps; no second POST was made.
+    throw new PayerError('gateway_unreachable', `payment sent but outcome not yet observable (${note}); no second payment was sent; re-run later to reconcile`);
   }
+
 
   private async markAccepted(purchaseId: string, tx: string | null): Promise<void> {
     const e = await this.ledger.find(purchaseId);

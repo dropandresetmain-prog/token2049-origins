@@ -387,7 +387,11 @@ class CardanoFundingAdapter implements CardanoRecoveryAdapter {
     if (!receipt) {
       const rec = await this.recoverFromChain(localTx, input, nonce, payer);
       if (rec) return rec;
-      return invalid('settlement_indeterminate: retry with the identical payment header');
+      // Settlement was invoked and its outcome is unknown: the facilitator may have broadcast this exact
+      // transaction. That is neither a rejection nor a request to POST again. Core keeps the durable candidate
+      // (transaction identity, signed header, reservation) and independent recovery owns the truth.
+      this.event('settlement.pending_recovery', { host: c.facilitatorHost, tx: localTx });
+      return { ok: false, code: 'payment_required', reason: 'Cardano settlement outcome retained for independent recovery', settlementAttempted: true };
     }
     if (receipt.success !== true && receipt.errorReason !== ERR_SETTLEMENT_PENDING) {
       // Definitive failure at the facilitator. Still check the chain: a restart can turn a resumed
