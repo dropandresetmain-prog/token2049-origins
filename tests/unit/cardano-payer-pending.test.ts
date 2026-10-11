@@ -139,12 +139,43 @@ describe('Cardano payer: uncertain settlement stays pending', () => {
 
   it('never auto-resends on a facilitator outage: one POST, then an explicit re-run reuses the identical header', async () => {
     const s = setup(); s.gateway.replies.push(s.err(402, 'payment_invalid', 'facilitator_unavailable: retry with the identical payment header'), s.pendingAck);
-    await expect(new Payer(s.deps).pay(ID)).rejects.toMatchObject({ code: 'gateway_unreachable', retrySafe: false });
+    // The gateway's canonical state (awaiting_funding / not_received / no evidence) proves nothing was attempted, so a deliberate
+    // caller-level repeat is declared safe; the payer itself still sends exactly one POST.
+    await expect(new Payer(s.deps).pay(ID)).rejects.toMatchObject({ code: 'gateway_unreachable', retrySafe: true });
     expect(s.gateway.posts).toBe(1);
     const header = s.gateway.signatures[0]!;
     expect(await new Payer(s.deps).pay(ID)).toMatchObject({ pending: true }); // deliberate second run
     expect(s.gateway.posts).toBe(2); expect(s.gateway.signatures[1]).toBe(header); expect(s.signer).toHaveBeenCalledTimes(1);
     expect(s.ledger.committed(s.config.network, s.config.allowedAsset)).toBe(400000n); // one reservation, never doubled
+  });
+
+  it('does not declare facilitator_unavailable retry-safe unless canonical state proves nothing was attempted', async () => {
+    const s = setup();
+    s.gateway.replies.push(() => { s.gateway.view = { state: 'awaiting_funding', paymentState: 'unknown', funding: [] }; return new Response(JSON.stringify({ error: { code: 'payment_invalid', message: 'facilitator_unavailable' } }), { status: 402 }); });
+    await expect(new Payer(s.deps).pay(ID)).rejects.toMatchObject({ code: 'gateway_unreachable', retrySafe: false });
+    expect(s.gateway.posts).toBe(1);
+  });
+
+  it('an old gateway 202 without confirmationPending/evidence is reconciled, not trusted and not re-POSTed', async () => {
+    const s = setup();
+    s.gateway.replies.push(() => new Response(JSON.stringify({ purchase: { purchaseId: ID, quoteId: 'quo_ABCDEFGHIJKLMNOP', state: 'awaiting_funding', paymentState: 'unknown', funding: [] } }), { status: 202 }));
+    s.gateway.view = { state: 'awaiting_funding', paymentState: 'unknown', funding: [] };
+    expect(await new Payer(s.deps).pay(ID)).toMatchObject({ pending: true, resumed: true });
+    expect(s.gateway.posts).toBe(1); expect(only(s).status).toBe('signed');
+  });
+
+  it('fails closed (conflict) when reconciliation finds the purchase closed without our evidence', async () => {
+    const s = setup();
+    s.gateway.replies.push(() => { s.gateway.view = { state: 'expired', paymentState: 'not_received', funding: [] }; throw new Error('connection reset'); });
+    await expect(new Payer(s.deps).pay(ID)).rejects.toMatchObject({ code: 'conflict', retrySafe: false });
+    expect(s.gateway.posts).toBe(1); expect(only(s).status).toBe('signed');
+  });
+
+  it('reports a replayed payment as a conflict, never as pending or accepted', async () => {
+    const s = setup();
+    s.gateway.replies.push(s.err(409, 'payment_replayed', 'this transfer has already been used'));
+    await expect(new Payer(s.deps).pay(ID)).rejects.toMatchObject({ code: 'conflict' });
+    expect(s.gateway.posts).toBe(1); expect(only(s).status).toBe('signed');
   });
 
   it('keeps definitive rejection as a rejection (no reconciliation, no pending)', async () => {

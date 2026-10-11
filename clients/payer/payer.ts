@@ -238,7 +238,8 @@ export class Payer {
         if (e instanceof PayerError && PURCHASE_ID.test(purchaseId)) {
           // Signed, accepted and unfinished signing records all remain ambiguous or committed.
           // Read failures also fail closed. Never infer safety from the gateway's paymentState alone.
-          try { e.retrySafe = !(await this.ledger.find(purchaseId)); } catch { e.retrySafe = false; }
+          // A gateway-proven "nothing was attempted" (facilitator_unavailable + canonical not_received) is set by sendFunding and kept.
+          if (!e.retrySafe) { try { e.retrySafe = !(await this.ledger.find(purchaseId)); } catch { e.retrySafe = false; } }
         }
         throw e;
       }
@@ -454,7 +455,12 @@ export class Payer {
     // The gateway proved settlement was never invoked (it removes the pending candidate before answering). Nothing
     // reached the chain, but a repeat is still an explicit operator/agent decision, not an automatic loop.
     if (code === 'payment_invalid' && /facilitator_unavailable/.test(message)) {
-      throw new PayerError('gateway_unreachable', 'facilitator temporarily unavailable; payment was not settled; re-run to resend the identical stored payment');
+      const err = new PayerError('gateway_unreachable', 'facilitator temporarily unavailable; payment was not settled; re-run to resend the identical stored payment');
+      // Only the gateway's own canonical state can prove nothing was attempted (it removed the candidate and reset to not_received).
+      // Then a deliberate caller-level repeat is safe: it resumes the stored header with one POST. Anything else stays not retry-safe.
+      const got = await this.getPurchase(purchaseId).catch(() => null);
+      if (got && got.lite.state === 'awaiting_funding' && got.lite.paymentState === 'not_received' && got.lite.funding.length === 0) err.retrySafe = true;
+      throw err;
     }
 
     if (res.status === 409) {
