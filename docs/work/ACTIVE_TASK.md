@@ -2,7 +2,7 @@
 Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreversible action.
 
 ## Objective and current state
-- READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED: both new cold cycles and covered activation PASS; owner tests only, all9live rows NOT RUN.
+- OWNER_E2E_INVESTIGATION_COMPLETE: Atlas/Sui independently verified; hotel/Cardano claimed success unsupported by canonical records; Shopify/Solana quote succeeded, no payment attempted. No repair deployed.
 - Existing Render Free gateway/MCP/OAuth, console, providers and Playwright are preserved. One reused Free payer contains three internal rails.
 - Canonical database: owner-authorized Neon Free PG18.6 Singapore, direct/unpooled verified TLS. This explicit authorization supersedes the earlier Render-only database constraint.
 - Former Render database remains read-only with its original loopback-only access restriction; expiry 2026-11-05T06:55:54.699333Z.
@@ -38,7 +38,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Owner requested a privately generated memorable passphrase; only the gateway owner-passcode secret changed, with the same86f5194 revision redeployed.
 - Old passcode HTTP401; new passphrase consent/PKCE/MCP initialize/tool discovery PASS using purchases:read only. Non-OAuth table hashes, all gateway environment variables and payer deployment unchanged. No payment or merchant call.
 - Passphrase copied privately to the owner clipboard; protected local file remains the retrieval source. No credential value or digest retained in Git.
-- Protected evidence: ~/.capsule/neon-migration-20261011/owner-passcode-rotation-20261011. Owner E2E remains NOT RUN.
+- Protected rotation evidence: ~/.capsule/neon-migration-20261011/owner-passcode-rotation-20261011; this rotation checkpoint preceded the owner E2E.
 
 ## Current repair checklist
 - [x] Authenticated selected-payer transport readiness before durable claim; useful bounded progress and expiry recheck.
@@ -55,6 +55,15 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 
 - [x] Final diagnostic21Worker tests/typecheck/default-deny PASS; actual deployed module equals dry bundle.08:04UTC one direct request after5506.843s idle: Worker200/upstream200JSON/routing none,32.408s upstream/33.135s caller; Render startup08:04:27.933UTC.40non-OAuth hashes/authority unchanged.
 - [x] Wake boundary19tests/local workerd/independent review; gateway135affected unit tests and68native PostgreSQL/MCP integration tests/typecheck/build PASS; independent extension no code blocker, including9fixture combinations and unclaimed wake failure/ambiguousPOST protection.
+
+## Owner E2E investigation (no fixes)
+- Scope: latest owner requests read-only investigation and proposed next steps only. No purchases, retries, provider writes, deployment or financial mutations.
+- Source405368c; actual gateway86f5194/dep-db5q9jdckfvc73b35c50 and payer3945f9c/dep-db5la02jnfac73ast890 verified unchanged.
+- Flightpur_01M4NRRCVHXW6GZEX35S7H20EM: one Sui74300-unit transfer and one Atlas ticketed execution; pending readback was mislabeled payment_rejected before same-digest recovery.
+- Hotel: no quote/purchase/Cardano ledger/receipt; claimed3899895 readback404. Shopify quotequo_01M4NSPKAB116PPJ9Z0KVGHVT2 succeeded with Solana available after107s; no pending-result collection or buy found.
+- Existing recovery/background fixtures2files/51tests PASS. Browser504.4MiB/512MiB with throttling, no recorded OOM kill; dispose observed.
+- Report: docs/work/OWNER_E2E_INVESTIGATION_20261011.md; protected raw evidence: ~/.capsule/neon-migration-20261011/owner-e2e-investigation-20261011. Exact host tool bodies and secure provider document retrieval remain unavailable.
+- STOP: proposed narrow pending-state/quote-collection/grounded-confirmation repair needs a new implementation instruction; fresh chat with report/ledger recommended. Preserve completed/expired purchases and all authority/history fences.
 
 ## Implementation and local verification
 - [x] Instructions, refs, implementations and histories inspected; isolated lane and known-good checkpoint preserved.
@@ -126,8 +135,8 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: owner refresh/reconnect existing Capsule OAuth and run nine fresh manual rows. STOP agent work. Same chat only for a narrow owner-reported failure.
-- Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
+- Next action PRIMARY: deliver investigation findings and STOP. Proposed repair scope is in the owner E2E report; no agent live test or implementation without the next owner instruction.
+- Fresh chat for the proposed UX/reliability repair using the report and this ledger; no autonomous purchase or provider preflight.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 
 ## Evidence links
