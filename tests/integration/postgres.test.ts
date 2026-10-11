@@ -1,3 +1,4 @@
+import { readdir } from 'node:fs/promises';
 import { describe, expect, it } from 'vitest';
 import { createTestDb, newTestSchema } from '../support/database.js';
 import { createFundablePurchase, retailFulfillment, retailIntent, startHarness, type Harness } from '../support/harness.js';
@@ -28,12 +29,17 @@ describe('PostgreSQL persistence and competing connections', () => {
   });
 
   it('migrates an empty schema once, tolerates competing startups, and preserves data on rerun', async () => {
+    const migrationFiles = (await readdir(new URL('../../src/migrations/', import.meta.url))).filter(name => /^\d{4}_[a-z0-9_]+\.sql$/.test(name)).sort();
+    expect(migrationFiles.length).toBeGreaterThan(0);
     const schema = newTestSchema();
     const first = await createTestDb(schema);
     await first.run("INSERT INTO customers VALUES ('persisted', 'Migration probe', '2026-10-06T00:00:00.000Z')");
     const [second, third] = await Promise.all([createTestDb(schema), createTestDb(schema)]);
     await Promise.all([first.initialize(), second.initialize(), third.initialize()]);
-    expect((await second.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM schema_migrations'))?.n).toBe(12);
+    // Applied exactly once each despite three competing startups; count derives from the migration files on disk.
+    expect((await second.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM schema_migrations'))?.n).toBe(migrationFiles.length);
+    expect((await second.all<{ version: string }>('SELECT version FROM schema_migrations ORDER BY version')).map(row => row.version)).toEqual(migrationFiles);
+    expect((await second.get<{ version: string }>('SELECT MAX(version) AS version FROM schema_migrations'))?.version).toBe(migrationFiles.at(-1));
     expect((await third.get<{ display_name: string }>("SELECT display_name FROM customers WHERE id = 'persisted'"))?.display_name).toBe('Migration probe');
     await first.run("UPDATE schema_migrations SET checksum = 'tampered'");
     await expect(second.initialize()).rejects.toThrow(/checksum mismatch/);

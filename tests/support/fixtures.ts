@@ -132,6 +132,7 @@ export class FixtureFundingAdapter implements FundingAdapter {
   readonly network = FIXTURE_NETWORK;
   readonly paymentHeaderName = 'payment-signature';
   readinessStatus: ReadinessStatus = 'LOCAL_TESTS_ONLY';
+  readinessCalls = 0;
   verifyCalls = 0;
   confirmResult: 'confirmed' | 'submitted' | 'invalid' = 'confirmed';
   /** Simulated verification/settlement latency. */
@@ -140,6 +141,7 @@ export class FixtureFundingAdapter implements FundingAdapter {
   constructor(private readonly clock: Clock) {}
 
   async readiness(): Promise<Readiness> {
+    this.readinessCalls++;
     return { component: 'cardano', status: this.readinessStatus, environment: 'fixture', missing: [], checkedAt: this.clock.now().toISOString() };
   }
 

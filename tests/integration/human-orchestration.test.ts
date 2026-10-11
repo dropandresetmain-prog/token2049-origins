@@ -51,22 +51,56 @@ describe('human orchestration over durable commerce', () => {
     const result = await h.call('GET', `/v1/purchases/${purchase.purchaseId}`, auth());
     expect(result.body.purchase.state).toBe('requires_reauthorization');
   });
-  it.each(['MISSING_CONFIG', 'ACCESS_BLOCKED'] as const)('excludes %s and cannot create a purchase', async readiness => {
+  const purchaseCount = async () => (await h.gw.db.get<{ n: number }>('SELECT COUNT(*)::int AS n FROM purchases'))!.n;
+  const buy = (q: any, selectedFundingOptionId: string, key: string) => h.call('POST', '/v1/purchases', { ...auth(), headers: { 'idempotency-key': key }, body: {
+    quoteId: q.quoteId, approval: { maxTotal: q.payablePrincipal, quoteDigest: q.digest, selectedFundingOptionId },
+  } });
+  it.each(['MISSING_CONFIG', 'ACCESS_BLOCKED'] as const)('lists configured %s capability at quote time but denies payment before any obligation exists', async readiness => {
     h.funding.readinessStatus = readiness;
     const q = await quote();
-    expect(q.fundingOptions).toEqual([]);
-    const result = await h.call('POST', '/v1/purchases', { ...auth(), headers: { 'idempotency-key': 'no-payment-source' }, body: { quoteId: q.quoteId, approval: { maxTotal: q.payablePrincipal, quoteDigest: q.digest, selectedFundingOptionId: 'fop_ABCDEFGHIJKLMNOP' } } });
+    expect(q.fundingOptions).toHaveLength(1);
+    expect(q.fundingOptions[0].fundingOptionId).toMatch(/^fop_/);
+    const result = await buy(q, q.fundingOptions[0].fundingOptionId, `not-ready-${readiness}`);
+    expect(result.status).toBe(503);
+    expect(result.body.error.code).toBe('route_unavailable');
+    expect(result.body.error.message).toContain(readiness);
+    expect(await purchaseCount()).toBe(0);
+  });
+  it('quoting never probes funding rail readiness; only the selected rail is checked at payment', async () => {
+    h.funding.readinessCalls = 0;
+    const q = await quote();
+    expect(q.fundingOptions).toHaveLength(1);
+    expect(h.funding.readinessCalls).toBe(0);
+    expect((await buy(q, q.fundingOptions[0].fundingOptionId, 'selected-rail-probe')).status).toBe(201);
+    expect(h.funding.readinessCalls).toBe(1);
+  });
+  it('rejects a fabricated funding option id as invalid, independent of readiness', async () => {
+    const q = await quote();
+    const result = await buy(q, 'fop_ABCDEFGHIJKLMNOP', 'fabricated-option');
     expect(result.status).toBe(400);
+    expect(result.body.error.code).toBe('invalid_request');
+    expect(await purchaseCount()).toBe(0);
   });
   it.each(['CONFIGURED_UNVERIFIED', 'EXTERNAL_CHECK_PASSED', 'LOCAL_TESTS_ONLY'] as const)('allows %s in tests', async readiness => {
     h.funding.readinessStatus = readiness;
     expect((await quote()).fundingOptions).toHaveLength(1);
   });
-  it('fixture rails are not selectable in demo runtime; no fallback', async () => {
+  it('fixture-only funding is not usable in the sandbox runtime and fails closed without fallback', async () => {
     h.gw.core.deps.config.appEnv = 'sandbox';
-    expect((await quote()).fundingOptions).toEqual([]);
+    // Quote lists configured capability only; the fixture-only readiness is enforced at payment, on the selected rail.
+    const q = await quote();
+    expect(q.fundingOptions).toHaveLength(1);
+    const denied = await buy(q, q.fundingOptions[0].fundingOptionId, 'sandbox-fixture-only');
+    expect(denied.status).toBe(503);
+    expect(denied.body.error.code).toBe('route_unavailable');
+    expect(denied.body.error.message).toContain('LOCAL_TESTS_ONLY');
+    expect(await purchaseCount()).toBe(0);
+    // A rail that is configured (not fixture-only) works in the same runtime.
     h.funding.readinessStatus = 'CONFIGURED_UNVERIFIED';
-    expect((await quote()).fundingOptions).toHaveLength(1);
+    const fresh = await quote();
+    const ok = await buy(fresh, fresh.fundingOptions[0].fundingOptionId, 'sandbox-configured-rail');
+    expect(ok.status).toBe(201);
+    expect(await purchaseCount()).toBe(1);
   });
   it('readiness loss after quote prevents creating a new funding obligation', async () => {
     const q = await quote(); h.funding.readinessStatus = 'ACCESS_BLOCKED';
