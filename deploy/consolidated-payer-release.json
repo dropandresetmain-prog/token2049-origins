@@ -255,8 +255,8 @@
     },
     "quotaEvidence": "Authenticated Render billing dashboard 11 October13:55SG: Hobby/no card/USD0,672.77hours/434pipeline minutes/~4.885GB remaining; shared rounded counters.",
     "status": "WAKE_INTEGRATION_IN_PROGRESS_SIGNING_DISABLED",
-    "candidateSha": "fe8abb7a82eb6e610445b40459137b5735647f39",
-    "canonicalGitSourceFingerprint": "5b3a6e5b14106b2f3094b68cfd881371eb9dcf46004a9d50541a8f60243068cc",
+    "candidateSha": "b122186ceaadc36cb75abb4fb986cde7423a3046",
+    "canonicalGitSourceFingerprint": "ef0291f957939be981e7247b081263820b78c0bf7cac03ae33fb9b6be17fb942",
     "fingerprintBasis": "sorted tracked path NUL canonical Git blob bytes NUL",
     "authorityRunner": "scripts/multiwallet/activate-repair-authority.mjs",
     "finalBackupSha256": "c36c8b2db86e79dcdb30653404c3bc1dd53baca57a98f0770c3e4a5c1e441ffc",
@@ -264,15 +264,21 @@
     "operatorPeakRssKiB": 146300,
     "warmTransportContract": "PASS; fixed invalid ID canonical HTTP400, no payment attempted",
     "neonQuota": {
+      "projectId": "cool-paper-95079645",
       "plan": "free_v3",
-      "reportedAt": "2026-10-10T21:44:00Z",
-      "computeSeconds": 1542,
-      "transferBytes": 21717126,
-      "preRepairDatabaseBytes": 12836864
+      "reportedAt": "2026-10-11T06:09:55.094Z",
+      "computeTimeSeconds": 2713,
+      "dataTransferBytes": 39889248,
+      "historyRetentionSeconds": 21600,
+      "fixedCU": 0.25,
+      "poolerEnabled": false,
+      "region": "aws-ap-southeast-1",
+      "exactRemainingComputeAllowance": "not established by Free consumption-history API",
+      "zeroStorageCounters": "deprecated counters; not zero usage"
     },
     "payerSha": "3945f9c52cf76e1960569d53416361bcd42de175",
     "payerCanonicalGitSourceFingerprint": "addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46",
-    "gatewayDeployId": "dep-db5bnajrjlhs73d40vng",
+    "gatewayDeployId": "dep-db5ibrd9fdbs73d067p0",
     "coldFirstCheck": {
       "idleSeconds": 978.981,
       "outerHttpStatus": 503,
@@ -280,7 +286,7 @@
       "paymentAttempted": false,
       "result": "SAFE FAILURE; GET-only429 retry correction applied; retest pending"
     },
-    "replacementBackupSha256": "332a542ac4b988e9207b5d21419252a3bf3fd29a238a7e5b66dc4573feaea78a",
+    "replacementBackupSha256": "caf31fb7f1acbc05a4bff030a9020d81fa9a02eb142fdfdb40ae8627ea3020d8",
     "affectedFollowupTests": 85,
     "authority": {
       "payerSigningEnabled": false,
@@ -323,7 +329,7 @@
     "payerDeployId": "dep-db595f3rjlhs73crrsa0"
   },
   "wakeExperiment": {
-    "status": "PHASE1_COLD_PASS_INTEGRATION_PENDING",
+    "status": "FIRST_INTEGRATED_COLD_PASS_SECOND_PENDING",
     "authorization": "owner attachment8577f52b, 11 October2026",
     "workerName": "capsule-payer-wake-experiment",
     "accountId": "c9e98d4cf5ad6e4eee3a5851d19639a8",
@@ -334,7 +340,7 @@
       "CAPSULE_WAKE_SECRET"
     ],
     "destination": "https://t2o-cardano-payer.onrender.com/health",
-    "gatewayIntegrationEnabled": false,
+    "gatewayIntegrationEnabled": true,
     "signingEnabled": false,
     "scheduledTriggers": [],
     "additionalStorageResources": 0,
@@ -370,6 +376,22 @@
       "two genuine>=960s idle checks: trigger gateway readiness, observe specific429 then Worker200 and direct authenticated status/invalid-ID400",
       "archive protected proofs and verify exact candidate/history/ownership before conditional activation; restore owner scope last",
       "non-spending MCP/console/proof check; owner performs all nine live rows"
+    ],
+    "integratedColdChecks": [
+      {
+        "started": "2026-10-11T06:03:50.314Z",
+        "idleSeconds": 993.28,
+        "durationMs": 34250,
+        "workerMs": 32761,
+        "gatewayInitialStatus": 429,
+        "workerHttpStatus": 200,
+        "directStatusReady": true,
+        "fixedInvalidIdPostStatus": 400,
+        "outerStatus": 200,
+        "independentStartup": true,
+        "historyUnchanged": true,
+        "paymentAttempted": false
+      }
     ]
   }
 }

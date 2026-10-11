@@ -13,10 +13,10 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Remote: https://github.com/dropandresetmain-prog/token2049-origins.git.
 - Main verified unchanged: 7c09b37eaaeda2bf3eec94fc1e3456118962f636.
 - Branch: codex/capsule-neon-migration; worktree: C:/Dev/token2049-origins-neon-migration.
-- Gateway deployed fe8abb7a82eb6e610445b40459137b5735647f39; retained payer 3945f9c52cf76e1960569d53416361bcd42de175, pushed; signing/grants disabled pending cold retest/activation.
-- Canonical gateway Git fingerprint: 5b3a6e5b14106b2f3094b68cfd881371eb9dcf46004a9d50541a8f60243068cc; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
+- Gateway deployed b122186ceaadc36cb75abb4fb986cde7423a3046; retained payer3945f9c52cf76e1960569d53416361bcd42de175; signing/grants/customer writes disabled pending second integrated cold check/activation.
+- Canonical gateway Git fingerprint: ef0291f957939be981e7247b081263820b78c0bf7cac03ae33fb9b6be17fb942; payer fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46.
 - Worker checkpoint9ee0e7d pushed; gateway integration replacement resolve git rev-parse HEAD. Worker deployed versionf416f62f, canonical moduleSHAe40e3110bdf403c1e0acb60b5493894aa27a3c28d10167e33a17b53775ac1450.
-- Normal gateway dep-db5bnajrjlhs73d40vng live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation blocked.
+- Normal gateway dep-db5ibrd9fdbs73d067p0 live; retained disabled payer dep-db5b0o5ckfvc739j3l60. Activation blocked.
 - Shared codex/console-source-store checkout and unrelated changes untouched; no main promotion.
 - Original on-demand7785c667 lane and gateway-onlyad3d675 lane preserved. Sui bae2f623 integrated asd7cd82c after overlap review.
 - Previous ledgers: PUBLIC_JUDGE_CHECKPOINT.md and CONSOLIDATED_PAYER_PRE_NEON_CHECKPOINT.md retained.
@@ -40,7 +40,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - [x] Focused native PostgreSQL/fixture tests, builds and one independent narrow review.
 - [x] Consistent backup/restore, quiescence/fencing, exact candidate deployment and cap configuration.
 - [ ] Hosted non-spending checks including cold ingress and selected-rail initialization; owner E2E handoff.
-- Current checkpoint: gatewayfe8abb7/payer3945live normal/disabled. Cold429 retries and identified UA fail; unauthenticatedhealth confirms x-render-routing hibernate-rate-limited.175integrated/85affected/8finaltests,6gateassertions,builds and OAuth16PASS;44table history unchanged.
+- Current checkpoint: gatewayb122186/payer3945live normal/disabled; first integrated cold993.28s idle/34.250s total PASS; second window starts06:04:24.564UTC. Cold429 retries and identified UA fail; unauthenticatedhealth confirms x-render-routing hibernate-rate-limited.175integrated/85affected/8finaltests,6gateassertions,builds and OAuth16PASS;44table history unchanged.
 - Incident report: C:/Dev/token2049-origins/output/cross-rail-investigation-20261011/REPORT.md.
 - Protected primary addendum: ~/.capsule/neon-migration-20261011/incident-crossrail-20261011/ADDENDUM.md.
 - VERIFIED: 1:1000 active on all3; financial hashes unchanged; chain reads no incident settlement; merchants not started.
@@ -110,7 +110,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 ## Risks, quotas and next action
 - Current authenticated Render dashboard13:55SG:77.23/750hours used (672.77remaining),66/500build minutes used (434remaining),115MB/5GBused (~4.885GBremaining);6/25services; Hobby/no card, current/projected chargesUSD0. Rounded shared counters.
 - No card on file verified: excess use stops builds/suspends Free apps. Worker Free/$0 verified; budget20Worker requests/3health wakes,30build minutes/2instance hours. No exact account-wide Worker request meter.
-- Neon Free confirmed free_v3:1GiB/project,100CUh/month,6hrestore; API reports1542CU-seconds (0.4283CUh),21,717,126transfer bytes. Zero storage/writes counters are not zero-usage proof.
+- Neon Free confirmed free_v3:1GiB/project,100CUh/month,6hrestore; API06:09:55UTC reportscompute_time_seconds2713,39,889,248transfer bytes; exact remaining Free compute allowance unverified. Zero storage/writes counters are not zero-usage proof.
 - Conservative empty-queue estimate43.4CUh/month using7min active windows; reserve20CUh for owner. Actual idle/reconnect PASS.
 - Investigate Now: repeated integrated cold acceptance and activation gates pending. First cold PASS at05:43UTC after982.281s idle: Worker200/upstream200 in32.441s, independent payer startup; authenticated gateway readiness subsequently PASS. Histories unchanged.
 - Investigate Now: owner9live rows/browser timing/disconnects and undocumented limiter scope/reset.
@@ -118,7 +118,7 @@ Updated 11 October 2026 Singapore. Re-read before resuming work or taking irreve
 - Investigate Now: local console-access-key differs from unchanged deployed hash; public demo view works without it. No rotation.
 - Ignore / Accept Risk: Free cold starts, controlled Render secret symlinks and retained conservative Sui exposure. No warm-up required.
 - Park for Later: consumer onboarding, advanced orchestration and infrastructure replacement.
-- Next action PRIMARY: deploy pushed gateway-only wake replacement with fresh dedicated secret, all authority disabled; two >=16min integrated cold checks; then inspected conditional activation. Narrow review/build PASS. Fresh44table/805row snapshot/PG18restore PASS, SHAcaf31fb7; exact inert Neon platform ACL placeholders preserve all ACLs without source changes.
+- Next action PRIMARY: second integrated cold check no earlier06:20:24.564UTC, refresh read-only OAuth first (no payer traffic); if PASS save exact candidate/history/ownership/backup proofs and resume conditional activation. Never buy. Fresh44table/805row PG18restore PASS SHAcaf31fb7; all ACLs preserved with inert local platform roles.
 - Same chat for narrow owner failure fixes. Never autonomously start a purchase or provider preflight after handoff.
 - Rollback: fence authority and inspect canonical history first; no stale restore or old signer reactivation after spending/uncertainty.
 
