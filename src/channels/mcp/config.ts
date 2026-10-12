@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 
-export type PayerRail = 'cardano' | 'solana' | 'sui';
-export const PAYER_RAILS: readonly PayerRail[] = ['cardano', 'solana', 'sui'];
+export type PayerRail = 'cardano' | 'solana' | 'sui' | 'xlayer';
+export const PAYER_RAILS: readonly PayerRail[] = ['cardano', 'solana', 'sui', 'xlayer'];
 export interface BridgeEndpoint { url: string; token: string }
 export const PAYER_WAKE_URL = 'https://capsule-payer-wake-experiment.dropandreset-main.workers.dev/wake';
 export const PAYER_WAKE_DESTINATION = 'https://t2o-cardano-payer.onrender.com';
@@ -91,6 +91,7 @@ const BRIDGE_VARS: Record<PayerRail, { url: string; token: string }[]> = {
   cardano: [{ url: 'CARDANO_PAYER_BRIDGE_URL', token: 'CARDANO_PAYER_BRIDGE_TOKEN_FILE' }, { url: 'PAYER_BRIDGE_URL', token: 'PAYER_BRIDGE_TOKEN_FILE' }],
   solana: [{ url: 'SOLANA_PAYER_BRIDGE_URL', token: 'SOLANA_PAYER_BRIDGE_TOKEN_FILE' }],
   sui: [{ url: 'SUI_PAYER_BRIDGE_URL', token: 'SUI_PAYER_BRIDGE_TOKEN_FILE' }],
+  xlayer: [{ url: 'XLAYER_PAYER_BRIDGE_URL', token: 'XLAYER_PAYER_BRIDGE_TOKEN_FILE' }],
 };
 
 function loadBridges(env: NodeJS.ProcessEnv): Partial<Record<PayerRail, BridgeEndpoint>> {

@@ -245,7 +245,7 @@ export type ReceiptView = z.infer<typeof ReceiptView>;
 export const FundingInstructions = z
   .object({
     fundUrl: z.string(),
-    protocol: z.enum(['x402', 'sui-usdc-transfer']),
+    protocol: z.enum(['x402', 'sui-usdc-transfer', 'xlayer-usdt0-transfer']),
     options: z.array(FundingOption),
     expiresAt: IsoTimestamp,
     note: z.string(),
