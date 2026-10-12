@@ -1,0 +1,139 @@
+{
+  "timestamp": "2026-10-12T17:40:23.095Z",
+  "schema": "xlayer_e2e_2d72a82e9e104a3eb8564301bbff9584",
+  "status": "PASS",
+  "provider": "shopify",
+  "providerEnvironment": "test",
+  "settlementPolicy": {
+    "mode": "scaled_testnet",
+    "numerator": 1,
+    "denominator": 1000
+  },
+  "onChainPurchaseCommitment": false,
+  "onChainQuoteExpiry": false,
+  "quoteExpiryEnforcement": "payer_signed_application_binding_and_gateway_preflight",
+  "payer": {
+    "status": 202,
+    "hash": "0xfa39b5fd57670e30be51b8b29db2d9839c55afe0dc2e7552c18aca8588d8cbc1",
+    "resumed": false
+  },
+  "purchase": {
+    "purchaseId": "pur_01M4RK7M8EVPX46H8WQY0ZHKJ2",
+    "state": "succeeded",
+    "paymentState": "confirmed",
+    "merchantPaymentStatus": "simulated_paid",
+    "commerceStatus": "paid",
+    "providerReference": "gid://shopify/Order/18944634585145",
+    "receiptId": "rcp_01M4RK92SYDGXVDK0NDA7K60BX",
+    "funding": [
+      {
+        "rail": "xlayer",
+        "network": "eip155:1952",
+        "asset": "0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c",
+        "amountBaseUnits": "17950",
+        "decimals": 6,
+        "transferReference": "0xfa39b5fd57670e30be51b8b29db2d9839c55afe0dc2e7552c18aca8588d8cbc1",
+        "paymentState": "confirmed",
+        "purpose": "purchase_principal",
+        "verifiedAt": "2026-10-12T17:40:54.098Z",
+        "evidenceMode": "fresh_external"
+      }
+    ]
+  },
+  "chain": {
+    "chainId": 1952,
+    "hash": "0xfa39b5fd57670e30be51b8b29db2d9839c55afe0dc2e7552c18aca8588d8cbc1",
+    "blockNumber": "43368014",
+    "blockHash": "0xbf13e8614f9fdb67bdcdfeb7047edb8ddc4102ae83a55f97e6555f6d4475de45",
+    "from": "0x8e1c8d2f595444b895f022f5f88746b8aceb9105",
+    "to": "0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c",
+    "token": "0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c",
+    "transferAmountBaseUnits": "17950",
+    "payee": "0xee38198cce4e690aa24e36c74f678f7ca7185888",
+    "gasUsed": "39276",
+    "effectiveGasPrice": "20000001",
+    "explorer": "https://www.okx.com/web3/explorer/xlayer-test/tx/0xfa39b5fd57670e30be51b8b29db2d9839c55afe0dc2e7552c18aca8588d8cbc1"
+  },
+  "evidenceCount": 1,
+  "providerReadback": {
+    "orderId": "gid://shopify/Order/18944634585145",
+    "name": "#1007",
+    "test": true,
+    "financialStatus": "PAID",
+    "paidTestEvidence": true
+  },
+  "proofReadback": {
+    "purchaseId": "pur_01M4RK7M8EVPX46H8WQY0ZHKJ2",
+    "hash": "0xfa39b5fd57670e30be51b8b29db2d9839c55afe0dc2e7552c18aca8588d8cbc1",
+    "receiptId": "rcp_01M4RK92SYDGXVDK0NDA7K60BX"
+  },
+  "fundingJournalCount": 1,
+  "duplicate": {
+    "status": 202,
+    "hash": "0xfa39b5fd57670e30be51b8b29db2d9839c55afe0dc2e7552c18aca8588d8cbc1",
+    "resumed": true
+  },
+  "acceptanceSummary": {
+    "verdict": "PASS",
+    "branch": "feat/xlayer-payment-rail",
+    "head": "85f93b06b3c54268db4df142ed51d0a9122ce895",
+    "worktreeCleanBeforeTest": true,
+    "noncePreflight": {
+      "pending": 0,
+      "latest": 1,
+      "selected": 1,
+      "selection": "max(pending,latest)",
+      "signedOrBroadcast": false
+    },
+    "postPaymentNonceRead": {
+      "pending": 0,
+      "latest": 2,
+      "nextSelected": 2,
+      "selection": "max(pending,latest)"
+    },
+    "checks": {
+      "xlayerNonceUnitFiles": "3 passed",
+      "focusedFiles": "13 passed",
+      "focusedTests": "306 passed",
+      "backendAndPayerTypecheck": "PASS",
+      "shopifyPreflight": "PASS"
+    },
+    "quoteId": "quo_01M4RK7KYHKFMXBB7B15D39ATC",
+    "transactionNonce": 1,
+    "independentRpc": "https://xlayertestrpc.okx.com/terigon",
+    "independentReceipt": "success",
+    "transferEventCount": 1,
+    "payerBalanceBaseUnits": {
+      "before": "9982050",
+      "after": "9964100",
+      "debit": "17950"
+    },
+    "persistedCounts": {
+      "fundingEvidence": 1,
+      "fundingAttempt": 1,
+      "fundingJournal": 1,
+      "merchantOperations": 1,
+      "succeededMerchantOperations": 1
+    },
+    "merchantCapture": "simulated Shopify sandbox PAID status; no real merchant settlement",
+    "repeatExecution": "same transaction hash, status 202, resumed true",
+    "issues": {
+      "Act Now": [],
+      "Investigate Now": [],
+      "Park for Later": [],
+      "Ignore / Accept Risk": [
+        "X Layer RPC pending count remained stale at 0 after latest advanced to 2; the verified implementation selects 2 and avoids nonce reuse."
+      ]
+    },
+    "mergeReady": true,
+    "originalImplementationEvidencePreserved": true,
+    "databaseIsolation": {
+      "host": "127.0.0.1",
+      "hostPort": 55432,
+      "database": "origins",
+      "freshRunSchema": "xlayer_e2e_2d72a82e9e104a3eb8564301bbff9584",
+      "previousRetainedSchema": "xlayer_e2e_463d4d90e09e4d38817461b0a1c54767",
+      "reason": "The supplied prior-run manifest was already complete. A fresh isolated schema gave the new quote and purchase a distinct idempotency namespace; the prior schema and XLAYER_LIVE.json evidence were preserved."
+    }
+  }
+}
