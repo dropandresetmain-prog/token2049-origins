@@ -134,6 +134,14 @@ describe('asset labels never guess', () => {
     expect(describeAsset(ADA).label).toBe('Cardano network');
   });
 
+  it('Sui network labels omit the operational qualifier', () => {
+    const asset = describeAsset('sui:testnet/0xa1ec7fc00a6f40db9693ad1415d0c193ad3906494428cf252621037bd7117e29::usdc::USDC');
+    expect(asset.label).toMatch(/^Sui network,/);
+    expect(asset.label).not.toMatch(/test network|testnet|devnet|sandbox/i);
+    expect(asset.unit).toBe('tokens');
+    expect(asset.decimals).toBe(6);
+  });
+
   it('percentOf uses exact integers and clamps', () => {
     expect(percentOf(1n, 3n)).toBe(33.33);
     expect(percentOf(5n, 0n)).toBe(0);

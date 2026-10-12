@@ -66,7 +66,7 @@ export function describeAsset(asset: string): AssetInfo {
     return { kind: 'crypto', label: `${op.asset.network('solana', test)}, ${shortAsset(id)}`, unit: op.asset.token(test), decimals: 6 };
   }
   if (network.startsWith('sui:')) {
-    return { kind: 'crypto', label: `Sui${test ? ' test' : ''} network, ${shortAsset(id)}`, unit: op.asset.token(test), decimals: 6 };
+    return { kind: 'crypto', label: `Sui network, ${shortAsset(id)}`, unit: op.asset.token(test), decimals: 6 };
   }
   return { kind: 'crypto', label: shortAsset(asset), unit: op.asset.baseUnits, decimals: null };
 }
