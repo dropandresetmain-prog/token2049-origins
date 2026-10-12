@@ -161,7 +161,7 @@ export const purchaseState: Record<string, { label: string; tone: Tone }> = {
 
 export const asset = {
   /** "Cardano test network" / "Solana test network"; the word "test" only when the network id says so. */
-  network: (family: 'cardano' | 'solana', test: boolean) => `${family === 'cardano' ? 'Cardano' : 'Solana'} network`,
+  network: (family: 'cardano' | 'solana' | 'xlayer', test: boolean) => `${family === 'cardano' ? 'Cardano' : family === 'solana' ? 'Solana' : 'X Layer'} network`,
   token: (test: boolean) => 'tokens',
   ada: (test: boolean) => 'ADA',
   usdm: (test: boolean) => 'USDM',
@@ -194,6 +194,7 @@ export const connections = {
 export const integration: Record<string, { name: string; role: string }> = {
   cardano: { name: 'Cardano', role: 'Receives token payments on Cardano' },
   solana: { name: 'Solana', role: 'Receives token payments on Solana' },
+  xlayer: { name: 'X Layer (OKX)', role: 'Receives token payments on X Layer' },
   masumi: { name: 'Masumi', role: 'Agent payments and service fees through Masumi' },
   shopify: { name: 'Shopify', role: 'Store orders' },
   nuitee: { name: 'Nuitée', role: 'Hotel bookings' },

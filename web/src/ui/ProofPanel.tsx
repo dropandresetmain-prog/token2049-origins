@@ -37,6 +37,11 @@ function Section({ section }: { section: ProofSectionVM }) {
           <div>
             <p>{reference.label}</p>
             <span className="mono">{reference.value}</span>
+            {reference.explorer ? (
+              <a className="source-link" href={reference.explorer.href} target="_blank" rel="noopener noreferrer">
+                {reference.explorer.label}
+              </a>
+            ) : null}
           </div>
           <button type="button" className="icon-button" aria-label={reference.copyLabel} onClick={() => ui.copy(reference.value)}>
             <Icon name="copy" />

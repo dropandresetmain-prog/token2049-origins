@@ -115,6 +115,7 @@ export const paymentMethod: Record<FundingRail, string> = {
   cardano: 'Cardano',
   solana: 'Solana',
   sui: 'Sui',
+  xlayer: 'X Layer (OKX)',
   masumi: 'Masumi',
 };
 export const testNetwork = '';
@@ -319,6 +320,7 @@ export const proof = {
   rowReceivedAt: 'Received',
   paymentReference: 'Payment reference',
   copyPaymentReference: 'Copy payment reference',
+  viewOnExplorer: 'View on X Layer explorer',
   noPayment: 'No payment has been received yet.',
   feeOnlyNote: "This payment covers Capsule's fee only. It doesn't pay for the purchase.",
   orderHeading: (cat: Cat) => (cat === 'retail' || cat === 'unknown' ? 'Order' : 'Booking'),

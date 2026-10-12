@@ -11,9 +11,10 @@ import { projectProgress, completionReference } from '../contracts/backend.js';
 import type { Category, Channel, FundingRail, HumanProgress, Money, ProviderRoute, PurchaseState, PurchaseView, SourceOffer } from '../contracts/backend.js';
 import type { EvidenceListItem } from '../contracts/evidence.js';
 import type { ConsoleMode, PurchaseBundle, PurchaseListResult } from '../contracts/source.js';
+import { explorerTxUrl } from './explorer.js';
 import { displayId, formatCrypto, formatMoney, formatTime, formatWhen, isTestNetwork, type FormatContext } from './format.js';
 import type {
-  ActivityItemVM, AttentionVM, Field, IconName, ListFilter, ProofSectionVM, ProofVM, PurchaseDetailVM, PurchaseListVM,
+  ActivityItemVM, AttentionVM, CopyableRef, Field, IconName, ListFilter, ProofSectionVM, ProofVM, PurchaseDetailVM, PurchaseListVM,
   PurchaseRowVM, QuoteVM, ReceiptVM, RouteVM, StatusKey, StatusVM, StepStatus, StepVM, SummaryVM,
 } from './types.js';
 
@@ -136,6 +137,7 @@ interface Facts {
   agent: { name: string; kind: string };
   merchant: { name: string; kind: string };
   merchantIsTest: boolean;
+  rail: string;
   method: string;
   network: string | null;
   networkIsTest: boolean;
@@ -166,6 +168,7 @@ function facts(b: PurchaseBundle, ctx: PresentContext): Facts {
     merchant: source ? { name: source.merchantName, kind: copy.sourceStore.sourceStoreKind }
       : sandboxed ? { name: copy.sourceStore.testStoreName, kind: copy.sourceStore.testStoreKind } : merchantOf(p.route),
     merchantIsTest: sandboxed || isTestEnvironment(env),
+    rail,
     method: rail ? methodOf(rail) : '',
     network: networkRaw,
     networkIsTest: networkRaw ? isTestNetwork(networkRaw) : false,
@@ -328,6 +331,14 @@ function buildSummary(f: Facts): SummaryVM {
   };
 }
 
+function paymentReference(rail: string, transferRef: string): CopyableRef {
+  const href = explorerTxUrl(rail, transferRef);
+  return {
+    label: copy.proof.paymentReference, value: transferRef, copyLabel: copy.proof.copyPaymentReference,
+    ...(href ? { explorer: { href, label: copy.proof.viewOnExplorer } } : {}),
+  };
+}
+
 function buildProof(f: Facts): ProofVM {
   const p = f.p;
   const paid = f.progress.paymentConfirmed;
@@ -352,7 +363,7 @@ function buildProof(f: Facts): ProofVM {
   }
   const payment: ProofSectionVM = {
     heading: copy.proof.paymentHeading, icon: 'wallet', badge: paymentBadge, fields: paymentFields,
-    reference: transferRef ? { label: copy.proof.paymentReference, value: transferRef, copyLabel: copy.proof.copyPaymentReference } : null,
+    reference: transferRef ? paymentReference(f.rail, transferRef) : null,
     note: !funding ? copy.proof.noPayment : funding.purpose === 'service_fee' ? copy.proof.feeOnlyNote : null,
   };
 

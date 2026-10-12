@@ -75,7 +75,7 @@ export function displayId(purchaseId: string): string {
 }
 
 export function isTestNetwork(network: string): boolean {
-  return /preprod|preview|devnet|testnet|test/i.test(network);
+  return /preprod|preview|devnet|testnet|test/i.test(network) || network === 'eip155:1952';
 }
 
 /** Splits "-1234" into sign and magnitude so signed integer strings can be formatted without Number. */

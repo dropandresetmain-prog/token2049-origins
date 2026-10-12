@@ -142,6 +142,25 @@ describe('asset labels never guess', () => {
     expect(asset.decimals).toBe(6);
   });
 
+  it('X Layer labels mirror Sui: no operational qualifier, 6-decimal tokens, only for the known USD₮0 asset', () => {
+    const usdt0 = describeAsset('eip155:1952/0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c');
+    expect(usdt0.label).toBe('X Layer network, 0x9e29b3...fb0c');
+    expect(usdt0.label).not.toMatch(/test network|testnet|devnet|sandbox/i);
+    expect(usdt0.kind).toBe('crypto');
+    expect(usdt0.unit).toBe('tokens');
+    expect(usdt0.decimals).toBe(6);
+    expect(formatAssetAmount('2500000', usdt0, ctx)).toBe('2.5 tokens');
+    expect(formatAssetAmount('-1500000', usdt0, ctx)).toBe('-1.5 tokens');
+  });
+
+  it('does not guess decimals for another asset on the X Layer chain', () => {
+    const other = describeAsset('eip155:1952/0x' + '1'.repeat(40));
+    expect(other.label).toMatch(/^X Layer network, /);
+    expect(other.decimals).toBeNull();
+    expect(other.unit).toBe('base units');
+    expect(describeAsset('eip155:196/0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c').decimals).toBeNull();
+  });
+
   it('percentOf uses exact integers and clamps', () => {
     expect(percentOf(1n, 3n)).toBe(33.33);
     expect(percentOf(5n, 0n)).toBe(0);
@@ -153,9 +172,9 @@ describe('asset labels never guess', () => {
 describe('connections presentation', () => {
   const vm = presentConnections(sampleConnections(NOW), ctx);
 
-  it('lists Cardano, Solana, Sui, Masumi, Shopify, Nuitée, Atlas and OCBC', () => {
+  it('lists Cardano, Solana, Sui, X Layer (OKX), Masumi, Shopify, Nuitée, Atlas and OCBC', () => {
     const names = [...vm.groups.flatMap((g) => g.items), vm.bank.connection].map((i) => i.name);
-    expect(names).toEqual(['Cardano', 'Solana', 'Sui', 'Masumi', 'Shopify', 'Nuitée', 'Atlas', 'OCBC']);
+    expect(names).toEqual(['Cardano', 'Solana', 'Sui', 'X Layer (OKX)', 'Masumi', 'Shopify', 'Nuitée', 'Atlas', 'OCBC']);
   });
 
   it('maps readiness without upgrading it', () => {

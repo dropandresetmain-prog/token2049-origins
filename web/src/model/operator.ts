@@ -39,8 +39,11 @@ const USDM_UNITS = new Set([
   '16a55b2a349361ff88c03788f93e1e966e5d689605d044fef722ddde.0014df10745553444d',
 ]);
 
+/** X Layer Testnet USD₮0, mirroring XLAYER_TESTNET_USDT0 in src/contracts/presentation.ts (no backend import in the web bundle). */
+const XLAYER_USDT0 = '0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c';
+
 const isTestNetworkId = (network: string): boolean =>
-  /preprod|preview|devnet|testnet/i.test(network) || /^solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1$/.test(network);
+  /preprod|preview|devnet|testnet/i.test(network) || /^solana:EtWTRABZaYq6iMfeYKouRu166VU2xqa1$/.test(network) || network === 'eip155:1952';
 
 const shortAsset = (id: string): string => (id.length <= 14 ? id : `${id.slice(0, 8)}...${id.slice(-4)}`);
 
@@ -67,6 +70,11 @@ export function describeAsset(asset: string): AssetInfo {
   }
   if (network.startsWith('sui:')) {
     return { kind: 'crypto', label: `Sui network, ${shortAsset(id)}`, unit: op.asset.token(test), decimals: 6 };
+  }
+  if (network === 'eip155:1952') {
+    // X Layer Testnet USD₮0 has 6 decimals (src/funding/xlayer/config.ts); any other asset on that chain is not guessed.
+    if (id.toLowerCase() === XLAYER_USDT0) return { kind: 'crypto', label: `${op.asset.network('xlayer', test)}, ${shortAsset(id)}`, unit: op.asset.token(test), decimals: 6 };
+    return { kind: 'crypto', label: `${op.asset.network('xlayer', test)}, ${shortAsset(id)}`, unit: op.asset.baseUnits, decimals: null };
   }
   return { kind: 'crypto', label: shortAsset(asset), unit: op.asset.baseUnits, decimals: null };
 }
@@ -329,7 +337,7 @@ export interface ConnectionsVM {
   technical: { capabilities: CapabilitiesResponse; bank: BankResponse };
 }
 
-const FUNDING = ['cardano', 'solana', 'sui', 'masumi'] as const;
+const FUNDING = ['cardano', 'solana', 'sui', 'xlayer', 'masumi'] as const;
 const MERCHANTS = ['shopify', 'nuitee', 'atlas'] as const;
 
 export function environmentLabel(env: string): string {

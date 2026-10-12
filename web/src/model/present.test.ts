@@ -88,3 +88,35 @@ describe('presenters over sample purchases', () => {
     }
   });
 });
+
+describe('payment reference explorer link', () => {
+  const HASH = '0x' + 'cd34'.repeat(16);
+
+  async function railDetail(rail: string, reference: string) {
+    const bundle = await source.getPurchase(source.idFor('completed')!);
+    bundle.purchase.fundingRequirement = { ...bundle.purchase.fundingRequirement!, rail: rail as 'xlayer' };
+    if (bundle.proof) {
+      bundle.proof.funding.requirement = { ...bundle.proof.funding.requirement, rail: rail as 'xlayer' };
+      bundle.proof.funding.transfers[0]!.reference = reference;
+    }
+    return presentDetail(bundle, ctx);
+  }
+  const paymentRef = (vm: Awaited<ReturnType<typeof railDetail>>) => vm.proof.sections[0]!.reference!;
+
+  it('names the rail and links an X Layer transaction hash to the explorer', async () => {
+    const vm = await railDetail('xlayer', HASH);
+    expect(vm.summary.payment.method).toBe('X Layer (OKX)');
+    expect(paymentRef(vm)).toMatchObject({ value: HASH, explorer: { href: `https://www.okx.com/web3/explorer/xlayer-test/tx/${HASH}`, label: 'View on X Layer explorer' } });
+  });
+
+  it('shows a non-hash X Layer reference without a link', async () => {
+    const vm = await railDetail('xlayer', 'fixture:abc');
+    expect(paymentRef(vm).explorer).toBeUndefined();
+  });
+
+  it.each(['cardano', 'solana', 'sui'])('leaves %s references without a link even when they look like a hash', async rail => {
+    const vm = await railDetail(rail, HASH);
+    expect(paymentRef(vm).value).toBe(HASH);
+    expect(paymentRef(vm).explorer).toBeUndefined();
+  });
+});

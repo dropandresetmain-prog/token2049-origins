@@ -49,6 +49,25 @@ describe('all customer surfaces exclude environment labels', () => {
     },
   );
 
+  it('renders a safe external explorer link for an X Layer payment reference only', async () => {
+    const hash = '0x' + 'ef56'.repeat(16);
+    const render = async (rail: string, reference: string) => {
+      const bundle = await source.getPurchase(source.idFor('completed-hotel')!);
+      bundle.purchase.fundingRequirement = { ...bundle.purchase.fundingRequirement!, rail: rail as 'xlayer' };
+      bundle.proof!.funding.requirement = { ...bundle.proof!.funding.requirement, rail: rail as 'xlayer' };
+      bundle.proof!.funding.transfers[0]!.reference = reference;
+      const vm = presentDetail(bundle, ctx);
+      return renderToStaticMarkup(<UiProvider><ProofPanel vm={vm} tab="summary" onTab={noop} onClose={noop} /></UiProvider>);
+    };
+    const linked = await render('xlayer', hash);
+    expect(linked).toContain(`href="https://www.okx.com/web3/explorer/xlayer-test/tx/${hash}"`);
+    expect(linked).toMatch(/<a [^>]*target="_blank"[^>]*>View on X Layer explorer<\/a>/);
+    expect(linked).toMatch(/rel="noopener noreferrer"/);
+    expect(linked).not.toMatch(forbidden);
+    expect(await render('xlayer', 'fixture:abc')).not.toContain('View on X Layer explorer');
+    expect(await render('solana', hash)).not.toContain('View on X Layer explorer');
+  });
+
   it.each(['Testnet USDC', 'Devnet test USDC'])('provider asset label %s is cleaned in the payment summary and proof', async symbol => {
     const bundle = await source.getPurchase(source.idFor('completed-hotel')!);
     bundle.purchase.fundingRequirement!.amount.symbol = symbol;
