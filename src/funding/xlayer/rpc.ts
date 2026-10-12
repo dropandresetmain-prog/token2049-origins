@@ -18,6 +18,10 @@ export interface XLayerRpcPort {
   transactionCount(address: string, block?: bigint): Promise<number>;
   tokenBalance(address: string): Promise<bigint>;
   nativeBalance(address: string): Promise<bigint>;
+  /** Payer-side only: gas limit estimate for the exact transfer calldata. */
+  estimateTransferGas(from: string, data: string): Promise<bigint>;
+  /** Payer-side only: current EIP-1559 fee caps. */
+  feeCaps(): Promise<{ maxFeePerGas: bigint; maxPriorityFeePerGas: bigint }>;
   /** A timeout does not establish failure. Recovery checks this hash before any exact-byte resubmission. */
   sendRaw(raw: string): Promise<void>;
 }
@@ -80,5 +84,14 @@ export class XLayerRpc implements XLayerRpcPort {
     return retryRead(() => this.client.readContract({ address: TOKEN as Hex, abi: ERC20_READ, functionName: 'balanceOf', args: [address as Hex] }));
   }
   async nativeBalance(address: string) { return retryRead(() => this.client.getBalance({ address: address as Hex })); }
+  async estimateTransferGas(from: string, data: string) {
+    return retryRead(() => this.client.estimateGas({ account: from as Hex, to: TOKEN as Hex, data: data as Hex }));
+  }
+  async feeCaps() {
+    const block = await retryRead(() => this.client.getBlock());
+    if (block.baseFeePerGas === null || block.baseFeePerGas === undefined) throw new Error('X Layer base fee unavailable');
+    const tip = await retryRead(() => this.client.estimateMaxPriorityFeePerGas());
+    return { maxFeePerGas: block.baseFeePerGas * 2n + tip, maxPriorityFeePerGas: tip };
+  }
   async sendRaw(raw: string) { await this.client.sendRawTransaction({ serializedTransaction: raw as Hex }); }
 }
