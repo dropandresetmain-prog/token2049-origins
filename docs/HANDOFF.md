@@ -1,3 +1,7 @@
+## X Layer integration status — 13 October 2026
+
+X Layer Testnet native USD₮0 rail is integrated in the local candidate and independently accepted, including a fresh nonce-1 transfer, persisted receipt, and idempotent Shopify sandbox execution. Acceptance evidence: [report](work/XLAYER_ACCEPTANCE_20261013.json); [integration record](work/XLAYER_INTEGRATION.md). This does not change the hosted handoff above: X Layer is not activated on Render, migration `0014` is not applied to hosted Neon, and no new signing grant or hosted deployment is authorized by this integration.
+
 # Capsule — current handoff
 
 READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED

@@ -98,8 +98,8 @@ Local tests never close an external issue. Update this file only when runtime/co
 
 | Classification | Finding / action | Risk / blocker |
 |---|---|---|
-| Investigate Now | Live testnet E2E (genuine transfer + Shopify sandbox order) NOT RUN: dedicated payer needs testnet OKB and USD₮0. | Owner funding only; see docs/work/XLAYER_RAIL.md. |
-| Investigate Now | OKX faucet documents OKB only; USD₮0 test-token source is unverified (token `mint` is owner-only on-chain). | Funding path for USD₮0 must be confirmed by the owner. |
+| Ignore / Accept Risk | One fresh X Layer Testnet purchase and Shopify sandbox order passed independent acceptance; the sandbox PAID state is simulated merchant capture, not real settlement. | Evidence is scoped to the accepted testnet run; see docs/work/XLAYER_ACCEPTANCE_20261013.json. |
+| Park for Later | General USD₮0 testnet replenishment path is not documented; the accepted payer was funded for the one authorized E2E. | Future test runs need an owner-approved funding source; no extra transaction is authorized. |
 | Park for Later | OKX x402 `exact` (EIP-3009 via OKX facilitator) not integrated. | Needs OKX API credentials and facilitator support for `eip155:1952`; Capsule has no x402 seller endpoint. |
 | Park for Later | Hosted (Render/Neon) X Layer activation: migration `0014`, wallet registration, signing grant. | Owner approval and deployment authorization required; nothing deployed. |
 | Ignore / Accept Risk | Payment/purchase binding is an application signature, not on-chain; a leaked signed transaction stays executable until its nonce is used. | Late funding becomes unapplied liability and cannot trigger commerce; keep candidate storage protected. |

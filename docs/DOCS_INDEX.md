@@ -53,6 +53,7 @@ Evidence records keep their original branch/SHA, date, environment and failed/pa
 | [Render rehearsal](evidence/render-rehearsal.md) | Point-in-time deployment verification, not current health. |
 | [Chainlink implementation and evidence](work/CHAINLINK_CRE.md) | Included SDK workflow, official simulation and fresh Koios verification of a retained purchase. |
 | [Coinbase CDP proof](evidence/coinbase-cdp/server-wallet-proof.json) | Server Wallet / Base Sepolia transfer via official CLI and independent public RPC; [implementation note](work/COINBASE_CDP.md). |
+| [X Layer acceptance](work/XLAYER_ACCEPTANCE_20261013.json) | Independent fresh testnet payment, durable proof, Shopify sandbox readback and idempotency. [Integration record](work/XLAYER_INTEGRATION.md). |
 
 Additional material remains in [evidence](evidence/), [work](work/), [providers](providers/), [contracts](contracts/) and [decisions](decisions/). [Planning](planning/) is historical context; do not silently rewrite it as a current plan.
 
