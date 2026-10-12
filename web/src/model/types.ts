@@ -28,6 +28,8 @@ export interface CopyableRef {
   label: string;
   value: string;
   copyLabel: string;
+  /** Block-explorer page for this reference. Only set for rails that have one and when the reference is a valid transaction hash. */
+  explorer?: { href: string; label: string };
 }
 
 /* ---------------- Purchases list ---------------- */

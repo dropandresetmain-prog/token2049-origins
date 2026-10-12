@@ -6,7 +6,7 @@ import { createMcpServer } from '../../src/channels/mcp/server.js';
 import { PAYER_WAKE_URL, PAYER_WAKE_DESTINATION } from '../../src/channels/mcp/config.js';
 import { startHarness, retailIntent, retailFulfillment, type Harness } from '../support/harness.js';
 import { FixtureFundingAdapter, FIXTURE_ASSET, FIXTURE_TREASURY } from '../support/fixtures.js';
-import { FundingSource, SOLANA_DEVNET_NETWORK, SOLANA_DEVNET_USDC_MINT, SUI_TESTNET_NETWORK, SUI_TESTNET_USDC_TYPE, maskAddress } from '../../src/contracts/presentation.js';
+import { FundingSource, SOLANA_DEVNET_NETWORK, SOLANA_DEVNET_USDC_MINT, SUI_TESTNET_NETWORK, SUI_TESTNET_USDC_TYPE, XLAYER_TESTNET_NETWORK, XLAYER_TESTNET_USDT0, maskAddress } from '../../src/contracts/presentation.js';
 import type { FundingRail } from '../../src/contracts/common.js';
 import type { FundingAdapter } from '../../src/contracts/ports.js';
 import { MultiWalletPayer } from '../../clients/multiwallet/dispatcher.js';
@@ -19,13 +19,13 @@ import type { AddressInfo } from 'node:net';
 
 const active: Array<()=>Promise<void>>=[];
 afterEach(async()=>{for(const close of active.splice(0).reverse())await close();});
-const networks={cardano:'cardano:preprod',solana:SOLANA_DEVNET_NETWORK,sui:SUI_TESTNET_NETWORK};
-const assets={cardano:FIXTURE_ASSET,solana:SOLANA_DEVNET_USDC_MINT,sui:SUI_TESTNET_USDC_TYPE};
-const addresses={cardano:'addr_test1fixturepayer',solana:'9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin',sui:'0x'+'a'.repeat(64)};
+const networks={cardano:'cardano:preprod',solana:SOLANA_DEVNET_NETWORK,sui:SUI_TESTNET_NETWORK,xlayer:XLAYER_TESTNET_NETWORK};
+const assets={cardano:FIXTURE_ASSET,solana:SOLANA_DEVNET_USDC_MINT,sui:SUI_TESTNET_USDC_TYPE,xlayer:XLAYER_TESTNET_USDT0};
+const addresses={cardano:'addr_test1fixturepayer',solana:'9xQeWvG816bUx9EPjHmaT23yvVM2ZWbrrpZb9PusVFin',sui:'0x'+'a'.repeat(64),xlayer:'0x71c7656ec7ab88b098defb751b7401b5f6d8976f'};
 async function register(h:Harness,rail:FundingRail,customer=h.alice.customerId,index=1) {
  if(rail==='masumi')throw Error('not a purchase rail');
- const address=index===1?addresses[rail]:rail==='cardano'?addresses[rail]+String(index):rail==='sui'?'0x'+String(index).repeat(64):'So11111111111111111111111111111111111111112';
- const source=FundingSource.parse({sourceId:'src_'+String(index).padStart(30,'0')+({cardano:'ca',solana:'50',sui:'51'}[rail]),rail,network:networks[rail],assetId:assets[rail],publicAddress:address,displayAddress:maskAddress(address),readiness:'configured'});
+ const address=index===1?addresses[rail]:rail==='cardano'?addresses[rail]+String(index):rail==='sui'?'0x'+String(index).repeat(64):rail==='xlayer'?'0x'+String(index).repeat(40):'So11111111111111111111111111111111111111112';
+ const source=FundingSource.parse({sourceId:'src_'+String(index).padStart(30,'0')+({cardano:'ca',solana:'50',sui:'51',xlayer:'52'}[rail]),rail,network:networks[rail],assetId:assets[rail],publicAddress:address,displayAddress:maskAddress(address),readiness:'configured'});
  const db=h.gw.db;
  await db.run("INSERT INTO payer_profiles(id,customer_id,created_at) VALUES($1,$2,'now') ON CONFLICT(customer_id) DO NOTHING",'payer_'+customer,customer);
  await db.run('INSERT INTO registered_wallets(source_id,payer_id,rail,network,asset_id,public_address,signer_ref,ledger_namespace,public_json,policy_json,enabled) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,\'{}\',TRUE)',
@@ -33,7 +33,7 @@ async function register(h:Harness,rail:FundingRail,customer=h.alice.customerId,i
  await db.run("INSERT INTO wallet_signing_authority VALUES($1,'fixture-candidate',TRUE)",source.sourceId);
  return source;
 }
-function adapter(h:Harness,rail:'cardano'|'solana'|'sui'):FundingAdapter {
+function adapter(h:Harness,rail:'cardano'|'solana'|'sui'|'xlayer'):FundingAdapter {
  const fixture=new FixtureFundingAdapter(h.clock);
  return {rail,network:networks[rail],paymentHeaderName:'payment-signature',readiness:vi.fn(()=>fixture.readiness()),
  acceptedAsset:()=>({assetId:assets[rail],decimals:6,payTo:rail==='cardano'?FIXTURE_TREASURY:addresses[rail]+'treasury',supportsUsdNotional:true}),
@@ -43,7 +43,7 @@ function adapter(h:Harness,rail:'cardano'|'solana'|'sui'):FundingAdapter {
 }
 async function setup(){
  const h=await startHarness({settlementPolicy:{mode:'scaled_testnet',numerator:1,denominator:1000}});active.push(()=>h.close());
- for(const rail of ['cardano','solana','sui'] as const)h.gw.core.deps.fundingAdapters.set(rail,adapter(h,rail));
+ for(const rail of ['cardano','solana','sui','xlayer'] as const)h.gw.core.deps.fundingAdapters.set(rail,adapter(h,rail));
  h.hotel.price=h.flight.price=h.retail.price; // bounded fixture capacity for all nine, no provider calls.
  return h;
 }
@@ -147,6 +147,7 @@ describe('consolidated payer / canonical PostgreSQL / labeled fixture commerce',
   await expect(db.run('INSERT INTO wallet_policy_amendments VALUES($1,2,$2,$3,$4,$5)',source.sourceId,(await walletRecord(db,source.sourceId))!.policy_json,JSON.stringify({maxPerPayment:'5100000',maxDaily:'5100000',maxTotal:'5100000',maxCommercial:'510000',payee:'replacement'}),'owner-cap-alignment-20261011','now')).rejects.toThrow('identity');
  });
 
+ // xlayer is not in this DB-backed matrix yet: registered_wallets.rail CHECK (migration 0011) still excludes it.
  for(const category of ['retail','hotel','flight'] as const)for(const rail of ['cardano','solana','sui'] as const)it('FIXTURE: '+category+' + '+rail+' through one payer and MCP',async()=>{
   const h=await setup();const sources=await Promise.all((['cardano','solana','sui'] as const).map(r=>register(h,r)));
   const selected=sources.find(s=>s.rail===rail)!;const loaded:string[]=[];
