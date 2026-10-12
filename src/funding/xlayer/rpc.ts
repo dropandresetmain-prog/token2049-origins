@@ -77,8 +77,14 @@ export class XLayerRpc implements XLayerRpcPort {
     return Number(b.timestamp) * 1000;
   }
   async transactionCount(address: string, block?: bigint) {
-    return retryRead(() => this.client.getTransactionCount(block === undefined
-      ? { address: address as Hex, blockTag: 'pending' } : { address: address as Hex, blockNumber: block }));
+    if (block !== undefined) return retryRead(() => this.client.getTransactionCount({ address: address as Hex, blockNumber: block }));
+    // Observed on X Layer Testnet (13 Oct 2026): the 'pending' view can LAG 'latest' (0 vs 1 after a mined transfer).
+    // The next usable nonce is the larger of the two, so a mined payment can never have its nonce reused.
+    const [pending, latest] = await Promise.all([
+      retryRead(() => this.client.getTransactionCount({ address: address as Hex, blockTag: 'pending' })),
+      retryRead(() => this.client.getTransactionCount({ address: address as Hex, blockTag: 'latest' })),
+    ]);
+    return Math.max(pending, latest);
   }
   async tokenBalance(address: string) {
     return retryRead(() => this.client.readContract({ address: TOKEN as Hex, abi: ERC20_READ, functionName: 'balanceOf', args: [address as Hex] }));

@@ -12,6 +12,13 @@ describe('X Layer RPC client allowlist', () => {
   it.each(RPC_URLS)('accepts the official Testnet endpoint %s', url => {
     expect(() => xlayerClient(url)).not.toThrow();
   });
+  it('uses the larger of the pending and latest counts: X Layer Testnet pending lags latest after a mined transfer', async () => {
+    const getTransactionCount = vi.fn(async (a: { blockTag?: string }) => (a.blockTag === 'pending' ? 0 : 1));
+    expect(await stub({ getTransactionCount }).transactionCount(ADDR)).toBe(1);
+    const ahead = vi.fn(async (a: { blockTag?: string }) => (a.blockTag === 'pending' ? 3 : 1));
+    expect(await stub({ getTransactionCount: ahead }).transactionCount(ADDR)).toBe(3);
+  });
+
   it('defaults to an official endpoint', () => {
     expect(() => xlayerClient()).not.toThrow();
     expect(() => new XLayerRpc()).not.toThrow();
@@ -147,7 +154,8 @@ describe('X Layer RPC chain state reads', () => {
     const getTransactionCount = vi.fn(async () => 5);
     const rpc = stub({ getTransactionCount });
     expect(await rpc.transactionCount(ADDR)).toBe(5);
-    expect(getTransactionCount).toHaveBeenLastCalledWith({ address: ADDR, blockTag: 'pending' });
+    expect(getTransactionCount).toHaveBeenCalledWith({ address: ADDR, blockTag: 'pending' });
+    expect(getTransactionCount).toHaveBeenCalledWith({ address: ADDR, blockTag: 'latest' });
     expect(await rpc.transactionCount(ADDR, 77n)).toBe(5);
     expect(getTransactionCount).toHaveBeenLastCalledWith({ address: ADDR, blockNumber: 77n });
     expect(await rpc.transactionCount(ADDR, 0n)).toBe(5); // block 0 is a historical read, not "pending"

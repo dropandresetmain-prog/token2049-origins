@@ -1,0 +1,76 @@
+{
+  "timestamp": "2026-10-12T17:12:23.163Z",
+  "schema": "xlayer_e2e_463d4d90e09e4d38817461b0a1c54767",
+  "status": "PASS",
+  "provider": "shopify",
+  "providerEnvironment": "test",
+  "settlementPolicy": {
+    "mode": "scaled_testnet",
+    "numerator": 1,
+    "denominator": 1000
+  },
+  "onChainPurchaseCommitment": false,
+  "onChainQuoteExpiry": false,
+  "quoteExpiryEnforcement": "payer_signed_application_binding_and_gateway_preflight",
+  "payer": {
+    "status": 202,
+    "hash": "0x4fb4fc1f5de3ad92867042a9ad435378e019dac900512147f52f64911be20b81",
+    "resumed": false
+  },
+  "purchase": {
+    "purchaseId": "pur_01M4RHMT537Y20FRJHSF5PFWVY",
+    "state": "succeeded",
+    "paymentState": "confirmed",
+    "merchantPaymentStatus": "simulated_paid",
+    "commerceStatus": "paid",
+    "providerReference": "gid://shopify/Order/18944595132473",
+    "receiptId": "rcp_01M4RHNWHEPR9CF3DG6HF5HXSS",
+    "funding": [
+      {
+        "rail": "xlayer",
+        "network": "eip155:1952",
+        "asset": "0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c",
+        "amountBaseUnits": "17950",
+        "decimals": 6,
+        "transferReference": "0x4fb4fc1f5de3ad92867042a9ad435378e019dac900512147f52f64911be20b81",
+        "paymentState": "confirmed",
+        "purpose": "purchase_principal",
+        "verifiedAt": "2026-10-12T17:13:12.921Z",
+        "evidenceMode": "fresh_external"
+      }
+    ]
+  },
+  "chain": {
+    "chainId": 1952,
+    "hash": "0x4fb4fc1f5de3ad92867042a9ad435378e019dac900512147f52f64911be20b81",
+    "blockNumber": "43366353",
+    "blockHash": "0x58368ce7f3c7123d392c0e82b00331e4502573ca0d3ab4fefa458b44c86a0a34",
+    "from": "0x8e1c8d2f595444b895f022f5f88746b8aceb9105",
+    "to": "0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c",
+    "token": "0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c",
+    "transferAmountBaseUnits": "17950",
+    "payee": "0xee38198cce4e690aa24e36c74f678f7ca7185888",
+    "gasUsed": "56376",
+    "effectiveGasPrice": "20000001",
+    "explorer": "https://www.okx.com/web3/explorer/xlayer-test/tx/0x4fb4fc1f5de3ad92867042a9ad435378e019dac900512147f52f64911be20b81"
+  },
+  "evidenceCount": 1,
+  "providerReadback": {
+    "orderId": "gid://shopify/Order/18944595132473",
+    "name": "#1006",
+    "test": true,
+    "financialStatus": "PAID",
+    "paidTestEvidence": true
+  },
+  "proofReadback": {
+    "purchaseId": "pur_01M4RHMT537Y20FRJHSF5PFWVY",
+    "hash": "0x4fb4fc1f5de3ad92867042a9ad435378e019dac900512147f52f64911be20b81",
+    "receiptId": "rcp_01M4RHNWHEPR9CF3DG6HF5HXSS"
+  },
+  "fundingJournalCount": 1,
+  "duplicate": {
+    "status": 202,
+    "hash": "0x4fb4fc1f5de3ad92867042a9ad435378e019dac900512147f52f64911be20b81",
+    "resumed": true
+  }
+}
