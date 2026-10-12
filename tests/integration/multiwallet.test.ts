@@ -147,9 +147,8 @@ describe('consolidated payer / canonical PostgreSQL / labeled fixture commerce',
   await expect(db.run('INSERT INTO wallet_policy_amendments VALUES($1,2,$2,$3,$4,$5)',source.sourceId,(await walletRecord(db,source.sourceId))!.policy_json,JSON.stringify({maxPerPayment:'5100000',maxDaily:'5100000',maxTotal:'5100000',maxCommercial:'510000',payee:'replacement'}),'owner-cap-alignment-20261011','now')).rejects.toThrow('identity');
  });
 
- // xlayer is not in this DB-backed matrix yet: registered_wallets.rail CHECK (migration 0011) still excludes it.
- for(const category of ['retail','hotel','flight'] as const)for(const rail of ['cardano','solana','sui'] as const)it('FIXTURE: '+category+' + '+rail+' through one payer and MCP',async()=>{
-  const h=await setup();const sources=await Promise.all((['cardano','solana','sui'] as const).map(r=>register(h,r)));
+ for(const category of ['retail','hotel','flight'] as const)for(const rail of ['cardano','solana','sui','xlayer'] as const)it('FIXTURE: '+category+' + '+rail+' through one payer and MCP',async()=>{
+  const h=await setup();const sources=await Promise.all((['cardano','solana','sui','xlayer'] as const).map(r=>register(h,r)));
   const selected=sources.find(s=>s.rail===rail)!;const loaded:string[]=[];
   const dispatch=payer(h,async w=>{loaded.push(w.source_id);return {pay:async id=>{
    const p=(await h.call('GET','/v1/purchases/'+id,{token:h.alice.token})).body.purchase;
