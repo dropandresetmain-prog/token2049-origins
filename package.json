@@ -45,6 +45,10 @@
     "payer:sui:bridge": "tsx clients/sui/bridge.ts",
     "payer:sui:setup": "tsx scripts/sui/setup.ts",
     "e2e:sui": "tsx scripts/sui/live-e2e.ts",
+    "payer:xlayer": "tsx clients/xlayer/pay.ts",
+    "payer:xlayer:bridge": "tsx clients/xlayer/bridge.ts",
+    "payer:xlayer:setup": "tsx scripts/xlayer/setup.ts",
+    "e2e:xlayer": "tsx scripts/xlayer/live-e2e.ts",
     "payer:multiwallet:hosted": "tsx clients/multiwallet/hosted.ts"
   },
   "dependencies": {

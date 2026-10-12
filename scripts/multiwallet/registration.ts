@@ -5,7 +5,7 @@ import {CustomerId} from '../../src/contracts/common.js';
 import {digestOf} from '../../src/infrastructure/ids.js';
 import {walletRecord,type WalletRecord} from '../../src/core/wallets.js';
 import {sourceEnv} from '../../clients/multiwallet/engines.js';
-import {cardanoPolicy,solanaPolicy,suiPolicy,assertPinnedPolicy} from '../../clients/multiwallet/policy.js';
+import {cardanoPolicy,solanaPolicy,suiPolicy,xlayerPolicy,assertPinnedPolicy} from '../../clients/multiwallet/policy.js';
 export const RegistrationManifest=z.object({
  customerId:CustomerId,payerId:z.string().regex(/^payer_[A-Za-z0-9_-]{8,80}$/),
  wallets:z.array(z.object({source:FundingSource,signerRef:z.string().regex(/^[A-Z][A-Z0-9_]{1,60}$/),
@@ -39,6 +39,11 @@ export async function registerWallets(db:Db,raw:unknown,env:NodeJS.ProcessEnv,ap
    await PgSolanaLedger.open(db,'sponsor',cfg.sponsor);
    const prior=await db.get<{max_fee_lamports:string}>('SELECT max_fee_lamports FROM wallet_sponsor_policy WHERE owner=$1',cfg.sponsor);
    if(prior&&prior.max_fee_lamports!==String(cfg.maxFees))throw Error('shared sponsor cap differs');
+  }else if(row.rail==='xlayer'){
+   const {loadXLayerPayerConfig}=await import('../../clients/xlayer/config.js');const cfg=loadXLayerPayerConfig(e,{ledger:'external'});
+   if(cfg.payer!==row.public_address)throw Error('X Layer registration config mismatch');
+   assertPinnedPolicy(row.policy_json,xlayerPolicy(cfg));
+   const {PgXLayerLedger}=await import('../../clients/xlayer/pg-ledger.js');await PgXLayerLedger.open(db,cfg.payer);
   }else{
    const {loadSuiPayerConfig}=await import('../../clients/sui/config.js');const cfg=loadSuiPayerConfig(e,{ledger:'external'});
    if(cfg.payer!==row.public_address)throw Error('Sui registration config mismatch');

@@ -3,7 +3,8 @@ import { SUI_TESTNET_NETWORK, SUI_TESTNET_USDC_TYPE } from '../../src/contracts/
 import type { Db } from '../../src/infrastructure/db.js';
 import type { WalletRecord } from '../../src/core/wallets.js';
 import type { BridgePayer } from '../payer/bridge.js';
-import { assertPinnedPolicy,cardanoPolicy,solanaPolicy,suiPolicy } from './policy.js';
+import { XLAYER_TESTNET_NETWORK, XLAYER_TESTNET_USDT0 } from '../../src/contracts/presentation.js';
+import { assertPinnedPolicy,cardanoPolicy,solanaPolicy,suiPolicy,xlayerPolicy } from './policy.js';
 import { PayerError } from '../payer/errors.js';
 
 /** Protected registration stores an environment prefix, never a caller-supplied URL or key path. */
@@ -51,6 +52,16 @@ export async function loadWalletEngine(db:Db,env:NodeJS.ProcessEnv,w:WalletRecor
   loadSigner(config.keyFile,config.payer);
   const ledger=await PgSuiLedger.open(db,config.payer);
   return {pay:async id=>{const r=await paySuiPurchase(config,id,{ledger});if(r.status!==202)throw new PayerError('payment_rejected','Sui funding needs purchase readback');return {transferReference:r.digest,resumed:r.resumed};}};
+ }
+ if(w.rail==='xlayer'){
+  const [{loadXLayerPayerConfig},{PgXLayerLedger},{payXLayerPurchase},{loadSigner}]=await Promise.all([import('../xlayer/config.js'),import('../xlayer/pg-ledger.js'),import('../xlayer/pay.js'),import('../xlayer/signer.js')]);
+  const parsed=loadXLayerPayerConfig(e,{ledger:'external'});
+  const config={...parsed,keyFile:protectedRuntimeFile(parsed.keyFile,env)};
+  if(config.payer!==w.public_address || w.network!==XLAYER_TESTNET_NETWORK || w.asset_id!==XLAYER_TESTNET_USDT0) throw new PayerError('policy_violation','registered X Layer signer mismatch');
+  assertPinnedPolicy(w.policy_json,xlayerPolicy(config));
+  loadSigner(config.keyFile,config.payer);
+  const ledger=await PgXLayerLedger.open(db,config.payer);
+  return {pay:async id=>{const r=await payXLayerPurchase(config,id,{ledger});if(r.status!==202)throw new PayerError('payment_rejected','X Layer funding needs purchase readback');return {transferReference:r.hash,resumed:r.resumed};}};
  }
  throw new PayerError('policy_violation','registered rail unavailable');
 }

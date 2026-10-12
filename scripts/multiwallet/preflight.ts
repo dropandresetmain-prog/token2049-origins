@@ -26,6 +26,12 @@ export async function readSourceReadiness(db:Db,env:NodeJS.ProcessEnv,sourceId:s
   const {solanaHostedBalances}=await import('../../clients/solana/hosted.js');
   const result=await solanaHostedBalances(loadSolanaPayerConfig(e,{ledger:'external'}));
   if(!result.verified)throw Error('Devnet readiness unavailable');balances=result;
+ }else if(wallet.rail==='xlayer'){
+  const {loadXLayerPayerConfig}=await import('../../clients/xlayer/config.js');
+  const {XLayerRpc}=await import('../../src/funding/xlayer/rpc.js');
+  const {xlayerClient}=await import('../../src/funding/xlayer/rpc.js');const c=loadXLayerPayerConfig(e,{ledger:'external'}),rpc=new XLayerRpc(xlayerClient(c.rpcUrl));
+  await rpc.assertNetwork();await rpc.assertAsset();
+  balances={usdt0:String(await rpc.tokenBalance(c.payer)),okbWei:String(await rpc.nativeBalance(c.payer))};
  }else{
   const {loadSuiPayerConfig}=await import('../../clients/sui/config.js');
   const {SuiRpc,suiClient}=await import('../../src/funding/sui/rpc.js');

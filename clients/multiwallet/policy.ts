@@ -2,6 +2,7 @@ import { digestOf } from '../../src/infrastructure/ids.js';
 import type { PayerConfig } from '../payer/config.js';
 import type { SolanaPayerConfig } from '../solana/config.js';
 import type { SuiPayerConfig } from '../sui/config.js';
+import type { XLayerPayerConfig } from '../xlayer/config.js';
 import { PayerError } from '../payer/errors.js';
 /** Financial bounds are pinned with ownership. Raising a cap requires an explicit new policy/cutover, never an env edit. */
 export function cardanoPolicy(c:PayerConfig) {
@@ -14,6 +15,11 @@ export function solanaPolicy(c:SolanaPayerConfig) {
 }
 export function suiPolicy(c:SuiPayerConfig) {
  return {rail:'sui',payee:c.payee,gateway:c.gatewayUrl,maxAmount:String(c.maxAmount),maxPerPayment:String(c.policy.maxPerPayment),
+ maxDaily:String(c.policy.maxDaily),maxTotal:String(c.policy.maxTotal),maxGasPerPayment:String(c.policy.maxGasPerPayment),
+ maxGasTotal:String(c.policy.maxGasTotal),maxCommercial:String(c.maxCommercial)};
+}
+export function xlayerPolicy(c:XLayerPayerConfig) {
+ return {rail:'xlayer',payee:c.payee,gateway:c.gatewayUrl,maxAmount:String(c.maxAmount),maxPerPayment:String(c.policy.maxPerPayment),
  maxDaily:String(c.policy.maxDaily),maxTotal:String(c.policy.maxTotal),maxGasPerPayment:String(c.policy.maxGasPerPayment),
  maxGasTotal:String(c.policy.maxGasTotal),maxCommercial:String(c.maxCommercial)};
 }
