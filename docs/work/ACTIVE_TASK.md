@@ -1,8 +1,16 @@
 # Capsule scoped E2E reliability and customer-experience repair
-Updated 12 October 2026 Singapore (revision 2: closing fixes). Re-read before resuming work or any irreversible action. Distinct UX/reliability milestone; the long infrastructure history is preserved separately.
+Updated 12 October 2026 Singapore (owner-authorized paired release). Re-read before resuming work or any irreversible action. Distinct UX/reliability milestone; the long infrastructure history is preserved separately.
 
 ## Objective
-Implement the repairs from the completed owner E2E investigation through code, focused verification, documentation, checkpoint commits and a deployment-ready handoff. Stop at READY_FOR_OWNER_AUTHORIZATION. No deployment, no live quotes, no purchase/payment/broadcast/provider write, no authoritative database mutation, no key relocation, no cap/policy change.
+READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED. Owner-authorized paired deployment/conditional activation completed at exact c788418. Stop for owner purchases; all nine new-release rows NOT RUN. No agent purchase, broadcast or merchant write.
+
+## Current release authorization and checkpoint
+- Owner explicitly authorizes exact c7884181ee0a23e535390b6f199217278465d638 to both existing Free services, verification, then enabling the three existing wallets and purchases only if all checks pass. No agent purchases/provider writes/broadcasts; no repeated approval unless a gate fails.
+- This authorization supersedes earlier deployment/activation prohibitions for this exact release only. Existing keys, caps, policies, database, endpoints, retired signers and Worker remain unchanged.
+- Current stage: READY_FOR_OWNER_MCP_TEST. Gateway dep-db67kdp42hec73b7fslg, payer dep-db67s6dckfvc73cfe94g, exact c788418 both LIVE/Free; fingerprints match. Three grants enabled for capsule_c7884181ee0a, original scopes restored, retired fences unchanged.
+- Payer instance is explicitly configured as capsule_c7884181ee0a; it is not derived automatically. Confirmed live caps are5100000 on every rail, not the fixture1000000.
+- Protected release journal: ~/.capsule/neon-migration-20261011/e2e-release-20261012-c788418. Old release runner/state must not be reused.
+- Preflight/backup/runtime PASS; disabled hosted37PASS, final activated38PASS.44tables/985rows full restore SHA368061aa2a45b735717878d27a37790aa24a738f078482d204bd14c840ce39b3; all financial hashes unchanged. Worker exact version/module/bindings PASS; final normal startup no operator fan-out. STOP for owner E2E.
 
 ## Corrected scope (five workstreams)
 1. WS1 payment-state semantics: a nondefinitive outcome stays confirmation-pending, never a definitive rejected payment. Files: src/funding/sui/adapter.ts, src/funding/solana/adapter.ts, src/core/service.ts (verifyAndRecord + FundResult), src/channels/http/app.ts (fund route), clients/sui/pay.ts, clients/multiwallet/engines.ts, clients/payer/bridge.ts, src/channels/mcp/tools.ts, src/core/views.ts, shared progress/contracts. Canonical purchase state stays authoritative; a stale failed handoff must not override confirmed payment/completed commerce. Preserve durable reservations, signed-candidate persistence, recovery and exactly-once merchant idempotency. Never auto-retry payment POSTs, rebuild an uncertain candidate or switch wallets. Do not weaken definitive rejection.
@@ -67,9 +75,9 @@ Verified: with WS2 stashed and HEAD detached at base 51ff776, the same 4 tests f
 - src/core/views.ts:40,77 retains the historical failed handoff as audit evidence; it must not overrule canonical payment confirmation.
 
 ## Next action
-READY_FOR_OWNER_AUTHORIZATION (revision 2). Code candidate c7884181ee0a23e535390b6f199217278465d638 on codex/capsule-e2e-reliability; later commits are documentation only. Findings #1 and #2 are resolved. The release is NOT gateway-only: the gateway and the consolidated payer must both be replaced as a pair. Handoff: docs/work/READY_FOR_OWNER_AUTHORIZATION_20261012.md; rollback: docs/work/RELEASE_ROLLBACK_RUNBOOK_20261012.md. No deployment, live test, signing, grant or authoritative-database action is authorized or has occurred.
+READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED. See docs/work/READY_FOR_OWNER_MCP_TEST_20261012.md and docs/demo/MULTIWALLET_MANUAL_ACCEPTANCE.md. Owner refreshes existing Capsule metadata and performs fresh quotes/purchases. No more agent implementation/review/payment tests.
 
-## Repair commit range
+## First repair commit range — historical, superseded by revision 2
 51ff776 (base) -> c3fd5ebf4c48d554f95f0d483973055f9e566e7f (first-handoff HEAD; revision 2 adds a0efdb3, e95037e, aee20f6, c788418 and docs on top of 756bd9c) on codex/capsule-e2e-reliability, pushed to origin (12 commits, 41 files, +1090/-235). Product files changed: src/channels/hosted-mcp/{oauth.ts,router.ts}, src/channels/http/app.ts, src/channels/mcp/{bridge.ts,config.ts,server.ts,tools.ts}, src/contracts/{commerce.ts,intent.ts,presentation.ts,provenance.ts}, src/core/{service.ts,views.ts,worker.ts}, src/evidence/read-model.ts, src/execution/atlas/executor.ts, src/execution/shopify/{browserCheckout.ts,globalCatalog.ts}, web/src/{contracts/evidence.ts,copy/en.ts,model/present.ts,source/sample.ts}. clients/ UNCHANGED, so the consolidated payer artifact needs no redeploy. No new dependencies, no migrations, no config/env/cap/policy/signer/key changes.
 
 ## Evidence links

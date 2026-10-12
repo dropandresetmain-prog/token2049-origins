@@ -1,3 +1,29 @@
+# Capsule — current owner handoff
+
+**READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED**
+
+12 October 2026 Singapore. The owner-authorized paired release and conditional activation are complete. Gateway and payer both run exact **c7884181ee0a23e535390b6f199217278465d638**. Gateway deployment **dep-db67kdp42hec73b7fslg**; payer deployment **dep-db67s6dckfvc73cfe94g**. Instance **capsule_c7884181ee0a** has exactly the three original wallet grants enabled. Customer search/quote/purchase scopes and the private payer's original fund scope are restored; original keys, policies, caps and histories remain. Main is unchanged. No agent purchase, chain broadcast or merchant write occurred.
+
+Actual Render-built fingerprints match the approved artifacts: gateway **0572598240edd56e681f08cd218f4969ab3b6b617880fb4020f8587b0dfdf663** (139files); payer **d2d7d70fd7f347ad97161ef892f2eff6a5ab6b1c5035a55ec68f411192429bc6** (79files). Node24.21.0 three-rail initialization/read-only checks PASS; peak149456KiB (~146MiB). Normal startup has no operator wallet fan-out. The unchanged health-only Worker is **00ee6d4a-afdd-4807-ad05-f46d33fa1986**, module **dc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15**, unchanged bindings and no schedules.
+
+Disabled hosted gate: **37PASS**. Final activated hosted gate: **38PASS** — OAuth/PKCE, scope/audience discovery, MCP initialize/tool listing, fixed invalid-ID payer transport400, three registered sources, historical receipt/proof, restored authority and unchanged financial hashes. The existing flight's proof URL was also opened in the deployed console: ticket issued,0.0743Sui Testnet USDC, receipt/proof controls visible. This is historical readback, not a new E2E.
+
+Fresh protected44table/985row backup and disposable PostgreSQL18.6 restore PASS; SHA **368061aa2a45b735717878d27a37790aa24a738f078482d204bd14c840ce39b3**. No canonical migration or history restore. Authority/source rows and saved client scopes were the only release-related database changes, plus normal OAuth verification records. Retired old clients and old Solana service remain fenced.
+
+Use the existing MCP **https://token2049-origins.onrender.com/mcp**, existing OAuth, and console **https://token2049-origins.onrender.com/console/**. In [ChatGPT Plugins](https://chatgpt.com/plugins), open the existing Capsule connection, select **Refresh**, then start a new conversation and select Capsule. Reconnect OAuth if its cached grant is read-only. [Official refresh guide](https://developers.openai.com/plugins/deploy/connect-chatgpt), checked12October2026. No manual payer preparation.
+
+The passphrase is unchanged. Copy it privately using the command in [the manual sheet](demo/MULTIWALLET_MANUAL_ACCEPTANCE.md); paste only into Capsule's sign-in/consent page. Signing in is separate from each exact quote/wallet approval.
+
+All **nine live rows on this release are NOT RUN**. The prior11October Atlas/Sui purchase remains verified historical evidence; the claimed hotel/Cardano booking remains unsupported; Shopify/Solana previously stopped after a successful quote. Use fresh offers/quotes for every new test. [Nine-row manual sheet](demo/MULTIWALLET_MANUAL_ACCEPTANCE.md).
+
+[Detailed activation record](work/READY_FOR_OWNER_MCP_TEST_20261012.md). [Rollback runbook](work/RELEASE_ROLLBACK_RUNBOOK_20261012.md): fence authority, inspect/reconcile current obligations, check binary compatibility; never restore stale history or reactivate competing signers.
+
+Final Render billing read-only: Hobby/no card/USD0accrued and projected;110.92/750Free hours,76/500build minutes,140MB/5GB,6/25services. Counters are shared and can lag; no paid change.
+
+**STOP for owner tests.** No new implementation, review cycle, quote or payment test follows this handoff.
+
+## Previous 11 October handoff — historical
+
 # Capsule — current handoff
 
 READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED

@@ -550,5 +550,46 @@
       "providerWrites": 0,
       "manualLiveRows": "all nine NOT RUN"
     }
+  },
+  "e2eReliabilityRelease": {
+    "status": "READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED",
+    "candidateBranch": "codex/capsule-e2e-reliability",
+    "candidateSha": "c7884181ee0a23e535390b6f199217278465d638",
+    "gateway": {
+      "deploymentId": "dep-db67kdp42hec73b7fslg",
+      "builtFiles": 139,
+      "fingerprintSha256": "0572598240edd56e681f08cd218f4969ab3b6b617880fb4020f8587b0dfdf663"
+    },
+    "payer": {
+      "deploymentId": "dep-db67s6dckfvc73cfe94g",
+      "builtFiles": 79,
+      "fingerprintSha256": "d2d7d70fd7f347ad97161ef892f2eff6a5ab6b1c5035a55ec68f411192429bc6",
+      "instanceId": "capsule_c7884181ee0a"
+    },
+    "worker": {
+      "version": "00ee6d4a-afdd-4807-ad05-f46d33fa1986",
+      "moduleSha256": "dc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15",
+      "unchanged": true
+    },
+    "signingEnabled": true,
+    "registeredWalletGrantsEnabled": 3,
+    "customerPurchasesEnabled": true,
+    "disabledHostedChecks": 37,
+    "finalHostedChecks": 38,
+    "historyUnchanged": true,
+    "backupSha256": "368061aa2a45b735717878d27a37790aa24a738f078482d204bd14c840ce39b3",
+    "environmentChanges": [
+      "MULTIWALLET_INSTANCE_ID explicitly set to capsule_c7884181ee0a",
+      "MULTIWALLET_SIGNING_ENABLED fenced false then restored true"
+    ],
+    "migrationChanges": 0,
+    "keyChanges": 0,
+    "capChanges": 0,
+    "agentPurchases": 0,
+    "chainBroadcasts": 0,
+    "merchantWrites": 0,
+    "ownerLiveRows": "all nine NOT RUN on this release",
+    "activationRecord": "docs/work/READY_FOR_OWNER_MCP_TEST_20261012.md",
+    "verifiedAt": "2026-10-12T06:40:10.792Z"
   }
 }

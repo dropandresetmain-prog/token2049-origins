@@ -1,12 +1,12 @@
 # Multiwallet owner acceptance
 
-**READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED** Both new integrated cold cycles and covered activation gates PASS. Original three source grants/signing and customer commerce scope are enabled. All9owner live rows remain NOT RUN; no agent purchase was performed.
+**READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED**12October2026: gateway and payer both c7884181ee0a23e535390b6f199217278465d638; instance capsule_c7884181ee0a, three original wallet grants/signing and customer purchases ENABLED. Actual fingerprints, read-only rail checks, disabled37/final38hosted gates and preserved histories PASS. All nine live rows on this release NOT RUN. Prior11October Atlas/Sui success is historical; hotel/Cardano remained unverified and Shopify/Solana never reached payment.
 
 Use the existing `https://token2049-origins.onrender.com/mcp` with its existing OAuth implementation. Consult [current official connection instructions](https://developers.openai.com/plugins/deploy/connect-chatgpt); account/workspace controls and UI wording may differ. Copy the exact redirect URI from the host's MCP/OAuth setup interface into the allowed configuration when needed. Retrieve the existing access code through its protected owner method; do not paste it into chat, logs or proof artifacts. No new OAuth provider is required. Console: [Capsule](https://token2049-origins.onrender.com/console/).
 
 ### Owner connection preflight
 
-The [official OpenAI setup guide](https://developers.openai.com/plugins/deploy/connect-chatgpt), fetched 11 October 2026, gives this flow:
+The [official OpenAI setup guide](https://developers.openai.com/plugins/deploy/connect-chatgpt), fetched 12 October 2026, gives this flow:
 
 1. Open [ChatGPT Plugins](https://chatgpt.com/plugins) in the intended account/workspace; select the plus button, then **Add custom MCP server**.
 2. Name it Capsule, describe it as sandbox/testnet commerce, and use public connection URL `https://token2049-origins.onrender.com/mcp`. Choose OAuth. Existing metadata supports dynamic client registration; leave manual client ID/secret blank when using that option.

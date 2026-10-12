@@ -1,5 +1,16 @@
 # Current Capsule issues
 
+## Current c788418 release — 12 October 2026
+
+| Classification | Finding/action | Risk/blocker |
+|---|---|---|
+| Act Now | Pending settlement semantics, one Cardano funding POST, durable quote collection, grounded confirmation/proof links and currency/sign-in copy repaired; paired deployment/activation PASS. | Resolved implementation/release blockers. |
+| Investigate Now | Owner nine fresh provider/rail rows, cold/new-build behavior and actual Shopify checkout timing. | All new-release rows NOT RUN. Warm hosted checks and historical live success do not substitute. |
+| Park for Later | Secure Atlas itinerary/Nuitée voucher documents and pending-to-local-transaction attribution. | References/receipt/proof available; no provider PDF or real reservation claim. Pending attribution trusts canonical purchase state; caps remain conservative. |
+| Ignore / Accept Risk | Free cold latency/shared quotas and retained signed/blocked exposure. | No automatic payment retry, wallet substitution, cap increase or history reset. |
+
+[Actual release/activation evidence](work/READY_FOR_OWNER_MCP_TEST_20261012.md).
+
 ## Payment repair triage — 11 October 2026
 
 | Classification | Finding / action | Risk / blocker |
