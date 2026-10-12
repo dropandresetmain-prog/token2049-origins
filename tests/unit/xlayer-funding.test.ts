@@ -402,7 +402,6 @@ describe('X Layer recovery (read-only)', () => {
   it.each([
     ['receipt sender', { receipt: { from: OTHER_ADDRESS } }],
     ['receipt target', { receipt: { to: OTHER_TOKEN } }],
-    ['receipt block', { receipt: { blockNumber: 1000n } }],
     ['receipt hash', { receipt: { hash: '0x' + '9'.repeat(64) } }],
     ['transaction target', { tx: { to: OTHER_TOKEN } }],
     ['transaction calldata', { tx: { input: '0x' } }],
@@ -411,6 +410,11 @@ describe('X Layer recovery (read-only)', () => {
   ] as const)('rejects when the %s disagrees with the exact requirement', async (_name, include) => {
     const { result } = await recoverCase(include as never);
     expect(result).toMatchObject({ ok: false, code: 'payment_invalid' });
+  });
+
+  it('treats a receipt/transaction block disagreement as transient (pending), never invalid or funded', async () => {
+    const { result } = await recoverCase({ receipt: { blockNumber: 1000n } } as never);
+    expect(result).toMatchObject({ ok: false, code: 'payment_required' });
   });
 
   it('rejects a transaction from an unapproved payer', async () => {
