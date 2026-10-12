@@ -65,7 +65,7 @@ const escapeHtml = (s: string) => s.replace(/[&<>"']/g, (c) => ({ '&': '&amp;', 
 const SCOPE_MEANINGS: ReadonlyArray<readonly [scope: string, meaning: string]> = [
   ['offers:read', 'search partner offers'],
   ['quotes:write', 'create price quotes'],
-  ['purchases:write', 'place purchases on behalf of the demo account'],
+  ['purchases:write', 'place purchases on behalf of your account'],
   ['purchases:read', 'read those purchases and their confirmation details back'],
 ];
 
@@ -136,7 +136,7 @@ export class HostedOAuth implements OAuthServerProvider {
   private async ensureIdentity(): Promise<void> {
     const at = this.iso();
     await this.o.db.tx(async () => {
-      await this.o.db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', this.o.customerId, 'Hosted MCP demo customer', at);
+      await this.o.db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', this.o.customerId, 'Hosted MCP customer', at);
       await this.o.db.run(
         'INSERT INTO api_clients(id, customer_id, channel, label, token_hash, scopes_json, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7) ON CONFLICT(id) DO NOTHING',
         this.o.apiClientId, this.o.customerId, 'mcp', 'Hosted MCP (OAuth)', hashOf(newSecretToken('t2o_unused')), JSON.stringify(HOSTED_MCP_SCOPES), at,
@@ -193,15 +193,14 @@ export class HostedOAuth implements OAuthServerProvider {
     return `<!doctype html><html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Sign in to Capsule</title>
 <style>body{font:16px/1.5 system-ui,sans-serif;max-width:30rem;margin:3rem auto;padding:0 1rem;color:#111}h1{font-size:1.3rem}code{background:#eee;padding:.1rem .3rem;border-radius:.25rem}
 input{width:100%;padding:.6rem;margin:.4rem 0 1rem;box-sizing:border-box;font-size:1rem}button{padding:.6rem 1.2rem;font-size:1rem;margin-right:.5rem}.err{color:#b00020}.note{color:#555;font-size:.9rem}</style></head>
-<body><h1>Sign in to the Capsule demo account</h1>
-<p><strong>${name}</strong> is asking to sign in as the one hosted Capsule demo account so it can search and shop with you. Approving here connects that session; it does not buy anything by itself.</p>
+<body><h1>Sign in to the Capsule account</h1>
+<p><strong>${name}</strong> is asking to sign in as the one hosted Capsule account so it can search and shop with you. Approving here connects that session; it does not buy anything by itself.</p>
 <p>Permissions requested: ${scopes.map((s) => `<code>${escapeHtml(s)}</code>`).join(' ')} — ${plainEnglish}.</p>
-<p class="note">Capsule is a sandbox/testnet demo: purchases settle in testnet funds and no real money moves.</p>
 <p><strong>Signing in is not buying.</strong> Each purchase is a separate step: Capsule places one only after you explicitly approve that exact quote and your chosen payment option (the <code>buy</code> approval).</p>
 <p class="note">The result of this sign-in is sent to <code>${escapeHtml(new URL(redirectUri).origin)}</code>. Only approve if you started this connection yourself.</p>
 ${error ? `<p class="err">${escapeHtml(error)}</p>` : ''}
 <form method="post" action="/oauth/consent" autocomplete="off"><input type="hidden" name="request_id" value="${escapeHtml(requestId)}">
-<label>Owner passcode — signs you in to the protected Capsule demo account. It is not a payment password or a wallet key, and it does not approve any purchase.<input type="password" name="passcode" required autocomplete="off"></label>
+<label>Owner passcode — signs you in to the protected Capsule account. It is not a payment password or a wallet key, and it does not approve any purchase.<input type="password" name="passcode" required autocomplete="off"></label>
 <button type="submit" name="decision" value="approve">Approve</button><button type="submit" name="decision" value="deny" formnovalidate>Deny</button></form></body></html>`;
   }
 

@@ -77,7 +77,7 @@ function Capacity({ pool }: { pool: CapacityVM }) {
   );
 }
 
-function TreasuryView({ vm }: { vm: TreasuryVM }) {
+export function TreasuryView({ vm }: { vm: TreasuryVM }) {
   const s = t.simulated;
   const o = t.observed;
   const ob = t.obligations;
@@ -88,9 +88,9 @@ function TreasuryView({ vm }: { vm: TreasuryVM }) {
         {t.separationBody}
       </OperatorNote>
 
-      <section className="op-panel simulated" aria-labelledby="op-simulated">
+      <section className="op-panel capacity" aria-labelledby="op-capacity">
         <div className="op-panel-head">
-          <h2 id="op-simulated">{s.title}</h2>
+          <h2 id="op-capacity">{s.title}</h2>
           <Badge tone="attention">{s.badge}</Badge>
         </div>
         <p className="op-intro">{s.intro}</p>

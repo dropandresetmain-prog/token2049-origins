@@ -1,3 +1,4 @@
+import { customerRecord } from '../../../src/presentation/customer.js';
 import { Fragment, useEffect, useId, useRef, type KeyboardEvent } from 'react';
 import { createPortal } from 'react-dom';
 import * as copy from '../copy/en.js';
@@ -120,7 +121,7 @@ export function ProofPanel({
     e.currentTarget.querySelectorAll<HTMLElement>('[role="tab"]')[next]?.focus();
   };
 
-  // What the download contains: everything the panel shows, plus the raw record for support.
+  // The download uses the same customer projection as technical details.
   const { downloadName, available: _available, ...record } = proof;
 
   return createPortal(
@@ -189,7 +190,7 @@ export function ProofPanel({
               ))}
               <details className="raw-details">
                 <summary>{copy.proof.technicalDetails}</summary>
-                <pre className="raw-audit">{JSON.stringify(proof.technicalRecord, null, 2)}</pre>
+                <pre className="raw-audit">{JSON.stringify(customerRecord(proof.technicalRecord), null, 2)}</pre>
               </details>
             </>
           )}

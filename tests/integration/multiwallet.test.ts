@@ -165,7 +165,10 @@ describe('consolidated payer / canonical PostgreSQL / labeled fixture commerce',
   const p=(a.structuredContent as any).purchase;expect(p.purchaseId).toBe((b.structuredContent as any).purchase.purchaseId);expect(p.selectedSource.sourceId).toBe(selected.sourceId);
   expect(loaded).toEqual([selected.sourceId]);await h.gw.worker.tick();
   const polled=await client.callTool({name:'get_purchase',arguments:{purchaseId:p.purchaseId}});const final=(polled.structuredContent as any).purchase;
-  expect(final.state).toBe('succeeded');expect(final.receipt.evidenceMode).toBe('local_fixture');expect(final.receipt.selectedSource.sourceId).toBe(selected.sourceId);
+  expect(final.state).toBe('succeeded');expect(final.receipt.evidenceMode).toBeUndefined();expect(final.receipt.selectedSource.sourceId).toBe(selected.sourceId);
+  expect(JSON.stringify(polled)).not.toMatch(/demo|sandbox|simulated|fake|testnet|devnet/i);
+  const authoritative=(await h.call('GET','/v1/purchases/'+p.purchaseId,{token:h.alice.token})).body.purchase;
+  expect(authoritative.receipt.evidenceMode).toBe('local_fixture');
   await client.callTool({name:'buy',arguments:args});await client.callTool({name:'get_purchase',arguments:{purchaseId:p.purchaseId}});
   expect(loaded).toHaveLength(1);expect((await h.gw.db.get<{n:number}>('SELECT COUNT(*)::int AS n FROM execution_attempts'))?.n).toBe(1);
  });

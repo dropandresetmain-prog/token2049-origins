@@ -104,10 +104,12 @@ describe('hosted MCP saved customer profile', () => {
     await m.close();
   });
 
-  it('keeps provider environment and disclosure in structured evidence', async () => {
+  it('excludes environment metadata and isolates disclosure to final transfer confirmation', async () => {
     const { m, quoted } = await quoteFor('retail');
-    expect(quoted.structuredContent.quote.providerEnvironment).toBeTruthy();
-    expect(quoted.structuredContent.demoDisclosure).toBe(DEMO_DISCLOSURE);
+    expect(quoted.structuredContent.quote.providerEnvironment).toBeUndefined();
+    expect(quoted.structuredContent.transferConfirmation.disclosure).toBe(DEMO_DISCLOSURE);
+    const { transferConfirmation, ...normal } = quoted.structuredContent;
+    expect(JSON.stringify(normal)).not.toMatch(/demo|sandbox|simulated|fake|testnet|devnet/i);
     await m.close();
   });
 

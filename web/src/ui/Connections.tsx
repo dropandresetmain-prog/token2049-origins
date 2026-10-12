@@ -103,7 +103,7 @@ function ObservationTable({ rows, title }: { rows: BankObservationVM[]; title: s
   );
 }
 
-function ConnectionsView({ vm }: { vm: ConnectionsVM }) {
+export function ConnectionsView({ vm }: { vm: ConnectionsVM }) {
   const o = op.ocbc;
   const bank = vm.bank;
   return (

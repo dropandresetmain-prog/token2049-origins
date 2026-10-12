@@ -6,6 +6,7 @@
  * a confirmed payment never makes a purchase look complete, and no receipt is shown before the merchant confirms.
  */
 import * as copy from '../copy/en.js';
+import { customerText, isEnvironmentCopy } from '../../../src/presentation/customer.js';
 import { projectProgress, completionReference } from '../contracts/backend.js';
 import type { Category, Channel, FundingRail, HumanProgress, Money, ProviderRoute, PurchaseState, PurchaseView, SourceOffer } from '../contracts/backend.js';
 import type { EvidenceListItem } from '../contracts/evidence.js';
@@ -89,11 +90,10 @@ export function presentList(result: PurchaseListResult, ctx: PresentContext): Pu
     const cat = asCategory(item.category);
     const progress = progressForListItem(item);
     const key = statusKey(progress.stage, item.state, item.paymentState);
-    const title = context.title ?? copy.category[cat].title;
+    const title = customerText(context.title ?? copy.category[cat].title);
     const merchantName = merchantOf(item.route).name;
-    const requestedBy = context.requestedBy?.name ?? copy.unknownRequester.name;
+    const requestedBy = customerText(context.requestedBy?.name ?? copy.unknownRequester.name);
     const rail = item.fundingRequirement.rail;
-    const network = item.fundingRequirement.amount.network;
     const id = displayId(item.id);
     return {
       id: item.id,
@@ -105,7 +105,7 @@ export function presentList(result: PurchaseListResult, ctx: PresentContext): Pu
       createdLabel: formatWhen(item.createdAt, ctx),
       requestedBy,
       paidWith: methodOf(rail),
-      paidWithDetail: isTestNetwork(network) ? copy.testNetwork : '',
+      paidWithDetail: '',
       amount: item.payable ? formatMoney(item.payable, ctx) : '',
       status: { ...statusVM(key), ...(key === 'completed' ? { label: progress.label } : {}) },
       group: groupOf(key),
@@ -153,13 +153,13 @@ function facts(b: PurchaseBundle, ctx: PresentContext): Facts {
   const rail = requirement?.rail ?? b.evidence?.purchase.fundingRail ?? p.funding[0]?.rail ?? '';
   const networkRaw = requirement?.amount.network ?? p.funding[0]?.network ?? null;
   const fromChannel = channelOf(b.evidence?.purchase.channel);
-  const agent = { name: b.context.requestedBy?.name ?? fromChannel.name, kind: fromChannel.kind };
+  const agent = { name: customerText(b.context.requestedBy?.name ?? fromChannel.name), kind: fromChannel.kind };
   const env = b.quote?.providerEnvironment ?? p.receipt?.providerEnvironment ?? b.proof?.merchant.environment;
   const sandboxed = !!(b.quote?.sandboxRepresentation ?? b.proof?.sandboxExecution ?? p.receipt?.sandboxExecution);
   const source = sandboxed ? (b.quote?.sourceOffer ?? b.proof?.sourceOffer ?? p.receipt?.sourceOffer ?? null) : null;
   return {
     b, p, ctx, cat, key, progress,
-    title: source?.productTitle ?? b.quote?.title ?? b.context.title ?? copy.category[cat].title,
+    title: customerText(source?.productTitle ?? b.quote?.title ?? b.context.title ?? copy.category[cat].title),
     ref: displayId(p.purchaseId),
     agent,
     // Lead with the source store; the execution disclosure separately identifies where checkout occurred.
@@ -263,7 +263,7 @@ function buildRoute(f: Facts): RouteVM {
   else if (f.key === 'checking' || f.key === 'in_progress') result = 'Waiting for confirmation';
   else result = copy.commerceOutcome('not_started', f.cat);
   return {
-    from: { label: copy.detail.requestedBy, name: f.agent.name, detail: f.agent.kind, payment: { method: f.method, network: f.networkIsTest ? copy.testNetwork : null } },
+    from: { label: copy.detail.requestedBy, name: f.agent.name, detail: f.agent.kind, payment: { method: f.method, network: null } },
     capsule: { label: copy.detail.capsule, action: copy.routeAction[f.key](f.cat), stopped },
     to: {
       label: copy.detail.merchantLabel, name: f.merchant.name,
@@ -313,13 +313,13 @@ function buildSummary(f: Facts): SummaryVM {
   const amount = requirement ? formatCrypto(requirement.amount, copy.testFunds, f.ctx) : null;
   const scaled = requirement?.settlement?.policy.mode === 'scaled_testnet';
   return {
-    item: { title: f.title, detail: q?.fulfillmentSummary ?? copy.category[f.cat].title, icon: categoryIcon(f.cat) },
+    item: { title: f.title, detail: customerText(q?.fulfillmentSummary ?? copy.category[f.cat].title), icon: categoryIcon(f.cat) },
     costs,
     total: { label: copy.detail.total, value: `${formatMoney(f.p.payablePrincipal, f.ctx)} ${f.p.payablePrincipal.currency}` },
     notes: [...payAtPropertyNotes(f), boundaryNote(f)].filter((n): n is string => !!n),
     payment: {
       method: f.method,
-      network: f.networkIsTest ? copy.testNetwork : null,
+      network: null,
       amount: amount ? (paid ? copy.detail.paidAmount(amount) : copy.detail.dueAmount(amount)) : null,
       note: scaled ? copy.detail.scaledTestPayment : f.networkIsTest ? copy.detail.testPaymentNote : '',
       locked: paid,
@@ -342,7 +342,7 @@ function buildProof(f: Facts): ProofVM {
       ? { label: copy.proof.notReceived, tone: 'pending' as const }
       : { label: copy.paymentState[p.paymentState], tone: 'progress' as const };
   const paymentFields: Field[] = [
-    { label: copy.proof.rowMethod, value: f.networkIsTest ? `${f.method}, ${copy.testNetwork.toLowerCase()}` : f.method },
+    { label: copy.proof.rowMethod, value: f.method },
   ];
   if (p.selectedSource) paymentFields.push({ label: 'Selected wallet', value: p.selectedSource.displayAddress });
   if (requirement) paymentFields.push({ label: copy.proof.rowAmount, value: formatCrypto(requirement.amount, copy.testFunds, f.ctx) });
@@ -366,7 +366,6 @@ function buildProof(f: Facts): ProofVM {
     fields: [
       { label: copy.proof.rowMerchant, value: f.merchant.name },
       ...(f.source ? [{ label: copy.sourceStore.rowFoundAt, value: f.source.merchantName }] : []),
-      { label: copy.proof.rowMode, value: f.merchantIsTest ? copy.proof.testMode : copy.proof.liveMode },
       { label: copy.proof.rowOutcome, value: copy.commerceOutcome(p.commerceStatus, f.cat) },
       { label: copy.proof.rowMerchantPayment, value: copy.merchantPayment[p.merchantPaymentStatus] },
     ],
@@ -392,7 +391,7 @@ function buildProof(f: Facts): ProofVM {
 
   return {
     available: !!(f.b.proof || f.b.evidence),
-    disclaimer: f.ctx.mode === 'sample' ? copy.proof.sampleNote : f.ctx.mode === 'test' ? copy.proof.testNote : null,
+    disclaimer: null,
     sections,
     confirmedCount: (paid ? 1 : 0) + (done ? 1 : 0),
     activity: buildActivity(f),
@@ -413,31 +412,13 @@ function buildActivity(f: Facts): ActivityItemVM[] {
   return items;
 }
 
-/**
- * Receipt notes in customer language, derived from receipt facts. The gateway's own limitation statements are
- * engineering wording; they stay in the downloaded receipt and the technical details, not on screen.
- */
-function receiptNotes(f: Facts, r: NonNullable<PurchaseView['receipt']>): string[] {
-  const notes: string[] = [];
-  const boundary = boundaryNote(f);
-  if (boundary) notes.push(boundary);
-  const simulated = r.evidenceMode === 'local_fixture' || r.funding.some((x) => x.evidenceMode === 'local_fixture');
-  if (simulated) notes.push(copy.receipt.noteSimulatedFunds);
-  else if (f.networkIsTest) notes.push(copy.receipt.noteTestFunds);
-  const requirement = r.fundingRequirement ?? f.p.fundingRequirement;
-  if (requirement?.settlement?.policy.mode === 'scaled_testnet') notes.push(copy.receipt.noteScaled);
-  if (f.merchantIsTest) notes.push(copy.receipt.noteTestMerchant);
-  notes.push(copy.receipt.noteNoBankCharge);
-  return notes;
-}
-
 function buildReceipt(f: Facts): ReceiptVM | null {
   const r = f.p.receipt;
   // No receipt before the merchant confirms, whatever else is true.
   if (!r || f.key !== 'completed') return null;
   const fields: Field[] = [
     { label: copy.receipt.rowRequestedBy, value: f.agent.name },
-    { label: copy.receipt.rowPaidWith, value: f.networkIsTest ? `${f.method}, ${copy.testNetwork.toLowerCase()}` : f.method },
+    { label: copy.receipt.rowPaidWith, value: f.method },
     { label: copy.receipt.rowMerchant, value: copy.merchantDetail(f.merchant.name, f.merchantIsTest) },
     ...(f.source ? [{ label: copy.sourceStore.rowFoundAt, value: f.source.merchantName }] : []),
     { label: copy.receipt.rowOutcome, value: copy.commerceOutcome(r.commerceStatus, f.cat) },
@@ -451,7 +432,7 @@ function buildReceipt(f: Facts): ReceiptVM | null {
     currency: f.p.payablePrincipal.currency,
     itemTitle: f.title,
     fields,
-    notes: receiptNotes(f, r),
+    notes: boundaryNote(f) ? [boundaryNote(f)!] : [],
     downloadName: `capsule-receipt-${f.ref.slice(1).toLowerCase()}.json`,
     download: r,
   };
@@ -460,10 +441,10 @@ function buildReceipt(f: Facts): ReceiptVM | null {
 function buildQuote(f: Facts): QuoteVM | null {
   const q = f.b.quote;
   if (!q) return null;
-  const line = (label: string, m: Money, negative = false): Field => ({ label, value: `${negative ? '-' : ''}${formatMoney(m, f.ctx)}` });
+  const line = (label: string, m: Money, negative = false): Field => ({ label: customerText(label), value: `${negative ? '-' : ''}${formatMoney(m, f.ctx)}` });
   return {
-    itemTitle: q.title,
-    details: q.fulfillmentSummary,
+    itemTitle: customerText(q.sourceOffer?.productTitle ?? q.title),
+    details: customerText(q.fulfillmentSummary),
     lines: q.breakdown
       .filter((l) => l.kind !== 'fee_payable_at_property')
       .map((l) => line(l.label, l.amount, l.kind === 'discount')),
@@ -473,7 +454,7 @@ function buildQuote(f: Facts): QuoteVM | null {
     limit: f.b.context.approvedMaxTotal ? { label: copy.quoteDialog.rowLimit, value: formatMoney(f.b.context.approvedMaxTotal, f.ctx) } : null,
     validUntil: { label: copy.quoteDialog.rowValidUntil, value: formatWhen(q.expiresAt, f.ctx) },
     quoteNumber: { label: copy.quoteDialog.rowQuoteNumber, value: displayId(q.quoteId), mono: true },
-    terms: q.terms,
+    terms: q.terms.filter(t => !isEnvironmentCopy(t)),
     source: f.source
       ? {
           foundAt: { label: copy.sourceStore.rowFoundAt, value: f.source.merchantName },

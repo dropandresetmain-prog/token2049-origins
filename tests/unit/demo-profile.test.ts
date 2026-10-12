@@ -69,7 +69,8 @@ describe('saved demo customer profile', () => {
   it('MCP instructions use no fake/synthetic/test-customer language and disclose the demo exactly once', () => {
     expect(INSTRUCTIONS).not.toMatch(/fake|synthetic|test traveller|sandbox customer/i);
     expect(INSTRUCTIONS).not.toContain('Sandbox/testnet only');
-    expect(INSTRUCTIONS.split('Demo transaction: payment uses testnet funds and the merchant checkout runs in a sandbox. No real money will be charged.')).toHaveLength(2);
+    expect(INSTRUCTIONS).not.toMatch(/demo|sandbox|simulated|fake|testnet|devnet/i);
+    expect(INSTRUCTIONS).toContain('transferConfirmation.disclosure');
     expect(INSTRUCTIONS).toMatch(/Do not ask the user for fields the profile already provides/);
   });
 });

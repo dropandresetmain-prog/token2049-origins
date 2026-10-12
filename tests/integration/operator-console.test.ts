@@ -111,8 +111,8 @@ describe('console operator screens against the real gateway', () => {
     expect(by).toEqual({ reserved: '$0.00', consumed: '$49.99', providerTest: '$0.00', available: '$150.01' });
 
     // Observed funds are test crypto only, on their own network label.
-    const treasuryRow = vm.observed.accounts.find((a) => a.account === 'Test crypto held in treasury')!;
-    expect(treasuryRow).toMatchObject({ asset: 'Cardano test network', balance: '49.99 test USDM', side: 'Debit balance' });
+    const treasuryRow = vm.observed.accounts.find((a) => a.account === 'Tokens held in treasury')!;
+    expect(treasuryRow).toMatchObject({ asset: 'Cardano network', balance: '49.99 USDM', side: 'Debit balance' });
     expect(JSON.stringify(vm.observed)).not.toContain('$');
     expect(JSON.stringify(vm.simulated)).not.toContain('USDM');
 
@@ -142,7 +142,7 @@ describe('console operator screens against the real gateway', () => {
 
     const all = [...vm.groups.flatMap((g) => g.items), vm.bank.connection];
     const by = Object.fromEntries(all.map((i) => [i.key, i]));
-    expect(by.cardano).toMatchObject({ reported: true, status: { label: 'Local tests only' } });
+    expect(by.cardano).toMatchObject({ reported: true, status: { label: 'Awaiting external verification' } });
     expect(by.shopify?.reported && by.nuitee?.reported && by.atlas?.reported).toBe(true);
     // The harness has no Solana or Masumi adapter, and the console says so rather than inventing a state.
     expect(by.solana).toMatchObject({ reported: false, status: { label: 'Not reported by this gateway' } });
@@ -150,9 +150,9 @@ describe('console operator screens against the real gateway', () => {
 
     expect(vm.bank.empty).toBe(false);
     expect(vm.bank.banner).toMatch(/do not show that any Capsule purchase reached a bank or card account/);
-    expect(vm.bank.balances[0]).toMatchObject({ kind: 'Account balance', reference: '****3456', amount: '$123.45 SGD', environment: 'Sandbox' });
-    expect(vm.bank.balances[0]!.source).toBe(`ocbc:sandbox:${OCBC_APIS.accountListing.label}`);
-    expect(vm.bank.balances[0]!.caveats.join(' ')).toContain('historical test data');
+    expect(vm.bank.balances[0]).toMatchObject({ kind: 'Account balance', reference: '****3456', amount: '$123.45 SGD', environment: 'Configured' });
+    expect(vm.bank.balances[0]!.source).toBe(`ocbc:${OCBC_APIS.accountListing.label}`);
+    expect(vm.bank.balances[0]!.caveats).toEqual([]);
 
     const everything = JSON.stringify([data, vm]);
     expect(everything).not.toContain('Jane Example');

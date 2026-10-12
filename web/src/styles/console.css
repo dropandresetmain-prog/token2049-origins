@@ -628,7 +628,7 @@ textarea:focus-visible{outline:2px solid var(--ox);outline-offset:3px}
 .op-note.caution{background:var(--warning-bg);border-color:var(--warning-line)}
 .op-note.caution>svg,.op-note.caution p{color:var(--warning)}
 .op-panel{border:1px solid var(--line);border-radius:var(--r-md);padding:20px 24px 22px;margin-bottom:20px;background:var(--paper)}
-.op-panel.simulated{border-left:3px solid var(--warning)}
+.op-panel.capacity{border-left:3px solid var(--warning)}
 .op-panel.observed{border-left:3px solid var(--positive)}
 .op-panel-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:6px}
 .op-panel-head h2{font-size:var(--fs-lg);font-weight:var(--fw-semibold)}

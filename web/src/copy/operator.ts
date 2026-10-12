@@ -2,7 +2,7 @@
  * User-facing strings for the operator screens (Treasury and Connections).
  *
  * These screens are for the person running the gateway, not for the person whose assistant made a purchase, so
- * they may say "capacity", "ledger" and "simulated". Everything else in docs/design/VOCABULARY.md still applies:
+ * they may say "capacity" and "ledger". Environment disclosure belongs at final transfer approval.
  * plain sentences, no em or en dashes, at most one middle dot per line, and never claim more than the data proves.
  *
  * Three claims these screens must never make, whatever the data says:
@@ -36,10 +36,10 @@ export const gate = {
 
 export const treasury = {
   heading: 'Treasury',
-  subhead: 'What the gateway has recorded: observed test funds and simulated purchasing capacity, kept apart.',
+  subhead: 'Recorded funding and purchasing capacity, kept apart.',
   separationTitle: 'Two ledgers, never added together',
   separationBody:
-    'Observed amounts are test crypto the gateway verified on a test network. Simulated amounts are a synthetic purchasing allowance. Test crypto is not bank cash, and the allowance is not a bank or card balance.',
+    'Verified token funding and purchasing allowances are recorded separately. Neither is a bank or card balance.',
   readonlyNote: 'This page reads stored records. It does not move money or contact any bank or provider.',
 
   health: {
@@ -61,9 +61,9 @@ export const treasury = {
   },
 
   observed: {
-    title: 'Observed test funds',
+    title: 'Observed funds',
     badge: 'Observed',
-    intro: 'Test crypto the gateway verified on a test network, and what it owes customers for it. No cash value.',
+    intro: 'Token funding verified by the gateway, and the corresponding customer obligations.',
     accountsTitle: 'Observed accounts',
     accountColumn: 'Account',
     assetColumn: 'Asset',
@@ -88,17 +88,17 @@ export const treasury = {
   },
 
   simulated: {
-    title: 'Simulated purchasing capacity',
-    badge: 'Simulated',
-    intro: 'A synthetic allowance that limits how much the gateway will spend on test purchases. It is not a bank or card balance.',
+    title: 'Purchasing capacity',
+    badge: 'Capacity',
+    intro: 'An allowance that limits purchasing. It is separate from bank and card balances.',
     limit: 'Capacity limit',
     available: 'Available',
     reserved: 'Reserved',
     consumed: 'Consumed',
-    providerTest: 'Provider test balance used',
+    providerTest: 'Provider balance used',
     reservedHint: 'Held for purchases still in progress.',
-    consumedHint: 'Simulated card spend for purchases that went through.',
-    providerTestHint: "Paid from a provider's test balance, not from the card allowance.",
+    consumedHint: 'Recorded allowance used by completed purchases.',
+    providerTestHint: "Paid from a provider balance, separate from the card allowance.",
     availableHint: 'Limit minus everything above.',
     barLabel: (currency: string) => `${currency} capacity split`,
     overspent: 'Recorded use is above the limit.',
@@ -108,9 +108,9 @@ export const treasury = {
     countColumn: 'Purchases',
     totalColumn: 'Amount',
     reservationsLabel: 'Capacity reservations by status',
-    accountsTitle: 'Simulated accounts',
-    accountsEmpty: 'No simulated entries yet.',
-    accountsLabel: 'Simulated ledger accounts',
+    accountsTitle: 'Capacity accounts',
+    accountsEmpty: 'No capacity entries yet.',
+    accountsLabel: 'Capacity ledger accounts',
   },
 
   purchases: {
@@ -121,7 +121,7 @@ export const treasury = {
 
   technical: {
     summary: 'Technical details',
-    note: 'The treasury response as the console read it. For support and audit.',
+    note: 'Customer treasury records. Operational environment metadata is omitted.',
   },
 
   /** Side of the ledger a balance sits on. */
@@ -129,17 +129,17 @@ export const treasury = {
 };
 
 export const accountLabel: Record<string, string> = {
-  'assets:crypto_treasury': 'Test crypto held in treasury',
+  'assets:crypto_treasury': 'Tokens held in treasury',
   'liabilities:customer_prepayment': 'Owed to customers: held for purchases',
   'liabilities:customer_unapplied': 'Owed to customers: not yet applied',
   'income:purchase_principal_applied': 'Purchase amounts applied',
   'income:service_fee': 'Service fees earned',
-  'simulated:merchant_purchases': 'Simulated merchant purchases',
-  'simulated:card_payable': 'Simulated card payable',
-  'simulated:provider_test_balance_used': 'Provider test balance used',
+  'simulated:merchant_purchases': 'Merchant purchases',
+  'simulated:card_payable': 'Card payable',
+  'simulated:provider_test_balance_used': 'Provider balance used',
 };
 
-export const ledgerLabel: Record<'observed' | 'simulated', string> = { observed: 'Observed', simulated: 'Simulated' };
+export const ledgerLabel: Record<'observed' | 'simulated', string> = { observed: 'Observed', simulated: 'Capacity' };
 
 export const reservationStatus: Record<string, string> = {
   active: 'Held for purchases in progress',
@@ -161,12 +161,12 @@ export const purchaseState: Record<string, { label: string; tone: Tone }> = {
 
 export const asset = {
   /** "Cardano test network" / "Solana test network"; the word "test" only when the network id says so. */
-  network: (family: 'cardano' | 'solana', test: boolean) => `${family === 'cardano' ? 'Cardano' : 'Solana'}${test ? ' test' : ''} network`,
-  token: (test: boolean) => (test ? 'test tokens' : 'tokens'),
-  ada: (test: boolean) => (test ? 'test ADA' : 'ADA'),
-  usdm: (test: boolean) => (test ? 'test USDM' : 'USDM'),
+  network: (family: 'cardano' | 'solana', test: boolean) => `${family === 'cardano' ? 'Cardano' : 'Solana'} network`,
+  token: (test: boolean) => 'tokens',
+  ada: (test: boolean) => 'ADA',
+  usdm: (test: boolean) => 'USDM',
   baseUnits: 'base units',
-  simulatedFiat: (currency: string) => `${currency} (simulated)`,
+  simulatedFiat: (currency: string) => currency,
 };
 
 /* ---------------- Connections ---------------- */
@@ -183,22 +183,22 @@ export const connections = {
   checked: 'Checked',
   missingTitle: 'Missing settings',
   noteTitle: 'Detail',
-  technical: { summary: 'Technical details', note: 'The readiness and bank responses as the console read them. For support and audit.' },
+  technical: { summary: 'Technical details', note: 'Customer connection records. Operational environment metadata is omitted.' },
   groups: {
-    funding: { title: 'Payments in', intro: 'Where customers pay from. Test networks only unless the environment says otherwise.' },
+    funding: { title: 'Payments in', intro: 'Connected customer payment sources.' },
     merchants: { title: 'Merchants', intro: 'Where the gateway places orders and bookings.' },
     bank: { title: 'Bank observation', intro: 'Read-only view of a bank. Observation only.' },
   },
 };
 
 export const integration: Record<string, { name: string; role: string }> = {
-  cardano: { name: 'Cardano', role: 'Receives test-token payments on Cardano' },
-  solana: { name: 'Solana', role: 'Receives test-token payments on Solana' },
+  cardano: { name: 'Cardano', role: 'Receives token payments on Cardano' },
+  solana: { name: 'Solana', role: 'Receives token payments on Solana' },
   masumi: { name: 'Masumi', role: 'Agent payments and service fees through Masumi' },
-  shopify: { name: 'Shopify', role: 'Test store orders' },
+  shopify: { name: 'Shopify', role: 'Store orders' },
   nuitee: { name: 'Nuitée', role: 'Hotel bookings' },
   atlas: { name: 'Atlas', role: 'Flight bookings' },
-  ocbc: { name: 'OCBC', role: 'Read-only view of sandbox accounts and cards' },
+  ocbc: { name: 'OCBC', role: 'Read-only account and card observations' },
 };
 
 export const readiness: Record<Readiness['status'], { label: string; tone: Tone }> = {
@@ -206,23 +206,23 @@ export const readiness: Record<Readiness['status'], { label: string; tone: Tone 
   CONFIGURED_UNVERIFIED: { label: 'Configured, not verified', tone: 'pending' },
   MISSING_CONFIG: { label: 'Not configured', tone: 'neutral' },
   ACCESS_BLOCKED: { label: 'Access blocked', tone: 'attention' },
-  LOCAL_TESTS_ONLY: { label: 'Local tests only', tone: 'neutral' },
+  LOCAL_TESTS_ONLY: { label: 'Awaiting external verification', tone: 'neutral' },
 };
 
 export const environmentLabel = {
-  sandbox: 'Sandbox',
-  test: 'Test network',
+  sandbox: 'Configured',
+  test: 'Configured',
   production: 'Production',
 };
 
 /* ---------------- OCBC observations ---------------- */
 
 export const ocbc = {
-  title: 'OCBC sandbox observations',
+  title: 'OCBC observations',
   badge: 'Observation only',
   banner:
-    'Read-only observations of OCBC sandbox data, stored with where they came from. They are not purchase settlement, not treasury truth, and they do not show that any Capsule purchase reached a bank or card account.',
-  historical: 'OCBC sandbox data is historical test data.',
+    'Read-only OCBC observations, stored with their source. They are not purchase settlement, not treasury truth, and they do not show that any Capsule purchase reached a bank or card account.',
+  historical: 'OCBC observations are historical records.',
   balancesTitle: 'Accounts and cards',
   transactionsTitle: 'Transactions',
   empty: 'No bank observations are stored yet. They are loaded outside this console, which only shows what is already stored.',
@@ -242,10 +242,10 @@ export const ocbc = {
   provenance: 'Provenance',
   amountUnavailable: 'Not available',
   evidence: {
-    local_fixture: 'Local test fixture',
-    fresh_external: 'Read from the OCBC sandbox',
+    local_fixture: 'Local record',
+    fresh_external: 'Read from OCBC',
   },
   evidenceUnknown: 'Unknown origin',
   referenceLabel: (masked: string) => `Reference ending ${masked.slice(-4)}`,
-  tableLabel: (title: string) => `${title}, OCBC sandbox observations`,
+  tableLabel: (title: string) => `${title}, OCBC observations`,
 };

@@ -153,6 +153,7 @@ async function token(f: Fixture, client: { client_id: string }, params: Record<s
 
 async function fullGrant(f: Fixture, over: {scope?:string} = {}) {
   const c = await connect(f,over);
+  expect(c.html).not.toMatch(/demo|sandbox|simulated|fake|testnet|devnet|preprod/i);
   const consent = await c.approve();
   expect(consent.status).toBe(302);
   const loc = new URL(consent.headers.get('location')!);
@@ -208,6 +209,7 @@ describe('hosted MCP: transport, host/origin and discovery', () => {
     const prm = await (await fetch(`${f.base}/.well-known/oauth-protected-resource/mcp`)).json() as any;
     expect(prm.resource).toBe(f.mcpUrl);
     expect(prm.resource_name).toBe('Capsule commerce gateway');
+    expect(JSON.stringify(prm)).not.toMatch(/demo|sandbox|simulated|fake|testnet|devnet/i);
     expect(prm.authorization_servers).toEqual([`${f.base}/`]);
     const root = await (await fetch(`${f.base}/.well-known/oauth-protected-resource`)).json() as any;
     expect(root.resource).toBe(f.mcpUrl);
@@ -294,15 +296,15 @@ describe('hosted MCP: OAuth 2.1 authorization code + PKCE', () => {
     expect(tokens.access_token).toMatch(/^t2o_oat_/);
   });
 
-  it('labels the consent page as a demo-account sign-in with human-readable permissions and one disclosure', async () => {
+  it('labels consent as account sign-in and reserves disclosure for transfer approval', async () => {
     const f = await start();
     const c = await connect(f);
     const html = c.html;
     // (a) The passcode signs in to the protected demo account; it is not a payment password and approves nothing.
-    expect(html).toMatch(/Owner passcode — signs you in to the protected Capsule demo account/);
+    expect(html).toMatch(/Owner passcode — signs you in to the protected Capsule account/);
     expect(html).toMatch(/not a payment password or a wallet key/);
     expect(html).toMatch(/does not approve any purchase/);
-    expect(html).toContain('<h1>Sign in to the Capsule demo account</h1>');
+    expect(html).toContain('<h1>Sign in to the Capsule account</h1>');
     // (b) No host/chat permission-card assumption: Capsule states only what it itself guarantees.
     expect(html).not.toContain('explicit approval in the chat');
     expect(html).not.toMatch(/host (?:shows|renders)|permission card|approval card/i);
@@ -311,13 +313,12 @@ describe('hosted MCP: OAuth 2.1 authorization code + PKCE', () => {
     expect(html).toContain('<code>quotes:write</code>');
     expect(html).toContain('<code>purchases:write</code>');
     expect(html).toContain('<code>purchases:read</code>');
-    expect(html).toMatch(/together these let ChatGPT search partner offers, create price quotes, place purchases on behalf of the demo account and read those purchases and their confirmation details back/);
+    expect(html).toMatch(/together these let ChatGPT search partner offers, create price quotes, place purchases on behalf of your account and read those purchases and their confirmation details back/);
     expect(html).not.toMatch(/purchases:fund|evidence:read/);
     // (d) Exactly one sandbox/testnet disclosure; the old duplicate infrastructure sentences are gone.
     expect(html).not.toContain('bounded Cardano Preprod test wallet');
     expect(html).not.toContain('No real funds are involved');
-    expect(html.match(/sandbox\/testnet/gi)).toHaveLength(1);
-    expect(html).toMatch(/no real money moves/);
+    expect(html).not.toMatch(/demo|sandbox|simulated|fake|testnet|devnet|preprod/i);
     // (e) Sign-in and per-purchase approval are visibly separate steps.
     expect(html).toMatch(/Signing in is not buying/);
     expect(html).toMatch(/Capsule places one only after you explicitly approve that exact quote and your chosen payment option \(the <code>buy<\/code> approval\)/);
@@ -572,8 +573,8 @@ describe('hosted MCP acceptance: the exact ChatGPT conversation', () => {
       const quoted = await call('create_quote', { offerId: chosen, fulfillment: retailFulfillment });
       const quote = quoted.structuredContent.quote;
       expect(quote.fundingOptions.map((o: any) => o.rail)).toEqual(['cardano', 'solana']);
-      expect(quoted.content[0].text).toMatch(/- cardano .*Connected wallet/);
-      expect(quoted.content[0].text).toMatch(/- solana .*External payment action required/);
+      expect(quoted.content[0].text).toMatch(/- cardano: .*Connected wallet/);
+      expect(quoted.content[0].text).toMatch(/- solana: .*External payment action required/);
       expect(quoted.content[0].text).toMatch(/explicit approval/);
       expect((await f.h.gw.db.all('SELECT id FROM purchases')).length).toBe(0);
 
@@ -648,7 +649,10 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
     const done = await client.callTool({ name: 'get_purchase', arguments: { purchaseId: bought.structuredContent.purchase.purchaseId } }) as any;
     await client.close();
     expect(done.structuredContent.orderConfirmation.headline).toBe('ORDER CONFIRMED');
-    return done.structuredContent.purchase as any;
+    // Stub the authoritative gateway contract, not the customer projection returned by MCP.
+    const raw = await f.h.call('GET', `/v1/purchases/${bought.structuredContent.purchase.purchaseId}`, { token: g.tokens.access_token });
+    expect(raw.status).toBe(200);
+    return raw.body.purchase as any;
   }
 
   async function viaStub(purchase: unknown) {
@@ -691,7 +695,8 @@ describe('hosted MCP acceptance: commerce-specific final states', () => {
     expect(text).toContain(proofUrl);
     // The customer-facing confirmation carries no environment suffix or demo caveat; the environment stays in the structured result.
     expect(text).not.toMatch(/environment|sandbox|testnet|Demo transaction|proof limitations/i);
-    expect(res.structuredContent.orderConfirmation.environment).toBeTruthy();
+    expect(res.structuredContent.orderConfirmation.environment).toBeUndefined();
+    expect(JSON.stringify(res)).not.toMatch(/demo|sandbox|simulated|fake|testnet|devnet/i);
     expect(res.structuredContent.orderConfirmation).toMatchObject({ headline, commerceType: category, paymentVerified: true });
     // The other commerce types' labels never appear.
     for (const other of ['ORDER CONFIRMED', 'BOOKING CONFIRMED', 'TICKET ISSUED'].filter((h) => h !== headline)) expect(text).not.toContain(other);
@@ -1053,7 +1058,7 @@ describe('hosted Solana MCP isolation',()=>{
       const found=await client.callTool({name:'find_offers',arguments:{intent:retailIntent()}}) as any;
       const q=await client.callTool({name:'create_quote',arguments:{offerId:found.structuredContent.offers[0].offerId,fulfillment:retailFulfillment}}) as any;
       expect(q.structuredContent.fundingSources.map((s:any)=>s.rail)).toEqual(['cardano','solana']);
-      expect(q.content[0].text).toMatch(/- solana .*Connected wallet/);
+      expect(q.content[0].text).toMatch(/- solana: .*Connected wallet/);
       expect(f.solanaCalls).toEqual([]);expect(f.bridge?.calls).toEqual([]);
       expect(await f.h.gw.db.all('SELECT id FROM purchases')).toEqual([]);
     }finally{await client.close();}

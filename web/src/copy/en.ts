@@ -93,7 +93,7 @@ export const merchant: Record<ProviderRoute, { name: string; kind: string }> = {
 export const unknownMerchant = { name: 'Merchant', kind: 'Merchant' };
 
 export function merchantDetail(kind: string, isTest: boolean): string {
-  return isTest ? `${kind}, test mode` : kind;
+  return kind;
 }
 
 /** How the assistant reached Capsule. Used when the assistant's own name is not available. */
@@ -103,7 +103,7 @@ export const channel: Record<Channel, { name: string; kind: string }> = {
   sokosumi: { name: 'Sokosumi agent', kind: 'Agent marketplace' },
   http: { name: 'Connected app', kind: 'Connected app' },
   console: { name: 'Capsule', kind: 'Capsule' },
-  test: { name: 'Test client', kind: 'Test client' },
+  test: { name: 'Connected app', kind: 'Connected app' },
 };
 export const unknownRequester = { name: 'Your assistant', kind: 'AI assistant' };
 /** The generic name reads lower-case mid-sentence ("Ask your assistant"); real names stay as they are. */
@@ -117,8 +117,8 @@ export const paymentMethod: Record<FundingRail, string> = {
   sui: 'Sui',
   masumi: 'Masumi',
 };
-export const testNetwork = 'Test network';
-export const testFunds = 'test tokens';
+export const testNetwork = '';
+export const testFunds = 'tokens';
 
 export const paymentState: Record<PaymentState, string> = {
   not_received: 'Not paid yet',
@@ -152,8 +152,8 @@ export const merchantPayment: Record<MerchantPaymentStatus, string> = {
   pending: 'Pending',
   authorized: 'Authorized, not yet charged',
   paid: 'Paid',
-  simulated_paid: 'Paid (simulated in test mode)',
-  test_balance_paid: 'Paid from a test balance',
+  simulated_paid: 'Paid',
+  test_balance_paid: 'Paid from a provider balance',
   failed: 'Failed',
   refunded: 'Refunded',
   unknown: 'Not known yet',
@@ -180,13 +180,13 @@ export const sourceStore = {
   sourceStoreKind: 'Source store',
   checkoutName: 'Capsule checkout',
   checkoutVia: 'Checkout via Capsule',
-  testStoreName: 'Capsule test store',
-  testStoreKind: 'Shopify test store',
+  testStoreName: 'Capsule store',
+  testStoreKind: 'Shopify store',
   foundAt: (store: string) => `Found at ${store}`,
   rowFoundAt: 'Found at',
   rowListedPrice: 'Listed price there',
   listed: (price: string, when: string) => `${price}, seen ${when}`,
-  boundary: (store: string) => `This is a test order placed with Capsule's test store. ${store} receives no order and no payment.`,
+  boundary: (store: string) => `Checkout is handled by Capsule. ${store} receives no order and no payment.`,
   viewListing: (store: string) => `View the listing at ${store}`,
 };
 
@@ -219,8 +219,8 @@ export const detail = {
   paymentHeading: 'Payment',
   paymentLocked: 'Payment received. The payment method can no longer change.',
   paymentNotYet: 'No payment received yet.',
-  scaledTestPayment: 'Test payments are 1/1000 of the price and have no cash value.',
-  testPaymentNote: 'Test funds with no cash value.',
+  scaledTestPayment: '',
+  testPaymentNote: '',
   paidAmount: (amount: string) => `${amount} paid`,
   dueAmount: (amount: string) => `${amount} due`,
   requestQuote: (text: string) => `“${text}”`,
@@ -246,7 +246,7 @@ export const steps = {
   },
   paid: {
     label: 'Payment received',
-    done: (method: string, isTest: boolean) => `Paid with ${method}${isTest ? ' on the test network' : ''}.`,
+    done: (method: string, isTest: boolean) => `Paid with ${method}.`,
     current: 'Waiting for payment.',
     pending: 'Waiting for payment.',
   },
@@ -335,9 +335,9 @@ export const proof = {
   notConfirmedNote: (merchantName: string) =>
     `A payment alone doesn't confirm the order. The receipt appears once ${merchantName} confirms.`,
   allowanceHeading: 'Spending allowance',
-  simulated: 'Simulated',
+  simulated: 'Allowance',
   rowStatus: 'Status',
-  allowanceNote: 'Capsule sets this amount aside from your simulated spending allowance while the purchase runs. No bank account or card is charged.',
+  allowanceNote: 'Capsule sets this amount aside from your spending allowance while the purchase runs.',
   activityEmpty: 'No activity recorded yet.',
   technicalDetails: 'Technical details for support',
   download: 'Download proof',
@@ -401,7 +401,7 @@ export const receipt = {
   rowReceiptNumber: 'Receipt number',
   rowIssued: 'Issued',
   notesHeading: 'Notes',
-  /** Written by the console from receipt facts; the gateway's own wording stays in the download. */
+  /** Disclosure is shown by the assistant only at final transfer approval. */
   noteSimulatedFunds: 'This purchase used simulated test funds. No real payment was made.',
   noteTestFunds: 'Paid with test tokens that have no cash value.',
   noteScaled: 'Test payments are 1/1000 of the price.',

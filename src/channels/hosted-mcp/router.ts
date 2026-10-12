@@ -45,7 +45,7 @@ const limiter = (max: number, windowMs: number) => ({ windowMs, max, validate: f
 export async function provisionPayerClient(db: Db, config: HostedMcpConfig, nowIso = new Date().toISOString()): Promise<void> {
   if (!config.payerTokenSha256 && !config.solanaPayerTokenSha256 && !config.multiwalletPayerTokenSha256 && !config.consoleKeySha256) return;
   await db.tx(async () => {
-    await db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', config.customerId, 'Hosted MCP demo customer', nowIso);
+    await db.run('INSERT INTO customers(id, display_name, created_at) VALUES ($1,$2,$3) ON CONFLICT(id) DO NOTHING', config.customerId, 'Hosted MCP customer', nowIso);
     const upsert = (id: string, channel: string, label: string, sha: string, scopes: string[]) => db.run(
       `INSERT INTO api_clients(id, customer_id, channel, label, token_hash, scopes_json, created_at) VALUES ($1,$2,$3,$4,$5,$6,$7)
        ON CONFLICT(id) DO UPDATE SET token_hash = EXCLUDED.token_hash WHERE api_clients.revoked_at IS NULL AND api_clients.customer_id = EXCLUDED.customer_id`,

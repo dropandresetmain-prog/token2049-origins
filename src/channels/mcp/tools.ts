@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { customerRecord, customerText, isEnvironmentCopy } from '../../presentation/customer.js';
 import type { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 import type { CallToolResult } from '@modelcontextprotocol/sdk/types.js';
 import { PurchaseIntentDraft, FulfillmentDraft, assessPurchaseIntent, assessFulfillment, NeedsInput } from '../../contracts/input.js';
@@ -151,11 +152,19 @@ function cleanText(deps: ToolDeps, text: string): string {
 }
 
 function success(deps: ToolDeps, text: string, structured: Record<string, unknown>): CallToolResult {
-  return { content: [{ type: 'text', text: cleanText(deps, text) }], structuredContent: clean(deps, structured) };
+  // Redact first: changing provider copy must never prevent a known secret from matching the scrubber.
+  const safe = clean(deps, structured);
+  const confirmation = safe.transferConfirmation;
+  const safeText = cleanText(deps, text);
+  const presented = confirmation ? safeText.split(DEMO_DISCLOSURE).map(customerText).join(DEMO_DISCLOSURE) : customerText(safeText);
+  return {
+    content: [{ type: 'text', text: presented }],
+    structuredContent: { ...customerRecord(safe) as Record<string, unknown>, ...(confirmation ? { transferConfirmation: confirmation } : {}) },
+  };
 }
 
 function failure(deps: ToolDeps, text: string, structured: Record<string, unknown>): CallToolResult {
-  return { isError: true, content: [{ type: 'text', text: cleanText(deps, text) }], structuredContent: clean(deps, structured) };
+  return { isError: true, content: [{ type: 'text', text: customerText(cleanText(deps, text)) }], structuredContent: customerRecord(clean(deps, structured)) as Record<string, unknown> };
 }
 
 /** Gateway failure (ErrorBody or transport problem) -> MCP tool error with code, message and requestId. */
@@ -238,14 +247,13 @@ function describeOffers(offers: OfferView[], totalFound: number): string {
 
 /**
  * The single customer-facing disclosure of the demo environment. It is stated once, immediately before approval/buy;
- * offers, quotes, progress and confirmations stay in normal commerce language. Environment facts remain in structured results.
+ * offers, progress and confirmations use commerce language. Operational metadata stays in gateway records.
  */
 export const DEMO_DISCLOSURE = 'Demo transaction: payment uses testnet funds and the merchant checkout runs in a sandbox. No real money will be charged.';
 export function demoDisclosure(): string {
   return DEMO_DISCLOSURE;
 }
-/** Terms that only restate the demo environment stay in structured output; the one disclosure covers them in text. */
-const ENVIRONMENT_TERM = /\b(sandbox|development store|bogus|simulated|testnet|test)\b/i;
+// Environment-only terms are disclosed at final transfer approval, not repeated as merchant terms.
 
 /** `unreachableRails`: rails whose configured payer probe failed transiently. The quote stays executable; only the readiness re-check is deferred. */
 export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms: Map<string, bigint> = new Map(), delivery: string | null = null, unreachableRails: string[] = []): string {
@@ -253,7 +261,7 @@ export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms:
     const digits = f.amount.amountBaseUnits.padStart(f.amount.decimals + 1, '0');
     const amount = f.amount.decimals ? digits.slice(0, -f.amount.decimals) + '.' + digits.slice(-f.amount.decimals) : digits;
     const connected = sources.find(s => sourceMatches(s, f));
-    return '- ' + f.rail + ' / ' + f.amount.network + ': ' + amount + ' ' + (f.amount.symbol ?? f.amount.assetId) +
+    return '- ' + f.rail + ': ' + amount + ' ' + (f.amount.symbol && !isEnvironmentCopy(f.amount.symbol) ? f.amount.symbol : 'tokens') +
       ' · ' + (connected
         ? (exceedsHeadroom(f, headrooms.get(connected.sourceId))
           ? 'Connected wallet ' + connected.displayAddress + ' BUT its remaining spend cap (' + String(headrooms.get(connected.sourceId)) + ' base units) is below this payment: it would be refused, nothing can be bought with it'
@@ -276,7 +284,7 @@ export function describeQuote(q: QuoteView, sources: FundingSource[], headrooms:
       'Your original budget: ' + formatMinor(q.originalBudget) + ' (this quote is in exact USD; the reference is preserved, not charged).',
     ] : []),
     delivery ?? 'Fulfillment: ' + q.fulfillmentSummary,
-    ...q.terms.filter(t => !ENVIRONMENT_TERM.test(t)).map(t => 'Terms: ' + t),
+    ...q.terms.filter(t => !isEnvironmentCopy(t)).map(t => 'Terms: ' + t),
     'Expires ' + q.expiresAt + '.',
     ...(fund.length ? ['Available funding options:', ...fund, ...sources.map(s => '- Registered wallet '+s.displayAddress+' / '+s.rail+' / '+s.readiness+' / selectedSourceId '+s.sourceId+' (balance checked only when selected)')] : ['No payment source is currently available. Purchase creation is unavailable.']),
     'Nothing has been purchased yet. Show these exact terms to the user, ask them to select one available funding option, then ask for explicit approval of the terms and that payment choice. Only then call buy with selectedFundingOptionId, selectedSourceId for the chosen registered wallet, quoteId, maxTotal and quoteDigest from this quote. Never infer a choice or fabricate customer information. Do not ask for name, email, phone, address or traveller details: the saved customer profile already covers them. Immediately before asking for that final approval, state this once, verbatim: "' + demoDisclosure() + '" Do not repeat it elsewhere.',
@@ -375,7 +383,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
     const key = createHash('sha256').update(stableKey({ customer, name, args })).digest('hex');
     const r = await deps.background.run(key, () => handler(args, extra), name === 'create_quote');
     if (!r.pending) {
-      const quote = r.value.structuredContent?.quote as QuoteView | undefined;
+      const quote = r.value.structuredContent?.quote as { quoteId: string } | undefined;
       if (quote && name === 'create_quote') {
         try { await deps.gateway.getQuote(quote.quoteId, true); }
         catch (e) { return gatewayFailure(deps, e); }
@@ -440,7 +448,7 @@ export function registerTools(server: McpServer, deps: ToolDeps): void {
         const fundingSources = payers.map(p => p.source);
         const headrooms = new Map(payers.flatMap(p => (p.headroom !== undefined ? [[p.source.sourceId, p.headroom] as [string, bigint]] : [])));
         return success(deps, describeQuote(quote, fundingSources, headrooms, deliveryLabel(assessment.value), unreachableRails),
-          { quote, fundingSources, ...(unreachableRails.length ? { unreachablePayerRails: unreachableRails } : {}), demoDisclosure: demoDisclosure() });
+          { quote, fundingSources, ...(unreachableRails.length ? { unreachablePayerRails: unreachableRails } : {}), transferConfirmation: { disclosure: demoDisclosure(), timing: 'Show only immediately before asking for final approval of the transfer.' } });
       } catch (e) {
         return gatewayFailure(deps, e);
       }

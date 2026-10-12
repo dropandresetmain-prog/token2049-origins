@@ -8,6 +8,7 @@
  *   fields in `BankObservation` can reach a view model (a bank `description` never does);
  * - an asset the console does not recognise is shown in raw base units, never guessed at.
  */
+import { customerText, isEnvironmentCopy } from '../../../src/presentation/customer.js';
 import type { CapabilitiesResponse } from '../contracts/backend.js';
 import type { BankObservation, BankResponse, LedgerMode, TreasuryResponse } from '../contracts/operator.js';
 import type { ConnectionsData, ConsoleMode } from '../contracts/source.js';
@@ -202,7 +203,7 @@ function capacityVM(p: TreasuryResponse['simulatedCapacity'][number], ctx: Opera
   ];
   return {
     currency: p.currency,
-    label: p.label,
+    label: 'Purchasing allowance',
     limit: fmt(p.limitMinor),
     available: fmt(p.availableMinor),
     availableNegative: available < 0n,
@@ -361,8 +362,8 @@ function connectionVM(key: string, found: Ready | undefined, ctx: OperatorContex
     status: { label: s.label, tone: s.tone },
     environment: environmentLabel(found.environment),
     checked: formatWhen(found.checkedAt, ctx),
-    missing: found.missing,
-    detail: found.detail ?? null,
+    missing: found.missing.map(v => isEnvironmentCopy(v) ? 'Integration credentials' : v),
+    detail: found.detail ? customerText(found.detail) : null,
   };
 }
 
@@ -377,10 +378,10 @@ function observationVM(o: BankObservation, ctx: OperatorContext): BankObservatio
     available: money(o.availableAmount),
     observed: formatWhen(o.observedAt, ctx),
     providerTime: o.providerTimestamp ? formatWhen(o.providerTimestamp, ctx) : null,
-    source: o.source,
+    source: o.source.split(':').filter(v => !isEnvironmentCopy(v)).join(':'),
     environment: environmentLabel(o.environment),
     provenance: op.ocbc.evidence[o.provenance.evidenceMode as keyof typeof op.ocbc.evidence] ?? op.ocbc.evidenceUnknown,
-    caveats: o.caveats,
+    caveats: o.caveats.filter(v => !isEnvironmentCopy(v)),
   };
 }
 

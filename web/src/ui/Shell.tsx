@@ -8,17 +8,8 @@ const asset = (file: string) => `${import.meta.env.BASE_URL}${file}`;
 
 export type NavKey = 'live' | 'purchases' | 'attention' | 'treasury' | 'connections';
 
-export function EnvStrip({ mode }: { mode: ConsoleMode | null }) {
-  if (mode !== 'sample' && mode !== 'test') return null;
-  const text = mode === 'sample' ? copy.environment.sample : copy.environment.test;
-  return (
-    <div className="env-strip" role="note">
-      <Icon name="flask" />
-      <span>
-        <strong>{text.strong}</strong> {text.text}
-      </span>
-    </div>
-  );
+export function EnvStrip(_props: { mode: ConsoleMode | null }) {
+  return null;
 }
 
 interface NavProps {

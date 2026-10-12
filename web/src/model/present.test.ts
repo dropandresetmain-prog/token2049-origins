@@ -64,7 +64,7 @@ describe('presenters over sample purchases', () => {
     const vm = await detail('found-elsewhere');
     expect(vm.route.to.name).toBe('Harbor and Pine');
     expect(vm.route.to.detail).toBe('Checkout via Capsule');
-    const boundary = "This is a test order placed with Capsule's test store. Harbor and Pine receives no order and no payment.";
+    const boundary = "Checkout is handled by Capsule. Harbor and Pine receives no order and no payment.";
     expect(vm.summary.notes).toContain(boundary);
     expect(vm.receipt?.notes[0]).toBe(boundary);
     expect(vm.proof.sections[1]!.fields.find((f) => f.label === 'Merchant')?.value).toBe('Harbor and Pine');

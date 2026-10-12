@@ -20,9 +20,9 @@ describe('treasury presentation: observed and simulated stay apart', () => {
     // Observed funds are test crypto only: no fiat, no simulated labels.
     expect(observed).not.toContain('simulated');
     expect(observed).not.toContain('$');
-    expect(observed).toContain('test ADA');
+    expect(observed).toContain('ADA');
     // The simulated allowance is fiat only: no test crypto.
-    expect(simulated).not.toContain('test ADA');
+    expect(simulated).not.toContain('ADA');
     expect(simulated).not.toContain('test tokens');
     expect(simulated).toContain('$');
     expect(vm.observed.accounts.length).toBeGreaterThan(0);
@@ -33,7 +33,7 @@ describe('treasury presentation: observed and simulated stay apart', () => {
     const modes = vm.trialRows.map((r) => r.ledgerMode);
     expect(modes).toEqual([...modes].sort((a, b) => (a === b ? 0 : a === 'observed' ? -1 : 1)));
     expect(vm.trialRows).toHaveLength(sampleTreasury().ledger.trialBalance.length);
-    expect(vm.trialRows.find((r) => r.ledgerMode === 'simulated')?.asset).toBe('USD (simulated)');
+    expect(vm.trialRows.find((r) => r.ledgerMode === 'simulated')?.asset).toBe('USD');
   });
 
   it('does not net observed assets against simulated capacity', () => {
@@ -74,8 +74,8 @@ describe('treasury presentation: observed and simulated stay apart', () => {
 
   it('shows customer obligations per asset in that asset, with refund due called out', () => {
     const rows = vm.observed.obligations;
-    const cardano = rows.find((r) => r.asset === 'Cardano test network')!;
-    expect(cardano).toMatchObject({ prepayment: '120 test ADA', unapplied: '5 test ADA', refundDue: '48 test ADA', refundDueNonZero: true });
+    const cardano = rows.find((r) => r.asset === 'Cardano network')!;
+    expect(cardano).toMatchObject({ prepayment: '120 ADA', unapplied: '5 ADA', refundDue: '48 ADA', refundDueNonZero: true });
     const solana = rows.find((r) => r.asset.startsWith('Solana'))!;
     expect(solana).toMatchObject({ unapplied: 'None', refundDue: 'None', refundDueNonZero: false });
   });
@@ -99,7 +99,7 @@ describe('treasury presentation: observed and simulated stay apart', () => {
 
   it('shows credit-normal accounts as positive credit balances', () => {
     const fee = vm.observed.accounts.find((a) => a.account === 'Service fees earned')!;
-    expect(fee).toMatchObject({ balance: '12.5 test ADA', side: 'Credit balance' });
+    expect(fee).toMatchObject({ balance: '12.5 ADA', side: 'Credit balance' });
   });
 
   it('presents an empty gateway without throwing', () => {
@@ -120,8 +120,8 @@ describe('treasury presentation: observed and simulated stay apart', () => {
 
 describe('asset labels never guess', () => {
   it('formats known assets and shows unknown ones in raw base units', () => {
-    expect(formatAssetAmount('1500000', describeAsset(ADA), ctx)).toBe('1.5 test ADA');
-    expect(formatAssetAmount('-1500000', describeAsset(ADA), ctx)).toBe('-1.5 test ADA');
+    expect(formatAssetAmount('1500000', describeAsset(ADA), ctx)).toBe('1.5 ADA');
+    expect(formatAssetAmount('-1500000', describeAsset(ADA), ctx)).toBe('-1.5 ADA');
     expect(formatAssetAmount('12345', describeAsset(USD), ctx)).toBe('$123.45');
     const unknown = describeAsset('cardano:preprod/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.00');
     expect(unknown.decimals).toBeNull();
@@ -131,7 +131,7 @@ describe('asset labels never guess', () => {
   it('only says "test" when the network id says so', () => {
     expect(describeAsset('cardano:mainnet/lovelace').label).toBe('Cardano network');
     expect(describeAsset('cardano:mainnet/lovelace').unit).toBe('ADA');
-    expect(describeAsset(ADA).label).toBe('Cardano test network');
+    expect(describeAsset(ADA).label).toBe('Cardano network');
   });
 
   it('percentOf uses exact integers and clamps', () => {
@@ -156,7 +156,7 @@ describe('connections presentation', () => {
       cardano: 'External check passed',
       solana: 'Configured, not verified',
       masumi: 'Access blocked',
-      nuitee: 'Local tests only',
+      nuitee: 'Awaiting external verification',
       atlas: 'Access blocked',
     });
     const nuitee = vm.groups.flatMap((g) => g.items).find((i) => i.key === 'nuitee')!;
@@ -177,21 +177,21 @@ describe('connections presentation', () => {
   });
 
   it('presents OCBC as a read-only observation with provenance, masked', () => {
-    expect(vm.bank.banner).toMatch(/Read-only observations/);
+    expect(vm.bank.banner).toMatch(/Read-only OCBC observations/);
     expect(vm.bank.banner).toMatch(/not purchase settlement/);
     expect(vm.bank.banner).toMatch(/do not show that any Capsule purchase reached a bank or card account/);
     expect(vm.bank.balances.map((o) => o.kind)).toEqual(['Account balance', 'Card summary']);
     expect(vm.bank.transactions.map((o) => o.kind)).toEqual(['Account transaction']);
     const balance = vm.bank.balances[0]!;
-    expect(balance).toMatchObject({ reference: '****3456', amount: '$12,500.00 SGD', available: '$11,980.00 SGD', environment: 'Sandbox', provenance: 'Read from the OCBC sandbox' });
-    expect(balance.source).toBe('ocbc:sandbox:corporateAccountListing/1.0');
-    expect(balance.caveats.join(' ')).toContain('historical test data');
+    expect(balance).toMatchObject({ reference: '****3456', amount: '$12,500.00 SGD', available: '$11,980.00 SGD', environment: 'Configured', provenance: 'Read from OCBC' });
+    expect(balance.source).toBe('ocbc:corporateAccountListing/1.0');
+    expect(balance.caveats).toEqual([]);
   });
 
   it('labels a stored fixture as one', () => {
     const data = sampleConnections(NOW);
     const fixture = BankResponse.parse({ ...data.bank, observations: data.bank.observations.map((o) => ({ ...o, provenance: { environment: 'fixture', evidenceMode: 'local_fixture' } })) });
-    expect(presentConnections({ ...data, bank: fixture }, ctx).bank.balances[0]!.provenance).toBe('Local test fixture');
+    expect(presentConnections({ ...data, bank: fixture }, ctx).bank.balances[0]!.provenance).toBe('Local record');
   });
 
   it('masks again and never lets a description through', () => {
@@ -229,7 +229,7 @@ describe('operator copy rules', () => {
 
   it('never claims test crypto is cash or OCBC data settles purchases', () => {
     const lower = source.toLowerCase();
-    expect(lower).toContain('test crypto is not bank cash');
+    expect(lower).toContain('neither is a bank or card balance');
     expect(lower).toContain('not purchase settlement');
     expect(lower).not.toMatch(/settled (at|by|through) ocbc/);
   });

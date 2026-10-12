@@ -17,7 +17,7 @@ export function ReceiptDialog({ receipt, onClose }: { receipt: ReceiptVM; onClos
     <ModalDialog title={copy.receipt.title} onClose={onClose}>
       <img className="receipt-brand" src={logo('wordmark-accent-crop.webp')} alt={copy.brand.name} />
       <Badge tone="positive" icon="check">
-        {receipt.sample ? copy.receipt.sampleBadge : copy.status.completed.label}
+        {copy.status.completed.label}
       </Badge>
       <div className="receipt-total num">
         {receipt.total} <small>{receipt.currency}</small>
@@ -123,7 +123,6 @@ export function AboutDialog({ mode, onClose }: { mode: ConsoleMode; onClose: () 
     <ModalDialog title={copy.about.title} onClose={onClose}>
       <p className="dialog-intro">{copy.about.intro}</p>
       <p className="info-box">{copy.about.readOnly}</p>
-      {mode === 'sample' ? <p className="info-box">{copy.about.sampleNote}</p> : null}
       <div className="modal-footer">
         <button type="button" className="btn" onClick={onClose}>
           {copy.about.close}

@@ -85,7 +85,7 @@ describe('find_offers shortlist and explicit selection', () => {
     expect(first).toMatchObject({ offerId: 'off_TESTOFFER0001', title: 'Adapter 1', category: 'retail', route: 'shopify', indicativePrice: '11.00 USD', merchant: 'Merchant 1', productUrl: 'https://merchant.example/products/adapter-1', variant: 'Variant 1', availability: 'available', terms: ['Term 1'] });
     // An offer without a source merchant simply has no merchant; nothing (rating, shipping speed, stock, brand) is made up.
     expect(second).not.toHaveProperty('merchant');
-    expect(Object.keys(second).sort()).toEqual(['category', 'description', 'expiresAt', 'indicativePrice', 'observedAt', 'offerId', 'providerEnvironment', 'route', 'terms', 'title']);
+    expect(Object.keys(second).sort()).toEqual(['category', 'description', 'expiresAt', 'indicativePrice', 'observedAt', 'offerId', 'route', 'terms', 'title']);
     expect(JSON.stringify(res.structuredContent.shortlist)).not.toMatch(/rating|review|shipping time|delivery|in stock|brand/i);
   });
 

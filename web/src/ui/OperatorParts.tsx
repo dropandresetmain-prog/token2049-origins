@@ -1,3 +1,4 @@
+import { customerRecord } from '../../../src/presentation/customer.js';
 import type { ReactNode } from 'react';
 import * as op from '../copy/operator.js';
 import type { Tone } from '../copy/en.js';
@@ -84,13 +85,13 @@ export function OperatorSkeleton({ label }: { label: string }) {
   );
 }
 
-/** Support/audit disclosure. The value is the parsed response, never a free-form raw body. */
+/** Customer support details. Operational metadata stays in authoritative gateway records. */
 export function TechnicalDetails({ summary, note, value }: { summary: string; note: string; value: unknown }) {
   return (
     <details className="raw-details">
       <summary>{summary}</summary>
       <p className="fineprint">{note}</p>
-      <pre className="raw-audit">{JSON.stringify(value, null, 2)}</pre>
+      <pre className="raw-audit">{JSON.stringify(customerRecord(value), null, 2)}</pre>
     </details>
   );
 }

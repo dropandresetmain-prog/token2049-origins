@@ -1,3 +1,4 @@
+import { customerRecord } from '../../../src/presentation/customer.js';
 import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import * as copy from '../copy/en.js';
 import { ModalDialog } from './Modal.js';
@@ -57,7 +58,7 @@ export function UiProvider({ children }: { children: ReactNode }) {
 
   const download = useCallback(
     (value: unknown, fileName: string, toastText: string) => {
-      const blob = new Blob([JSON.stringify(value, null, 2)], { type: 'application/json' });
+      const blob = new Blob([JSON.stringify(customerRecord(value), null, 2)], { type: 'application/json' });
       const url = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = url;

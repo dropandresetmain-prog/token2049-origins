@@ -10,6 +10,8 @@ import { StreamableHTTPClientTransport } from '@modelcontextprotocol/sdk/client/
 import { startHarness, retailIntent, retailFulfillment, type Harness } from '../support/harness.js';
 import { createClient } from '../../src/infrastructure/auth.js';
 import { redact } from '../../src/infrastructure/redact.js';
+import { customerRecord } from '../../src/presentation/customer.js';
+import { DEMO_DISCLOSURE } from '../../src/channels/mcp/tools.js';
 import { createMcpServer } from '../../src/channels/mcp/server.js';
 import { startMcpHttpServer } from '../../src/channels/mcp/http.js';
 import { ConfigError, loadConfigFromEnv, type McpConfig } from '../../src/channels/mcp/config.js';
@@ -30,7 +32,12 @@ async function connect(config: McpConfig): Promise<{ client: Client; call(name: 
   await Promise.all([server.connect(a), client.connect(b)]);
   return {
     client,
-    call: async (name, args) => (await client.callTool({ name, arguments: args })) as unknown as ToolResult,
+    call: async (name, args) => {
+      const result = await client.callTool({ name, arguments: args }) as unknown as ToolResult;
+      const visible = JSON.stringify(result);
+      expect(name === 'create_quote' ? visible.split(DEMO_DISCLOSURE).join('') : visible).not.toMatch(/demo|sandbox|simulated|fake|testnet|devnet/i);
+      return result;
+    },
     close: async () => {
       await client.close();
       await server.close();
@@ -130,19 +137,19 @@ describe('MCP channel', () => {
   it('find_offers -> create_quote -> buy yields the same purchase as HTTP with the same customer', async () => {
     const m = await connect(cfg);
     const quote = await quoteViaMcp(m);
-    // The quote through MCP equals the quote read over HTTP (after redaction, which MCP always applies).
+    // MCP presents the redacted gateway quote without operational environment metadata.
     const httpQuote = await h.call('GET', `/v1/quotes/${quote.quoteId}`, { token: h.alice.token });
-    expect(quote).toEqual(redact(httpQuote.body.quote));
+    expect(quote).toEqual(customerRecord(redact(httpQuote.body.quote)));
 
     const bought = await m.call('buy', buyArgs(quote));
     expect(bought.isError).toBeFalsy();
     const viaMcp = bought.structuredContent.purchase;
     const viaHttp = await h.call('GET', `/v1/purchases/${viaMcp.purchaseId}`, { token: h.alice.token });
     expect(viaHttp.status).toBe(200);
-    expect(viaMcp).toEqual(redact(viaHttp.body.purchase));
+    expect(viaMcp).toEqual(customerRecord(redact(viaHttp.body.purchase)));
 
     const got = await m.call('get_purchase', { purchaseId: viaMcp.purchaseId, includeEvents: true });
-    expect(got.structuredContent.purchase).toEqual(redact(viaHttp.body.purchase));
+    expect(got.structuredContent.purchase).toEqual(customerRecord(redact(viaHttp.body.purchase)));
     expect(got.structuredContent.events.length).toBeGreaterThan(0);
     await m.close();
   });

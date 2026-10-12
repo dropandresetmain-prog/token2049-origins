@@ -1,4 +1,5 @@
 /** Formatting helpers. Exact: amounts are formatted from integer strings, never via float arithmetic on totals. */
+import { customerText } from '../../../src/presentation/customer.js';
 import type { CryptoAmount, Money } from '../contracts/backend.js';
 
 export interface FormatContext {
@@ -35,11 +36,12 @@ function currencySymbol(code: string, locale: string): string {
   return part?.value ?? `${code} `;
 }
 
-/** "0.286 test tokens" or "0.286 ADA". Trailing zeros trimmed; never rounded. */
+/** Human token amount. Operational prefixes are omitted; trailing zeros are trimmed, never rounded. */
 export function formatCrypto(a: CryptoAmount, fallbackUnit: string, ctx: Pick<FormatContext, 'locale'>): string {
   const { int, frac } = splitMinor(a.amountBaseUnits, a.decimals);
   const trimmed = frac.replace(/0+$/, '');
-  return `${group(int, ctx.locale)}${trimmed ? `.${trimmed}` : ''} ${a.symbol ?? fallbackUnit}`;
+  const unit = customerText((a.symbol ?? fallbackUnit).replace(/^(?:(?:testnet|devnet|test|sandbox|demo|simulated|fake)\s+)+/i, ''));
+  return `${group(int, ctx.locale)}${trimmed ? `.${trimmed}` : ''} ${unit || fallbackUnit}`;
 }
 
 function dayKey(d: Date, ctx: FormatContext): string {
