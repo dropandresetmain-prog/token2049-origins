@@ -105,6 +105,14 @@ when its advertised URL is HTTPS. Payer and facilitator configuration must pin t
 
 Recorded evidence: finalized Devnet funding/recovery passed.
 
+## X Layer Testnet (OKX)
+
+Template: `.env.xlayer.example`; wallet generation: `npm run payer:xlayer:setup -- <absolute protected directory outside the repo>` (testnet-only keys, 0600/ACL-protected, never printed). Details and evidence: docs/work/XLAYER_RAIL.md.
+
+Gateway (no keys): `XLAYER_NETWORK=eip155:1952`, `XLAYER_CHAIN_ID=1952`, `XLAYER_RPC_URL` (one of the two official testnet endpoints only), `XLAYER_TOKEN_ADDRESS=0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c`, `XLAYER_ASSET_DECIMALS=6`, `XLAYER_TREASURY_ADDRESS`, `XLAYER_MAX_PAYMENT_BASE_UNITS` (ceiling 5,100,000), `XLAYER_MAX_GAS_BUDGET_WEI` (ceiling 1e16 = 0.01 OKB), optional `XLAYER_CONFIRMATIONS` (default 2, max 20). Missing or invalid values leave the rail `MISSING_CONFIG` and it is not offered in quotes.
+
+Payer (separate process, protected files): `XLAYER_PAYER_ADDRESS`, `XLAYER_PAYER_KEY_FILE`, `XLAYER_LEDGER_DIRECTORY`, `XLAYER_GATEWAY_URL`, `XLAYER_GATEWAY_TOKEN_FILE`, `XLAYER_PAYER_MAX_{PAYMENT,DAILY,TOTAL}_BASE_UNITS` (≤ 5,100,000), `XLAYER_PAYER_MAX_TOTAL_GAS_WEI` (≤ 1e17), `XLAYER_PAYER_MAX_COMMERCIAL_USD_MINOR` (≤ 510000), bridge `XLAYER_PAYER_BRIDGE_{TOKEN_FILE,PORT,URL}`. Hosted use goes through the registered-wallet path (`DEMO_XLAYER_` style signer prefix, migration `0014`, disabled until the owner grants signing authority). The payer wallet needs testnet OKB for gas and USD₮0 for principal; nothing else may spend from it.
+
 ## Shopify
 
 Required controlled-store config:

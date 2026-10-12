@@ -93,3 +93,17 @@ Historical issue ledgers remain in docs/evidence/. This file contains only curre
 ## Evidence rule
 
 Local tests never close an external issue. Update this file only when runtime/code or retained external evidence actually changes the classification.
+
+## X Layer (OKX) rail triage — 13 October 2026
+
+| Classification | Finding / action | Risk / blocker |
+|---|---|---|
+| Investigate Now | Live testnet E2E (genuine transfer + Shopify sandbox order) NOT RUN: dedicated payer needs testnet OKB and USD₮0. | Owner funding only; see docs/work/XLAYER_RAIL.md. |
+| Investigate Now | OKX faucet documents OKB only; USD₮0 test-token source is unverified (token `mint` is owner-only on-chain). | Funding path for USD₮0 must be confirmed by the owner. |
+| Park for Later | OKX x402 `exact` (EIP-3009 via OKX facilitator) not integrated. | Needs OKX API credentials and facilitator support for `eip155:1952`; Capsule has no x402 seller endpoint. |
+| Park for Later | Hosted (Render/Neon) X Layer activation: migration `0014`, wallet registration, signing grant. | Owner approval and deployment authorization required; nothing deployed. |
+| Ignore / Accept Risk | Payment/purchase binding is an application signature, not on-chain; a leaked signed transaction stays executable until its nonce is used. | Late funding becomes unapplied liability and cannot trigger commerce; keep candidate storage protected. |
+| Ignore / Accept Risk | USD₮0 testnet token is an upgradeable proxy; OP-Stack L1 data fee is outside the bounded L2 gas budget. | Address/decimals/symbol pinned, not bytecode; fees are negligible at observed prices. |
+| Ignore / Accept Risk | Confirmation depth (default 2 blocks) is not L1 finality. | Testnet only. |
+| Ignore / Accept Risk | The X Layer payer wallet must not be used for other transactions. | A foreign transaction advancing the nonce closes the in-flight candidate as superseded; the purchase fails safely without payment. |
+
