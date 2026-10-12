@@ -33,7 +33,8 @@ export function createXLayerFundingAdapter(env: NodeJS.ProcessEnv, opts: XLayerA
           tx.from === input.payTo || (input.expectedPayer && tx.from !== input.expectedPayer.toLowerCase())) return invalid('X Layer on-chain transaction does not match the exact requirement');
       const receipt = await rpc.receipt(hash);
       if (!receipt || tx.blockNumber === null) return pending();
-      if (receipt.hash !== hash || receipt.from !== tx.from || receipt.to !== TOKEN || receipt.blockNumber !== tx.blockNumber) return invalid('X Layer receipt and transaction disagree');
+      if (receipt.hash !== hash || receipt.from !== tx.from || receipt.to !== TOKEN) return invalid('X Layer receipt and transaction disagree');
+      if (receipt.blockNumber !== tx.blockNumber) return pending(); // transient view skew or reorg; re-read later
       const latest = await rpc.latestBlock(), confirmations = latest - receipt.blockNumber + 1n;
       if (confirmations < BigInt(cfg.confirmations)) return pending();
       const transfers = receipt.logs.filter(l => l.address === TOKEN && l.topics[0] === TRANSFER_TOPIC);
