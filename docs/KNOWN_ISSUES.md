@@ -106,4 +106,3 @@ Local tests never close an external issue. Update this file only when runtime/co
 | Ignore / Accept Risk | USD₮0 testnet token is an upgradeable proxy; OP-Stack L1 data fee is outside the bounded L2 gas budget. | Address/decimals/symbol pinned, not bytecode; fees are negligible at observed prices. |
 | Ignore / Accept Risk | Confirmation depth (default 2 blocks) is not L1 finality. | Testnet only. |
 | Ignore / Accept Risk | The X Layer payer wallet must not be used for other transactions. | A foreign transaction advancing the nonce closes the in-flight candidate as superseded; the purchase fails safely without payment. |
-

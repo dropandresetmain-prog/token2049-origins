@@ -139,4 +139,3 @@ The completed native lane is integrated onto current main based on 84c0aef. Exac
 Status: implemented and locally verified on `feat/xlayer-payment-rail`; not merged or deployed (13 October 2026).
 
 Native X Layer Testnet (chain 1952, `eip155:1952`) USD₮0 ERC-20 transfer, paid by a separate limited payer, independently verified by receipt + exact `Transfer` event + confirmations. Same 1:1000 scaling, caps, approval binding, durable candidate/recovery and merchant-once semantics as Sui; EVM-specific nonce discipline and nonce-supersession closure are documented in docs/work/XLAYER_RAIL.md. OKX x402 `exact` was investigated and not shipped: its facilitator needs OKX API credentials and documents only `eip155:196`, and Capsule's Shopify flow has no x402 seller. No x402 or Shopify-via-x402 claim is made. Migration `0014` is additive.
-
