@@ -35,7 +35,7 @@ Required:
 
 Do not use DATABASE_PATH; SQLite is unsupported.
 
-Migrations are the ordered immutable files in `src/migrations/`. The consolidated candidate adds `0011_registered_wallets.sql` and `0012_wallet_ledgers.sql` after the integrated Sui `0010_sui_funding_recovery.sql`; the X Layer rail adds migration `0014`. Hosted Neon has not received `0014`. Existing deployed history must remain intact; authoritative migration execution requires owner approval.
+Migrations are the ordered immutable files in `src/migrations/`. The consolidated database includes `0011_registered_wallets.sql` and `0012_wallet_ledgers.sql` after the integrated Sui `0010_sui_funding_recovery.sql`; the hosted X Layer release applied additive migration `0014` once while preserving existing history. No further migration is part of the closeout. See [hosted release evidence](work/XLAYER_HOSTED_RELEASE_20261013.json).
 
 Retained former Render DB (historical; Neon is authoritative):
 - name: token2049-origins-db
@@ -111,7 +111,7 @@ Template: `.env.xlayer.example`; wallet generation: `npm run payer:xlayer:setup 
 
 Gateway (no keys): `XLAYER_NETWORK=eip155:1952`, `XLAYER_CHAIN_ID=1952`, `XLAYER_RPC_URL` (one of the two official testnet endpoints only), `XLAYER_TOKEN_ADDRESS=0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c`, `XLAYER_ASSET_DECIMALS=6`, `XLAYER_TREASURY_ADDRESS`, `XLAYER_MAX_PAYMENT_BASE_UNITS` (ceiling 5,100,000), `XLAYER_MAX_GAS_BUDGET_WEI` (ceiling 1e16 = 0.01 OKB), optional `XLAYER_CONFIRMATIONS` (default 2, max 20). Missing or invalid values leave the rail `MISSING_CONFIG` and it is not offered in quotes.
 
-Payer (separate process, protected files): `XLAYER_PAYER_ADDRESS`, `XLAYER_PAYER_KEY_FILE`, `XLAYER_LEDGER_DIRECTORY`, `XLAYER_GATEWAY_URL`, `XLAYER_GATEWAY_TOKEN_FILE`, `XLAYER_PAYER_MAX_{PAYMENT,DAILY,TOTAL}_BASE_UNITS` (≤ 5,100,000), `XLAYER_PAYER_MAX_TOTAL_GAS_WEI` (≤ 1e17), `XLAYER_PAYER_MAX_COMMERCIAL_USD_MINOR` (≤ 510000), bridge `XLAYER_PAYER_BRIDGE_{TOKEN_FILE,PORT,URL}`. Hosted use goes through the registered-wallet path (`DEMO_XLAYER_` style signer prefix, migration `0014`, disabled until the owner grants signing authority). The rail is locally integrated and accepted; migration `0014` is not applied to hosted Neon and X Layer is not activated on Render. See [acceptance](work/XLAYER_ACCEPTANCE_20261013.json) and [integration record](work/XLAYER_INTEGRATION.md). The payer wallet needs testnet OKB for gas and USD₮0 for principal; nothing else may spend from it.
+Payer (separate process, protected files): `XLAYER_PAYER_ADDRESS`, `XLAYER_PAYER_KEY_FILE`, `XLAYER_LEDGER_DIRECTORY`, `XLAYER_GATEWAY_URL`, `XLAYER_GATEWAY_TOKEN_FILE`, `XLAYER_PAYER_MAX_{PAYMENT,DAILY,TOTAL}_BASE_UNITS` (≤ 5,100,000), `XLAYER_PAYER_MAX_TOTAL_GAS_WEI` (≤ 1e17), `XLAYER_PAYER_MAX_COMMERCIAL_USD_MINOR` (≤ 510000), bridge `XLAYER_PAYER_BRIDGE_{TOKEN_FILE,PORT,URL}`. Hosted use goes through the registered-wallet path. Migration `0014` and the bounded X Layer signing grant are active on the existing payer for Testnet use; this does not widen existing rail policies or spending caps. See [hosted release report](work/XLAYER_HOSTED_RELEASE_20261013.json), [acceptance](work/XLAYER_ACCEPTANCE_20261013.json), and [rail details](work/XLAYER_RAIL.md). The payer wallet needs testnet OKB for gas and USD₮0 for principal; nothing else may spend from it.
 
 ## Shopify
 

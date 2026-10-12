@@ -1,10 +1,16 @@
-## X Layer integration status — 13 October 2026
+## X Layer hosted release closeout — 13 October 2026
 
-X Layer Testnet native USD₮0 rail is integrated in the local candidate and independently accepted, including a fresh nonce-1 transfer, persisted receipt, and idempotent Shopify sandbox execution. Acceptance evidence: [report](work/XLAYER_ACCEPTANCE_20261013.json); [integration record](work/XLAYER_INTEGRATION.md). X Layer is not activated on Render and migration `0014` is not applied to hosted Neon. The owner authorized a push to `main`, which may trigger the existing gateway auto-deploy; no X Layer wallet registration, signing grant, or hosted payment authorization was added.
+X Layer Testnet is deployed and enabled on the existing consolidated hosted payer. Hosted acceptance completed: chain 1952, USD₮0 amount 17,950 base units, nonce 2, successful receipt, one exact treasury Transfer event, Shopify sandbox order marked paid, and durable Capsule receipt. Same-quote replay returned the same purchase and did not rebroadcast. Shopify PAID is simulated merchant capture, not real settlement. Full sanitized evidence: [hosted release report](work/XLAYER_HOSTED_RELEASE_20261013.json). The console purchase and Proof panel were visually verified at [the completed purchase](https://token2049-origins.onrender.com/console/#/purchases/pur_01M4RVF618Z2V7WTSF9SRR8WYZ).
+
+Deployment SHA for gateway and payer: `f959384e74f20eeee4ebf9dd43b343443a14c1d5`. The existing three rails and their limits remain unchanged. No mainnet transfer or real merchant settlement occurred.
 
 # Capsule — current handoff
 
-READY_FOR_OWNER_MCP_TEST — LIVE E2E NOT YET VERIFIED
+X LAYER HOSTED E2E VERIFIED — historical manual acceptance rows for other flows remain tracked below.
+
+### Historical three-rail readiness handoff
+
+The following readiness record predates hosted X Layer activation. Its deployment IDs and remaining manual acceptance status are retained as historical context.
 
 Gateway 86f519450b1d61d5c42f8bbadb685b49f01ea798 / Git fingerprint 50029d5666088b1fc848b650a125cd637bbcd1c6b15812cdd0ebb4110a876fe3 / dep-db5kvf142hec739b8940; payer 3945f9c52cf76e1960569d53416361bcd42de175 / retained fingerprint addbe059ddebc7794a8d6f510f964f0d1dee300e3a58dcdb44248fd088ecdd46 / activation deploy dep-db5la02jnfac73ast890. Worker00ee6d4a-afdd-4807-ad05-f46d33fa1986/moduleSHA dc652cc9fc9f22de757e0d35387e15726f985ba3929f162180313dab515cbf15 unchanged.
 

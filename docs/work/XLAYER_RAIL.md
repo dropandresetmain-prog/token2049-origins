@@ -1,6 +1,6 @@
 # X Layer (OKX) purchase funding lane
 
-Branch: `feat/xlayer-payment-rail`. Base: `739a618c212cb74f2fd806cf32becd4f520e0eb3` (`origin/main`, 13 October 2026). Isolated worktree `C:/Dev/t2o-wt-xlayer`. Sui is the behavioural reference; nothing Sui-, Solana- or Cardano-specific was changed. Integrated into the local candidate `integration/xlayer-candidate` after independent acceptance. Not activated; hosted migration `0014` is not applied. The owner authorized a `main` push, which may trigger the existing gateway auto-deploy. See [integration record](XLAYER_INTEGRATION.md).
+Branch: `feat/xlayer-payment-rail`. Accepted implementation SHA: `85f93b06b3c54268db4df142ed51d0a9122ce895`. Base: `739a618c212cb74f2fd806cf32becd4f520e0eb3`. Sui is the behavioural reference; the X Layer change did not alter Sui, Solana or Cardano behavior. X Layer is now deployed and enabled on the existing hosted payer; migration `0014` is applied. The one-purchase hosted verification and sanitized release evidence are in [XLAYER_HOSTED_RELEASE_20261013.json](XLAYER_HOSTED_RELEASE_20261013.json). Historical integration details remain in [XLAYER_INTEGRATION.md](XLAYER_INTEGRATION.md).
 
 ## What shipped
 

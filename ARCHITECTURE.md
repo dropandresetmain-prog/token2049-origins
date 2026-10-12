@@ -108,9 +108,9 @@ Sponsor preparation is part of this payer's transaction path: it separates the t
 
 [Solana adapter](src/funding/solana/) · [Payer and facilitator](clients/solana/) · [Completed hotel run](docs/evidence/nuitee-solana-combined-pass-20261007.md)
 
-### X Layer funding (locally accepted, not hosted)
+### X Layer funding (hosted Testnet, locally and hosted accepted)
 
-The X Layer Testnet rail (chain 1952) sends native USD₮0 ERC-20 transfers from a separate bounded payer. It uses EVM account nonces, durable candidate recovery, independent transfer/receipt verification and the shared funding/merchant-once path. The payer selects the larger valid pending/latest nonce to handle stale RPC pending counts. One fresh nonce-1 payment and idempotent sandbox execution passed independent acceptance. Shopify sandbox PAID means simulated merchant capture, not settlement. Migration `0014` is not applied to hosted Neon and this rail is not active on Render. [Acceptance](docs/work/XLAYER_ACCEPTANCE_20261013.json) · [rail details](docs/work/XLAYER_RAIL.md).
+The X Layer Testnet rail (chain 1952) sends native USD₮0 ERC-20 transfers from a bounded payer. It uses EVM account nonces, durable candidate recovery, independent transfer/receipt verification and the shared funding/merchant-once path. The payer selects the larger valid pending/latest nonce to handle stale RPC pending counts. The accepted implementation and migration `0014` are deployed on the existing consolidated payer. Hosted verification completed one 17,950-base-unit transfer using nonce 2, followed by a confirmed Shopify sandbox order and idempotent same-quote replay without rebroadcast. Shopify sandbox PAID means simulated merchant capture, not settlement. [Hosted release report](docs/work/XLAYER_HOSTED_RELEASE_20261013.json) · [independent acceptance](docs/work/XLAYER_ACCEPTANCE_20261013.json) · [rail details](docs/work/XLAYER_RAIL.md).
 
 ### Paying an agent is a separate commercial relationship
 
@@ -124,7 +124,7 @@ The price of the agent service and the price of the goods are separate obligatio
 
 Capsule treats customer settlement, company treasury and fiat observation as different financial domains because they answer different questions.
 
-**Customer purchase funding** is transaction-specific. Cardano Preprod and Solana Devnet prove that the approved customer obligation was funded before merchant execution; Sui Testnet and the locally accepted X Layer Testnet rail also use the same durable funding boundary.
+**Customer purchase funding** is transaction-specific. Cardano Preprod and Solana Devnet prove that the approved customer obligation was funded before merchant execution; Sui Testnet and the hosted-accepted X Layer Testnet rail also use the same durable funding boundary.
 
 **Operational crypto treasury** is company-side. Coinbase CDP Server Wallets give Capsule a programmable treasury on Base Sepolia that is not used as a substitute for Cardano/Solana purchase principal. In the completed external proof, the named treasury wallet received 0.0001 ETH from the CDP faucet and sent 0.000001 ETH to the named recipient. The transaction and resulting balances were independently verified through public Base Sepolia RPC.
 

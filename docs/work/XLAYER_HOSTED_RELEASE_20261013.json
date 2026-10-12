@@ -1,0 +1,95 @@
+{
+  "report": "X Layer hosted release closeout",
+  "date": "2026-10-13",
+  "outcome": "PASS",
+  "source": {
+    "acceptedImplementationSha": "85f93b06b3c54268db4df142ed51d0a9122ce895",
+    "canonicalMainAtCloseout": "f959384e74f20eeee4ebf9dd43b343443a14c1d5",
+    "gatewayDeployedSha": "f959384e74f20eeee4ebf9dd43b343443a14c1d5",
+    "payerDeployedSha": "f959384e74f20eeee4ebf9dd43b343443a14c1d5",
+    "gatewayHealth": 200,
+    "payerHealth": 200
+  },
+  "hostedActivation": {
+    "migration": "0014_xlayer_wallet_ledger.sql",
+    "migrationAppliedExactlyOnce": true,
+    "existingPayerReused": true,
+    "otherRailsChanged": false,
+    "newXLayerSigningGrant": true,
+    "existingRailsPermissionsUnchanged": true,
+    "spendingLimitsChanged": false
+  },
+  "verification": {
+    "focusedTests": {
+      "files": 14,
+      "passed": 311,
+      "failed": 0
+    },
+    "backendTypecheck": "passed",
+    "consoleTypecheck": "passed",
+    "payerBuildTypecheck": "passed",
+    "applicationBuild": "passed",
+    "rerunDuringCloseout": false
+  },
+  "payment": {
+    "network": "X Layer Testnet",
+    "chainId": 1952,
+    "nonceAtPreflight": {
+      "pending": 0,
+      "latest": 2,
+      "selected": 2
+    },
+    "transactionNonce": 2,
+    "token": "USDt0",
+    "tokenContract": "0x9e29b3aada05bf2d2c827af80bd28dc0b9b4fb0c",
+    "amountBaseUnits": "17950",
+    "decimals": 6,
+    "payerBalanceBeforeBaseUnits": "9964100",
+    "payerBalanceAfterBaseUnits": "9946150",
+    "payerBalanceDeltaBaseUnits": "-17950",
+    "transactionHash": "0x69dde40dea366c800227097eba0b4c78eb6fc2aeadda01fda66525e59c2e6a44",
+    "explorerUrl": "https://www.okx.com/web3/explorer/xlayer-test/tx/0x69dde40dea366c800227097eba0b4c78eb6fc2aeadda01fda66525e59c2e6a44",
+    "receiptStatus": "success",
+    "confirmationsAtVerification": 125,
+    "transferEventsToTreasury": 1,
+    "repeatExecution": "same purchase and transaction returned; no rebroadcast"
+  },
+  "purchase": {
+    "purchaseId": "pur_01M4RVF618Z2V7WTSF9SRR8WYZ",
+    "receiptId": "rcp_01M4RVJWBHSYDFNB2PB3QH44TS",
+    "purchaseState": "succeeded",
+    "paymentState": "confirmed",
+    "commerceStatus": "paid",
+    "merchantPaymentStatus": "paid",
+    "provider": "Shopify sandbox",
+    "merchantCapture": "simulated; not real merchant settlement",
+    "merchantReference": "redacted"
+  },
+  "databaseCountsForPurchase": {
+    "purchasesForQuote": 1,
+    "fundingAttempts": 1,
+    "fundingEvidence": 1,
+    "fundingJournalEntries": 1,
+    "executionAttempts": 1,
+    "merchantSuccessEvents": 1,
+    "evidenceRowsForTransfer": 1,
+    "xlayerLedgerRows": 1
+  },
+  "consoleVerification": {
+    "visualBrowser": "passed",
+    "purchaseStatus": "Order confirmed",
+    "paymentMethod": "X Layer (OKX)",
+    "displayedAmount": "0.01795 USD₮0",
+    "proofShowsPaymentReference": true,
+    "proofShowsExplorerLink": true,
+    "proofShowsMerchantOrderPaid": true,
+    "purchaseId": "pur_01M4RVF618Z2V7WTSF9SRR8WYZ",
+    "readOnlyApi": "Capsule MCP purchase readback, Neon counts, and public X Layer RPC transaction/receipt verified"
+  },
+  "limitations": [
+    "Shopify sandbox PAID status is simulated merchant capture, not real settlement.",
+    "This release uses X Layer Testnet only; no mainnet transfer was made.",
+    "The public RPC health endpoint returns health and contract version but does not expose a deployment SHA; the service SHA is from the verified Render deployment record."
+  ],
+  "secretsIncluded": false
+}
